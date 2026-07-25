@@ -81,6 +81,13 @@ var COLOR_HEX = {
  * Web app entry
  * ═══════════════════════════════════════════════════════════════════ */
 
+/**
+ * Apps Script ignores meta tags written inside the HTML file and accepts only
+ * four names through addMetaTag: viewport, apple-mobile-web-app-capable,
+ * mobile-web-app-capable, google-site-verification. Anything else throws
+ * "The meta tag you specified is not allowed in this context" at request time,
+ * so this list is not the place to get creative.
+ */
 function doGet() {
   var t = HtmlService.createTemplateFromFile('Index');
   t.bootstrap = JSON.stringify(clientConfig_());
@@ -89,7 +96,6 @@ function doGet() {
     .addMetaTag('viewport', 'width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no')
     .addMetaTag('apple-mobile-web-app-capable', 'yes')
     .addMetaTag('mobile-web-app-capable', 'yes')
-    .addMetaTag('apple-mobile-web-app-status-bar-style', 'black-translucent')
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
 }
 
