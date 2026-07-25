@@ -23,6 +23,7 @@
   .files li:last-child { border-bottom:1px solid var(--line); }
   .files .n { font:400 14px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; min-width:150px; }
   .files .d { color:var(--dim); font-size:14px; flex:1; min-width:220px; }
+  .files .raw { color:var(--dimmer); font-size:12px; letter-spacing:.06em; text-transform:uppercase; margin-left:4px; }
   pre {
     background:var(--panel); border-radius:10px; padding:16px; overflow-x:auto;
     font:400 13px/1.6 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; color:var(--fg);
@@ -50,7 +51,7 @@
     <li><span class="n"><a href="src/appsscript.json.txt">appsscript.json</a></span><span class="d">Manifest. One OAuth scope. Set your timezone here.</span></li>
     <li><span class="n"><a href="src/Code.gs.txt">Code.gs</a></span><span class="d">Server. CONFIG block, calendar reads and writes, week aggregation.</span></li>
     <li><span class="n"><a href="src/Index.html.txt">Index.html</a></span><span class="d">Client. All HTML, CSS and JS inlined. No CDN, no build step.</span></li>
-    <li><span class="n"><a href="src/SETUP.md.txt">SETUP.md</a></span><span class="d">Deployment steps and the required Google Calendar settings.</span></li>
+    <li><span class="n"><a href="setup.html">SETUP.md</a></span><span class="d">Deployment steps and the required Google Calendar settings. <a class="raw" href="src/SETUP.md.txt">raw</a></span></li>
   </ul>
 
   <h2>The open-block mechanism</h2>
@@ -106,7 +107,7 @@ sits over 90 min        7</pre>
     <li>Writing to the PLAN calendar in any way</li>
   </ul>
 
-  <p class="foot">This page is documentation. The app itself does not run here — it runs as a Google Apps Script web app deployed under your own account, with access set to only yourself. See <a href="src/SETUP.md.txt">SETUP.md</a>.</p>
+  <p class="foot">This page is documentation. The app itself does not run here — it runs as a Google Apps Script web app deployed under your own account, with access set to only yourself. See <a href="setup.html">SETUP.md</a>.</p>
 
 </div>
 </body>
