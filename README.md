@@ -1,0 +1,62 @@
+# timetap
+
+A personal time-logging web app. Google Apps Script, four files, no dependencies.
+
+**Automate capture. Never automate judgment.**
+
+Logging costs one tap. The app never interprets, scores, advises, summarises,
+reminds or nudges. Every conclusion is drawn by the human, later, elsewhere.
+
+You maintain a **PLAN** calendar by hand (intent, written Sunday). The app
+writes an **ACTUAL** calendar (record, written continuously) and a **SITTING**
+calendar (posture overlay). Comparing them is a weekly manual ritual the app
+does not participate in beyond emitting raw numbers.
+
+## Files
+
+| File | What it is |
+|---|---|
+| [`appsscript.json`](appsscript.json) | Manifest. One OAuth scope. Set your timezone here. |
+| [`Code.gs`](Code.gs) | Server. CONFIG block, calendar reads/writes, week aggregation. |
+| [`Index.html`](Index.html) | Client. All HTML/CSS/JS inlined. No CDN, no build step. |
+| [`SETUP.md`](SETUP.md) | Deployment steps and the required Google Calendar settings. |
+
+Start with [SETUP.md](SETUP.md).
+
+## How it works
+
+The calendar is the source of truth, not localStorage. Tapping a category
+immediately creates an event with `start = now`, `end = now + 1 minute`, and
+`#open` in the description. The next tap patches the end to that instant,
+applies the mark, and strips `#open`. This survives a dead battery and a
+reinstall — on load the open block is found by querying the calendar, not by
+trusting the browser.
+
+The UI updates on tap and the write happens in the background. When the write
+fails, the operation is queued in localStorage, ordered and idempotent, and
+retried on the next interaction and on load.
+
+### The mark
+
+The mark belongs to the block that just **closed**, captured at the transition
+— the one moment you both know how it went and are already holding the phone.
+A closed block shows the `+ = -` strip only if its category has no `autoMark`
+and it ran at least `MIN_MARK_MINUTES`. Ignoring the strip costs zero taps: it
+dismisses itself and `=` stands. You should see it two to four times a day.
+
+### Sitting
+
+Sitting is an overlay, not a seventh category. Categories are a partition —
+exactly one true at a time. You sit *while* doing deep work, meetings, meals.
+Only sitting is logged; standing is never written, and non-sitting time is
+computed at review as `waking span − sitting`.
+
+The only coupling in the entire app: tapping `BODY` closes an open SIT block.
+That is definitional, not inference. No accelerometer, no screen time, no
+heuristics, ever.
+
+## Non-goals
+
+No notifications. No automatic detection of anything. No streaks, scores or
+badges. No AI summaries or insights. No charts. No settings screen. No
+onboarding. No writes to PLAN, ever.

@@ -1,0 +1,725 @@
+<style>
+  :root {
+    --bg:      #000000;
+    --panel:   #131417;
+    --panel2:  #1b1d21;
+    --line:    #2a2d33;
+    --fg:      #f2f3f5;
+    --dim:     #8b9098;
+    --dimmer:  #5d626a;
+    --flag:    #c9a227;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body {
+    margin: 0; padding: 0; height: 100%;
+    background: var(--bg); color: var(--fg);
+    font: 400 16px/1.3 -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif;
+    overscroll-behavior: none;
+  }
+  body { user-select: none; -webkit-user-select: none; }
+  button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
+  .hidden { display: none !important; }
+
+  #app {
+    display: flex; flex-direction: column;
+    height: 100dvh; height: 100vh;
+    padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+    gap: 6px;
+  }
+
+  /* ── sync dot ────────────────────────────────────────────────── */
+  #sync {
+    position: fixed; top: calc(env(safe-area-inset-top) + 8px); right: 12px;
+    width: 8px; height: 8px; border-radius: 50%; z-index: 40;
+    background: var(--dimmer); transition: background .2s linear;
+  }
+  #sync.s-pending { background: #c9a227; }
+  #sync.s-failed  { background: #dc2127; }
+  #sync.s-synced  { background: #2f3339; }
+
+  #err {
+    background: #2a1416; color: #ffb4ad; font-size: 12px;
+    padding: 7px 10px; border-radius: 6px; margin: 0 8px;
+    user-select: text; -webkit-user-select: text;
+  }
+
+  /* ── mark strip ──────────────────────────────────────────────── */
+  #strip { margin: 0 8px; background: var(--panel2); border-radius: 10px; padding: 10px 12px 8px; }
+  #stripHead { font-size: 13px; color: var(--dim); letter-spacing: .04em; margin-bottom: 8px; }
+  .strip-marks { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .strip-marks button {
+    background: var(--panel); border: 1px solid var(--line); border-radius: 8px;
+    height: 52px; font-size: 26px; font-weight: 600;
+  }
+  .strip-marks button:active { background: #303338; }
+
+  /* ── now bar ─────────────────────────────────────────────────── */
+  #nowbar {
+    margin: 0 8px; background: var(--panel); border-radius: 10px;
+    padding: 10px 12px; border-left: 3px solid transparent;
+  }
+  #nowbar.long { border-left-color: var(--flag); }
+  #nowbar.idle .now-cat { color: var(--dimmer); }
+  .now-cat { font-size: 13px; font-weight: 700; letter-spacing: .17em; color: var(--dim); }
+  .now-row { display: flex; align-items: baseline; gap: 10px; margin-top: 4px; }
+  .now-text { flex: 1; min-width: 0; font-size: 17px; color: var(--fg); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .now-el { font-variant-numeric: tabular-nums; font-size: 17px; color: var(--dim); }
+
+  /* ── sitting ─────────────────────────────────────────────────── */
+  #sitrow { margin: 0 8px; display: flex; gap: 6px; }
+  #sitbar {
+    flex: 1; display: flex; align-items: center; justify-content: space-between;
+    background: var(--panel); border-radius: 10px; padding: 12px;
+  }
+  #sitbar.on { background: var(--panel2); }
+  .sit-left { display: flex; align-items: center; gap: 10px; font-size: 14px; font-weight: 700; letter-spacing: .17em; color: var(--dim); }
+  #sitbar.on .sit-left { color: var(--fg); }
+  .sit-box { font-size: 18px; letter-spacing: 0; }
+  .sit-right { display: flex; align-items: baseline; gap: 12px; }
+  .sit-hint { font-size: 11px; color: var(--dimmer); letter-spacing: 0; }
+  .sit-el { font-variant-numeric: tabular-nums; font-size: 15px; color: var(--dim); min-width: 46px; text-align: right; }
+  #sitAdj {
+    width: 46px; background: var(--panel); border-radius: 10px;
+    font-size: 11px; font-weight: 700; letter-spacing: .1em; color: var(--dim);
+  }
+  #sitAdj:active { background: var(--panel2); }
+
+  /* ── grid ────────────────────────────────────────────────────── */
+  #grid { flex: 1; display: grid; gap: 6px; margin: 0 8px; min-height: 0; }
+  .gbtn {
+    position: relative; background: var(--panel2); border-radius: 10px;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 4px; overflow: hidden; min-height: 0;
+  }
+  .gbtn:active { background: #33373d; }
+  .gbtn .bar { position: absolute; top: 0; left: 0; right: 0; height: 4px; }
+  .gbtn .k { font-size: 27px; font-weight: 700; letter-spacing: .04em; }
+  .gbtn .l { font-size: 11px; color: var(--dim); letter-spacing: .08em; text-transform: uppercase; }
+  .gbtn.active { box-shadow: inset 0 0 0 2px var(--fg); }
+  .gbtn.active .l { color: var(--fg); }
+
+  /* ── footer ──────────────────────────────────────────────────── */
+  .footer { display: flex; gap: 6px; margin: 0 8px 8px; }
+  #note {
+    flex: 1; min-width: 0; background: var(--panel); border: 0; border-radius: 10px;
+    color: var(--fg); padding: 0 14px; height: 52px; font-size: 16px;
+    user-select: text; -webkit-user-select: text;
+  }
+  #note::placeholder { color: var(--dimmer); }
+  .fbtn {
+    background: var(--panel); border-radius: 10px; height: 52px; padding: 0 16px;
+    font-size: 13px; font-weight: 700; letter-spacing: .12em; color: var(--dim);
+  }
+  .fbtn:active { background: var(--panel2); }
+  .fbtn:disabled { opacity: .35; }
+
+  /* ── overlays ────────────────────────────────────────────────── */
+  .view {
+    position: fixed; inset: 0; background: var(--bg); z-index: 30;
+    display: flex; flex-direction: column;
+    padding: calc(env(safe-area-inset-top) + 8px) 8px calc(env(safe-area-inset-bottom) + 8px);
+    gap: 8px;
+  }
+  .vhead { display: flex; gap: 6px; align-items: center; }
+  .vhead .fbtn { flex: 0 0 auto; }
+  .vtitle { flex: 1; text-align: center; font-size: 12px; font-weight: 700; letter-spacing: .17em; color: var(--dim); }
+  #weekout {
+    flex: 1; overflow: auto; margin: 0; padding: 12px;
+    background: var(--panel); border-radius: 10px;
+    font: 400 13px/1.55 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    white-space: pre; color: var(--fg);
+    user-select: text; -webkit-user-select: text;
+  }
+  .sheetbody { flex: 1; overflow: auto; display: flex; flex-direction: column; gap: 10px; }
+  .card { background: var(--panel); border-radius: 10px; padding: 14px; }
+  .card .lab { font-size: 11px; font-weight: 700; letter-spacing: .17em; color: var(--dim); margin-bottom: 8px; }
+  .card .big { font-size: 22px; font-variant-numeric: tabular-nums; }
+  .card .sub { font-size: 13px; color: var(--dim); margin-top: 6px; font-variant-numeric: tabular-nums; }
+  input[type=range] { width: 100%; margin: 14px 0 2px; accent-color: #8b9098; height: 34px; }
+  .ends { display: flex; justify-content: space-between; font-size: 11px; color: var(--dimmer); font-variant-numeric: tabular-nums; }
+  #splitGrid { display: grid; gap: 6px; }
+  .sbtn { background: var(--panel2); border-radius: 10px; padding: 16px 8px; font-size: 18px; font-weight: 700; position: relative; overflow: hidden; }
+  .sbtn .bar { position: absolute; top: 0; left: 0; right: 0; height: 3px; }
+  .sbtn:active { background: #33373d; }
+  .danger { background: #2a1416; color: #ffb4ad; border-radius: 10px; height: 48px; font-size: 13px; font-weight: 700; letter-spacing: .1em; }
+</style>
+
+<div id="app">
+  <div id="sync" class="s-synced"></div>
+  <div id="err" class="hidden"></div>
+
+  <div id="strip" class="hidden">
+    <div id="stripHead"></div>
+    <div class="strip-marks">
+      <button data-mark="+">+</button>
+      <button data-mark="=">=</button>
+      <button data-mark="-">-</button>
+    </div>
+  </div>
+
+  <div id="nowbar" class="idle">
+    <div class="now-cat" id="nowCat">NOW: IDLE</div>
+    <div class="now-row">
+      <div class="now-text" id="nowText"></div>
+      <div class="now-el" id="nowEl"></div>
+    </div>
+  </div>
+
+  <div id="sitrow">
+    <button id="sitbar">
+      <span class="sit-left"><span class="sit-box" id="sitBox">&#9634;</span> SITTING</span>
+      <span class="sit-right">
+        <span class="sit-hint">only if 5+ min</span>
+        <span class="sit-el" id="sitEl"></span>
+      </span>
+    </button>
+    <button id="sitAdj" class="hidden">EDIT</button>
+  </div>
+
+  <div id="grid"></div>
+
+  <div class="footer">
+    <input id="note" type="text" placeholder="note" autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false" enterkeyhint="done">
+    <button id="btnSplit" class="fbtn">SPLIT</button>
+    <button id="btnWeek" class="fbtn">W</button>
+  </div>
+</div>
+
+<!-- ── week ─────────────────────────────────────────────────────── -->
+<div id="week" class="view hidden">
+  <div class="vhead">
+    <button id="wPrev" class="fbtn">&larr;</button>
+    <div class="vtitle">WEEK</div>
+    <button id="wNext" class="fbtn">&rarr;</button>
+    <button id="wClose" class="fbtn">X</button>
+  </div>
+  <pre id="weekout">loading</pre>
+</div>
+
+<!-- ── split ────────────────────────────────────────────────────── -->
+<div id="sheetSplit" class="view hidden">
+  <div class="vhead">
+    <div class="vtitle">SPLIT</div>
+    <button id="spClose" class="fbtn">X</button>
+  </div>
+  <div class="sheetbody">
+    <div class="card">
+      <div class="lab" id="spLab">OPEN BLOCK</div>
+      <div class="big" id="spAt">--:--</div>
+      <input type="range" id="spRange" min="0" max="1" value="0" step="1">
+      <div class="ends"><span id="spStart"></span><span id="spNow"></span></div>
+      <div class="sub" id="spSub"></div>
+    </div>
+    <div class="card">
+      <div class="lab">REMAINDER IS</div>
+      <div id="splitGrid"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ── sit start ────────────────────────────────────────────────── -->
+<div id="sheetSit" class="view hidden">
+  <div class="vhead">
+    <div class="vtitle">SITTING START</div>
+    <button id="ssClose" class="fbtn">X</button>
+  </div>
+  <div class="sheetbody">
+    <div class="card">
+      <div class="lab">STARTED AT</div>
+      <div class="big" id="ssAt">--:--</div>
+      <input type="range" id="ssRange" min="0" max="1" value="0" step="1">
+      <div class="ends"><span id="ssLo"></span><span id="ssHi"></span></div>
+      <div class="sub" id="ssSub"></div>
+    </div>
+    <button id="ssApply" class="fbtn" style="width:100%">APPLY</button>
+    <button id="ssDelete" class="danger">DISCARD THIS SIT BLOCK</button>
+  </div>
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  var CFG = <?!= bootstrap ?>;
+
+  var K_QUEUE = 'tt.queue.v1';
+  var K_STATE = 'tt.state.v1';
+  var MS_MIN = 60000;
+
+  var CATS = CFG.categories;
+  var catByKey = {};
+  CATS.forEach(function (c) { catByKey[c.key] = c; });
+
+  /* ── state ─────────────────────────────────────────────────── */
+
+  var S = { open: null, sit: null, lastTapMs: 0 };
+  var strip = null;          // {ref, key, durMs, timer}
+  var flushing = false, retryTimer = null, retryDelay = 4000;
+  var noteTimer = null;
+  var split = { atMs: 0, startMs: 0, nowMs: 0 };
+  var sitEdit = { lo: 0, hi: 0, atMs: 0 };
+  var weekOffset = 0;
+
+  var $ = function (id) { return document.getElementById(id); };
+  var hasRun = (typeof google !== 'undefined' && google.script && google.script.run);
+
+  function uid() {
+    var s = '';
+    for (var i = 0; i < 16; i++) s += 'abcdefghijklmnopqrstuvwxyz0123456789'[Math.floor(Math.random() * 36)];
+    return s;
+  }
+  function ls(k, d) { try { var v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch (e) { return d; } }
+  function lsSet(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
+  function saveState() { lsSet(K_STATE, S); }
+
+  /* ── formatting ────────────────────────────────────────────── */
+
+  function fmtEl(ms) {
+    if (!(ms > 0)) ms = 0;
+    var m = Math.floor(ms / MS_MIN), h = Math.floor(m / 60);
+    return h ? (h + 'h' + String(m % 60).replace(/^(\d)$/, '0$1')) : (m + 'm');
+  }
+  function fmtDur(ms) {
+    var m = Math.max(0, Math.round(ms / MS_MIN)), h = Math.floor(m / 60);
+    return h ? (h + 'h ' + (m % 60) + 'm') : (m + 'm');
+  }
+  function clock(ms) {
+    var d = new Date(ms);
+    return String(d.getHours()).replace(/^(\d)$/, '0$1') + ':' + String(d.getMinutes()).replace(/^(\d)$/, '0$1');
+  }
+
+  /* ── queue ─────────────────────────────────────────────────── */
+
+  function queue() { var q = ls(K_QUEUE, []); return Array.isArray(q) ? q : []; }
+  function setQueue(q) { lsSet(K_QUEUE, q); }
+
+  function enqueue(op) {
+    op.id = uid();
+    op.ts = Date.now();
+    var q = queue();
+    q.push(op);
+    setQueue(q);
+  }
+
+  /** Coalesce a still-pending open into a correction. Returns true if absorbed. */
+  function mutatePendingOpen(ref, key) {
+    var q = queue(), hit = false;
+    for (var i = 0; i < q.length; i++) {
+      if (q[i].type === 'openActual' && q[i].ref === ref) { q[i].key = key; hit = true; }
+      if (q[i].type === 'splitActual' && q[i].newRef === ref) { q[i].newKey = key; hit = true; }
+    }
+    if (hit) setQueue(q);
+    return hit;
+  }
+
+  /** Only the newest note per block needs to survive. */
+  function enqueueText(ref, text, hintMs) {
+    var q = queue().filter(function (o) { return !(o.type === 'setText' && o.ref === ref); });
+    setQueue(q);
+    enqueue({ type: 'setText', ref: ref, text: text, hintMs: hintMs });
+  }
+
+  function setSync(cls) { $('sync').className = 's-' + cls; }
+
+  function flush() {
+    if (flushing || !hasRun) return;
+    var q = queue();
+    if (!q.length) { setSync('synced'); return; }
+    flushing = true;
+    setSync('pending');
+    var batch = q.slice(0, 40);
+    google.script.run
+      .withSuccessHandler(function (res) {
+        flushing = false;
+        var done = {};
+        (res.applied || []).forEach(function (id) { done[id] = 1; });
+        setQueue(queue().filter(function (o) { return !done[o.id]; }));
+        if (res.errors && res.errors.length) {
+          showErr(res.errors[0].message);
+          setSync('failed');
+          scheduleRetry();
+        } else {
+          hideErr();
+          retryDelay = 4000;
+          if (queue().length) flush(); else setSync('synced');
+        }
+      })
+      .withFailureHandler(function (e) {
+        flushing = false;
+        setSync('failed');
+        scheduleRetry();
+      })
+      .applyOps(batch);
+  }
+
+  function scheduleRetry() {
+    if (retryTimer) return;
+    retryTimer = setTimeout(function () {
+      retryTimer = null;
+      retryDelay = Math.min(retryDelay * 2, 60000);
+      flush();
+    }, retryDelay);
+  }
+
+  function showErr(msg) { var e = $('err'); e.textContent = msg; e.classList.remove('hidden'); }
+  function hideErr() { $('err').classList.add('hidden'); }
+
+  /* ── logging ───────────────────────────────────────────────── */
+
+  function markFor(key, durMs) {
+    var c = catByKey[key];
+    if (c && c.autoMark) return { mark: c.autoMark, strip: false };
+    if (durMs >= CFG.minMarkMinutes * MS_MIN) return { mark: '=', strip: true };
+    return { mark: null, strip: false };
+  }
+
+  function tapCategory(key) {
+    var now = Date.now();
+    if (S.open && S.open.key === key) return;                        // 6.1 no-op
+
+    var mistap = S.open && S.lastTapMs && (now - S.lastTapMs) < CFG.mistapSeconds * 1000;
+
+    if (mistap) {                                                    // 6.3 correction
+      S.open.key = key;
+      S.lastTapMs = now;
+      if (!mutatePendingOpen(S.open.ref, key)) {
+        enqueue({ type: 'recategorize', ref: S.open.ref, key: key, hintMs: S.open.startMs });
+      }
+      if (key === CFG.bodyKey) closeSit(now);
+      saveState(); render(); flush();
+      return;
+    }
+
+    var pending = null;
+    if (S.open) {
+      var dur = now - S.open.startMs;
+      var m = markFor(S.open.key, dur);
+      enqueue({ type: 'closeActual', ref: S.open.ref, key: S.open.key, endMs: now,
+                mark: m.mark, text: S.open.text || '' });
+      if (m.strip) pending = { ref: S.open.ref, key: S.open.key, durMs: dur, hintMs: S.open.startMs };
+    }
+
+    var ref = uid();
+    S.open = { ref: ref, key: key, text: '', startMs: now };
+    S.lastTapMs = now;
+    enqueue({ type: 'openActual', ref: ref, key: key, startMs: now });
+
+    if (key === CFG.bodyKey) closeSit(now);                          // 8.2 the only coupling
+
+    $('note').value = '';
+    if (pending) showStrip(pending); else hideStrip();
+    saveState(); render(); flush();
+  }
+
+  /* ── the mark ──────────────────────────────────────────────── */
+
+  function showStrip(p) {
+    hideStrip();
+    strip = p;
+    $('stripHead').textContent = p.key + ' closed · ' + fmtEl(p.durMs);
+    $('strip').classList.remove('hidden');
+    strip.timer = setTimeout(hideStrip, CFG.markTimeoutMs);          // "=" already written
+  }
+
+  function hideStrip() {
+    if (strip && strip.timer) clearTimeout(strip.timer);
+    strip = null;
+    $('strip').classList.add('hidden');
+  }
+
+  function applyMark(mark) {
+    if (!strip) return;
+    if (mark !== '=') {
+      enqueue({ type: 'setMark', ref: strip.ref, mark: mark, hintMs: strip.hintMs });
+    }
+    hideStrip();
+    flush();
+  }
+
+  /* ── sitting ───────────────────────────────────────────────── */
+
+  function closeSit(atMs) {
+    if (!S.sit) return;
+    enqueue({ type: 'closeSit', ref: S.sit.ref, endMs: atMs });
+    S.sit = null;
+  }
+
+  function toggleSit() {
+    var now = Date.now();
+    if (S.sit) {
+      closeSit(now);
+    } else {
+      var ref = uid();
+      S.sit = { ref: ref, startMs: now };
+      enqueue({ type: 'openSit', ref: ref, startMs: now });
+    }
+    saveState(); render(); flush();
+  }
+
+  /* ── render ────────────────────────────────────────────────── */
+
+  function buildGrid() {
+    var g = $('grid');
+    g.innerHTML = '';
+    var cols = CATS.length <= 2 ? 1 : (CATS.length <= 4 ? 2 : 3);
+    g.style.gridTemplateColumns = 'repeat(' + cols + ', 1fr)';
+    CATS.forEach(function (c) {
+      var b = document.createElement('button');
+      b.className = 'gbtn';
+      b.dataset.key = c.key;
+      b.innerHTML = '<span class="bar"></span><span class="k"></span><span class="l"></span>';
+      b.querySelector('.bar').style.background = c.hex;
+      b.querySelector('.k').textContent = c.key;
+      b.querySelector('.l').textContent = c.label;
+      b.addEventListener('click', function () { tapCategory(c.key); });
+      g.appendChild(b);
+    });
+
+    var sg = $('splitGrid');
+    sg.innerHTML = '';
+    sg.style.gridTemplateColumns = 'repeat(' + cols + ', 1fr)';
+    CATS.forEach(function (c) {
+      var b = document.createElement('button');
+      b.className = 'sbtn';
+      b.innerHTML = '<span class="bar"></span>' + c.key;
+      b.querySelector('.bar').style.background = c.hex;
+      b.addEventListener('click', function () { doSplit(c.key); });
+      sg.appendChild(b);
+    });
+  }
+
+  function render() {
+    var now = Date.now();
+    var bar = $('nowbar');
+
+    if (S.open) {
+      bar.classList.remove('idle');
+      $('nowCat').textContent = 'NOW: ' + S.open.key;
+      $('nowText').textContent = S.open.text || '';
+      $('nowEl').textContent = '● ' + fmtEl(now - S.open.startMs);
+      bar.classList.toggle('long', (now - S.open.startMs) > CFG.longBlockMinutes * MS_MIN);
+    } else {
+      bar.classList.add('idle');
+      bar.classList.remove('long');
+      $('nowCat').textContent = 'NOW: IDLE';
+      $('nowText').textContent = '';
+      $('nowEl').textContent = '';
+    }
+
+    $('sitBox').innerHTML = S.sit ? '&#9635;' : '&#9634;';
+    $('sitbar').classList.toggle('on', !!S.sit);
+    $('sitEl').textContent = S.sit ? '● ' + fmtEl(now - S.sit.startMs) : '';
+    $('sitAdj').classList.toggle('hidden', !S.sit);
+
+    $('btnSplit').disabled = !S.open;
+
+    var kids = $('grid').children;
+    for (var i = 0; i < kids.length; i++) {
+      kids[i].classList.toggle('active', !!S.open && kids[i].dataset.key === S.open.key);
+    }
+  }
+
+  function tick() {
+    var now = Date.now();
+    if (S.open) $('nowEl').textContent = '● ' + fmtEl(now - S.open.startMs);
+    if (S.sit) $('sitEl').textContent = '● ' + fmtEl(now - S.sit.startMs);
+    if (S.open) $('nowbar').classList.toggle('long', (now - S.open.startMs) > CFG.longBlockMinutes * MS_MIN);
+  }
+
+  /* ── split ─────────────────────────────────────────────────── */
+
+  function openSplit() {
+    if (!S.open) return;
+    split.startMs = S.open.startMs;
+    split.nowMs = Date.now();
+    var span = Math.max(1, Math.round((split.nowMs - split.startMs) / MS_MIN));
+    var r = $('spRange');
+    r.min = 1; r.max = Math.max(1, span - 1); r.step = 1;
+    r.value = Math.max(1, Math.round(span / 2));
+    $('spLab').textContent = 'OPEN BLOCK: ' + S.open.key;
+    $('spStart').textContent = clock(split.startMs);
+    $('spNow').textContent = clock(split.nowMs);
+    renderSplit();
+    $('sheetSplit').classList.remove('hidden');
+  }
+
+  function renderSplit() {
+    var mins = parseInt($('spRange').value, 10) || 1;
+    split.atMs = split.startMs + mins * MS_MIN;
+    $('spAt').textContent = clock(split.atMs);
+    $('spSub').textContent = (S.open ? S.open.key : '?') + ' ' + fmtDur(split.atMs - split.startMs) +
+      '   →   ' + fmtDur(split.nowMs - split.atMs) + ' remainder';
+  }
+
+  function doSplit(key) {
+    if (!S.open) { $('sheetSplit').classList.add('hidden'); return; }
+    var at = split.atMs, now = Date.now();
+    var m = markFor(S.open.key, at - S.open.startMs);
+    var newRef = uid();
+    enqueue({ type: 'splitActual', ref: S.open.ref, atMs: at, mark: m.mark,
+              text: S.open.text || '', newRef: newRef, newKey: key, nowMs: now });
+    S.open = { ref: newRef, key: key, text: '', startMs: at };
+    S.lastTapMs = now;
+    if (key === CFG.bodyKey) closeSit(now);
+    $('note').value = '';
+    hideStrip();
+    $('sheetSplit').classList.add('hidden');
+    saveState(); render(); flush();
+  }
+
+  /* ── sit start ─────────────────────────────────────────────── */
+
+  function openSitEdit() {
+    if (!S.sit) return;
+    var now = Date.now();
+    sitEdit.hi = now;
+    sitEdit.lo = Math.min(S.sit.startMs, now - 6 * 3600000);
+    var span = Math.max(1, Math.round((sitEdit.hi - sitEdit.lo) / MS_MIN));
+    var r = $('ssRange');
+    r.min = 0; r.max = span; r.step = 1;
+    r.value = Math.round((S.sit.startMs - sitEdit.lo) / MS_MIN);
+    $('ssLo').textContent = clock(sitEdit.lo);
+    $('ssHi').textContent = clock(sitEdit.hi);
+    renderSitEdit();
+    $('sheetSit').classList.remove('hidden');
+  }
+
+  function renderSitEdit() {
+    var mins = parseInt($('ssRange').value, 10) || 0;
+    sitEdit.atMs = Math.min(sitEdit.lo + mins * MS_MIN, sitEdit.hi - MS_MIN);
+    $('ssAt').textContent = clock(sitEdit.atMs);
+    $('ssSub').textContent = fmtDur(Date.now() - sitEdit.atMs) + ' sitting';
+  }
+
+  /* ── week ──────────────────────────────────────────────────── */
+
+  function openWeek() {
+    weekOffset = 0;
+    $('week').classList.remove('hidden');
+    loadWeek();
+  }
+
+  function loadWeek() {
+    $('weekout').textContent = 'loading';
+    if (!hasRun) { $('weekout').textContent = 'offline'; return; }
+    google.script.run
+      .withSuccessHandler(function (r) { $('weekout').textContent = r.text; })
+      .withFailureHandler(function (e) { $('weekout').textContent = String((e && e.message) || e); })
+      .getWeek(weekOffset);
+  }
+
+  /* ── boot ──────────────────────────────────────────────────── */
+
+  function adoptServerState(st) {
+    // Anything the user did while the round trip was in flight wins.
+    if (!queue().length) {
+      S.open = st.open ? { ref: st.open.ref, key: st.open.key, text: st.open.text || '', startMs: st.open.startMs } : null;
+      S.sit = st.sit ? { ref: st.sit.ref, startMs: st.sit.startMs } : null;
+      S.lastTapMs = 0;
+      $('note').value = S.open ? (S.open.text || '') : '';
+      saveState();
+      render();
+    }
+  }
+
+  function boot() {
+    var saved = ls(K_STATE, null);
+    if (saved && typeof saved === 'object') {
+      S.open = saved.open || null;
+      S.sit = saved.sit || null;
+      S.lastTapMs = 0;                 // a reload is never a mis-tap window
+    }
+    buildGrid();
+    render();
+    $('note').value = S.open ? (S.open.text || '') : '';
+
+    if (!hasRun) { showErr('google.script.run unavailable'); return; }
+
+    // Drain first so the calendar reflects everything before we read it.
+    var q = queue();
+    if (q.length) {
+      setSync('pending');
+      google.script.run
+        .withSuccessHandler(function (res) {
+          var done = {};
+          (res.applied || []).forEach(function (id) { done[id] = 1; });
+          setQueue(queue().filter(function (o) { return !done[o.id]; }));
+          if (queue().length) { setSync('failed'); scheduleRetry(); }
+          else { setSync('synced'); loadServerState(); }
+        })
+        .withFailureHandler(function () { setSync('failed'); scheduleRetry(); })
+        .applyOps(q.slice(0, 40));
+    } else {
+      loadServerState();
+    }
+  }
+
+  function loadServerState() {
+    google.script.run
+      .withSuccessHandler(function (st) { hideErr(); adoptServerState(st); })
+      .withFailureHandler(function (e) { showErr(String((e && e.message) || e)); })
+      .getState();
+  }
+
+  /* ── wiring ────────────────────────────────────────────────── */
+
+  $('strip').addEventListener('click', function (e) {
+    var b = e.target.closest('button[data-mark]');
+    if (b) applyMark(b.dataset.mark);
+  });
+
+  $('sitbar').addEventListener('click', toggleSit);
+  $('sitAdj').addEventListener('click', openSitEdit);
+
+  $('note').addEventListener('input', function () {
+    if (!S.open) return;
+    S.open.text = $('note').value;
+    $('nowText').textContent = S.open.text;
+    saveState();
+    if (noteTimer) clearTimeout(noteTimer);
+    var ref = S.open.ref, hint = S.open.startMs, val = S.open.text;
+    noteTimer = setTimeout(function () {
+      noteTimer = null;
+      enqueueText(ref, val, hint);   // belongs to the block that was open when typed
+      flush();
+    }, 900);
+  });
+  $('note').addEventListener('keydown', function (e) { if (e.key === 'Enter') $('note').blur(); });
+
+  $('btnSplit').addEventListener('click', openSplit);
+  $('spClose').addEventListener('click', function () { $('sheetSplit').classList.add('hidden'); });
+  $('spRange').addEventListener('input', renderSplit);
+
+  $('ssClose').addEventListener('click', function () { $('sheetSit').classList.add('hidden'); });
+  $('ssRange').addEventListener('input', renderSitEdit);
+  $('ssApply').addEventListener('click', function () {
+    if (S.sit) {
+      S.sit.startMs = sitEdit.atMs;
+      enqueue({ type: 'setSitStart', ref: S.sit.ref, startMs: sitEdit.atMs });
+      saveState(); render(); flush();
+    }
+    $('sheetSit').classList.add('hidden');
+  });
+  $('ssDelete').addEventListener('click', function () {
+    if (S.sit) {
+      enqueue({ type: 'deleteSit', ref: S.sit.ref, hintMs: S.sit.startMs });
+      S.sit = null;
+      saveState(); render(); flush();
+    }
+    $('sheetSit').classList.add('hidden');
+  });
+
+  $('btnWeek').addEventListener('click', openWeek);
+  $('wClose').addEventListener('click', function () { $('week').classList.add('hidden'); });
+  $('wPrev').addEventListener('click', function () { weekOffset--; loadWeek(); });
+  $('wNext').addEventListener('click', function () { weekOffset++; loadWeek(); });
+
+  window.addEventListener('online', function () { retryDelay = 4000; flush(); });
+  document.addEventListener('visibilitychange', function () {
+    if (!document.hidden) { retryDelay = 4000; flush(); render(); }
+  });
+
+  setInterval(tick, 1000);
+  boot();
+})();
+</script>

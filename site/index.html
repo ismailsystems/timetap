@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>timetap</title>
+<style>
+  :root { --bg:#0b0b0c; --panel:#131417; --panel2:#1b1d21; --fg:#f2f3f5; --dim:#8b9098; --dimmer:#5d626a; --line:#2a2d33; }
+  * { box-sizing: border-box; }
+  body {
+    margin:0; background:var(--bg); color:var(--fg);
+    font:400 16px/1.6 -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif;
+  }
+  .wrap { max-width: 720px; margin:0 auto; padding: 56px 20px 96px; }
+  h1 { font-size:34px; letter-spacing:-.01em; margin:0 0 6px; }
+  .tag { color:var(--dim); font-size:15px; margin:0 0 40px; }
+  h2 { font-size:12px; font-weight:700; letter-spacing:.17em; color:var(--dim); text-transform:uppercase; margin:44px 0 14px; }
+  p { margin:0 0 14px; }
+  a { color:var(--fg); }
+  code { font:400 13px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; background:var(--panel2); padding:1px 5px; border-radius:4px; }
+  .files { list-style:none; padding:0; margin:0; }
+  .files li { border-top:1px solid var(--line); padding:12px 0; display:flex; gap:16px; align-items:baseline; flex-wrap:wrap; }
+  .files li:last-child { border-bottom:1px solid var(--line); }
+  .files .n { font:400 14px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; min-width:150px; }
+  .files .d { color:var(--dim); font-size:14px; flex:1; min-width:220px; }
+  pre {
+    background:var(--panel); border-radius:10px; padding:16px; overflow-x:auto;
+    font:400 13px/1.6 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; color:var(--fg);
+  }
+  ul.plain { color:var(--dim); padding-left:20px; }
+  ul.plain li { margin-bottom:6px; }
+  .foot { color:var(--dimmer); font-size:13px; margin-top:56px; border-top:1px solid var(--line); padding-top:20px; }
+  @media (prefers-color-scheme: light) {
+    :root { --bg:#ffffff; --panel:#f4f5f7; --panel2:#eceef1; --fg:#16181d; --dim:#5d626a; --dimmer:#8b9098; --line:#e2e4e8; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>timetap</h1>
+  <p class="tag">A personal time-logging web app. Google Apps Script, four files, no dependencies.</p>
+
+  <p><strong>Automate capture. Never automate judgment.</strong></p>
+  <p>Logging costs one tap. The app never interprets, scores, advises, summarises, reminds or nudges. Every conclusion is drawn by the human, later, elsewhere.</p>
+  <p>You maintain a <strong>PLAN</strong> calendar by hand — intent, written Sunday. The app writes an <strong>ACTUAL</strong> calendar — record, written continuously — plus a <strong>SITTING</strong> calendar as a posture overlay. Comparing them is a weekly manual ritual the app does not participate in beyond emitting raw numbers.</p>
+
+  <h2>Files</h2>
+  <ul class="files">
+    <li><span class="n"><a href="src/appsscript.json.txt">appsscript.json</a></span><span class="d">Manifest. One OAuth scope. Set your timezone here.</span></li>
+    <li><span class="n"><a href="src/Code.gs.txt">Code.gs</a></span><span class="d">Server. CONFIG block, calendar reads and writes, week aggregation.</span></li>
+    <li><span class="n"><a href="src/Index.html.txt">Index.html</a></span><span class="d">Client. All HTML, CSS and JS inlined. No CDN, no build step.</span></li>
+    <li><span class="n"><a href="src/SETUP.md.txt">SETUP.md</a></span><span class="d">Deployment steps and the required Google Calendar settings.</span></li>
+  </ul>
+
+  <h2>The open-block mechanism</h2>
+  <p>The calendar is the source of truth, not localStorage. Tapping a category immediately creates an event with <code>start = now</code>, <code>end = now + 1 minute</code>, and <code>#open</code> in the description. The next tap patches the end to that instant, applies the mark, and strips <code>#open</code>.</p>
+  <p>This survives a dead battery and a reinstall. On load the open block is found by querying the calendar, not by trusting the browser. The UI updates on tap; the write happens in the background, and a failed write is queued in localStorage — ordered and idempotent — then retried on the next interaction and on load.</p>
+
+  <h2>The logger</h2>
+<pre>┌──────────────────────────┐
+│  NOW: DW                 │
+│  memo drafting     ● 47m │
+├──────────────────────────┤
+│  ▣ SITTING        ● 1h12 │
+├──────────────────────────┤
+│   DW    │   MTG   │  ADM │
+├─────────┼─────────┼──────┤
+│  BODY   │  PEOPLE │ FRAG │
+├──────────────────────────┤
+│  [ note ]    [SPLIT] [W] │
+└──────────────────────────┘</pre>
+
+  <h2>The mark</h2>
+  <p>The mark belongs to the block that just <em>closed</em>, captured at the transition — the one moment you both know how it went and are already holding the phone. Never asked for on a block that is starting.</p>
+  <p>A closed block shows the <code>+ = -</code> strip only if its category has no <code>autoMark</code> and it ran at least <code>MIN_MARK_MINUTES</code>. Ignoring the strip costs zero taps: it dismisses itself and <code>=</code> stands. You should see it two to four times a day. If you see it constantly, the design has failed.</p>
+
+  <h2>Sitting</h2>
+  <p>Sitting is an overlay, not a seventh category. Categories are a partition — exactly one true at a time. You sit <em>while</em> doing deep work, meetings, meals. Only sitting is logged; standing is never written, and non-sitting time is computed at review as waking span minus sitting.</p>
+  <p>The only coupling in the entire app: tapping <code>BODY</code> closes an open SIT block. That is definitional, not inference. No accelerometer, no screen time, no heuristics, ever.</p>
+
+  <h2>The week</h2>
+<pre>DW    12.0 -> 8.25   0.69
+MTG    7.5 -> 10.0   1.33
+ADM    5.0 -> 6.5    1.30
+BODY   3.75 -> 3.0   0.80
+REL    8.0 -> 8.5    1.06
+FRAG      0 -> 3.75    -
+
+switches/day:  9  7  12  6  11
+
+SITTING   64.5h / 98h waking   66%
+longest unbroken sit    2h 50m
+sits over 90 min        7</pre>
+  <p>Monospace, selectable, copyable. No charts. No colours. No highlighting of problem rows. No commentary. No totals versus last week. The numbers, and nothing else.</p>
+
+  <h2>Non-goals</h2>
+  <ul class="plain">
+    <li>Notifications, reminders, alerts, nudges, sit-time warnings</li>
+    <li>Any automatic detection: screen time, location, motion, calendar inference</li>
+    <li>Streaks, scores, badges, gamification, encouragement</li>
+    <li>AI summaries, insights, recommendations, generated review text</li>
+    <li>Charts, graphs, sparklines, progress bars</li>
+    <li>Accounts, auth, databases, external services, analytics</li>
+    <li>A settings screen — configuration is the CONFIG block in Code.gs</li>
+    <li>Writing to the PLAN calendar in any way</li>
+  </ul>
+
+  <p class="foot">This page is documentation. The app itself does not run here — it runs as a Google Apps Script web app deployed under your own account, with access set to only yourself. See <a href="src/SETUP.md.txt">SETUP.md</a>.</p>
+
+</div>
+</body>
+</html>

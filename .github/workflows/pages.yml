@@ -1,0 +1,48 @@
+name: Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Assemble site
+        run: |
+          mkdir -p _site/src
+          cp site/index.html _site/index.html
+          # Served as .txt so the browser shows source rather than executing it.
+          cp appsscript.json _site/src/appsscript.json.txt
+          cp Code.gs         _site/src/Code.gs.txt
+          cp Index.html      _site/src/Index.html.txt
+          cp SETUP.md        _site/src/SETUP.md.txt
+          touch _site/.nojekyll
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
