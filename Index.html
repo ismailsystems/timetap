@@ -213,7 +213,7 @@
               stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
       </svg>
       <span class="pl">STANDING</span>
-      <span class="pm"></span>
+      <span class="pm" id="standEl"></span>
     </button>
   </div>
 
@@ -290,7 +290,7 @@
 
   /* ── state ─────────────────────────────────────────────────── */
 
-  var S = { open: null, sit: null, lastTapMs: 0 };
+  var S = { open: null, sit: null, stoodAt: null, lastTapMs: 0 };
   var strip = null;          // {ref, key, durMs, hintMs, timer}
   var flushing = false, retryTimer = null, retryDelay = 4000;
   var noteTimer = null;
@@ -444,6 +444,7 @@
     var ref = uid();
     S.open = { ref: ref, key: key, text: '', startMs: now };
     S.lastTapMs = now;
+    if (!S.sit && !S.stoodAt) S.stoodAt = now;
     enqueue({ type: 'openActual', ref: ref, key: key, startMs: now });
 
     if (key === CFG.bodyKey) closeSit(now);                          // 8.2 the only coupling
@@ -484,6 +485,7 @@
     if (!S.sit) return;
     enqueue({ type: 'closeSit', ref: S.sit.ref, endMs: atMs });
     S.sit = null;
+    S.stoodAt = atMs;          // standing began the instant sitting ended
   }
 
   /**
@@ -501,6 +503,7 @@
       if (S.sit) { openSitEdit(); return; }
       var ref = uid();
       S.sit = { ref: ref, startMs: now };
+      S.stoodAt = null;
       enqueue({ type: 'openSit', ref: ref, startMs: now });
     } else {
       if (!S.sit) return;
@@ -593,8 +596,9 @@
     for (var p = 0; p < seg.length; p++) {
       seg[p].classList.toggle('on', seg[p].dataset.posture === lit);
     }
-    // The same slot is the hint before you sit and the clock while you are.
-    $('sitEl').textContent = S.sit ? '● ' + fmtEl(now - S.sit.startMs) : 'only if 5+ min';
+    // Whichever half is lit says how long it has been true.
+    $('sitEl').textContent = S.sit ? '● ' + fmtEl(now - S.sit.startMs) : '';
+    $('standEl').textContent = (!S.sit && S.stoodAt) ? '● ' + fmtEl(now - S.stoodAt) : '';
 
     $('btnSplit').disabled = !S.open;
 
@@ -612,6 +616,7 @@
       $('nowbar').classList.toggle('long', (now - S.open.startMs) > CFG.longBlockMinutes * MS_MIN);
     }
     if (S.sit) $('sitEl').textContent = '● ' + fmtEl(now - S.sit.startMs);
+    else if (S.stoodAt) $('standEl').textContent = '● ' + fmtEl(now - S.stoodAt);
   }
 
   /* ── split ─────────────────────────────────────────────────── */
@@ -686,6 +691,7 @@
     if (!queue().length) {
       S.open = st.open ? { ref: st.open.ref, key: st.open.key, text: st.open.text || '', startMs: st.open.startMs } : null;
       S.sit = st.sit ? { ref: st.sit.ref, startMs: st.sit.startMs } : null;
+      S.stoodAt = S.sit ? null : (st.stoodSinceMs || null);
       S.lastTapMs = 0;
       render();
       $('note').value = S.open ? (S.open.text || '') : '';
@@ -698,6 +704,11 @@
     if (saved && typeof saved === 'object') {
       S.open = saved.open || null;
       S.sit = saved.sit || null;
+      // Same reason the server confines its bounds to today: a mirror written
+      // last night would otherwise report the whole night as standing.
+      var dayStart = new Date(); dayStart.setHours(0, 0, 0, 0);
+      S.stoodAt = (S.sit || !saved.stoodAt || saved.stoodAt < dayStart.getTime())
+        ? null : saved.stoodAt;
       S.lastTapMs = 0;                 // a reload is never a mis-tap window
     }
     buildGrid();
@@ -776,6 +787,7 @@
     if (S.sit) {
       enqueue({ type: 'deleteSit', ref: S.sit.ref, hintMs: S.sit.startMs });
       S.sit = null;
+      S.stoodAt = Date.now();
       saveState(); render(); flush();
     }
     $('sheetSit').classList.add('hidden');
