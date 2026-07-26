@@ -5,6 +5,7 @@
 #   ./deploy.sh                  resolve the deployment automatically
 #   ./deploy.sh AKfycb...        target a specific deployment id
 #   ./deploy.sh --no-pull        skip the git pull
+#   ./deploy.sh --no-test        skip the checks (they are the point; think twice)
 #
 # Requires clasp (npm install -g @google/clasp), a clasp login, and a
 # .clasp.json pointing at your script. See SETUP.md section 10.
@@ -19,9 +20,11 @@ die()  { printf '\n%serror:%s %s\n' "$B" "$R" "$1" >&2; exit 1; }
 
 DEPLOY_ID="${TIMETAP_DEPLOYMENT_ID:-}"
 DO_PULL=1
+DO_TEST=1
 for arg in "$@"; do
   case "$arg" in
     --no-pull) DO_PULL=0 ;;
+    --no-test) DO_TEST=0 ;;
     -h|--help) awk 'NR>1 && /^#/ { sub(/^# ?/, ""); print; next } NR>1 { exit }' "$0"; exit 0 ;;
     -*)        die "unknown option: $arg" ;;
     *)         DEPLOY_ID="$arg" ;;
@@ -52,6 +55,31 @@ If the autostash conflicted, your local edits are safe: git stash list"
   fi
 else
   step "git pull ${D}(skipped)${R}"
+fi
+
+# ── 1b. checks ───────────────────────────────────────────────────────
+# Every regression that reached the phone went out through this script while
+# the tests sat green and unrun. They run here now, before anything ships.
+if [ "$DO_TEST" -eq 1 ]; then
+  step "checks"
+  if ! command -v node >/dev/null 2>&1; then
+    echo "${D}node not found, skipping${R}"
+  else
+    if ! OUT=$(node test/lint.js 2>&1); then
+      printf '%s\n' "$OUT"
+      die "static checks failed. Nothing deployed."
+    fi
+    printf '%s\n' "$OUT" | tail -1
+    for z in America/New_York Europe/London UTC; do
+      if ! OUT=$(TZ=$z node test/tests.js 2>&1); then
+        printf '%s\n' "$OUT" | tail -25
+        die "tests failed under $z. Nothing deployed."
+      fi
+      printf '  %-18s %s\n' "$z" "$(printf '%s\n' "$OUT" | tail -1)"
+    done
+  fi
+else
+  step "checks ${D}(skipped)${R}"
 fi
 
 # ── 2. deployments ───────────────────────────────────────────────────

@@ -116,7 +116,7 @@
     background: #000; opacity: 0; border-radius: 12px; pointer-events: none;
     transition: opacity .25s ease-out;
   }
-  #grid.idle .gbtn::before { opacity: .58; }
+  #grid.idle .gbtn:not(.addcell)::before { opacity: .58; }
   .gbtn .k, .gbtn .gn, .gbtn .ge, .gbtn .cf { position: relative; z-index: 1; }
   .gbtn {
     position: relative; cursor: pointer; font: inherit; color: inherit;
@@ -702,6 +702,10 @@
 
   function buildGrid() {
     var cols = colsFor(CATS.length + (CATS.length < CFG.maxCategories ? 1 : 0));
+    // A third column is 137px wide on a phone, which is the width that turns
+    // "Fragments" into "Fragm ents". The label has to know how much room it got.
+    var faceSize = cols >= 3 ? 19 : 26;
+    var facePad = cols >= 3 ? '7px 9px' : '9px 15px';
     CELL = {};
 
     var g = $('grid');
@@ -730,7 +734,10 @@
         '<input class="gn" type="text" placeholder="add a note" autocomplete="off" ' +
         'autocapitalize="none" autocorrect="off" spellcheck="false" enterkeyhint="done">' +
         '<span class="ge"></span><span class="cf"></span>';
-      b.querySelector('.k').textContent = faceOf(c);
+      var face = b.querySelector('.k');
+      face.textContent = faceOf(c);
+      face.style.fontSize = faceSize + 'px';
+      face.style.padding = facePad;
       b.style.background = c.hex;
 
       var gn = b.querySelector('.gn');

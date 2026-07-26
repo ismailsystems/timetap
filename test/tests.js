@@ -919,6 +919,35 @@ posture('sit'); settle();
 chk('so the posture row is usable again', litPosture() === 'sit');
 reset();
 
+console.log('\n32. the label is sized for the column it gets');
+reset(); reboot();
+const faceSize = k => $('grid').children.find(c => c.dataset.key === k).querySelector('.k').style.fontSize;
+chk('two columns give the label full size', faceSize('DW') === '26px', faceSize('DW'));
+
+const real32 = CATEGORIES.slice();
+for (let i = CATEGORIES.length; i < 11; i++)
+  CATEGORIES.push({ key: 'X' + i, label: 'Extra ' + i, color: String((i % 11) + 1), autoMark: null });
+reboot();
+chk('eleven categories move to three columns',
+  $('grid').style.gridTemplateColumns === 'repeat(3, 1fr)', $('grid').style.gridTemplateColumns);
+chk('and the label shrinks to fit a narrower cell', faceSize('DW') === '19px', faceSize('DW'));
+chk('every configured category is still on screen',
+  CATEGORIES.every(c => $('grid').children.some(x => x.dataset.key === c.key)));
+chk('the first two still hold the bottom row',
+  $('grid').children[$('grid').children.length - 3].dataset.key === 'DW',
+  $('grid').children.map(c => c.dataset.key || '_').join(' '));
+CATEGORIES.length = 0; real32.forEach(c => CATEGORIES.push(c));
+reset(); reboot();
+
+console.log('\n32b. idle dims the categories and nothing else');
+chk('idle to start with', $('grid')._cls.has('idle'));
+chk('the add box is not a category and is not dimmed with them',
+  addCell()._cls.has('addcell') && !addCell()._cls.has('active'),
+  'the veil is scoped by :not(.addcell) in CSS');
+tap('DW'); settle();
+chk('and a running block lifts the veil', !$('grid')._cls.has('idle'));
+reset();
+
 console.log('\n────────────────────────────────────────');
 console.log(H.pass + ' passed, ' + H.fail + ' failed');
 process.exit(H.fail ? 1 : 0);

@@ -18,7 +18,16 @@
  */
 (function () {
   var out = [], px = function (n) { return Math.round(n); };
-  function ok(name, cond, detail) { out.push({ name: name, pass: !!cond, detail: detail || '' }); }
+  /* An empty array is truthy, so a check that reports its offenders as a list
+     would pass whatever it found. Arrays are judged by length, booleans by
+     themselves, and anything else is a mistake worth shouting about. */
+  function ok(name, cond, detail) {
+    var pass;
+    if (Array.isArray(cond)) pass = cond.length === 0;
+    else if (typeof cond === 'boolean') pass = cond;
+    else pass = false;
+    out.push({ name: name, pass: pass, detail: detail || '' });
+  }
 
   var app = document.getElementById('app');
   var grid = document.getElementById('grid');
@@ -78,9 +87,66 @@
   cells.forEach(function (c) { heights[px(c.getBoundingClientRect().height)] = 1; });
   ok('every cell is the same height regardless of state',
     Object.keys(heights).length === 1, Object.keys(heights).join(' / '));
-  ok('the grid is two columns',
-    getComputedStyle(grid).gridTemplateColumns.split(' ').length === 2,
-    getComputedStyle(grid).gridTemplateColumns);
+  // Derived, not hardcoded: the column count changes above ten categories, and
+  // a check that assumes two would fail on a grid that is perfectly correct.
+  var cols = getComputedStyle(grid).gridTemplateColumns.split(' ').length;
+  ok('every row is full', cells.length % cols === 0, cells.length + ' cells / ' + cols + ' cols');
+  /* Wrapping is not overflow, so the width check above passes happily while a
+     word is being sliced in half. "Fragments" rendering as "Fragmen ts" is the
+     shape of this bug. A label may use as many lines as it has words, no more. */
+  function lineCount(k) {
+    var cs = getComputedStyle(k);
+    var lh = parseFloat(cs.lineHeight);
+    if (!lh || isNaN(lh)) lh = parseFloat(cs.fontSize) * 1.2;
+    // The box includes its padding; only the content is made of lines.
+    var content = k.getBoundingClientRect().height
+      - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom);
+    return Math.max(1, Math.round(content / lh));
+  }
+  /* A word may only be broken if it could not have fitted. "Fragments" at
+     19px in a 137px cell fits and must not be split; "Correspondence" does not
+     fit at any legible size and breaking it is the least bad option. */
+  function widestWordFits(k) {
+    var cs = getComputedStyle(k);
+    var probe = document.createElement('span');
+    probe.style.cssText = 'position:absolute;visibility:hidden;white-space:pre;font:' + cs.font;
+    document.body.appendChild(probe);
+    var room = k.getBoundingClientRect().width
+      - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+    var fits = k.textContent.trim().split(/\s+/).every(function (w) {
+      probe.textContent = w;
+      return probe.getBoundingClientRect().width <= room + 1;
+    });
+    probe.remove();
+    return fits;
+  }
+  var split = cats.filter(function (c) {
+    var k = c.querySelector('.k');
+    return lineCount(k) > k.textContent.trim().split(/\s+/).length && widestWordFits(k);
+  }).map(function (c) { return c.querySelector('.k').textContent; });
+  ok('no word is broken that had room to fit', split, split.join(' '));
+
+  /* The check above measures against whatever padding is currently set, so it
+     excuses a break that the padding itself caused — which is exactly how
+     "Fragments" came to render as "Fragmen ts". This one is absolute: a short
+     label gets one line at any column count, or the styling is wrong. */
+  var cramped = cats.filter(function (c) {
+    var k = c.querySelector('.k'), text = k.textContent.trim();
+    // Single words only: "Deep work" wrapping at its space is correct.
+    return text.length <= 10 && !/\s/.test(text) && lineCount(k) > 1;
+  }).map(function (c) { return c.querySelector('.k').textContent; });
+  ok('a single word of ten characters or fewer gets one line', cramped, cramped.join(' '));
+
+  ok('the label fits the column it was given',
+    cats.every(function (c) {
+      var k = c.querySelector('.k');
+      return k.scrollWidth <= k.clientWidth + 1 &&
+             k.getBoundingClientRect().height <= c.getBoundingClientRect().height - 20;
+    }),
+    cats.map(function (c) {
+      var k = c.querySelector('.k');
+      return k.textContent + ':' + px(k.getBoundingClientRect().height);
+    }).join(' '));
 
   // ── touch targets and the safe area ─────────────────────────────
   var footRoom = window.innerHeight - (document.getElementById('postureRow')

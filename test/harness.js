@@ -24,7 +24,9 @@ function advance(ms) {
   }
   NOW = target;
 }
-function settle() { advance(0); advance(200); }   // let queued run-handlers fire
+// Advance as little as possible: every settle() adds to a drift that assertions
+// then have to tolerate, and a wide tolerance is a place a real error can hide.
+function settle() { advance(0); advance(12); }
 
 /* ── fake calendar ─────────────────────────────────────────────── */
 class FEvent {
@@ -252,7 +254,7 @@ global.google = {
               let r;
               try { r = global[name](...args); } catch (e) { return b._fail && b._fail(e); }
               b._ok && b._ok(r);
-            }, 40);
+            }, 5);
           };
         });
         return b;
@@ -304,8 +306,9 @@ const desc = e => e.d.replace(/\n/g, '|');
 const hhmm = ms => new Date(ms).toTimeString().slice(0, 5);
 const show = e => `"${e.t}" ${hhmm(e.s)}-${hhmm(e.e)}${/#open/.test(e.d) ? ' OPEN' : ''}`;
 
-// each settle() advances the virtual clock 200ms; that bookkeeping drift is not the product's
-const near = (a, b, tol) => Math.abs(a - b) <= (tol === undefined ? 5000 : tol);
+// settle() advances 12ms, so drift across a test is tens of milliseconds, not
+// seconds. The tolerance is for that bookkeeping and nothing else.
+const near = (a, b, tol) => Math.abs(a - b) <= (tol === undefined ? 750 : tol);
 let pass = 0, fail = 0;
 function chk(label, cond, detail) {
   if (cond) { pass++; console.log('  ok   ' + label); }
