@@ -11,7 +11,15 @@
  * CONFIG — the only thing you edit
  * ═══════════════════════════════════════════════════════════════════ */
 
-/** Calendar IDs. Settings -> the specific calendar -> Integrate calendar -> Calendar ID. */
+/**
+ * Calendar IDs. Settings -> the specific calendar -> Integrate calendar -> Calendar ID.
+ *
+ * A script property of the same name wins over the literal here, and that is
+ * the better place for them if you sync this repo with clasp: the IDs are the
+ * only part of this file that is yours rather than the project's, and leaving
+ * them out of it means git pull and clasp push can never fight over the one
+ * line you care about. Project Settings -> Script properties. See SETUP.md 4.
+ */
 var CAL_PLAN    = '';   // read-only. Your hand-written Sunday intent.
 var CAL_ACTUAL  = '';   // written continuously by this app.
 var CAL_SITTING = '';   // written continuously by this app. Posture overlay.
@@ -125,12 +133,35 @@ function clientConfig_() {
  * Calendars
  * ═══════════════════════════════════════════════════════════════════ */
 
-function calActual_()  { return openCal_(CAL_ACTUAL,  'CAL_ACTUAL'); }
-function calSitting_() { return openCal_(CAL_SITTING, 'CAL_SITTING'); }
-function calPlan_()    { return openCal_(CAL_PLAN,    'CAL_PLAN'); }
+/* No calPlan_(). PLAN is read through readCal_ only, so there is no handle in
+   this file that could ever be used to write to it. */
+function calActual_()  { return openCal_('CAL_ACTUAL'); }
+function calSitting_() { return openCal_('CAL_SITTING'); }
 
-function openCal_(id, name) {
-  if (!id) throw new Error(name + ' is empty in the CONFIG block of Code.gs.');
+var PROPS_ = null;   // one fetch per execution, not one per op
+
+function prop_(name) {
+  if (PROPS_ === null) {
+    try { PROPS_ = PropertiesService.getScriptProperties().getProperties() || {}; }
+    catch (e) { PROPS_ = {}; }
+  }
+  var v = PROPS_[name];
+  return v ? String(v).trim() : '';
+}
+
+/** Script property first, CONFIG literal second. Trimmed, because a pasted ID
+    carries a trailing space more often than not. */
+function calId_(name) {
+  var literal = { CAL_PLAN: CAL_PLAN, CAL_ACTUAL: CAL_ACTUAL, CAL_SITTING: CAL_SITTING }[name];
+  return prop_(name) || String(literal || '').trim();
+}
+
+function openCal_(name) {
+  var id = calId_(name);
+  if (!id) {
+    throw new Error(name + ' is not set. Put the calendar ID in the CONFIG block ' +
+      'of Code.gs, or in a script property of the same name.');
+  }
   var c = CalendarApp.getCalendarById(id);
   if (!c) throw new Error(name + ' does not resolve to a calendar you can open: ' + id);
   return c;
@@ -524,9 +555,9 @@ function getWeek(offsetWeeks) {
   for (var i = 0; i < 8; i++) dayStarts.push(addLocalDaysMs_(startMs, i));
   var endMs = dayStarts[7];
 
-  var plan   = readCal_(CAL_PLAN,    startMs, endMs);
-  var actual = readCal_(CAL_ACTUAL,  startMs, endMs);
-  var sit    = readCal_(CAL_SITTING, startMs, endMs);
+  var plan   = readCal_(calId_('CAL_PLAN'),    startMs, endMs);
+  var actual = readCal_(calId_('CAL_ACTUAL'),  startMs, endMs);
+  var sit    = readCal_(calId_('CAL_SITTING'), startMs, endMs);
 
   var planH = {}, actH = {}, switches = [0, 0, 0, 0, 0, 0, 0];
   var order = [];

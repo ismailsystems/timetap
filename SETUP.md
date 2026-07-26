@@ -78,15 +78,44 @@ The Advanced Calendar Service is **not** required. Every write goes through
 
 ---
 
-## 4. Paste the calendar IDs into CONFIG
+## 4. Give the app your calendar IDs
 
-Top of `Code.gs`:
+Two places work. The app reads a **script property** first and falls back to the
+**CONFIG literal**, and either way the ID is trimmed, so a trailing space
+pasted along with it does no harm.
+
+### Option A — script properties (do this if you use clasp)
+
+**Project Settings → Script properties → Edit script properties → Add script
+property.** Three rows, named exactly:
+
+| Property | Value |
+|---|---|
+| `CAL_PLAN` | `c_...@group.calendar.google.com` |
+| `CAL_ACTUAL` | `c_...@group.calendar.google.com` |
+| `CAL_SITTING` | `c_...@group.calendar.google.com` |
+
+Save. `Code.gs` stays byte-identical to the repo.
+
+That is the whole point of this option: the calendar IDs are the only part of
+`Code.gs` that is yours rather than the project's. Leave them in the file and
+every `git pull` that touches `Code.gs` collides with the one line you care
+about, and you get to choose between committing your personal calendar IDs to
+a public repo or resolving the same conflict forever. Script properties live in
+the Apps Script project only — never in git, never pushed, never pulled.
+
+### Option B — paste them into CONFIG
+
+Simpler if you are only ever going to use the editor. Top of `Code.gs`:
 
 ```js
 var CAL_PLAN    = 'c_...@group.calendar.google.com';
 var CAL_ACTUAL  = 'c_...@group.calendar.google.com';
 var CAL_SITTING = 'c_...@group.calendar.google.com';
 ```
+
+Values set in script properties override these, so it is safe to leave stale
+literals here — but confusing, so do not.
 
 While you are there, the rest of the CONFIG block is the whole settings
 surface of the app. There is no settings screen and there will never be one.
@@ -252,24 +281,45 @@ alongside `Index.html` and the docs site would land in your web app.
 **Then, after any edit:**
 
 ```bash
-clasp push
+./deploy.sh
 ```
 
-That replaces the paste step. It does **not** replace the redeploy step — a
-push updates the code, but the web app URL keeps serving the pinned version
-until you cut a new one. Get the deployment ID once with `clasp deployments`,
-then:
+That is the whole loop: pull, list deployments, push, redeploy. It matters that
+it does all four — a `clasp push` alone updates the code but the web app URL
+keeps serving the pinned version, so the phone sees nothing until a new one is
+cut.
+
+The script resolves the deployment itself by ignoring `@HEAD` and taking the
+single numbered deployment. If you have more than one, name it:
 
 ```bash
-clasp push && clasp deploy -i YOUR_DEPLOYMENT_ID -d "$(git rev-parse --short HEAD)"
+./deploy.sh AKfycb...
 ```
 
-One command, code live, deployment described by the commit it came from. Worth
-an alias.
+or `export TIMETAP_DEPLOYMENT_ID=AKfycb...`. `--no-pull` skips step one.
+
+It will refuse to run if no numbered deployment exists yet, rather than
+creating one: `clasp deploy` with no ID mints a **new URL**, which would leave
+the icon on your home screen pointing at the old one. Create the first
+deployment from the editor, as in section 5.
+
+The pull uses `--rebase --autostash`, so uncommitted local edits survive it.
+Prefer script properties for your calendar IDs (section 4) and there is nothing
+to survive — `Code.gs` never diverges from the repo in the first place.
 
 `clasp pull` goes the other way, if you ever edit in the browser and want the
 change back in git. Push and pull both overwrite wholesale, so pick one
 direction as the source of truth — the repo — and stay there.
+
+> **The one way to lose your calendar IDs.** `clasp push` replaces the editor's
+> `Code.gs` with your local one, entirely. If the IDs are pasted into the
+> editor's copy and your local copy still has the empty strings from the repo,
+> the first push silently blanks them and the app starts throwing
+> `CAL_ACTUAL is not set`.
+>
+> Script properties (section 4) are immune: they are project data, not a file,
+> so nothing `clasp` does can touch them. That is the real reason to prefer
+> Option A once you are syncing.
 
 A GitHub Action can run `clasp push` on every commit to main, but it needs your
 `~/.clasprc.json` OAuth token in a repo secret. For a personal app deployed to
