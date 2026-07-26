@@ -74,8 +74,9 @@
      Only SITTING is written to a calendar. STANDING is the absence of a SIT
      block, not a row of its own, which is why the row needs nothing remembered
      to know which half to light. */
+  #postureRow { position: relative; flex: 0 0 72px; }
   #posture {
-    flex: 0 0 72px; display: flex; gap: 4px;
+    position: absolute; inset: 0; display: flex; gap: 4px;
     background: var(--panel); border-radius: 12px; padding: 4px;
   }
   .pbtn {
@@ -116,25 +117,36 @@
     padding: 9px 15px; border-radius: 10px; max-width: calc(100% - 24px);
     text-align: center; overflow-wrap: break-word; hyphens: none; text-wrap: balance;
   }
-  /* --ring is black or white per button, whichever the server worked out sits
-     better on that colour, so the open-block marker can never sink into it.
-     Dimming the other five would have been the prettier signal and would have
-     dragged the darkest colours under contrast, which is the one thing this
-     is not allowed to cost. */
-  .gbtn.active { box-shadow: inset 0 0 0 6px var(--ring, #000); }
+  /* Outside the button, not inside it. An inset ring has to contrast with the
+     button, which forced a per-colour choice, and the colours that chose black
+     got a black ring on a black page — indistinguishable from the tile simply
+     being smaller. An outset ring sits in the gap, where the page is always
+     black, so one white is right for every colour. */
+  .gbtn.active { box-shadow: 0 0 0 3px var(--fg); }
+  /* Armed, not committed. Amber rather than white so it cannot be mistaken for
+     the ring that means "this one is running". */
+  .gbtn.arming { box-shadow: 0 0 0 3px var(--flag); }
+  .gbtn .cf {
+    margin-top: 9px; font-size: 11px; font-weight: 700; letter-spacing: .14em;
+    color: #fff; background: var(--flag); padding: 4px 9px; border-radius: 6px;
+  }
+  .gbtn .cf:empty { display: none; }
 
-  /* ── footer: SPLIT/WEEK, or the mark strip in their place ──
-     The strip swaps 1:1 with the buttons, so the grid never moves, and the
-     marks land in the thumb arc instead of the far corner of the screen. */
-  #footer { position: relative; flex: 0 0 54px; }
-  #footBtns, #strip { position: absolute; inset: 0; display: flex; gap: 6px; }
+  /* The mark strip takes the posture row's place for its six seconds. Same
+     slot, same height, so nothing above it moves — and the marks stay in the
+     thumb arc rather than going back to the far corner of the screen. Posture
+     is unreachable for those six seconds, with a one-tap escape: choosing a
+     mark dismisses immediately. */
   .fbtn {
     flex: 1; background: var(--panel); border-radius: 10px;
     font-size: 13px; font-weight: 700; letter-spacing: .12em; color: var(--dim);
   }
   .fbtn:active { background: var(--panel2); }
-  .fbtn:disabled { opacity: .35; }
-  #strip { align-items: center; background: var(--panel2); border-radius: 10px; padding: 0 6px 0 14px; }
+  #strip {
+    position: absolute; inset: 0; display: flex; gap: 6px;
+    align-items: center; background: var(--panel2); border-radius: 12px;
+    padding: 0 6px 0 16px;
+  }
   #stripHead { flex: 1; min-width: 0; font-size: 13px; color: var(--fg); letter-spacing: .02em;
     overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .strip-marks { display: flex; gap: 6px; }
@@ -147,7 +159,7 @@
   /* Errors float above the footer so nothing in the layout shifts. */
   #err {
     position: absolute; left: var(--pad-x); right: var(--pad-x);
-    bottom: calc(var(--pad-b) + 60px); z-index: 20;
+    bottom: calc(var(--pad-b) + 78px); z-index: 20;
     background: #2a1416; color: #ffb4ad; font-size: 12px;
     padding: 9px 12px; border-radius: 8px;
     user-select: text; -webkit-user-select: text;
@@ -196,7 +208,8 @@
 
   <div id="grid"></div>
 
-  <div id="posture">
+  <div id="postureRow">
+    <div id="posture">
     <button class="pbtn" data-posture="sit">
       <svg viewBox="0 0 24 24" aria-hidden="true">
         <circle cx="8.5" cy="4.6" r="2.4" fill="currentColor"/>
@@ -215,12 +228,8 @@
       <span class="pl">STANDING</span>
       <span class="pm" id="standEl"></span>
     </button>
-  </div>
-
-  <div id="footer">
-    <div id="footBtns">
-      <button id="btnSplit" class="fbtn">SPLIT</button>
     </div>
+
     <div id="strip" class="hidden">
       <div id="stripHead"></div>
       <div class="strip-marks">
@@ -292,6 +301,7 @@
 
   var S = { open: null, sit: null, stoodAt: null, lastTapMs: 0 };
   var strip = null;          // {ref, key, durMs, hintMs, timer}
+  var armed = null;          // {key, timer} — a tap waiting to be confirmed
   var flushing = false, retryTimer = null, retryDelay = 4000;
   var noteTimer = null;
   var split = { atMs: 0, startMs: 0, nowMs: 0 };
@@ -415,9 +425,41 @@
     return { mark: null, strip: false };
   }
 
+  /** Light the button and wait. Nothing is queued until the second tap. */
+  function arm(key) {
+    disarm();
+    // Repaint when it forgets, or the button keeps offering a confirmation it
+    // is no longer holding.
+    armed = { key: key, timer: setTimeout(function () { disarm(); render(); },
+                                          CFG.confirmTimeoutMs) };
+    render();
+  }
+
+  function disarm() {
+    if (armed && armed.timer) clearTimeout(armed.timer);
+    armed = null;
+  }
+
   function tapCategory(key) {
     var now = Date.now();
-    if (S.open && S.open.key === key) return;                        // 6.1 no-op
+    if (S.open && S.open.key === key) {
+      // The lit button is the open block, so re-tapping it means "correct
+      // this", exactly as re-tapping the lit SITTING half means "correct when
+      // that started". Below the mis-tap window nothing about the block is
+      // settled yet and there is nothing worth cutting, so it stays a no-op.
+      // Re-tapping the lit button opens SPLIT, which writes nothing, so it
+      // needs no confirming.
+      if (now - S.open.startMs >= CFG.mistapSeconds * 1000) openSplit();
+      return;                                                        // 6.1
+    }
+
+    // Ask before acting on a tap that lands on the heels of the last one.
+    if (S.lastTapMs && (now - S.lastTapMs) < CFG.confirmWithinSeconds * 1000 &&
+        !(armed && armed.key === key)) {
+      arm(key);
+      return;
+    }
+    disarm();
 
     var mistap = S.open && S.lastTapMs && (now - S.lastTapMs) < CFG.mistapSeconds * 1000;
 
@@ -461,7 +503,7 @@
     strip = p;
     $('stripHead').textContent = p.key + ' closed · ' + fmtEl(p.durMs);
     $('strip').classList.remove('hidden');
-    $('footBtns').classList.add('hidden');
+    $('posture').classList.add('hidden');
     strip.timer = setTimeout(hideStrip, CFG.markTimeoutMs);          // "=" already written
   }
 
@@ -469,7 +511,7 @@
     if (strip && strip.timer) clearTimeout(strip.timer);
     strip = null;
     $('strip').classList.add('hidden');
-    $('footBtns').classList.remove('hidden');
+    $('posture').classList.remove('hidden');
   }
 
   function applyMark(mark) {
@@ -543,10 +585,9 @@
       var b = document.createElement('button');
       b.className = 'gbtn';
       b.dataset.key = c.key;
-      b.innerHTML = '<span class="k"></span>';
+      b.innerHTML = '<span class="k"></span><span class="cf"></span>';
       b.querySelector('.k').textContent = faceOf(c);
       b.style.background = c.hex;
-      b.style.setProperty('--ring', c.ring);
       b.addEventListener('click', function () { confirmTap(b); tapCategory(c.key); });
       g.appendChild(b);
     });
@@ -600,11 +641,14 @@
     $('sitEl').textContent = S.sit ? '● ' + fmtEl(now - S.sit.startMs) : '';
     $('standEl').textContent = (!S.sit && S.stoodAt) ? '● ' + fmtEl(now - S.stoodAt) : '';
 
-    $('btnSplit').disabled = !S.open;
-
     var kids = $('grid').children;
     for (var i = 0; i < kids.length; i++) {
-      kids[i].classList.toggle('active', !!S.open && kids[i].dataset.key === S.open.key);
+      var k = kids[i].dataset.key;
+      kids[i].classList.toggle('active', !!S.open && k === S.open.key);
+      var isArmed = !!armed && armed.key === k;
+      kids[i].classList.toggle('arming', isArmed);
+      var cf = kids[i].querySelector('.cf');
+      if (cf) cf.textContent = isArmed ? 'TAP AGAIN' : '';
     }
     paintSync();
   }
@@ -769,7 +813,6 @@
   });
   $('note').addEventListener('keydown', function (e) { if (e.key === 'Enter') $('note').blur(); });
 
-  $('btnSplit').addEventListener('click', openSplit);
   $('spClose').addEventListener('click', function () { $('sheetSplit').classList.add('hidden'); });
   $('spRange').addEventListener('input', renderSplit);
 

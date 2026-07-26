@@ -140,7 +140,14 @@ surface of the app. There is no settings screen and there will never be one.
   never shows the mark strip; the mark is applied silently. `null` means the
   strip may appear.
 - `MIN_MARK_MINUTES` (15) — shorter blocks get no mark and no strip.
-- `MISTAP_SECONDS` (90) — a tap this soon after the last one is a correction.
+- `MISTAP_SECONDS` (90) — a tap this soon after the last one is a correction:
+  it retitles the open block rather than starting a new one, keeping the
+  original start time.
+- `CONFIRM_WITHIN_SECONDS` (60) — a tap this soon after the last one arms the
+  button instead of acting, and waits for a second tap on the same button.
+  Nothing is written or queued until that second tap.
+- `CONFIRM_TIMEOUT_MS` (4000) — how long an armed button waits before
+  forgetting. Ignoring it is always the safe outcome.
 - `STALE_OPEN_HOURS` (5) — how far a forgotten open block may run before the
   app bounds it and writes `UNLOGGED -` for the rest.
 - `MARK_TIMEOUT_MS` (6000) — how long the strip waits before applying `=`.

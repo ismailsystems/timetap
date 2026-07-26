@@ -51,6 +51,18 @@ var MIN_MARK_MINUTES = 15;
 /** A category tap this soon after the previous tap is a correction, not a transition. */
 var MISTAP_SECONDS = 90;
 
+/**
+ * A category tap this soon after the previous one asks before it acts. The tap
+ * arms the button instead of committing, and only a second tap on the same
+ * button writes anything. Taps this close together are far more often a brush
+ * than a decision, and the correction rule makes a brush destructive: it
+ * silently retitles the block you are actually in.
+ */
+var CONFIRM_WITHIN_SECONDS = 60;
+
+/** How long an armed button waits for that second tap before forgetting. */
+var CONFIRM_TIMEOUT_MS = 4000;
+
 /** On load, an open block older than this (or from a previous day) is bounded, not extended. */
 var STALE_OPEN_HOURS = 5;
 
@@ -139,19 +151,6 @@ function contrast_(a, b) {
   return (Math.max(la, lb) + 0.05) / (Math.min(la, lb) + 0.05);
 }
 
-/**
- * Black or white for the active ring, whichever contrasts better with the
- * button underneath it. The label does not need this — white on a black
- * highlight is 21:1 on any colour — but the ring sits directly on the colour,
- * and neither constant works alone: black falls to 2.98:1 on Grape, white to
- * 1.69:1 on Banana. Picking the better of the two cannot go below 4.58:1 for
- * any colour, because the two ratios always multiply to 21.
- */
-function ringOn_(hex) {
-  var L = relLum_(hex);
-  return (1.05 / (L + 0.05)) > ((L + 0.05) / 0.05) ? '#ffffff' : '#000000';
-}
-
 /* ═══════════════════════════════════════════════════════════════════
  * Web app entry
  * ═══════════════════════════════════════════════════════════════════ */
@@ -178,18 +177,18 @@ function doGet() {
 function clientConfig_() {
   return {
     categories: CATEGORIES.map(function (c) {
-      var hex = COLOR_HEX[String(c.color)] || '#616161';
       return {
         key: c.key,
         label: c.label,
         color: String(c.color),
-        hex: hex,
-        ring: ringOn_(hex),
+        hex: COLOR_HEX[String(c.color)] || '#616161',
         autoMark: c.autoMark || null
       };
     }),
     minMarkMinutes: MIN_MARK_MINUTES,
     mistapSeconds: MISTAP_SECONDS,
+    confirmWithinSeconds: CONFIRM_WITHIN_SECONDS,
+    confirmTimeoutMs: CONFIRM_TIMEOUT_MS,
     staleOpenHours: STALE_OPEN_HOURS,
     markTimeoutMs: MARK_TIMEOUT_MS,
     longBlockMinutes: LONG_BLOCK_MINUTES,
