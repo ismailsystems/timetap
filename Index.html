@@ -71,9 +71,9 @@
 
   /* ── posture ─────────────────────────────────────────────────
      Three segments, exactly one lit, below the grid where the thumb is.
-     Only SITTING is ever written to a calendar: STANDING and LYING DOWN both
-     mean "not sitting", and differ only in what they tell you. They are states
-     of the person, not rows in the record. */
+     Only SITTING is written to a calendar. STANDING is the absence of a SIT
+     block, not a row of its own, which is why the row needs nothing remembered
+     to know which half to light. */
   #posture {
     flex: 0 0 72px; display: flex; gap: 4px;
     background: var(--panel); border-radius: 12px; padding: 4px;
@@ -215,15 +215,6 @@
       <span class="pl">STANDING</span>
       <span class="pm"></span>
     </button>
-    <button class="pbtn" data-posture="lie">
-      <svg viewBox="0 0 24 24" aria-hidden="true">
-        <circle cx="6" cy="12.4" r="2.4" fill="currentColor"/>
-        <path d="M8.7 14.6h5.4l3.7 4M2.8 18.6h18.4" fill="none" stroke="currentColor"
-              stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-      </svg>
-      <span class="pl">LYING DOWN</span>
-      <span class="pm"></span>
-    </button>
   </div>
 
   <div id="footer">
@@ -299,7 +290,7 @@
 
   /* ── state ─────────────────────────────────────────────────── */
 
-  var S = { open: null, sit: null, posture: 'stand', lastTapMs: 0 };
+  var S = { open: null, sit: null, lastTapMs: 0 };
   var strip = null;          // {ref, key, durMs, hintMs, timer}
   var flushing = false, retryTimer = null, retryDelay = 4000;
   var noteTimer = null;
@@ -493,32 +484,28 @@
     if (!S.sit) return;
     enqueue({ type: 'closeSit', ref: S.sit.ref, endMs: atMs });
     S.sit = null;
-    if (S.posture === 'sit') S.posture = 'stand';
   }
 
   /**
-   * Exactly one posture is always true. Only SITTING reaches a calendar:
-   * STANDING and LYING DOWN both mean "not sitting" and differ only in what
-   * they tell you, so choosing either closes an open SIT block and choosing
-   * one when none is open writes nothing at all.
+   * Exactly one posture is always true, and which one is a fact about the
+   * record rather than a thing to remember: sitting means a SIT block is open,
+   * standing means none is. Nothing is stored for it, so a reload recovers the
+   * posture from the calendar like everything else does.
    *
-   * Re-tapping the lit SITTING segment adjusts its start, since re-tapping
-   * the posture you are already in has nothing else to mean.
+   * Re-tapping the lit SITTING segment adjusts its start, since re-tapping the
+   * posture you are already in has nothing else to mean.
    */
   function setPosture(p) {
     var now = Date.now();
-    if (p === S.posture) {
-      if (p === 'sit' && S.sit) openSitEdit();
-      return;
-    }
     if (p === 'sit') {
+      if (S.sit) { openSitEdit(); return; }
       var ref = uid();
       S.sit = { ref: ref, startMs: now };
       enqueue({ type: 'openSit', ref: ref, startMs: now });
     } else {
+      if (!S.sit) return;
       closeSit(now);
     }
-    S.posture = p;
     saveState(); render(); flush();
   }
 
@@ -602,9 +589,9 @@
       note.placeholder = 'nothing running';
     }
 
-    var seg = $('posture').children;
+    var seg = $('posture').children, lit = S.sit ? 'sit' : 'stand';
     for (var p = 0; p < seg.length; p++) {
-      seg[p].classList.toggle('on', seg[p].dataset.posture === S.posture);
+      seg[p].classList.toggle('on', seg[p].dataset.posture === lit);
     }
     // The same slot is the hint before you sit and the clock while you are.
     $('sitEl').textContent = S.sit ? '● ' + fmtEl(now - S.sit.startMs) : 'only if 5+ min';
@@ -699,8 +686,6 @@
     if (!queue().length) {
       S.open = st.open ? { ref: st.open.ref, key: st.open.key, text: st.open.text || '', startMs: st.open.startMs } : null;
       S.sit = st.sit ? { ref: st.sit.ref, startMs: st.sit.startMs } : null;
-      if (S.sit) S.posture = 'sit';
-      else if (S.posture === 'sit') S.posture = 'stand';
       S.lastTapMs = 0;
       render();
       $('note').value = S.open ? (S.open.text || '') : '';
@@ -713,9 +698,6 @@
     if (saved && typeof saved === 'object') {
       S.open = saved.open || null;
       S.sit = saved.sit || null;
-      // STANDING and LYING DOWN are never written down, so the mirror is the
-      // only record of which you were in. SITTING comes from the calendar.
-      S.posture = S.sit ? 'sit' : (saved.posture === 'lie' ? 'lie' : 'stand');
       S.lastTapMs = 0;                 // a reload is never a mis-tap window
     }
     buildGrid();
@@ -794,7 +776,6 @@
     if (S.sit) {
       enqueue({ type: 'deleteSit', ref: S.sit.ref, hintMs: S.sit.startMs });
       S.sit = null;
-      S.posture = 'stand';
       saveState(); render(); flush();
     }
     $('sheetSit').classList.add('hidden');

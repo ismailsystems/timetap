@@ -69,8 +69,8 @@
 ├──────────────┼──────────────┤
 │  Deep work   │   Meetings   │
 ├──────────────┴──────────────┤
-│ SITTING │ STANDING │ LYING  │
-│  1h12   │          │  DOWN  │
+│   SITTING    │   STANDING   │
+│    1h12      │              │
 ├─────────────────────────────┤
 │            SPLIT            │
 └─────────────────────────────┘</pre>
@@ -82,8 +82,8 @@
 
   <h2>Posture</h2>
   <p>Posture is an overlay, not a seventh category. Categories are a partition — exactly one true at a time. You sit <em>while</em> doing deep work, meetings, meals.</p>
-  <p>A three-way row sits below the grid: <strong>sitting</strong>, <strong>standing</strong>, <strong>lying down</strong>. One is always true. But only sitting is ever written down — standing and lying down both mean "not sitting" and differ only in what they tell you, so choosing either closes an open SIT block, and choosing one when no block is open writes nothing at all. Non-sitting time is computed at review as waking span minus sitting.</p>
-  <p>That asymmetry is deliberate. Sitting is the thing being measured; the other two are states of the person, not rows in the record. It also means a reload can only recover sitting, which comes from the calendar. Standing and lying down live in the browser's mirror and fall back to standing when it is gone.</p>
+  <p>A two-way row sits below the grid: <strong>sitting</strong> or <strong>standing</strong>, one always lit. Only sitting is written down. Standing is the absence of a SIT block rather than a row of its own, so which half is lit is a fact about the calendar and not a thing the browser has to remember — clear the storage and it still comes back right. Non-sitting time is computed at review as waking span minus sitting.</p>
+  <p>Re-tapping the lit SITTING half adjusts its start time, since re-tapping the posture you are already in has nothing else to mean.</p>
   <p>The only coupling in the entire app: tapping <code>BODY</code> closes an open SIT block and drops the row to standing. That is definitional, not inference. No accelerometer, no screen time, no heuristics, ever.</p>
 
   <h2>The numbers</h2>
