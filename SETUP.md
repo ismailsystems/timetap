@@ -175,14 +175,50 @@ gives you a second URL — avoid.)
 
 ## 6. Add to the iPhone home screen
 
-1. Open the web app URL in **Safari** (not Chrome — only Safari installs home
-   screen bookmarks).
+**Use Chrome. Not Safari.** This is the opposite of the usual iOS advice and it
+is worth the two minutes it takes to read why.
+
+1. Open the web app URL in **Chrome for iOS**.
 2. Share sheet → **Add to Home Screen** → name it `timetap` → **Add**.
+
+You get a fullscreen icon with no browser chrome, same as Safari would give.
+
+### Why not Safari
+
+Safari fails with `Sorry, unable to open the file at this time`, which sounds
+like a broken deployment and is not one. Apps Script serves your page inside a
+sandboxed iframe from `googleusercontent.com` after bouncing through Google's
+auth domains — a genuinely cross-site flow — and Safari's **Prevent Cross-Site
+Tracking**, on by default, breaks it.
+
+The misleading part: `script.google.com/home` loads fine in Safari, because
+that is a first-party page. A working Google session there proves nothing about
+whether `/exec` will load. Do not spend an hour chasing the account, as this
+setup did.
+
+Turning off Prevent Cross-Site Tracking and Block All Cookies in
+**Settings → Apps → Safari** may fix it. Chrome just works, is already signed
+into your Google account, and does not require weakening Safari's defaults for
+every other site you visit.
+
+**Brave cannot do this at all** — third-party browsers on iOS gained Add to
+Home Screen in 2023 and Brave has not implemented it. Chrome has.
+
+### Getting the URL onto the phone
+
+Do not retype it. It is ~114 characters, and one stray space or line break from
+a wrapped copy makes the address bar treat it as a search query and hand it to
+Google — which looks like the app failing when nothing has been requested yet.
+
+Send it as something tappable: Handoff from the Mac, Messages to yourself, a
+note synced over iCloud, or a QR code generated locally.
+
+### After it is installed
 
 The app tolerates being killed. State lives on the calendar, not in the page,
 so the icon can be cold-launched at any time and it will find the open block.
 
-If the launched app shows a Google sign-in loop, open the URL in Safari
+If the launched app shows a Google sign-in loop, open the URL in the browser
 normally once, complete the sign-in, then use the icon again.
 
 ---
