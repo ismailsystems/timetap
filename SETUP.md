@@ -63,8 +63,11 @@ Now paste, replacing the entire contents of each file:
 | `Code.gs`         | `Code.gs`        |
 | `Index.html`      | `Index.html`     |
 
-**Set the timezone** in `appsscript.json`. It ships as
-`"timeZone": "America/New_York"` — change it to your own
+**Set the timezone** in `appsscript.json`. This is the setting most likely to be
+silently wrong, because the shipped default is a real place and nothing
+complains if it is not yours: day boundaries, the rollup window and the trigger
+hour all come from it, so an hour out puts everything logged late at night on
+the wrong day. `setupRollup` prints the zone it is using. Change it to your own
 [IANA zone](https://en.wikipedia.org/wiki/List_of_tz_database_time_zones)
 (`Europe/London`, `America/Los_Angeles`, `Asia/Tokyo`, …). Every day boundary,
 the rollup window and the hour the nightly trigger fires all read from this one
@@ -327,8 +330,13 @@ the test suite cannot.
 There is no week screen in the app. The numbers go to a Google Sheet on a daily
 trigger, and you read them where you actually think — which was never a phone.
 
-**Create a spreadsheet.** Any blank one. Copy its URL — the whole thing, out of
-the address bar. You do not need to extract the id; the app will take it out.
+**Create a spreadsheet.** A **new, empty** one — not a workbook you already use.
+`daily` and `weekly` are cleared and rewritten every night, so a tab of yours
+that happens to share either name is gone by morning. `setupRollup` lists any
+other tabs it finds so you know when you have pointed it at a shared workbook.
+
+Copy its URL — the whole thing, out of the address bar. You do not need to
+extract the id; the app will take it out.
 
 **Tell the app about it.** Project Settings → Script properties → add
 `SHEET_ID` and paste the URL. (The `SHEET_ID` literal in CONFIG works too, but

@@ -972,6 +972,11 @@ chk('it fills both tabs there and then',
   H.SHEETS.book.getSheetByName('weekly').rows.length > 1);
 chk('and counts what it found on each calendar', /ACTUAL {4}2/.test(report),
   report.split('\n').slice(-3).join(' | '));
+chk('it names the timezone it is drawing days in', /timezone/.test(report),
+  report.split('\n').filter(l => /timezone/.test(l))[0]);
+chk('the category count excludes UNLOGGED',
+  new RegExp('90 days, ' + clientConfig_().categories.length + ' categories').test(report),
+  report.split('\n').filter(l => /window/.test(l))[0]);
 
 chk('running it twice does not double the trigger',
   (setupRollup(), H.TRIGGERS.length) === 1, String(H.TRIGGERS.length));
@@ -991,6 +996,22 @@ H.SCRIPT_PROPS.SHEET_ID = 'book'; H.clearPropCache();
 const emptyReport = setupRollup();
 chk('an empty ACTUAL is called out rather than left to Sunday',
   /ACTUAL is empty/.test(emptyReport), emptyReport.split('\n').slice(-1)[0]);
+reset();
+
+console.log('\n33b. a shared workbook is called out before it is overwritten');
+reset();
+H.SCRIPT_PROPS.SHEET_ID = 'book'; H.clearPropCache();
+H.SHEETS.book.insertSheet('Inventory');
+const shared = setupRollup();
+chk('it names the tabs that are not its own', /other tabs: Inventory/.test(shared),
+  shared.split('\n').filter(l => /other tabs/.test(l))[0]);
+chk('and says which two it rewrites nightly',
+  /daily and weekly are cleared/.test(shared.replace(/\n/g, ' ')),
+  shared.split('\n').slice(-3).join(' | '));
+reset();
+H.SCRIPT_PROPS.SHEET_ID = 'book'; H.clearPropCache();
+const dedicated = setupRollup();
+chk('a dedicated sheet gets no such warning', !/other tabs/.test(dedicated));
 reset();
 
 console.log('\n────────────────────────────────────────');

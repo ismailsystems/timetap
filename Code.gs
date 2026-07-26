@@ -833,7 +833,7 @@ function dailyRollup() {
 
   writeGrid_(ss, DAILY_TAB, dailyGrid_(days, keys));
   writeGrid_(ss, WEEKLY_TAB, weeklyGrid_(days, keys));
-  say_('rolled up ' + days.length + ' days across ' + keys.length +
+  say_('rolled up ' + days.length + ' days across ' + allCategories_().length +
        ' categories into ' + ss.getUrl());
   return { days: days.length, categories: keys.length, sheet: ss.getUrl() };
 }
@@ -1025,6 +1025,12 @@ function setupRollup() {
     SITTING: readCal_(calId_('CAL_SITTING'), lo, hi).length
   };
 
+  var others = [];
+  ss.getSheets().forEach(function (sh) {
+    var n = sh.getName();
+    if (n !== DAILY_TAB && n !== WEEKLY_TAB) others.push(n);
+  });
+
   var lines = [
     'Rollup is set up.',
     '',
@@ -1032,13 +1038,20 @@ function setupRollup() {
     '            ' + ss.getUrl(),
     'tabs        ' + DAILY_TAB + ', ' + WEEKLY_TAB + ' (rebuilt every run)',
     'trigger     ' + trig,
-    'window      ' + res.days + ' days, ' + res.categories + ' categories',
+    'window      ' + res.days + ' days, ' + allCategories_().length + ' categories',
+    'timezone    ' + tz_() + '  (day boundaries and the trigger hour)',
     '',
     'events found in the last ' + ROLLUP_DAYS + ' days:',
     '  PLAN      ' + seen.PLAN,
     '  ACTUAL    ' + seen.ACTUAL,
     '  SITTING   ' + seen.SITTING
   ];
+  if (others.length) {
+    lines.push('',
+      'This spreadsheet has other tabs: ' + others.join(', ') + '.',
+      'That is fine, but ' + DAILY_TAB + ' and ' + WEEKLY_TAB + ' are cleared and',
+      'rewritten every night. Keep nothing of your own in either.');
+  }
   if (!seen.ACTUAL) {
     lines.push('', 'ACTUAL is empty. If you have been logging, CAL_ACTUAL is ' +
       'pointing at the wrong calendar.');

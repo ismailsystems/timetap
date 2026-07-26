@@ -110,6 +110,7 @@ class FSheet {
 class FSpreadsheet {
   constructor(id) { this.id = id; this.sheets = []; }
   getName() { return 'timetap rollup'; }
+  getSheets() { return this.sheets.slice(); }
   getUrl() { return 'https://docs.google.com/spreadsheets/d/' + this.id + '/edit'; }
   getSheetByName(n) { return this.sheets.find(s => s.name === n) || null; }
   insertSheet(n) { const s = new FSheet(n); this.sheets.push(s); return s; }
