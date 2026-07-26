@@ -78,8 +78,14 @@ var BODY_KEY = 'BODY';
 /** Colour used for the recovery "UNLOGGED -" block written by stale handling. */
 var UNLOGGED_COLOR = CalendarApp.EventColor.GRAY;
 
-/** Flag the NOW bar once the open block passes this. Purely visual. */
+/** Flag the open block's box once it passes this. Purely visual. */
 var LONG_BLOCK_MINUTES = 90;
+
+/**
+ * Ceiling on categories, counting both the array above and any added from the
+ * grid's "+" box. The add box disappears once this many exist.
+ */
+var MAX_CATEGORIES = 10;
 
 /**
  * The rollup spreadsheet. Create one, copy the id out of its URL
@@ -176,7 +182,7 @@ function doGet() {
 /** Config the client needs. Touches no calendar, so it can never fail on a bad ID. */
 function clientConfig_() {
   return {
-    categories: CATEGORIES.map(function (c) {
+    categories: allCategories_().map(function (c) {
       return {
         key: c.key,
         label: c.label,
@@ -192,6 +198,7 @@ function clientConfig_() {
     staleOpenHours: STALE_OPEN_HOURS,
     markTimeoutMs: MARK_TIMEOUT_MS,
     longBlockMinutes: LONG_BLOCK_MINUTES,
+    maxCategories: MAX_CATEGORIES,
     bodyKey: BODY_KEY,
     tz: Session.getScriptTimeZone()
   };
@@ -235,9 +242,74 @@ function openCal_(name) {
   return c;
 }
 
+/**
+ * Categories added from the grid live in a script property rather than in the
+ * array above, because a running script cannot edit its own source. They are
+ * appended to it, never merged into it, so CONFIG stays the thing you edit and
+ * this stays the thing the app wrote.
+ */
+function extraCategories_() {
+  var raw = prop_('EXTRA_CATEGORIES');
+  if (!raw) return [];
+  try {
+    var a = JSON.parse(raw);
+    return Array.isArray(a) ? a : [];
+  } catch (e) { return []; }
+}
+
+function allCategories_() {
+  return CATEGORIES.concat(extraCategories_()).slice(0, MAX_CATEGORIES);
+}
+
 function catOf_(key) {
-  for (var i = 0; i < CATEGORIES.length; i++) if (CATEGORIES[i].key === key) return CATEGORIES[i];
+  var all = allCategories_();
+  for (var i = 0; i < all.length; i++) if (all[i].key === key) return all[i];
   return null;
+}
+
+/**
+ * The key is the calendar's vocabulary, so it has to be short, unique and
+ * stable. It is derived once from the label and never changes — there is no
+ * rename, here or anywhere, because renaming a key would split every past
+ * event away from every future one in the rollup.
+ */
+function keyFor_(label, taken) {
+  var base = String(label).toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 8) || 'CAT';
+  var key = base, n = 2;
+  var used = {};
+  taken.forEach(function (c) { used[c.key] = 1; });
+  while (used[key]) { key = base.slice(0, 7) + n; n++; }
+  return key;
+}
+
+/** First colour in the palette nobody is using yet. */
+function nextColor_(taken) {
+  var used = {};
+  taken.forEach(function (c) { used[String(c.color)] = 1; });
+  for (var id = 1; id <= 11; id++) if (!used[String(id)]) return String(id);
+  return String((taken.length % 11) + 1);
+}
+
+/** Called from the grid's "+" box. Returns the config the client should adopt. */
+function addCategory(label) {
+  var name = String(label == null ? '' : label).replace(/\s+/g, ' ').trim().slice(0, 24);
+  if (!name) throw new Error('A category needs a name.');
+
+  var all = allCategories_();
+  if (all.length >= MAX_CATEGORIES) {
+    throw new Error('That is ' + MAX_CATEGORIES + ' categories already.');
+  }
+  for (var i = 0; i < all.length; i++) {
+    if (all[i].label.toLowerCase() === name.toLowerCase()) {
+      throw new Error('There is already a category called ' + all[i].label + '.');
+    }
+  }
+
+  var extras = extraCategories_();
+  extras.push({ key: keyFor_(name, all), label: name, color: nextColor_(all), autoMark: null });
+  PropertiesService.getScriptProperties().setProperty('EXTRA_CATEGORIES', JSON.stringify(extras));
+  PROPS_ = null;                       // the cache above is now a lie
+  return clientConfig_();
 }
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -702,7 +774,7 @@ function dailyRollup() {
 
 /** Configured categories first, then anything else the calendars mention. */
 function rollupKeys_(plan, actual) {
-  var keys = CATEGORIES.map(function (c) { return c.key; });
+  var keys = allCategories_().map(function (c) { return c.key; });
   plan.concat(actual).forEach(function (e) {
     var p = parseTitle_(e.title);
     if (p && keys.indexOf(p.key) < 0) keys.push(p.key);

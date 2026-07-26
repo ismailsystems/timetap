@@ -39,34 +39,19 @@
 
   /* ── now bar ─────────────────────────────────────────────────
      Fixed height in every state. Nothing below it may ever move. */
-  /* No "NOW: DW" line. The lit button in the grid already says which category
-     is running, and saying it twice cost 26px of a phone screen. */
-  #nowbar {
-    position: relative; flex: 0 0 54px;
-    background: var(--panel); border-radius: 10px;
-    padding: 0 13px; border-left: 3px solid transparent;
-    display: flex; align-items: center;
+  /* No NOW bar. The note and the clock belong to the block that is running,
+     and the block that is running is the lit box, so they live in it. Nothing
+     is left for a bar at the top to hold. */
+  #sync {
+    position: fixed; z-index: 25;
+    top: calc(var(--pad-t) + 8px); right: calc(var(--pad-x) + 8px);
+    display: flex; align-items: center; gap: 5px;
+    background: rgba(0, 0, 0, .62); border-radius: 20px; padding: 4px 8px;
   }
-  #nowbar.long { border-left-color: var(--flag); }
-  .now-row { display: flex; align-items: baseline; gap: 10px; flex: 1; min-width: 0;
-             padding-right: 26px; }
-  /* The note lives here, not in the footer: it describes this block, it no
-     longer duplicates a line 800px above it, and focusing it no longer puts
-     the caret behind the keyboard. */
-  #note {
-    flex: 1; min-width: 0; background: none; border: 0; padding: 0;
-    color: var(--fg); font-size: 17px; font-family: inherit; line-height: 22px;
-    user-select: text; -webkit-user-select: text;
-  }
-  #note::placeholder { color: var(--dim); }
-  #note:disabled { opacity: 1; }
-  .now-el { font-variant-numeric: tabular-nums; font-size: 17px; color: var(--dim); }
-
-  #sync { position: absolute; top: 50%; right: 12px; transform: translateY(-50%); display: flex; align-items: center; gap: 5px; }
-  #sync::after { content: ''; width: 9px; height: 9px; border-radius: 50%; background: #2f3339; }
+  #sync::after { content: ''; width: 9px; height: 9px; border-radius: 50%; background: #4b5057; }
   #sync.s-pending::after { background: var(--flag); }
   #sync.s-failed::after  { background: var(--bad); }
-  #syncN { font-size: 11px; font-variant-numeric: tabular-nums; color: var(--dim); }
+  #syncN { font-size: 11px; font-variant-numeric: tabular-nums; color: #fff; font-weight: 700; }
   #syncN:empty { display: none; }
 
   /* ── posture ─────────────────────────────────────────────────
@@ -99,6 +84,7 @@
   /* ── grid ────────────────────────────────────────────────── */
   #grid { flex: 1 1 auto; display: grid; gap: 6px; min-height: 0; }
   .gbtn {
+    cursor: pointer; font: inherit; color: inherit;
     background: var(--panel2); border-radius: 12px;
     display: flex; flex-direction: column; align-items: center; justify-content: center;
     gap: 9px; overflow: hidden; min-height: 0;
@@ -114,15 +100,59 @@
   .gbtn .k {
     background: #000; color: #fff;
     font-size: 26px; font-weight: 700; line-height: 1.2; letter-spacing: .01em;
-    padding: 9px 15px; border-radius: 10px; max-width: calc(100% - 24px);
+    padding: 9px 15px; border-radius: 10px; max-width: calc(100% - 20px);
     text-align: center; overflow-wrap: break-word; hyphens: none; text-wrap: balance;
   }
+  /* The note and the clock only exist while the box is the open block. Both
+     ride the same black backing as the label, so they stay legible on any
+     colour in the palette without a per-colour rule. */
+  .gbtn .gn, .gbtn .ge { display: none; }
+  .gbtn.active .gn, .gbtn.active .ge { display: block; }
+  .gbtn .gn {
+    margin-top: 7px; width: calc(100% - 20px);
+    background: #000; color: #fff; border: 0; border-radius: 8px;
+    font: 400 16px/1.25 inherit; padding: 7px 10px; text-align: center;
+    user-select: text; -webkit-user-select: text;
+  }
+  .gbtn .gn::placeholder { color: #8b9098; font-weight: 400; }
+  .gbtn .ge {
+    margin-top: 7px; background: #000; color: #fff;
+    font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums;
+    padding: 4px 10px; border-radius: 7px; letter-spacing: .02em;
+  }
+  .gbtn.long .ge { color: var(--flag); }
   /* Outside the button, not inside it. An inset ring has to contrast with the
      button, which forced a per-colour choice, and the colours that chose black
      got a black ring on a black page — indistinguishable from the tile simply
      being smaller. An outset ring sits in the gap, where the page is always
      black, so one white is right for every colour. */
-  .gbtn.active { box-shadow: 0 0 0 3px var(--fg); }
+  /* Breathing, not blinking: the ring fades and returns over two and a half
+     seconds so the running block reads as alive without becoming ambient
+     noise. Reduce Motion turns it off, as every animation here does. */
+  @keyframes ringBreath {
+    0%, 100% { box-shadow: 0 0 0 3px rgba(242, 243, 245, 1); }
+    50%      { box-shadow: 0 0 0 3px rgba(242, 243, 245, .34); }
+  }
+  .gbtn.active {
+    box-shadow: 0 0 0 3px var(--fg);
+    animation: ringBreath 2.5s ease-in-out infinite;
+  }
+  /* The add box. Outlined rather than filled, because it is not a category
+     yet and must not read like one. */
+  .addcell {
+    background: none; box-shadow: inset 0 0 0 2px var(--line);
+  }
+  .addcell .k { background: none; color: var(--dim); font-size: 40px; font-weight: 300; padding: 0; }
+  .addcell.naming .k { display: none; }
+  .addcell .an { display: none; }
+  .addcell.naming .an { display: block; }
+  .addcell .an {
+    width: calc(100% - 20px); background: #000; color: #fff; border: 0;
+    border-radius: 8px; font: 700 19px/1.25 inherit; padding: 10px;
+    text-align: center; user-select: text; -webkit-user-select: text;
+  }
+  .addcell .an::placeholder { color: var(--mute); font-weight: 400; }
+  .addcell.busy { opacity: .5; }
   /* Armed, not committed. Amber rather than white so it cannot be mistaken for
      the ring that means "this one is running". */
   .gbtn.arming { box-shadow: 0 0 0 3px var(--flag); }
@@ -193,18 +223,12 @@
   @media (prefers-reduced-motion: reduce) {
     .gbtn { transition: none; }
     .gbtn:active, .gbtn.tapped { transform: none; }
+    .gbtn.active { animation: none; }
   }
 </style>
 
 <div id="app">
-  <div id="nowbar" class="idle">
-    <div id="sync" class="s-synced"><span id="syncN"></span></div>
-    <div class="now-row">
-      <input id="note" type="text" placeholder="note" autocomplete="off" autocapitalize="none"
-             autocorrect="off" spellcheck="false" enterkeyhint="done" disabled>
-      <div class="now-el" id="nowEl"></div>
-    </div>
-  </div>
+  <div id="sync" class="s-synced"><span id="syncN"></span></div>
 
   <div id="grid"></div>
 
@@ -302,6 +326,7 @@
   var S = { open: null, sit: null, stoodAt: null, lastTapMs: 0 };
   var strip = null;          // {ref, key, durMs, hintMs, timer}
   var armed = null;          // {key, timer} — a tap waiting to be confirmed
+  var CELL = {};             // key -> {box, note, el}, so the lit one is O(1)
   var flushing = false, retryTimer = null, retryDelay = 4000;
   var noteTimer = null;
   var split = { atMs: 0, startMs: 0, nowMs: 0 };
@@ -359,6 +384,20 @@
     }
     if (hit) setQueue(q);
     return hit;
+  }
+
+  /** Typed into the lit box. Debounced, and it rides the close op regardless. */
+  function noteChanged(val) {
+    if (!S.open) return;
+    S.open.text = val;
+    saveState();
+    if (noteTimer) clearTimeout(noteTimer);
+    var ref = S.open.ref, hint = S.open.startMs;
+    noteTimer = setTimeout(function () {
+      noteTimer = null;
+      enqueueText(ref, val, hint);   // belongs to the block that was open when typed
+      flush();
+    }, 900);
   }
 
   /** Only the newest note per block needs to survive. */
@@ -491,7 +530,6 @@
 
     if (key === CFG.bodyKey) closeSit(now);                          // 8.2 the only coupling
 
-    $('note').value = '';
     if (pending) showStrip(pending); else hideStrip();
     saveState(); render(); flush();
   }
@@ -556,7 +594,9 @@
 
   /* ── render ────────────────────────────────────────────────── */
 
-  function colsFor(n) { return n <= 3 ? 1 : (n <= 6 ? 2 : 3); }
+  /* Two columns for as long as the labels stay readable in them. Three makes a
+     cell 137px wide, which turns "Fragments" into "Fragm ents". */
+  function colsFor(n) { return n <= 3 ? 1 : (n <= 10 ? 2 : 3); }
 
   /**
    * Fill the grid from the bottom row up, left to right within each row.
@@ -576,18 +616,47 @@
   function faceOf(c) { return c.label || c.key; }
 
   function buildGrid() {
-    var cols = colsFor(CATS.length);
+    var cols = colsFor(CATS.length + (CATS.length < CFG.maxCategories ? 1 : 0));
+    CELL = {};
 
     var g = $('grid');
     g.innerHTML = '';
     g.style.gridTemplateColumns = 'repeat(' + cols + ', 1fr)';
-    thumbOrder(CATS, cols).forEach(function (c) {
-      var b = document.createElement('button');
+    var cells = CATS.slice();
+    if (CATS.length < CFG.maxCategories) cells.push(null);   // the add box
+    // An odd count leaves one cell alone in the top row after the bottom-up
+    // fill. Let it take the whole row rather than sitting beside a hole.
+    var lonely = (cells.length % cols) === 1;
+    thumbOrder(cells, cols).forEach(function (c, i) {
+      if (c === null) {
+        var ac = buildAddCell();
+        if (lonely && i === 0) ac.style.gridColumn = 'span ' + cols;
+        g.appendChild(ac);
+        return;
+      }
+      // A div, not a button: <button> may not contain interactive content, so
+      // the parser silently drops an <input> placed inside one.
+      var b = document.createElement('div');
       b.className = 'gbtn';
+      b.setAttribute('role', 'button');
       b.dataset.key = c.key;
-      b.innerHTML = '<span class="k"></span><span class="cf"></span>';
+      b.innerHTML = '<span class="k"></span>' +
+        '<input class="gn" type="text" placeholder="add a note" autocomplete="off" ' +
+        'autocapitalize="none" autocorrect="off" spellcheck="false" enterkeyhint="done">' +
+        '<span class="ge"></span><span class="cf"></span>';
       b.querySelector('.k').textContent = faceOf(c);
       b.style.background = c.hex;
+
+      var gn = b.querySelector('.gn');
+      // The note must not also be a tap on the category it sits inside.
+      gn.addEventListener('click', function (e) { if (e && e.stopPropagation) e.stopPropagation(); });
+      gn.addEventListener('input', function () {
+        if (S.open && S.open.key === c.key) noteChanged(gn.value);
+      });
+      gn.addEventListener('keydown', function (e) { if (e && e.key === 'Enter') gn.blur(); });
+
+      CELL[c.key] = { box: b, note: gn, el: b.querySelector('.ge') };
+      if (lonely && i === 0) b.style.gridColumn = 'span ' + cols;
       b.addEventListener('click', function () { confirmTap(b); tapCategory(c.key); });
       g.appendChild(b);
     });
@@ -607,6 +676,54 @@
     });
   }
 
+  /**
+   * The add box. Tapping it turns its label into the field that names the new
+   * category; naming it is the only chance to, since nothing here can be
+   * renamed afterwards.
+   */
+  function buildAddCell() {
+    var b = document.createElement('div');
+    b.className = 'gbtn addcell';
+    b.setAttribute('role', 'button');
+    b.dataset.add = '1';
+    b.innerHTML = '<span class="k">+</span>' +
+      '<input class="an" type="text" placeholder="name it" autocomplete="off" ' +
+      'autocapitalize="words" autocorrect="off" spellcheck="false" enterkeyhint="done">';
+    var an = b.querySelector('.an');
+
+    function commit() {
+      var name = (an.value || '').trim();
+      if (!name) { b.classList.remove('naming'); return; }
+      if (!hasRun) { showErr('cannot add a category while offline'); return; }
+      b.classList.add('busy');
+      google.script.run
+        .withSuccessHandler(function (cfg) {
+          hideErr();
+          CFG.categories = cfg.categories;
+          CATS = CFG.categories;
+          catByKey = {};
+          CATS.forEach(function (c) { catByKey[c.key] = c; });
+          buildGrid();
+          render();
+        })
+        .withFailureHandler(function (e) {
+          b.classList.remove('busy');
+          showErr(String((e && e.message) || e));
+        })
+        .addCategory(name);
+    }
+
+    an.addEventListener('click', function (e) { if (e && e.stopPropagation) e.stopPropagation(); });
+    an.addEventListener('keydown', function (e) { if (e && e.key === 'Enter') an.blur(); });
+    an.addEventListener('blur', commit);
+    b.addEventListener('click', function () {
+      if (b.classList.contains('busy')) return;
+      b.classList.add('naming');
+      an.focus();
+    });
+    return b;
+  }
+
   /** One beat, 140ms, on the button that was actually hit. */
   function confirmTap(b) {
     b.classList.add('tapped');
@@ -615,23 +732,6 @@
 
   function render() {
     var now = Date.now();
-    var bar = $('nowbar');
-    var note = $('note');
-
-    if (S.open) {
-      bar.classList.remove('idle');
-      $('nowEl').textContent = '● ' + fmtEl(now - S.open.startMs);
-      note.disabled = false;
-      note.placeholder = 'note';
-      bar.classList.toggle('long', (now - S.open.startMs) > CFG.longBlockMinutes * MS_MIN);
-    } else {
-      bar.classList.add('idle');
-      bar.classList.remove('long');
-      $('nowEl').textContent = '';
-      note.value = '';
-      note.disabled = true;
-      note.placeholder = 'nothing running';
-    }
 
     var seg = $('posture').children, lit = S.sit ? 'sit' : 'stand';
     for (var p = 0; p < seg.length; p++) {
@@ -643,21 +743,32 @@
 
     var kids = $('grid').children;
     for (var i = 0; i < kids.length; i++) {
-      var k = kids[i].dataset.key;
-      kids[i].classList.toggle('active', !!S.open && k === S.open.key);
+      var k = kids[i].dataset.key, cell = CELL[k];
+      if (!k) continue;                                   // the add box
+      var isOpen = !!S.open && k === S.open.key;
+      kids[i].classList.toggle('active', isOpen);
+      kids[i].classList.toggle('long',
+        isOpen && (now - S.open.startMs) > CFG.longBlockMinutes * MS_MIN);
+
       var isArmed = !!armed && armed.key === k;
       kids[i].classList.toggle('arming', isArmed);
-      var cf = kids[i].querySelector('.cf');
-      if (cf) cf.textContent = isArmed ? 'TAP AGAIN' : '';
+      if (cell) {
+        cell.el.textContent = isOpen ? '● ' + fmtEl(now - S.open.startMs) : '';
+        // Never overwrite what is being typed right now.
+        if (cell.note !== document.activeElement) cell.note.value = isOpen ? (S.open.text || '') : '';
+        var cf = kids[i].querySelector('.cf');
+        if (cf) cf.textContent = isArmed ? 'TAP AGAIN' : '';
+      }
     }
     paintSync();
   }
 
   function tick() {
     var now = Date.now();
-    if (S.open) {
-      $('nowEl').textContent = '● ' + fmtEl(now - S.open.startMs);
-      $('nowbar').classList.toggle('long', (now - S.open.startMs) > CFG.longBlockMinutes * MS_MIN);
+    if (S.open && CELL[S.open.key]) {
+      CELL[S.open.key].el.textContent = '● ' + fmtEl(now - S.open.startMs);
+      CELL[S.open.key].box.classList.toggle('long',
+        (now - S.open.startMs) > CFG.longBlockMinutes * MS_MIN);
     }
     if (S.sit) $('sitEl').textContent = '● ' + fmtEl(now - S.sit.startMs);
     else if (S.stoodAt) $('standEl').textContent = '● ' + fmtEl(now - S.stoodAt);
@@ -698,7 +809,6 @@
     S.open = { ref: newRef, key: key, text: '', startMs: at };
     S.lastTapMs = now;
     if (key === CFG.bodyKey) closeSit(now);
-    $('note').value = '';
     hideStrip();
     $('sheetSplit').classList.add('hidden');
     saveState(); render(); flush();
@@ -738,7 +848,6 @@
       S.stoodAt = S.sit ? null : (st.stoodSinceMs || null);
       S.lastTapMs = 0;
       render();
-      $('note').value = S.open ? (S.open.text || '') : '';
       saveState();
     }
   }
@@ -757,7 +866,6 @@
     }
     buildGrid();
     render();
-    $('note').value = S.open ? (S.open.text || '') : '';
 
     if (!hasRun) { showErr('google.script.run unavailable'); return; }
 
@@ -798,20 +906,6 @@
     var b = e.target.closest('button[data-posture]');
     if (b) setPosture(b.dataset.posture);
   });
-
-  $('note').addEventListener('input', function () {
-    if (!S.open) return;
-    S.open.text = $('note').value;
-    saveState();
-    if (noteTimer) clearTimeout(noteTimer);
-    var ref = S.open.ref, hint = S.open.startMs, val = S.open.text;
-    noteTimer = setTimeout(function () {
-      noteTimer = null;
-      enqueueText(ref, val, hint);   // belongs to the block that was open when typed
-      flush();
-    }, 900);
-  });
-  $('note').addEventListener('keydown', function (e) { if (e.key === 'Enter') $('note').blur(); });
 
   $('spClose').addEventListener('click', function () { $('sheetSplit').classList.add('hidden'); });
   $('spRange').addEventListener('input', renderSplit);

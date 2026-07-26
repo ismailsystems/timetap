@@ -129,6 +129,14 @@ surface of the app. There is no settings screen and there will never be one.
 - `CATEGORIES` — add or remove entries and the button grid, the rollup columns
   and the mark rules all follow. Nothing else needs editing. Keys become the
   `"KEY:"` title prefix, so keep them short and uppercase.
+  You can also add one from the grid itself: the `+` box names a category and
+  the app stores it in a script property called `EXTRA_CATEGORIES`, appended to
+  this array rather than merged into it. Delete that property to get back to
+  exactly what is written here. Categories cannot be renamed from either place,
+  because a key change would split every past event away from every future one
+  in the rollup.
+- `MAX_CATEGORIES` (10) — the ceiling on both together. The `+` box disappears
+  once you reach it.
   **Order matters ergonomically:** the grid fills from the bottom row upward,
   so the first entries land nearest your thumb and the last entries sit in the
   top corners. Put what you tap most at the top of the array.
