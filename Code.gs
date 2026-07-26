@@ -82,10 +82,15 @@ var UNLOGGED_COLOR = CalendarApp.EventColor.GRAY;
 var LONG_BLOCK_MINUTES = 90;
 
 /**
- * Ceiling on categories, counting both the array above and any added from the
- * grid's "+" box. The add box disappears once this many exist.
+ * Ceiling on how many categories the app will let you *add* from the grid's
+ * "+" box; the box disappears once this many exist. It is deliberately not a
+ * ceiling on CATEGORIES itself — silently discarding entries someone typed
+ * into the file is worse than a grid that is one row taller than intended.
  */
 var MAX_CATEGORIES = 10;
+
+/** A queued write that fails this many times is set aside instead of retried. */
+var MAX_OP_TRIES = 5;
 
 /**
  * The rollup spreadsheet. Create one, copy the id out of its URL
@@ -199,6 +204,7 @@ function clientConfig_() {
     markTimeoutMs: MARK_TIMEOUT_MS,
     longBlockMinutes: LONG_BLOCK_MINUTES,
     maxCategories: MAX_CATEGORIES,
+    maxOpTries: MAX_OP_TRIES,
     bodyKey: BODY_KEY,
     tz: Session.getScriptTimeZone()
   };
@@ -258,7 +264,22 @@ function extraCategories_() {
 }
 
 function allCategories_() {
-  return CATEGORIES.concat(extraCategories_()).slice(0, MAX_CATEGORIES);
+  var room = Math.max(0, MAX_CATEGORIES - CATEGORIES.length);
+  return CATEGORIES.concat(extraCategories_().slice(0, room));
+}
+
+/**
+ * Keys that used to be categories. The rollup still reports them, because the
+ * events are still on the calendar and a report that quietly forgot a month of
+ * them would be worse than a column of zeroes.
+ */
+function retiredKeys_() {
+  var raw = prop_('RETIRED_KEYS');
+  if (!raw) return [];
+  try {
+    var a = JSON.parse(raw);
+    return Array.isArray(a) ? a : [];
+  } catch (e) { return []; }
 }
 
 function catOf_(key) {
@@ -290,26 +311,80 @@ function nextColor_(taken) {
   return String((taken.length % 11) + 1);
 }
 
-/** Called from the grid's "+" box. Returns the config the client should adopt. */
+/**
+ * Called from the grid's "+" box. Returns the config the client should adopt.
+ *
+ * Locked, because this is read-modify-write on a single property: two clients
+ * adding at once without it and the second silently overwrites the first.
+ */
 function addCategory(label) {
   var name = String(label == null ? '' : label).replace(/\s+/g, ' ').trim().slice(0, 24);
   if (!name) throw new Error('A category needs a name.');
 
-  var all = allCategories_();
-  if (all.length >= MAX_CATEGORIES) {
-    throw new Error('That is ' + MAX_CATEGORIES + ' categories already.');
-  }
-  for (var i = 0; i < all.length; i++) {
-    if (all[i].label.toLowerCase() === name.toLowerCase()) {
-      throw new Error('There is already a category called ' + all[i].label + '.');
+  var lock = LockService.getUserLock();
+  try { lock.waitLock(20000); } catch (e) { throw new Error('Busy, try that again.'); }
+  try {
+    PROPS_ = null;                     // read fresh inside the lock, not before it
+    var all = allCategories_();
+    if (all.length >= MAX_CATEGORIES) {
+      throw new Error('That is ' + MAX_CATEGORIES + ' categories already.');
     }
-  }
+    for (var i = 0; i < all.length; i++) {
+      if (all[i].label.toLowerCase() === name.toLowerCase()) {
+        throw new Error('There is already a category called ' + all[i].label + '.');
+      }
+    }
 
-  var extras = extraCategories_();
-  extras.push({ key: keyFor_(name, all), label: name, color: nextColor_(all), autoMark: null });
-  PropertiesService.getScriptProperties().setProperty('EXTRA_CATEGORIES', JSON.stringify(extras));
-  PROPS_ = null;                       // the cache above is now a lie
-  return clientConfig_();
+    var extras = extraCategories_();
+    extras.push({ key: keyFor_(name, all.concat(retiredKeys_())), label: name,
+                  color: nextColor_(all), autoMark: null });
+    PropertiesService.getScriptProperties().setProperty('EXTRA_CATEGORIES', JSON.stringify(extras));
+    PROPS_ = null;                     // the cache is now a lie
+    return clientConfig_();
+  } finally {
+    try { lock.releaseLock(); } catch (e2) {}
+  }
+}
+
+/**
+ * Remove one added category without touching the others. Run it from the
+ * editor; there is deliberately no button for it, because a delete beside a
+ * logging control is a delete that happens by accident.
+ *
+ * Only categories added from the grid can go — the ones in CATEGORIES are
+ * yours to edit in the file. The key is remembered as retired so the rollup
+ * keeps reporting the events already logged under it.
+ */
+function removeCategory(key) {
+  var want = String(key == null ? '' : key).trim().toUpperCase();
+  if (!want) throw new Error('Which key?');
+
+  var lock = LockService.getUserLock();
+  try { lock.waitLock(20000); } catch (e) { throw new Error('Busy, try that again.'); }
+  try {
+    PROPS_ = null;
+    var extras = extraCategories_();
+    var keep = extras.filter(function (c) { return c.key !== want; });
+    if (keep.length === extras.length) {
+      if (CATEGORIES.some(function (c) { return c.key === want; })) {
+        throw new Error(want + ' is in the CATEGORIES array. Remove it from Code.gs.');
+      }
+      throw new Error('No added category with key ' + want + '.');
+    }
+    var gone = extras.filter(function (c) { return c.key === want; })[0];
+
+    var retired = retiredKeys_();
+    if (!retired.some(function (r) { return r.key === want; })) {
+      retired.push({ key: want, label: gone.label });
+    }
+    var props = PropertiesService.getScriptProperties();
+    props.setProperty('EXTRA_CATEGORIES', JSON.stringify(keep));
+    props.setProperty('RETIRED_KEYS', JSON.stringify(retired));
+    PROPS_ = null;
+    return 'removed ' + want + '; its history stays in the rollup';
+  } finally {
+    try { lock.releaseLock(); } catch (e2) {}
+  }
 }
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -528,8 +603,31 @@ function staleGuard_(cal, ev, isActual, notes) {
  * Ops — the offline queue drains through here, in order, idempotently
  * ═══════════════════════════════════════════════════════════════════ */
 
+/**
+ * A queued op is only as trustworthy as the localStorage it came out of. An op
+ * that cannot possibly succeed is dropped rather than thrown, because throwing
+ * would leave it at the head of the queue blocking every write behind it.
+ */
+function validOp_(op) {
+  if (!op || typeof op !== 'object') return false;
+  if (typeof op.type !== 'string' || !op.type) return false;
+  if (typeof op.id !== 'string' || !op.id) return false;
+  var ms = ['startMs', 'endMs', 'atMs', 'nowMs', 'hintMs'];
+  for (var i = 0; i < ms.length; i++) {
+    var v = op[ms[i]];
+    if (v !== undefined && v !== null && !(typeof v === 'number' && isFinite(v))) return false;
+  }
+  var refs = ['ref', 'newRef'];
+  for (var j = 0; j < refs.length; j++) {
+    var r = op[refs[j]];
+    if (r !== undefined && !/^[A-Za-z0-9]{4,64}$/.test(String(r))) return false;
+  }
+  if (op.mark !== undefined && op.mark !== null && '+=-'.indexOf(op.mark) < 0) return false;
+  return true;
+}
+
 function applyOps(ops) {
-  var out = { applied: [], errors: [] };
+  var out = { applied: [], errors: [], dropped: [] };
   if (!ops || !ops.length) return out;
 
   var lock = LockService.getUserLock();
@@ -539,6 +637,12 @@ function applyOps(ops) {
   }
   try {
     for (var i = 0; i < ops.length; i++) {
+      if (!validOp_(ops[i])) {
+        // Applied in the sense that the client should stop holding it.
+        out.dropped.push({ id: (ops[i] && ops[i].id) || null, op: ops[i] });
+        if (ops[i] && ops[i].id) out.applied.push(ops[i].id);
+        continue;
+      }
       try {
         applyOp_(ops[i]);
         out.applied.push(ops[i].id);
@@ -710,7 +814,7 @@ function dailyRollup() {
   var actual = readCal_(calId_('CAL_ACTUAL'),  firstDay, endMs);
   var sit    = readCal_(calId_('CAL_SITTING'), firstDay, endMs);
 
-  var keys = rollupKeys_(plan, actual);
+  var keys = rollupKeys_();
   var days = [];
   for (var i = 0; i < ROLLUP_DAYS; i++) {
     var s = addLocalDaysMs_(firstDay, i);
@@ -722,13 +826,19 @@ function dailyRollup() {
   return { days: days.length, categories: keys.length, sheet: ss.getUrl() };
 }
 
-/** Configured categories first, then anything else the calendars mention. */
-function rollupKeys_(plan, actual) {
+/**
+ * The keys the rollup reports: the ones you configured, the ones you retired,
+ * and UNLOGGED. Deliberately not "whatever the calendars mention".
+ *
+ * PLAN is hand-written by design, and parseTitle_ cannot tell a category from
+ * any other text before a colon: "9:00 standup" reads as key 9, "Dinner: with
+ * Ada" as DINNER, "Re: the thing" as RE. Discovering keys from titles turned
+ * ordinary calendar entries into columns and would have gone on doing it.
+ */
+function rollupKeys_() {
   var keys = allCategories_().map(function (c) { return c.key; });
-  plan.concat(actual).forEach(function (e) {
-    var p = parseTitle_(e.title);
-    if (p && keys.indexOf(p.key) < 0) keys.push(p.key);
-  });
+  retiredKeys_().forEach(function (r) { if (keys.indexOf(r.key) < 0) keys.push(r.key); });
+  keys.push('UNLOGGED');
   return keys;
 }
 

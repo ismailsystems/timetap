@@ -46,11 +46,11 @@
   /* No NOW bar. The note and the clock belong to the block that is running,
      and the block that is running is the lit box, so they live in it. Nothing
      is left for a bar at the top to hold. */
+  /* In the posture row, which is chrome, rather than floating over whichever
+     category happens to be in the top right corner. */
   #sync {
-    position: fixed; z-index: 25;
-    top: calc(var(--pad-t) + 8px); right: calc(var(--pad-x) + 8px);
-    display: flex; align-items: center; gap: 5px;
-    background: rgba(0, 0, 0, .62); border-radius: 20px; padding: 4px 8px;
+    flex: 0 0 auto; display: flex; align-items: center; gap: 5px;
+    padding: 0 11px; border-radius: 9px; background: var(--panel2);
   }
   #sync::after { content: ''; width: 9px; height: 9px; border-radius: 50%; background: #4b5057; }
   #sync.s-pending::after { background: var(--flag); }
@@ -244,12 +244,11 @@
 </style>
 
 <div id="app">
-  <div id="sync" class="s-synced"><span id="syncN"></span></div>
-
   <div id="grid"></div>
 
   <div id="postureRow">
     <div id="posture">
+      <div id="sync" class="s-synced"><span id="syncN"></span></div>
       <button id="postureBtn">
         <svg id="icSit" viewBox="0 0 24 24" aria-hidden="true">
           <circle cx="8.5" cy="4.6" r="2.4" fill="currentColor"/>
@@ -327,6 +326,7 @@
 
   var K_QUEUE = 'tt.queue.v1';
   var K_STATE = 'tt.state.v1';
+  var K_DEAD  = 'tt.dead.v1';
   var MS_MIN = 60000;
 
   var CATS = CFG.categories;
@@ -339,7 +339,7 @@
   var strip = null;          // {ref, key, durMs, hintMs, timer}
   var armed = null;          // {key, timer} — a tap waiting to be confirmed
   var CELL = {};             // key -> {box, note, el}, so the lit one is O(1)
-  var flushing = false, retryTimer = null, retryDelay = 4000;
+  var flushing = false, retryTimer = null, retryDelay = 4000, lastStateMs = 0;
   var noteTimer = null;
   var split = { atMs: 0, startMs: 0, nowMs: 0 };
   var sitEdit = { lo: 0, hi: 0, atMs: 0 };
@@ -437,8 +437,12 @@
         var done = {};
         (res.applied || []).forEach(function (id) { done[id] = 1; });
         setQueue(queue().filter(function (o) { return !done[o.id]; }));
+        if (res.dropped && res.dropped.length) {
+          showErr('discarded ' + res.dropped.length + ' malformed write' +
+                  (res.dropped.length > 1 ? 's' : ''));
+        }
         if (res.errors && res.errors.length) {
-          showErr(res.errors[0].message);
+          quarantine(res.errors[0]);
           setSync('failed');
           scheduleRetry();
         } else {
@@ -453,6 +457,37 @@
         scheduleRetry();
       })
       .applyOps(q.slice(0, 40));
+  }
+
+  /**
+   * A server-side failure is counted against the op that caused it. Past
+   * MAX_OP_TRIES the op is set aside, because it sits at the head of the queue
+   * and every write behind it is waiting on something that is not going to
+   * work. Network failures are not counted: those are the case retrying is for.
+   */
+  function quarantine(err) {
+    var q = queue(), i = -1;
+    for (var n = 0; n < q.length; n++) if (q[n].id === err.id) { i = n; break; }
+    if (i < 0) { showErr(err.message); return; }
+
+    q[i].tries = (q[i].tries || 0) + 1;
+    if (q[i].tries < CFG.maxOpTries) {
+      setQueue(q);
+      showErr(err.message + ' (attempt ' + q[i].tries + ' of ' + CFG.maxOpTries + ')');
+      return;
+    }
+    var dead = ls(K_DEAD, []);
+    if (!Array.isArray(dead)) dead = [];
+    dead.push({ at: Date.now(), why: err.message, op: q[i] });
+    lsSet(K_DEAD, dead.slice(-50));
+    q.splice(i, 1);
+    setQueue(q);
+    showErr('gave up on one write and set it aside: ' + err.message);
+  }
+
+  function deadCount() {
+    var d = ls(K_DEAD, []);
+    return Array.isArray(d) ? d.length : 0;
   }
 
   function scheduleRetry() {
@@ -872,6 +907,10 @@
     }
     buildGrid();
     render();
+    if (deadCount()) {
+      showErr(deadCount() + ' write' + (deadCount() > 1 ? 's' : '') +
+              ' were set aside after repeated failures');
+    }
 
     if (!hasRun) { showErr('google.script.run unavailable'); return; }
 
@@ -896,9 +935,27 @@
 
   function loadServerState() {
     google.script.run
-      .withSuccessHandler(function (st) { hideErr(); adoptServerState(st); })
+      .withSuccessHandler(function (st) {
+        lastStateMs = Date.now();
+        hideErr();
+        adoptServerState(st);
+      })
       .withFailureHandler(function (e) { showErr(String((e && e.message) || e)); })
       .getState();
+  }
+
+  /**
+   * The stale guard lives in getState, so it only ever ran on a page load — and
+   * a home screen web app can stay warm for days. Coming back to it counts as
+   * arriving: re-read if the state is stale, or if the open block has already
+   * outrun the bound the guard would have put on it.
+   */
+  function refreshOnReturn() {
+    if (!hasRun || queue().length) return;
+    var now = Date.now();
+    var overdue = (now - lastStateMs) > 10 * 60000;
+    var runaway = S.open && (now - S.open.startMs) > CFG.staleOpenHours * 3600000;
+    if (overdue || runaway) loadServerState();
   }
 
   /* ── wiring ────────────────────────────────────────────────── */
@@ -935,7 +992,11 @@
 
   window.addEventListener('online', function () { retryDelay = 4000; flush(); });
   document.addEventListener('visibilitychange', function () {
-    if (!document.hidden) { retryDelay = 4000; flush(); render(); }
+    if (document.hidden) return;
+    retryDelay = 4000;
+    flush();
+    render();
+    refreshOnReturn();
   });
 
   setInterval(tick, 1000);
