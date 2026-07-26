@@ -69,6 +69,23 @@ var UNLOGGED_COLOR = CalendarApp.EventColor.GRAY;
 /** Flag the NOW bar once the open block passes this. Purely visual. */
 var LONG_BLOCK_MINUTES = 90;
 
+/**
+ * The rollup spreadsheet. Create one, copy the id out of its URL
+ * (docs.google.com/spreadsheets/d/THIS_PART/edit) and paste it here — or set a
+ * script property named SHEET_ID instead, same as the calendars. See SETUP.md 9.
+ */
+var SHEET_ID = '';
+
+/** Tab names. Both are rebuilt from scratch on every run. */
+var DAILY_TAB  = 'daily';
+var WEEKLY_TAB = 'weekly';
+
+/** How far back each run rebuilds. Cheap: three calendar reads regardless. */
+var ROLLUP_DAYS = 90;
+
+/** Hour of the day the trigger fires, in the script timezone. */
+var ROLLUP_HOUR = 3;
+
 /* ═══════════════════════════════════════════════════════════════════
  * Constants — not configuration
  * ═══════════════════════════════════════════════════════════════════ */
@@ -598,88 +615,200 @@ function opDeleteSit_(op) {
 }
 
 /* ═══════════════════════════════════════════════════════════════════
- * Week — raw numbers, and nothing else
+ * Rollup — raw numbers into a spreadsheet, and nothing else
+ *
+ * There is no week screen. The numbers go to a sheet on a daily trigger and
+ * you read them where you do your thinking, which was never the phone.
+ *
+ * Both tabs are rebuilt from the calendars on every run, for the whole
+ * ROLLUP_DAYS window. That makes the job idempotent, lets a retroactive
+ * calendar edit correct itself, and keeps the columns honest when CATEGORIES
+ * changes. It also means these tabs are generated output: anything you type
+ * into them is erased overnight. Put your own work in another tab and point
+ * formulas at these.
  * ═══════════════════════════════════════════════════════════════════ */
 
-function getWeek(offsetWeeks) {
-  var startMs = mondayStartMs_(Date.now(), offsetWeeks || 0);
-  var dayStarts = [];
-  for (var i = 0; i < 8; i++) dayStarts.push(addLocalDaysMs_(startMs, i));
-  var endMs = dayStarts[7];
+/** Entry point for the daily time-driven trigger. Safe to run by hand. */
+function dailyRollup() {
+  var ss = openSheet_();
+  var todayStart = localMidnightMs_(Date.now());
+  var firstDay = addLocalDaysMs_(todayStart, -(ROLLUP_DAYS - 1));
+  var endMs = addLocalDaysMs_(todayStart, 1);
 
-  var plan   = readCal_(calId_('CAL_PLAN'),    startMs, endMs);
-  var actual = readCal_(calId_('CAL_ACTUAL'),  startMs, endMs);
-  var sit    = readCal_(calId_('CAL_SITTING'), startMs, endMs);
+  var plan   = readCal_(calId_('CAL_PLAN'),    firstDay, endMs);
+  var actual = readCal_(calId_('CAL_ACTUAL'),  firstDay, endMs);
+  var sit    = readCal_(calId_('CAL_SITTING'), firstDay, endMs);
 
-  var planH = {}, actH = {}, switches = [0, 0, 0, 0, 0, 0, 0];
-  var order = [];
-  CATEGORIES.forEach(function (c) { order.push(c.key); planH[c.key] = 0; actH[c.key] = 0; });
-
-  function bump(map, key, hours) {
-    if (!(key in map)) { map[key] = 0; if (order.indexOf(key) < 0) order.push(key); }
-    map[key] += hours;
+  var keys = rollupKeys_(plan, actual);
+  var days = [];
+  for (var i = 0; i < ROLLUP_DAYS; i++) {
+    var s = addLocalDaysMs_(firstDay, i);
+    days.push(dayStats_(s, addLocalDaysMs_(s, 1), plan, actual, sit, keys));
   }
+
+  writeGrid_(ss, DAILY_TAB, dailyGrid_(days, keys));
+  writeGrid_(ss, WEEKLY_TAB, weeklyGrid_(days, keys));
+  return { days: days.length, categories: keys.length, sheet: ss.getUrl() };
+}
+
+/** Configured categories first, then anything else the calendars mention. */
+function rollupKeys_(plan, actual) {
+  var keys = CATEGORIES.map(function (c) { return c.key; });
+  plan.concat(actual).forEach(function (e) {
+    var p = parseTitle_(e.title);
+    if (p && keys.indexOf(p.key) < 0) keys.push(p.key);
+  });
+  return keys;
+}
+
+/** Everything the day is, as numbers. No ratios, no commentary. */
+function dayStats_(lo, hi, plan, actual, sit, keys) {
+  var d = { ms: lo, ymd: ymd_(lo), dow: new Date(lo).getDay(),
+            plan: {}, actual: {}, switches: 0, waking: 0, sitting: 0,
+            longestSit: 0, sitsOver90: 0 };
+  keys.forEach(function (k) { d.plan[k] = 0; d.actual[k] = 0; });
 
   plan.forEach(function (e) {
     var p = parseTitle_(e.title);
-    if (!p) return;
-    bump(planH, p.key, clipHours_(e, startMs, endMs));
-    if (!(p.key in actH)) actH[p.key] = 0;
+    if (p && (p.key in d.plan)) d.plan[p.key] += clipHours_(e, lo, hi);
   });
 
+  var first = null, last = null;
   actual.forEach(function (e) {
     var p = parseTitle_(e.title);
-    if (p) {
-      bump(actH, p.key, clipHours_(e, startMs, endMs));
-      if (!(p.key in planH)) planH[p.key] = 0;
-    }
-    var d = dayIndex_(e.start, dayStarts);
-    if (d >= 0) switches[d]++;
-  });
-
-  // Waking span per day: first ACTUAL start -> last ACTUAL end, clipped to the day.
-  var wakingH = 0;
-  for (var d = 0; d < 7; d++) {
-    var lo = dayStarts[d], hi = dayStarts[d + 1];
-    var first = null, last = null;
-    actual.forEach(function (e) {
-      var s = Math.max(e.start, lo), t = Math.min(e.end, hi);
-      if (!(t > s)) return;
+    if (p && (p.key in d.actual)) d.actual[p.key] += clipHours_(e, lo, hi);
+    if (e.start >= lo && e.start < hi) d.switches++;
+    var s = Math.max(e.start, lo), t = Math.min(e.end, hi);
+    if (t > s) {
       if (first === null || s < first) first = s;
       if (last === null || t > last) last = t;
-    });
-    if (first !== null && last !== null && last > first) wakingH += (last - first) / MS_HOUR;
-  }
+    }
+  });
+  if (first !== null && last > first) d.waking = (last - first) / MS_HOUR;
 
-  var sitH = 0, longest = 0, over90 = 0;
   sit.forEach(function (e) {
-    var s = Math.max(e.start, startMs), t = Math.min(e.end, endMs);
-    var ms = t - s;
+    var ms = Math.min(e.end, hi) - Math.max(e.start, lo);
     if (!(ms > 0)) return;
-    sitH += ms / MS_HOUR;
-    if (ms > longest) longest = ms;
-    if (ms > 90 * MS_MIN) over90++;
+    d.sitting += ms / MS_HOUR;
+    if (ms > d.longestSit) d.longestSit = ms;
+    if (ms > 90 * MS_MIN) d.sitsOver90++;
   });
-
-  var L = [];
-  L.push(ymd_(startMs) + ' .. ' + ymd_(dayStarts[6]));
-  L.push('');
-  order.forEach(function (k) {
-    var ph = planH[k] || 0, ah = actH[k] || 0;
-    if (ph === 0 && ah === 0 && !catOf_(k)) return;
-    var ratio = ph > 0 ? (Math.round((ah / ph) * 100) / 100).toFixed(2) : '-';
-    L.push(pad_(k, 6) + lpad_(fmtH_(ph), 6) + ' -> ' + pad_(fmtH_(ah), 7) + lpad_(ratio, 5));
-  });
-  L.push('');
-  L.push('switches/day:' + switches.map(function (n) { return lpad_(String(n), 4); }).join(''));
-  L.push('');
-  L.push(pad_('SITTING', 10) + fmtH_(sitH) + 'h / ' + fmtH_(wakingH) + 'h waking' +
-    lpad_(wakingH > 0 ? Math.round((sitH / wakingH) * 100) + '%' : '-', 7));
-  L.push(pad_('longest unbroken sit', 24) + fmtHM_(longest));
-  L.push(pad_('sits over 90 min', 24) + String(over90));
-
-  return { text: L.join('\n'), startMs: startMs, endMs: endMs, offset: offsetWeeks || 0 };
+  return d;
 }
+
+var DOW_ = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+/** One row per day. The rawest thing the calendars can say. */
+function dailyGrid_(days, keys) {
+  var head = ['date', 'day'];
+  keys.forEach(function (k) { head.push(k); });
+  keys.forEach(function (k) { head.push('plan ' + k); });
+  head = head.concat(['switches', 'waking h', 'sitting h', 'sitting %',
+                      'longest sit min', 'sits over 90']);
+
+  var rows = [head];
+  days.forEach(function (d) {
+    var r = [d.ymd, DOW_[d.dow]];
+    keys.forEach(function (k) { r.push(round2_(d.actual[k])); });
+    keys.forEach(function (k) { r.push(round2_(d.plan[k])); });
+    r.push(d.switches, round2_(d.waking), round2_(d.sitting),
+           d.waking > 0 ? round2_(d.sitting / d.waking) : '',
+           Math.round(d.longestSit / MS_MIN), d.sitsOver90);
+    rows.push(r);
+  });
+  return rows;
+}
+
+/** The same numbers grouped Monday to Sunday, with the planned-versus-actual
+    ratio the weekly ritual actually compares. */
+function weeklyGrid_(days, keys) {
+  var head = ['week of'];
+  keys.forEach(function (k) { head.push('plan ' + k, k, k + ' ratio'); });
+  head = head.concat(['switches', 'waking h', 'sitting h', 'sitting %',
+                      'longest sit min', 'sits over 90']);
+
+  var weeks = [], index = {};
+  days.forEach(function (d) {
+    var wk = ymd_(mondayStartMs_(d.ms, 0));
+    if (!(wk in index)) {
+      index[wk] = weeks.length;
+      var blank = { wk: wk, plan: {}, actual: {}, switches: 0, waking: 0,
+                    sitting: 0, longestSit: 0, sitsOver90: 0 };
+      keys.forEach(function (k) { blank.plan[k] = 0; blank.actual[k] = 0; });
+      weeks.push(blank);
+    }
+    var w = weeks[index[wk]];
+    keys.forEach(function (k) { w.plan[k] += d.plan[k]; w.actual[k] += d.actual[k]; });
+    w.switches += d.switches;
+    w.waking += d.waking;
+    w.sitting += d.sitting;
+    w.sitsOver90 += d.sitsOver90;
+    if (d.longestSit > w.longestSit) w.longestSit = d.longestSit;
+  });
+
+  var rows = [head];
+  weeks.forEach(function (w) {
+    var r = [w.wk];
+    keys.forEach(function (k) {
+      r.push(round2_(w.plan[k]), round2_(w.actual[k]),
+             w.plan[k] > 0 ? round2_(w.actual[k] / w.plan[k]) : '');
+    });
+    r.push(w.switches, round2_(w.waking), round2_(w.sitting),
+           w.waking > 0 ? round2_(w.sitting / w.waking) : '',
+           Math.round(w.longestSit / MS_MIN), w.sitsOver90);
+    rows.push(r);
+  });
+  return rows;
+}
+
+function round2_(n) { return Math.round((n || 0) * 100) / 100; }
+
+/* ── the spreadsheet ────────────────────────────────────────────── */
+
+function openSheet_() {
+  var id = prop_('SHEET_ID') || String(SHEET_ID || '').trim();
+  if (!id) {
+    throw new Error('SHEET_ID is not set. Create a spreadsheet, take the id out ' +
+      'of its URL, and put it in the CONFIG block of Code.gs or in a script ' +
+      'property named SHEET_ID.');
+  }
+  var ss = SpreadsheetApp.openById(id);
+  if (!ss) throw new Error('SHEET_ID does not resolve to a spreadsheet you can open: ' + id);
+  return ss;
+}
+
+/** Replace the tab's contents wholesale. Values only: no formatting opinions. */
+function writeGrid_(ss, tabName, rows) {
+  var sh = ss.getSheetByName(tabName) || ss.insertSheet(tabName);
+  sh.clear();
+  if (!rows.length) return;
+  var width = 0;
+  rows.forEach(function (r) { if (r.length > width) width = r.length; });
+  rows.forEach(function (r) { while (r.length < width) r.push(''); });
+  sh.getRange(1, 1, rows.length, width).setValues(rows);
+  sh.setFrozenRows(1);
+}
+
+/* ── the trigger ────────────────────────────────────────────────── */
+
+/**
+ * Run once from the editor. Idempotent: clears any trigger it previously made
+ * before installing the new one, so running it twice does not double up.
+ */
+function installDailyTrigger() {
+  removeDailyTrigger();
+  ScriptApp.newTrigger('dailyRollup').timeBased().atHour(ROLLUP_HOUR).everyDays(1).create();
+  return 'dailyRollup will run daily around ' + ROLLUP_HOUR + ':00 ' + tz_();
+}
+
+function removeDailyTrigger() {
+  var gone = 0;
+  ScriptApp.getProjectTriggers().forEach(function (t) {
+    if (t.getHandlerFunction() === 'dailyRollup') { ScriptApp.deleteTrigger(t); gone++; }
+  });
+  return 'removed ' + gone;
+}
+
 
 /** Reads are tolerant: an unconfigured or unreadable calendar contributes nothing. */
 function readCal_(id, startMs, endMs) {
@@ -705,24 +834,3 @@ function clipHours_(e, lo, hi) {
   var ms = Math.min(e.end, hi) - Math.max(e.start, lo);
   return ms > 0 ? ms / MS_HOUR : 0;
 }
-
-function dayIndex_(ms, dayStarts) {
-  for (var i = 0; i < 7; i++) if (ms >= dayStarts[i] && ms < dayStarts[i + 1]) return i;
-  return -1;
-}
-
-function fmtH_(h) {
-  if (!h) return '0';
-  var s = (Math.round(h * 100) / 100).toFixed(2);
-  return s.replace(/0$/, '');
-}
-
-function fmtHM_(ms) {
-  if (!(ms > 0)) return '0m';
-  var mins = Math.round(ms / MS_MIN);
-  var h = Math.floor(mins / 60), m = mins % 60;
-  return h ? (h + 'h ' + m + 'm') : (m + 'm');
-}
-
-function pad_(s, n)  { s = String(s); return s.length >= n ? s + ' ' : s + new Array(n - s.length + 1).join(' '); }
-function lpad_(s, n) { s = String(s); return s.length >= n ? ' ' + s : new Array(n - s.length + 1).join(' ') + s; }

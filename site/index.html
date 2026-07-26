@@ -48,8 +48,8 @@
 
   <h2>Files</h2>
   <ul class="files">
-    <li><span class="n"><a href="src/appsscript.json.txt">appsscript.json</a></span><span class="d">Manifest. One OAuth scope. Set your timezone here.</span></li>
-    <li><span class="n"><a href="src/Code.gs.txt">Code.gs</a></span><span class="d">Server. CONFIG block, calendar reads and writes, week aggregation.</span></li>
+    <li><span class="n"><a href="src/appsscript.json.txt">appsscript.json</a></span><span class="d">Manifest. Three OAuth scopes. Set your timezone here.</span></li>
+    <li><span class="n"><a href="src/Code.gs.txt">Code.gs</a></span><span class="d">Server. CONFIG block, calendar reads and writes, the nightly rollup.</span></li>
     <li><span class="n"><a href="src/Index.html.txt">Index.html</a></span><span class="d">Client. All HTML, CSS and JS inlined. No CDN, no build step.</span></li>
     <li><span class="n"><a href="setup.html">SETUP.md</a></span><span class="d">Deployment steps and the required Google Calendar settings. <a class="raw" href="src/SETUP.md.txt">raw</a></span></li>
   </ul>
@@ -70,10 +70,10 @@
 │  Deep work   │   Meetings   │
 ├──────────────┴──────────────┤
 │  ▣ SITTING           ● 1h12 │
-├──────────────┬──────────────┤
-│    SPLIT     │     WEEK     │
-└──────────────┴──────────────┘</pre>
-  <p>The grid fills from the bottom row up, so the first entries in <code>CATEGORIES</code> land nearest your thumb. The note lives in the NOW bar, beside the block it describes. When a closed block earns a mark, the <code>+ = -</code> strip takes the place of SPLIT and WEEK for six seconds — same row, same height, so nothing above it moves.</p>
+├─────────────────────────────┤
+│            SPLIT            │
+└─────────────────────────────┘</pre>
+  <p>The grid fills from the bottom row up, so the first entries in <code>CATEGORIES</code> land nearest your thumb. The note lives in the NOW bar, beside the block it describes. When a closed block earns a mark, the <code>+ = -</code> strip takes the place of SPLIT for six seconds — same row, same height, so nothing above it moves.</p>
 
   <h2>The mark</h2>
   <p>The mark belongs to the block that just <em>closed</em>, captured at the transition — the one moment you both know how it went and are already holding the phone. Never asked for on a block that is starting.</p>
@@ -83,20 +83,11 @@
   <p>Sitting is an overlay, not a seventh category. Categories are a partition — exactly one true at a time. You sit <em>while</em> doing deep work, meetings, meals. Only sitting is logged; standing is never written, and non-sitting time is computed at review as waking span minus sitting.</p>
   <p>The only coupling in the entire app: tapping <code>BODY</code> closes an open SIT block. That is definitional, not inference. No accelerometer, no screen time, no heuristics, ever.</p>
 
-  <h2>The week</h2>
-<pre>DW    12.0 -> 8.25   0.69
-MTG    7.5 -> 10.0   1.33
-ADM    5.0 -> 6.5    1.30
-BODY   3.75 -> 3.0   0.80
-REL    8.0 -> 8.5    1.06
-FRAG      0 -> 3.75    -
-
-switches/day:  9  7  12  6  11
-
-SITTING   64.5h / 98h waking   66%
-longest unbroken sit    2h 50m
-sits over 90 min        7</pre>
-  <p>Monospace, selectable, copyable. No charts. No colours. No highlighting of problem rows. No commentary. No totals versus last week. The numbers, and nothing else.</p>
+  <h2>The numbers</h2>
+  <p>There is no week screen. A daily trigger rebuilds two tabs of a Google Sheet straight from the calendars, and you read them where you do your thinking — which was never a phone.</p>
+  <p><code>daily</code> is one row per day for ninety days: hours per category, planned hours per category, switches, waking span, sitting hours, sitting percentage, longest unbroken sit, sits over ninety minutes. <code>weekly</code> is the same numbers grouped Monday to Sunday with the planned-versus-actual ratio the weekly ritual compares.</p>
+  <p>Both tabs are rebuilt from scratch on every run rather than appended to. That makes the job idempotent, lets a calendar you correct on Thursday fix Tuesday's row, and keeps the columns honest when the category list changes. It also makes them generated output: put your own work in another tab and point formulas at these.</p>
+  <p>Everything is a real number rather than a padded string, so the spreadsheet will sum, pivot and chart it without being asked twice. The app emits the grid and stops. No charts, no highlighting of problem rows, no commentary, no comparison to last week — the spreadsheet will do all of that if <em>you</em> ask it to.</p>
 
   <h2>Non-goals</h2>
   <ul class="plain">

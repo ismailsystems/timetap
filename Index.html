@@ -108,7 +108,7 @@
      button, so the pressed state has to work against any hue */
   .gbtn:active, .gbtn.tapped { filter: brightness(.86); transform: scale(.975); }
   /* The label as written in CONFIG, verbatim. The key still prefixes the
-     calendar title and names the week report row; it is not what you aim at.
+     calendar title and heads the rollup's columns; it is not what you aim at.
      White on a black highlight is 21:1 on every button, so legibility stops
      depending on which colour the category happens to be. */
   .gbtn .k {
@@ -163,13 +163,6 @@
   .vhead { display: flex; gap: 6px; align-items: center; flex: 0 0 48px; }
   .vhead .fbtn { flex: 0 0 auto; padding: 0 18px; height: 100%; }
   .vtitle { flex: 1; text-align: center; font-size: 12px; font-weight: 700; letter-spacing: .17em; color: var(--dim); }
-  #weekout {
-    flex: 1; overflow: auto; margin: 0; padding: 14px;
-    background: var(--panel); border-radius: 10px;
-    font: 400 13px/1.55 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-    white-space: pre; color: var(--fg);
-    user-select: text; -webkit-user-select: text;
-  }
   .sheetbody { flex: 1; overflow: auto; display: flex; flex-direction: column; gap: 10px; }
   .card { background: var(--panel); border-radius: 10px; padding: 15px; }
   .card .lab { font-size: 11px; font-weight: 700; letter-spacing: .17em; color: var(--dim); margin-bottom: 9px; }
@@ -219,7 +212,6 @@
   <div id="footer">
     <div id="footBtns">
       <button id="btnSplit" class="fbtn">SPLIT</button>
-      <button id="btnWeek" class="fbtn">WEEK</button>
     </div>
     <div id="strip" class="hidden">
       <div id="stripHead"></div>
@@ -232,17 +224,6 @@
   </div>
 
   <div id="err" class="hidden"></div>
-</div>
-
-<!-- ── week ─────────────────────────────────────────────────────── -->
-<div id="week" class="view hidden">
-  <div class="vhead">
-    <button id="wPrev" class="fbtn">&larr;</button>
-    <div class="vtitle">WEEK</div>
-    <button id="wNext" class="fbtn">&rarr;</button>
-    <button id="wClose" class="fbtn">DONE</button>
-  </div>
-  <pre id="weekout">loading</pre>
 </div>
 
 <!-- ── split ────────────────────────────────────────────────────── -->
@@ -307,7 +288,6 @@
   var noteTimer = null;
   var split = { atMs: 0, startMs: 0, nowMs: 0 };
   var sitEdit = { lo: 0, hi: 0, atMs: 0 };
-  var weekOffset = 0;
 
   var $ = function (id) { return document.getElementById(id); };
   var hasRun = (typeof google !== 'undefined' && google.script && google.script.run);
@@ -679,23 +659,6 @@
     $('ssSub').textContent = fmtDur(Date.now() - sitEdit.atMs) + ' sitting';
   }
 
-  /* ── week ──────────────────────────────────────────────────── */
-
-  function openWeek() {
-    weekOffset = 0;
-    $('week').classList.remove('hidden');
-    loadWeek();
-  }
-
-  function loadWeek() {
-    $('weekout').textContent = 'loading';
-    if (!hasRun) { $('weekout').textContent = 'offline'; return; }
-    google.script.run
-      .withSuccessHandler(function (r) { $('weekout').textContent = r.text; })
-      .withFailureHandler(function (e) { $('weekout').textContent = String((e && e.message) || e); })
-      .getWeek(weekOffset);
-  }
-
   /* ── boot ──────────────────────────────────────────────────── */
 
   function adoptServerState(st) {
@@ -795,11 +758,6 @@
     }
     $('sheetSit').classList.add('hidden');
   });
-
-  $('btnWeek').addEventListener('click', openWeek);
-  $('wClose').addEventListener('click', function () { $('week').classList.add('hidden'); });
-  $('wPrev').addEventListener('click', function () { weekOffset--; loadWeek(); });
-  $('wNext').addEventListener('click', function () { weekOffset++; loadWeek(); });
 
   window.addEventListener('online', function () { retryDelay = 4000; flush(); });
   document.addEventListener('visibilitychange', function () {

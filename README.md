@@ -55,6 +55,16 @@ The only coupling in the entire app: tapping `BODY` closes an open SIT block.
 That is definitional, not inference. No accelerometer, no screen time, no
 heuristics, ever.
 
+### The numbers
+
+There is no week screen. A daily trigger rebuilds two tabs of a Google Sheet
+from the calendars — `daily`, one row per day for ninety days, and `weekly`,
+the same numbers grouped Monday to Sunday with the planned-versus-actual ratio.
+Both are rebuilt rather than appended, so the job is idempotent and a
+retroactive calendar edit corrects itself.
+
+The app emits the grid and stops. No charts, no highlighting, no commentary.
+
 ## Non-goals
 
 No notifications. No automatic detection of anything. No streaks, scores or

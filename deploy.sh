@@ -7,7 +7,7 @@
 #   ./deploy.sh --no-pull        skip the git pull
 #
 # Requires clasp (npm install -g @google/clasp), a clasp login, and a
-# .clasp.json pointing at your script. See SETUP.md section 9.
+# .clasp.json pointing at your script. See SETUP.md section 10.
 
 set -euo pipefail
 
@@ -29,7 +29,7 @@ for arg in "$@"; do
 done
 
 command -v clasp >/dev/null 2>&1 || die "clasp is not installed. npm install -g @google/clasp"
-[ -f .clasp.json ] || die ".clasp.json not found. See SETUP.md section 9 for how to create it."
+[ -f .clasp.json ] || die ".clasp.json not found. See SETUP.md section 10 for how to create it."
 if grep -q 'YOUR_SCRIPT_ID' .clasp.json 2>/dev/null; then
   die ".clasp.json still holds the placeholder scriptId.
 

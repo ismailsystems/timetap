@@ -66,15 +66,21 @@ Now paste, replacing the entire contents of each file:
 **Set the timezone** in `appsscript.json`. It ships as
 `"timeZone": "America/New_York"` — change it to your own
 [IANA zone](https://en.wikipedia.org/wiki/List_of_tz_database_time_zones)
-(`Europe/London`, `America/Los_Angeles`, `Asia/Tokyo`, …). Everything the app
-does with day boundaries and the week window reads from this one value via
-`Session.getScriptTimeZone()`.
+(`Europe/London`, `America/Los_Angeles`, `Asia/Tokyo`, …). Every day boundary,
+the rollup window and the hour the nightly trigger fires all read from this one
+value via `Session.getScriptTimeZone()`.
 
 **Save** (⌘S / Ctrl-S).
 
 The Advanced Calendar Service is **not** required. Every write goes through
-`CalendarApp`, so the manifest needs exactly one scope,
-`https://www.googleapis.com/auth/calendar`, and nothing under `dependencies`.
+`CalendarApp`, and nothing belongs under `dependencies`. The manifest asks for
+three scopes and no more:
+
+| Scope | For |
+|---|---|
+| `.../auth/calendar` | reading PLAN, writing ACTUAL and SITTING |
+| `.../auth/spreadsheets` | the nightly rollup (section 9) |
+| `.../auth/script.scriptapp` | installing the nightly trigger |
 
 ---
 
@@ -120,7 +126,7 @@ literals here — but confusing, so do not.
 While you are there, the rest of the CONFIG block is the whole settings
 surface of the app. There is no settings screen and there will never be one.
 
-- `CATEGORIES` — add or remove entries and the button grid, the week report
+- `CATEGORIES` — add or remove entries and the button grid, the rollup columns
   and the mark rules all follow. Nothing else needs editing. Keys become the
   `"KEY:"` title prefix, so keep them short and uppercase.
   **Order matters ergonomically:** the grid fills from the bottom row upward,
@@ -128,8 +134,8 @@ surface of the app. There is no settings screen and there will never be one.
   top corners. Put what you tap most at the top of the array.
   The button shows the `label`, verbatim and full size, so write it the way you
   want to read it. The `key` never appears on the grid — it is the record's
-  vocabulary: the `"KEY:"` prefix on every ACTUAL event and the row name in the
-  week report. Long labels wrap to two lines and still fit.
+  vocabulary: the `"KEY:"` prefix on every ACTUAL event and the column headers
+  in the rollup sheet. Long labels wrap to two lines and still fit.
 - `autoMark` — `'+'`, `'='`, `'-'` or `null`. Non-null means that category
   never shows the mark strip; the mark is applied silently. `null` means the
   strip may appear.
@@ -140,6 +146,8 @@ surface of the app. There is no settings screen and there will never be one.
 - `MARK_TIMEOUT_MS` (6000) — how long the strip waits before applying `=`.
 - `BODY_KEY` (`'BODY'`) — the one category whose tap closes an open SIT block.
   Set it to `''` to remove even that coupling.
+- `SHEET_ID`, `DAILY_TAB`, `WEEKLY_TAB`, `ROLLUP_DAYS`, `ROLLUP_HOUR` — the
+  nightly rollup. See section 9.
 
 Save.
 
@@ -157,7 +165,11 @@ Save.
 → **Deploy** → **Authorize access** → pick your account → "Google hasn't
 verified this app" → **Advanced** → **Go to timetap (unsafe)** → **Allow**.
 The warning is expected: it is your own unpublished script asking for your own
-calendar.
+calendar, spreadsheet and triggers.
+
+If you are updating an existing deployment and the scopes have changed, Google
+will ask you to authorize again. Run any function from the editor once and
+approve the new list, or the trigger will fail silently overnight.
 
 Copy the **Web app URL** (`https://script.google.com/macros/s/AKfy…/exec`).
 
@@ -274,15 +286,77 @@ For **PLAN**:
    titled `DW:`, same start time. That is the mis-tap rule.
 4. Toggle `SITTING` on. A `SIT` event appears on the SITTING calendar. Tap
    `BODY`. The SIT block closes at that instant and nothing else moves.
-5. Tap `W`. The week screen renders numbers. It is monospace and selectable —
-   long-press to copy the whole block into whatever you review in.
+5. In the editor, run `dailyRollup` once by hand and open your spreadsheet.
+   The `daily` and `weekly` tabs should be full of numbers.
 
 If the sync dot sits red, the message under it names the cause. The two common
 ones are an empty `CAL_ACTUAL` and a calendar ID pasted with a trailing space.
 
 ---
 
-## 9. Push from the repo instead of pasting (optional)
+## 9. The rollup spreadsheet
+
+There is no week screen in the app. The numbers go to a Google Sheet on a daily
+trigger, and you read them where you actually think — which was never a phone.
+
+**Create a spreadsheet.** Any blank one. Copy the id out of its URL:
+
+```
+https://docs.google.com/spreadsheets/d/THIS_LONG_PART_HERE/edit
+```
+
+**Tell the app about it**, the same two ways the calendars work — a script
+property named `SHEET_ID` (preferred, and required if you sync with clasp), or
+the `SHEET_ID` literal in the CONFIG block.
+
+**Install the trigger.** In the editor, pick `installDailyTrigger` from the
+function dropdown and **Run**. It is idempotent: it clears any trigger it
+previously made, so running it twice does not give you two. `removeDailyTrigger`
+undoes it. You can also add the trigger by hand under the clock icon in the left
+sidebar — time-driven, day timer, function `dailyRollup`.
+
+Run `dailyRollup` once by hand to confirm it works rather than waiting until
+3am to find out.
+
+### What lands in the sheet
+
+Two tabs, both rebuilt from the calendars on every run.
+
+`daily` — one row per day, ninety days back:
+
+| date | day | DW | MTG | … | plan DW | … | switches | waking h | sitting h | sitting % | longest sit min | sits over 90 |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+
+`weekly` — the same numbers grouped Monday to Sunday, with the planned-versus-
+actual ratio the weekly ritual compares:
+
+| week of | plan DW | DW | DW ratio | … | switches | waking h | sitting h | sitting % | longest sit min | sits over 90 |
+|---|---|---|---|---|---|---|---|---|---|---|
+
+Everything is a real number, not a padded string, so Sheets will sum, pivot and
+chart it without being asked twice. A ratio against zero planned hours is blank
+rather than an error, and so is a sitting percentage on a day with no waking
+span.
+
+### Two things to know
+
+**These tabs are generated output.** Every run clears them and writes them
+again. Anything you type into them is gone by morning. Put your own work in
+another tab and point formulas at `daily!A:Z` — that survives.
+
+**Rebuilding is the point.** Because each run recomputes the whole window
+rather than appending yesterday, a calendar you correct on Thursday shows up
+correctly for Tuesday, and adding a category does not leave the old columns
+misaligned. Today's row is partial until the day ends and gets corrected on the
+next run.
+
+The app itself still does not participate in the review. It emits raw numbers
+into a grid and stops there. No charts, no highlighting, no comparison to last
+week — the spreadsheet will happily do all of that if *you* ask it to.
+
+---
+
+## 10. Push from the repo instead of pasting (optional)
 
 Copying three files into the editor by hand gets old fast, and it is how the
 two copies drift. `clasp` is Google's own CLI for this — it pushes the working
@@ -366,7 +440,7 @@ little gain. Local `clasp push` is the better trade.
 
 ---
 
-## 10. What lives where
+## 11. What lives where
 
 | | |
 |---|---|
@@ -374,6 +448,7 @@ little gain. Local `clasp push` is the better trade.
 | Source of truth for everything else | the calendar |
 | localStorage | an unsent-write queue and a UI mirror, both disposable |
 | Settings | the CONFIG block in `Code.gs` |
+| The numbers | a Google Sheet, rebuilt nightly from the calendars |
 | Conclusions about your week | you, on Sunday, by hand |
 
 Clearing Safari's storage loses nothing but unsent writes. Deleting the app
