@@ -39,15 +39,17 @@
 
   /* ── now bar ─────────────────────────────────────────────────
      Fixed height in every state. Nothing below it may ever move. */
+  /* No "NOW: DW" line. The lit button in the grid already says which category
+     is running, and saying it twice cost 26px of a phone screen. */
   #nowbar {
-    position: relative; flex: 0 0 74px;
+    position: relative; flex: 0 0 54px;
     background: var(--panel); border-radius: 10px;
-    padding: 11px 13px; border-left: 3px solid transparent;
+    padding: 0 13px; border-left: 3px solid transparent;
+    display: flex; align-items: center;
   }
   #nowbar.long { border-left-color: var(--flag); }
-  #nowbar.idle .now-cat { color: var(--mute); }
-  .now-cat { font-size: 13px; font-weight: 700; letter-spacing: .17em; color: var(--dim); }
-  .now-row { display: flex; align-items: baseline; gap: 10px; margin-top: 7px; }
+  .now-row { display: flex; align-items: baseline; gap: 10px; flex: 1; min-width: 0;
+             padding-right: 26px; }
   /* The note lives here, not in the footer: it describes this block, it no
      longer duplicates a line 800px above it, and focusing it no longer puts
      the caret behind the keyboard. */
@@ -60,41 +62,38 @@
   #note:disabled { opacity: 1; }
   .now-el { font-variant-numeric: tabular-nums; font-size: 17px; color: var(--dim); }
 
-  #sync { position: absolute; top: 11px; right: 12px; display: flex; align-items: center; gap: 5px; }
+  #sync { position: absolute; top: 50%; right: 12px; transform: translateY(-50%); display: flex; align-items: center; gap: 5px; }
   #sync::after { content: ''; width: 9px; height: 9px; border-radius: 50%; background: #2f3339; }
   #sync.s-pending::after { background: var(--flag); }
   #sync.s-failed::after  { background: var(--bad); }
   #syncN { font-size: 11px; font-variant-numeric: tabular-nums; color: var(--dim); }
   #syncN:empty { display: none; }
 
-  /* ── sitting ─────────────────────────────────────────────────
-     Below the grid, because it gets toggled as often as a category does and
-     it spent its life in the least reachable strip of the screen. Wide and
-     flat rather than a grid cell: it is an overlay, not a seventh category,
-     and it must never start looking like one. */
-  #sitrow { flex: 0 0 62px; display: flex; gap: 6px; }
-  #sitbar {
-    flex: 1; display: flex; align-items: center; justify-content: space-between;
-    background: var(--panel); border-radius: 12px; padding: 0 16px;
-    border: 1px solid transparent;
-    transition: background .12s ease-out;
+  /* ── posture ─────────────────────────────────────────────────
+     Three segments, exactly one lit, below the grid where the thumb is.
+     Only SITTING is ever written to a calendar: STANDING and LYING DOWN both
+     mean "not sitting", and differ only in what they tell you. They are states
+     of the person, not rows in the record. */
+  #posture {
+    flex: 0 0 72px; display: flex; gap: 4px;
+    background: var(--panel); border-radius: 12px; padding: 4px;
   }
-  #sitbar.on { background: var(--panel2); border-color: var(--line); }
-  #sitbar:active { background: var(--panel3); }
-  .sit-left { display: flex; align-items: center; gap: 12px; font-size: 16px; font-weight: 700; letter-spacing: .15em; color: var(--dim); }
-  #sitbar.on .sit-left { color: var(--fg); }
-  .sit-box { font-size: 22px; letter-spacing: 0; line-height: 1; }
-  .sit-right { display: flex; align-items: baseline; gap: 12px; }
-  .sit-hint { font-size: 11px; color: var(--dim); letter-spacing: 0; }
-  .sit-el { font-variant-numeric: tabular-nums; font-size: 17px; color: var(--dim); min-width: 50px; text-align: right; }
-  /* visibility, not display: the SITTING bar must not change width when the
-     control appears. */
-  #sitAdj {
-    flex: 0 0 52px; background: var(--panel); border-radius: 10px;
-    font-size: 11px; font-weight: 700; letter-spacing: .1em; color: var(--dim);
+  .pbtn {
+    flex: 1; min-width: 0; border-radius: 9px;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 3px; color: var(--dim);
+    transition: background .12s ease-out, color .12s ease-out;
   }
-  #sitAdj.off { visibility: hidden; }
-  #sitAdj:active { background: var(--panel2); }
+  .pbtn svg { width: 23px; height: 23px; display: block; }
+  .pbtn .pl { font-size: 10px; font-weight: 700; letter-spacing: .1em;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+  .pbtn .pm {
+    font-size: 10px; height: 12px; line-height: 12px; color: var(--mute);
+    font-variant-numeric: tabular-nums; letter-spacing: 0;
+  }
+  .pbtn.on { background: var(--panel3); color: var(--fg); }
+  .pbtn.on .pm { color: var(--dim); }
+  .pbtn:active { background: var(--panel2); }
 
   /* ── grid ────────────────────────────────────────────────── */
   #grid { flex: 1 1 auto; display: grid; gap: 6px; min-height: 0; }
@@ -187,7 +186,6 @@
 
 <div id="app">
   <div id="nowbar" class="idle">
-    <div class="now-cat" id="nowCat">NOW: IDLE</div>
     <div id="sync" class="s-synced"><span id="syncN"></span></div>
     <div class="now-row">
       <input id="note" type="text" placeholder="note" autocomplete="off" autocapitalize="none"
@@ -198,15 +196,34 @@
 
   <div id="grid"></div>
 
-  <div id="sitrow">
-    <button id="sitbar">
-      <span class="sit-left"><span class="sit-box" id="sitBox">&#9634;</span> SITTING</span>
-      <span class="sit-right">
-        <span class="sit-hint">only if 5+ min</span>
-        <span class="sit-el" id="sitEl"></span>
-      </span>
+  <div id="posture">
+    <button class="pbtn" data-posture="sit">
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <circle cx="8.5" cy="4.6" r="2.4" fill="currentColor"/>
+        <path d="M8.5 8.2v6.3h7v6.9M5.2 21.4h3.3" fill="none" stroke="currentColor"
+              stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      <span class="pl">SITTING</span>
+      <span class="pm" id="sitEl"></span>
     </button>
-    <button id="sitAdj" class="off">EDIT</button>
+    <button class="pbtn" data-posture="stand">
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <circle cx="12" cy="4.6" r="2.4" fill="currentColor"/>
+        <path d="M12 8.2v6.6M8.4 11.2h7.2M9.4 21.4 12 14.8l2.6 6.6" fill="none"
+              stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      <span class="pl">STANDING</span>
+      <span class="pm"></span>
+    </button>
+    <button class="pbtn" data-posture="lie">
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <circle cx="6" cy="12.4" r="2.4" fill="currentColor"/>
+        <path d="M8.7 14.6h5.4l3.7 4M2.8 18.6h18.4" fill="none" stroke="currentColor"
+              stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      <span class="pl">LYING DOWN</span>
+      <span class="pm"></span>
+    </button>
   </div>
 
   <div id="footer">
@@ -282,7 +299,7 @@
 
   /* ── state ─────────────────────────────────────────────────── */
 
-  var S = { open: null, sit: null, lastTapMs: 0 };
+  var S = { open: null, sit: null, posture: 'stand', lastTapMs: 0 };
   var strip = null;          // {ref, key, durMs, hintMs, timer}
   var flushing = false, retryTimer = null, retryDelay = 4000;
   var noteTimer = null;
@@ -314,8 +331,9 @@
     return h ? (h + 'h ' + (m % 60) + 'm') : (m + 'm');
   }
   function clock(ms) {
-    var d = new Date(ms);
-    return pad2(d.getHours()) + ':' + pad2(d.getMinutes());
+    var d = new Date(ms), h = d.getHours() % 12;
+    return (h === 0 ? 12 : h) + ':' + pad2(d.getMinutes()) +
+           (d.getHours() < 12 ? ' AM' : ' PM');
   }
 
   /* ── queue ─────────────────────────────────────────────────── */
@@ -475,17 +493,32 @@
     if (!S.sit) return;
     enqueue({ type: 'closeSit', ref: S.sit.ref, endMs: atMs });
     S.sit = null;
+    if (S.posture === 'sit') S.posture = 'stand';
   }
 
-  function toggleSit() {
+  /**
+   * Exactly one posture is always true. Only SITTING reaches a calendar:
+   * STANDING and LYING DOWN both mean "not sitting" and differ only in what
+   * they tell you, so choosing either closes an open SIT block and choosing
+   * one when none is open writes nothing at all.
+   *
+   * Re-tapping the lit SITTING segment adjusts its start, since re-tapping
+   * the posture you are already in has nothing else to mean.
+   */
+  function setPosture(p) {
     var now = Date.now();
-    if (S.sit) {
-      closeSit(now);
-    } else {
+    if (p === S.posture) {
+      if (p === 'sit' && S.sit) openSitEdit();
+      return;
+    }
+    if (p === 'sit') {
       var ref = uid();
       S.sit = { ref: ref, startMs: now };
       enqueue({ type: 'openSit', ref: ref, startMs: now });
+    } else {
+      closeSit(now);
     }
+    S.posture = p;
     saveState(); render(); flush();
   }
 
@@ -556,7 +589,6 @@
 
     if (S.open) {
       bar.classList.remove('idle');
-      $('nowCat').textContent = 'NOW: ' + S.open.key;
       $('nowEl').textContent = '● ' + fmtEl(now - S.open.startMs);
       note.disabled = false;
       note.placeholder = 'note';
@@ -564,17 +596,18 @@
     } else {
       bar.classList.add('idle');
       bar.classList.remove('long');
-      $('nowCat').textContent = 'NOW: IDLE';
       $('nowEl').textContent = '';
       note.value = '';
       note.disabled = true;
-      note.placeholder = '';
+      note.placeholder = 'nothing running';
     }
 
-    $('sitBox').innerHTML = S.sit ? '&#9635;' : '&#9634;';
-    $('sitbar').classList.toggle('on', !!S.sit);
-    $('sitEl').textContent = S.sit ? '● ' + fmtEl(now - S.sit.startMs) : '';
-    $('sitAdj').classList.toggle('off', !S.sit);
+    var seg = $('posture').children;
+    for (var p = 0; p < seg.length; p++) {
+      seg[p].classList.toggle('on', seg[p].dataset.posture === S.posture);
+    }
+    // The same slot is the hint before you sit and the clock while you are.
+    $('sitEl').textContent = S.sit ? '● ' + fmtEl(now - S.sit.startMs) : 'only if 5+ min';
 
     $('btnSplit').disabled = !S.open;
 
@@ -666,6 +699,8 @@
     if (!queue().length) {
       S.open = st.open ? { ref: st.open.ref, key: st.open.key, text: st.open.text || '', startMs: st.open.startMs } : null;
       S.sit = st.sit ? { ref: st.sit.ref, startMs: st.sit.startMs } : null;
+      if (S.sit) S.posture = 'sit';
+      else if (S.posture === 'sit') S.posture = 'stand';
       S.lastTapMs = 0;
       render();
       $('note').value = S.open ? (S.open.text || '') : '';
@@ -678,6 +713,9 @@
     if (saved && typeof saved === 'object') {
       S.open = saved.open || null;
       S.sit = saved.sit || null;
+      // STANDING and LYING DOWN are never written down, so the mirror is the
+      // only record of which you were in. SITTING comes from the calendar.
+      S.posture = S.sit ? 'sit' : (saved.posture === 'lie' ? 'lie' : 'stand');
       S.lastTapMs = 0;                 // a reload is never a mis-tap window
     }
     buildGrid();
@@ -719,8 +757,10 @@
     if (b) applyMark(b.dataset.mark);
   });
 
-  $('sitbar').addEventListener('click', toggleSit);
-  $('sitAdj').addEventListener('click', openSitEdit);
+  $('posture').addEventListener('click', function (e) {
+    var b = e.target.closest('button[data-posture]');
+    if (b) setPosture(b.dataset.posture);
+  });
 
   $('note').addEventListener('input', function () {
     if (!S.open) return;
@@ -754,6 +794,7 @@
     if (S.sit) {
       enqueue({ type: 'deleteSit', ref: S.sit.ref, hintMs: S.sit.startMs });
       S.sit = null;
+      S.posture = 'stand';
       saveState(); render(); flush();
     }
     $('sheetSit').classList.add('hidden');

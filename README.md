@@ -44,16 +44,20 @@ A closed block shows the `+ = -` strip only if its category has no `autoMark`
 and it ran at least `MIN_MARK_MINUTES`. Ignoring the strip costs zero taps: it
 dismisses itself and `=` stands. You should see it two to four times a day.
 
-### Sitting
+### Posture
 
-Sitting is an overlay, not a seventh category. Categories are a partition —
+Posture is an overlay, not a seventh category. Categories are a partition —
 exactly one true at a time. You sit *while* doing deep work, meetings, meals.
-Only sitting is logged; standing is never written, and non-sitting time is
-computed at review as `waking span − sitting`.
 
-The only coupling in the entire app: tapping `BODY` closes an open SIT block.
-That is definitional, not inference. No accelerometer, no screen time, no
-heuristics, ever.
+A three-way row below the grid: **sitting**, **standing**, **lying down**. One
+is always true, but only sitting is ever written down. Standing and lying down
+both mean "not sitting" and differ only in what they tell you, so choosing
+either closes an open SIT block and choosing one when none is open writes
+nothing. Non-sitting time is computed at review as `waking span − sitting`.
+
+The only coupling in the entire app: tapping `BODY` closes an open SIT block
+and drops the row to standing. That is definitional, not inference. No
+accelerometer, no screen time, no heuristics, ever.
 
 ### The numbers
 
