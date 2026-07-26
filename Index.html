@@ -1,6 +1,6 @@
 <style>
   :root {
-    --bg:      #000000;
+    --bg:      #0e0f12;   /* not quite black, so the black chips read as chips */
     --panel:   #131417;
     --panel2:  #1b1d21;
     --panel3:  #24272c;
@@ -82,9 +82,12 @@
   .pbtn:active { background: var(--panel2); }
 
   /* ── grid ────────────────────────────────────────────────── */
-  #grid { flex: 1 1 auto; display: grid; gap: 6px; min-height: 0; }
+  /* 1fr rows, not auto. Auto rows size to their content, so the lit box grew
+     the whole row the moment it gained a note and the grid shifted under the
+     thumb. Every box is now the same height in every state. */
+  #grid { flex: 1 1 auto; display: grid; gap: 6px; min-height: 0; grid-auto-rows: 1fr; }
   .gbtn {
-    cursor: pointer; font: inherit; color: inherit;
+    position: relative; cursor: pointer; font: inherit; color: inherit;
     background: var(--panel2); border-radius: 12px;
     display: flex; flex-direction: column; align-items: center; justify-content: center;
     gap: 9px; overflow: hidden; min-height: 0;
@@ -115,10 +118,13 @@
     user-select: text; -webkit-user-select: text;
   }
   .gbtn .gn::placeholder { color: #8b9098; font-weight: 400; }
+  /* Pinned to a corner rather than stacked, so a running block's clock cannot
+     push its own label around. Top left: the sync pill owns the top right. */
   .gbtn .ge {
-    margin-top: 7px; background: #000; color: #fff;
-    font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums;
-    padding: 4px 10px; border-radius: 7px; letter-spacing: .02em;
+    position: absolute; top: 8px; left: 8px;
+    background: #000; color: #fff;
+    font-size: 14px; font-weight: 700; font-variant-numeric: tabular-nums;
+    padding: 4px 9px; border-radius: 7px; letter-spacing: .02em;
   }
   .gbtn.long .ge { color: var(--flag); }
   /* Outside the button, not inside it. An inset ring has to contrast with the
@@ -624,16 +630,20 @@
     g.style.gridTemplateColumns = 'repeat(' + cols + ', 1fr)';
     var cells = CATS.slice();
     if (CATS.length < CFG.maxCategories) cells.push(null);   // the add box
-    // An odd count leaves one cell alone in the top row after the bottom-up
-    // fill. Let it take the whole row rather than sitting beside a hole.
-    var lonely = (cells.length % cols) === 1;
-    thumbOrder(cells, cols).forEach(function (c, i) {
-      if (c === null) {
-        var ac = buildAddCell();
-        if (lonely && i === 0) ac.style.gridColumn = 'span ' + cols;
-        g.appendChild(ac);
+    // Pad to a whole number of rows before reversing them. Without this the
+    // short row is not a row at all once flattened: every position after it
+    // slides by one, the first category loses the bottom row it was given, and
+    // the gap ends up in the most reachable corner on the screen.
+    while (cells.length % cols !== 0) cells.push(undefined);
+
+    thumbOrder(cells, cols).forEach(function (c) {
+      if (c === undefined) {
+        var sp = document.createElement('div');
+        sp.className = 'gspacer';
+        g.appendChild(sp);
         return;
       }
+      if (c === null) { g.appendChild(buildAddCell()); return; }
       // A div, not a button: <button> may not contain interactive content, so
       // the parser silently drops an <input> placed inside one.
       var b = document.createElement('div');
@@ -656,7 +666,6 @@
       gn.addEventListener('keydown', function (e) { if (e && e.key === 'Enter') gn.blur(); });
 
       CELL[c.key] = { box: b, note: gn, el: b.querySelector('.ge') };
-      if (lonely && i === 0) b.style.gridColumn = 'span ' + cols;
       b.addEventListener('click', function () { confirmTap(b); tapCategory(c.key); });
       g.appendChild(b);
     });
