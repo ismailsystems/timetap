@@ -49,14 +49,14 @@ dismisses itself and `=` stands. You should see it two to four times a day.
 Posture is an overlay, not a seventh category. Categories are a partition —
 exactly one true at a time. You sit *while* doing deep work, meetings, meals.
 
-A two-way row below the grid: **sitting** or **standing**, one always lit. Only
-sitting is written down — standing is the absence of a SIT block rather than a
-row of its own, so which half is lit comes from the calendar and survives the
-browser storage being wiped. Non-sitting time is computed at review as
-`waking span − sitting`.
+One button below the grid, reading **SITTING** or **NOT SITTING**. Only sitting
+is written down — not sitting is the absence of a SIT block rather than a row of
+its own, so the button needs nothing remembered to know what it says. Only
+sitting carries a duration, because only sitting has a start to count from, and
+that duration is also the way in to correcting it.
 
 The only coupling in the entire app: tapping `BODY` closes an open SIT block
-and drops the row to standing. That is definitional, not inference. No
+and drops the button to not sitting. That is definitional, not inference. No
 accelerometer, no screen time, no heuristics, ever.
 
 ### The numbers

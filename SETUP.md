@@ -160,7 +160,7 @@ surface of the app. There is no settings screen and there will never be one.
   app bounds it and writes `UNLOGGED -` for the rest.
 - `MARK_TIMEOUT_MS` (6000) — how long the strip waits before applying `=`.
 - `BODY_KEY` (`'BODY'`) — the one category whose tap closes an open SIT block
-  and drops the posture row back to standing. Set it to `''` to remove even
+  and drops the posture button back to `NOT SITTING`. Set it to `''` to remove even
   that coupling.
 - `SHEET_ID`, `DAILY_TAB`, `WEEKLY_TAB`, `ROLLUP_DAYS`, `ROLLUP_HOUR` — the
   nightly rollup. See section 9.
@@ -300,9 +300,9 @@ For **PLAN**:
    `#open` in its description.
 3. Tap `DW` within 90 seconds. Still exactly one event on the calendar, now
    titled `DW:`, same start time. That is the mis-tap rule.
-4. Tap `SITTING` on the posture row. A `SIT` event appears on the SITTING
-   calendar. Tap `BODY`. The SIT block closes at that instant, the posture row
-   falls back to `STANDING`, and nothing else moves.
+4. Tap the `NOT SITTING` button so it reads `SITTING`. A `SIT` event appears on
+   the SITTING calendar. Tap `BODY`. The SIT block closes at that instant, the
+   button falls back to `NOT SITTING`, and nothing else moves.
 5. In the editor, run `dailyRollup` once by hand and open your spreadsheet.
    The `daily` and `weekly` tabs should be full of numbers.
 

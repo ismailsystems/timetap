@@ -33,7 +33,11 @@
   #app {
     position: relative;
     display: flex; flex-direction: column; gap: 6px;
-    height: 100dvh; height: 100vh;
+    /* Order matters: the later declaration wins, so dvh must come second.
+       Reversed, 100vh takes over on iOS — the large viewport, sized as if the
+       browser toolbars were hidden — and the app runs off the bottom of the
+       screen behind them. */
+    height: 100vh; height: 100dvh;
     padding: var(--pad-t) var(--pad-x) var(--pad-b);
   }
 
@@ -55,31 +59,37 @@
   #syncN:empty { display: none; }
 
   /* ── posture ─────────────────────────────────────────────────
-     Three segments, exactly one lit, below the grid where the thumb is.
-     Only SITTING is written to a calendar. STANDING is the absence of a SIT
-     block, not a row of its own, which is why the row needs nothing remembered
-     to know which half to light. */
+     One button, two states. Only sitting is written to a calendar, so "not
+     sitting" is the absence of a SIT block rather than a state of its own —
+     which is why the button needs nothing remembered to know what it says. */
   #postureRow { position: relative; flex: 0 0 72px; }
   #posture {
     position: absolute; inset: 0; display: flex; gap: 4px;
     background: var(--panel); border-radius: 12px; padding: 4px;
   }
-  .pbtn {
+  #postureBtn {
     flex: 1; min-width: 0; border-radius: 9px;
-    display: flex; flex-direction: column; align-items: center; justify-content: center;
-    gap: 3px; color: var(--dim);
-    transition: background .12s ease-out, color .12s ease-out;
+    display: flex; align-items: center; justify-content: center; gap: 12px;
+    color: var(--dim); transition: background .12s ease-out, color .12s ease-out;
   }
-  .pbtn svg { width: 23px; height: 23px; display: block; }
-  .pbtn .pl { font-size: 10px; font-weight: 700; letter-spacing: .1em;
-    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
-  .pbtn .pm {
-    font-size: 10px; height: 12px; line-height: 12px; color: var(--mute);
-    font-variant-numeric: tabular-nums; letter-spacing: 0;
+  #postureBtn svg { width: 25px; height: 25px; }
+  #postureBtn .pl { font-size: 14px; font-weight: 700; letter-spacing: .15em; }
+  #postureBtn.on { background: var(--panel3); color: var(--fg); }
+  #postureBtn:active { background: var(--panel2); }
+  /* Both selectors carry two ids so neither can be outranked by the element
+     rule above, which is what left both icons on screen at once. */
+  #postureBtn #icSit, #postureBtn #icStand { display: none; }
+  #postureBtn.on #icSit { display: block; }
+  #postureBtn:not(.on) #icStand { display: block; }
+  /* The clock is also the way in to correcting when it started, which is the
+     only moment that correction means anything. */
+  #sitEdit {
+    flex: 0 0 auto; padding: 0 14px; border-radius: 9px;
+    font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums;
+    color: var(--dim); background: var(--panel2);
   }
-  .pbtn.on { background: var(--panel3); color: var(--fg); }
-  .pbtn.on .pm { color: var(--dim); }
-  .pbtn:active { background: var(--panel2); }
+  #sitEdit.off { display: none; }
+  #sitEdit:active { background: var(--panel3); }
 
   /* ── grid ────────────────────────────────────────────────── */
   /* 1fr rows, not auto. Auto rows size to their content, so the lit box grew
@@ -240,24 +250,20 @@
 
   <div id="postureRow">
     <div id="posture">
-    <button class="pbtn" data-posture="sit">
-      <svg viewBox="0 0 24 24" aria-hidden="true">
-        <circle cx="8.5" cy="4.6" r="2.4" fill="currentColor"/>
-        <path d="M8.5 8.2v6.3h7v6.9M5.2 21.4h3.3" fill="none" stroke="currentColor"
-              stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-      </svg>
-      <span class="pl">SITTING</span>
-      <span class="pm" id="sitEl"></span>
-    </button>
-    <button class="pbtn" data-posture="stand">
-      <svg viewBox="0 0 24 24" aria-hidden="true">
-        <circle cx="12" cy="4.6" r="2.4" fill="currentColor"/>
-        <path d="M12 8.2v6.6M8.4 11.2h7.2M9.4 21.4 12 14.8l2.6 6.6" fill="none"
-              stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-      </svg>
-      <span class="pl">STANDING</span>
-      <span class="pm" id="standEl"></span>
-    </button>
+      <button id="postureBtn">
+        <svg id="icSit" viewBox="0 0 24 24" aria-hidden="true">
+          <circle cx="8.5" cy="4.6" r="2.4" fill="currentColor"/>
+          <path d="M8.5 8.2v6.3h7v6.9M5.2 21.4h3.3" fill="none" stroke="currentColor"
+                stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <svg id="icStand" viewBox="0 0 24 24" aria-hidden="true">
+          <circle cx="12" cy="4.6" r="2.4" fill="currentColor"/>
+          <path d="M12 8.2v6.6M8.4 11.2h7.2M9.4 21.4 12 14.8l2.6 6.6" fill="none"
+                stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <span class="pl" id="postureLabel">NOT SITTING</span>
+      </button>
+      <button id="sitEdit" class="off"><span id="sitEl"></span></button>
     </div>
 
     <div id="strip" class="hidden">
@@ -329,7 +335,7 @@
 
   /* ── state ─────────────────────────────────────────────────── */
 
-  var S = { open: null, sit: null, stoodAt: null, lastTapMs: 0 };
+  var S = { open: null, sit: null, lastTapMs: 0 };
   var strip = null;          // {ref, key, durMs, hintMs, timer}
   var armed = null;          // {key, timer} — a tap waiting to be confirmed
   var CELL = {};             // key -> {box, note, el}, so the lit one is O(1)
@@ -531,7 +537,6 @@
     var ref = uid();
     S.open = { ref: ref, key: key, text: '', startMs: now };
     S.lastTapMs = now;
-    if (!S.sit && !S.stoodAt) S.stoodAt = now;
     enqueue({ type: 'openActual', ref: ref, key: key, startMs: now });
 
     if (key === CFG.bodyKey) closeSit(now);                          // 8.2 the only coupling
@@ -571,29 +576,22 @@
     if (!S.sit) return;
     enqueue({ type: 'closeSit', ref: S.sit.ref, endMs: atMs });
     S.sit = null;
-    S.stoodAt = atMs;          // standing began the instant sitting ended
   }
 
   /**
-   * Exactly one posture is always true, and which one is a fact about the
-   * record rather than a thing to remember: sitting means a SIT block is open,
-   * standing means none is. Nothing is stored for it, so a reload recovers the
-   * posture from the calendar like everything else does.
-   *
-   * Re-tapping the lit SITTING segment adjusts its start, since re-tapping the
-   * posture you are already in has nothing else to mean.
+   * One button, two states, and which one is a fact about the record rather
+   * than a thing to remember: sitting means a SIT block is open, not sitting
+   * means none is. Nothing is stored for it, so a reload gets it from the
+   * calendar like everything else.
    */
-  function setPosture(p) {
+  function toggleSit() {
     var now = Date.now();
-    if (p === 'sit') {
-      if (S.sit) { openSitEdit(); return; }
+    if (S.sit) {
+      closeSit(now);
+    } else {
       var ref = uid();
       S.sit = { ref: ref, startMs: now };
-      S.stoodAt = null;
       enqueue({ type: 'openSit', ref: ref, startMs: now });
-    } else {
-      if (!S.sit) return;
-      closeSit(now);
     }
     saveState(); render(); flush();
   }
@@ -628,7 +626,13 @@
       }
     }
     cats.forEach(function (cat, n) { if (n < free.length) out[free[n]] = cat; });
-    return out;
+
+    // Whatever is still empty would be a hole in the grid. Rather than leave
+    // one, let the box beside it take the whole row.
+    var holes = 0;
+    out.forEach(function (v) { if (v === undefined) holes++; });
+    var span = holes ? cols - holes + 1 : 1;
+    return { slots: out.filter(function (v) { return v !== undefined; }), span: span };
   }
 
   /** What you aim at. The key is the record's vocabulary, not the button's. */
@@ -641,14 +645,14 @@
     var g = $('grid');
     g.innerHTML = '';
     g.style.gridTemplateColumns = 'repeat(' + cols + ', 1fr)';
-    layoutCells(CATS, cols, CATS.length < CFG.maxCategories).forEach(function (c) {
-      if (c === undefined) {
-        var sp = document.createElement('div');
-        sp.className = 'gspacer';
-        g.appendChild(sp);
+    var plan = layoutCells(CATS, cols, CATS.length < CFG.maxCategories);
+    plan.slots.forEach(function (c, i) {
+      if (c === null) {
+        var ac = buildAddCell();
+        if (i === 0 && plan.span > 1) ac.style.gridColumn = 'span ' + plan.span;
+        g.appendChild(ac);
         return;
       }
-      if (c === null) { g.appendChild(buildAddCell()); return; }
       // A div, not a button: <button> may not contain interactive content, so
       // the parser silently drops an <input> placed inside one.
       var b = document.createElement('div');
@@ -671,6 +675,7 @@
       gn.addEventListener('keydown', function (e) { if (e && e.key === 'Enter') gn.blur(); });
 
       CELL[c.key] = { box: b, note: gn, el: b.querySelector('.ge') };
+      if (i === 0 && plan.span > 1) b.style.gridColumn = 'span ' + plan.span;
       b.addEventListener('click', function () { confirmTap(b); tapCategory(c.key); });
       g.appendChild(b);
     });
@@ -747,13 +752,11 @@
   function render() {
     var now = Date.now();
 
-    var seg = $('posture').children, lit = S.sit ? 'sit' : 'stand';
-    for (var p = 0; p < seg.length; p++) {
-      seg[p].classList.toggle('on', seg[p].dataset.posture === lit);
-    }
-    // Whichever half is lit says how long it has been true.
-    $('sitEl').textContent = S.sit ? '● ' + fmtEl(now - S.sit.startMs) : '';
-    $('standEl').textContent = (!S.sit && S.stoodAt) ? '● ' + fmtEl(now - S.stoodAt) : '';
+    $('postureBtn').classList.toggle('on', !!S.sit);
+    $('postureLabel').textContent = S.sit ? 'SITTING' : 'NOT SITTING';
+    // Only sitting has a duration, because only sitting is written down.
+    $('sitEdit').classList.toggle('off', !S.sit);
+    $('sitEl').textContent = S.sit ? fmtEl(now - S.sit.startMs) : '';
 
     var kids = $('grid').children;
     for (var i = 0; i < kids.length; i++) {
@@ -784,8 +787,7 @@
       CELL[S.open.key].box.classList.toggle('long',
         (now - S.open.startMs) > CFG.longBlockMinutes * MS_MIN);
     }
-    if (S.sit) $('sitEl').textContent = '● ' + fmtEl(now - S.sit.startMs);
-    else if (S.stoodAt) $('standEl').textContent = '● ' + fmtEl(now - S.stoodAt);
+    if (S.sit) $('sitEl').textContent = fmtEl(now - S.sit.startMs);
   }
 
   /* ── split ─────────────────────────────────────────────────── */
@@ -859,7 +861,6 @@
     if (!queue().length) {
       S.open = st.open ? { ref: st.open.ref, key: st.open.key, text: st.open.text || '', startMs: st.open.startMs } : null;
       S.sit = st.sit ? { ref: st.sit.ref, startMs: st.sit.startMs } : null;
-      S.stoodAt = S.sit ? null : (st.stoodSinceMs || null);
       S.lastTapMs = 0;
       render();
       saveState();
@@ -871,11 +872,6 @@
     if (saved && typeof saved === 'object') {
       S.open = saved.open || null;
       S.sit = saved.sit || null;
-      // Same reason the server confines its bounds to today: a mirror written
-      // last night would otherwise report the whole night as standing.
-      var dayStart = new Date(); dayStart.setHours(0, 0, 0, 0);
-      S.stoodAt = (S.sit || !saved.stoodAt || saved.stoodAt < dayStart.getTime())
-        ? null : saved.stoodAt;
       S.lastTapMs = 0;                 // a reload is never a mis-tap window
     }
     buildGrid();
@@ -916,10 +912,8 @@
     if (b) applyMark(b.dataset.mark);
   });
 
-  $('posture').addEventListener('click', function (e) {
-    var b = e.target.closest('button[data-posture]');
-    if (b) setPosture(b.dataset.posture);
-  });
+  $('postureBtn').addEventListener('click', toggleSit);
+  $('sitEdit').addEventListener('click', openSitEdit);
 
   $('spClose').addEventListener('click', function () { $('sheetSplit').classList.add('hidden'); });
   $('spRange').addEventListener('input', renderSplit);
@@ -938,7 +932,6 @@
     if (S.sit) {
       enqueue({ type: 'deleteSit', ref: S.sit.ref, hintMs: S.sit.startMs });
       S.sit = null;
-      S.stoodAt = Date.now();
       saveState(); render(); flush();
     }
     $('sheetSit').classList.add('hidden');

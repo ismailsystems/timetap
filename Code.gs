@@ -477,57 +477,7 @@ function getState() {
   evS = staleGuard_(cs, evS, false, out.notes);
   if (evS) out.sit = { ref: refOf_(evS), startMs: evS.getStartTime().getTime() };
 
-  // Standing is never written, so when it began has to be read back out of what
-  // is: the moment the last SIT block closed, or the moment today's logging
-  // started, whichever is later.
-  //
-  // Both bounds are confined to today on purpose. Reach back to yesterday's
-  // last SIT block and a night's sleep is reported as eleven hours on your
-  // feet; fall back to an UNLOGGED block and it is reported from midnight,
-  // which is the same lie with a different number. When today says nothing,
-  // the honest answer is nothing.
-  if (!out.sit) {
-    var stood = Math.max(lastSitEndTodayMs_(cs) || 0, firstLoggedStartTodayMs_(ca) || 0);
-    out.stoodSinceMs = stood > 0 ? stood : null;
-  } else {
-    out.stoodSinceMs = null;
-  }
-
   return out;
-}
-
-/** End of the most recent SIT block that closed today, or null. */
-function lastSitEndTodayMs_(cal) {
-  var now = Date.now(), lo = localMidnightMs_(now);
-  if (!(now > lo)) return null;
-  var evs = cal.getEvents(new Date(lo), new Date(now));
-  var best = 0;
-  for (var i = 0; i < evs.length; i++) {
-    if (evs[i].isAllDayEvent()) continue;
-    var e = evs[i].getEndTime().getTime();
-    if (e >= lo && e <= now && e > best) best = e;
-  }
-  return best || null;
-}
-
-/**
- * Start of today's first ACTUAL block, ignoring UNLOGGED. An UNLOGGED block is
- * the app admitting it does not know what you were doing, so it cannot be the
- * evidence for when you got up.
- */
-function firstLoggedStartTodayMs_(cal) {
-  var now = Date.now(), lo = localMidnightMs_(now);
-  if (!(now > lo)) return null;
-  var evs = cal.getEvents(new Date(lo), new Date(now));
-  var best = 0;
-  for (var i = 0; i < evs.length; i++) {
-    if (evs[i].isAllDayEvent()) continue;
-    var p = parseTitle_(evs[i].getTitle());
-    if (p && p.key === 'UNLOGGED') continue;
-    var st = evs[i].getStartTime().getTime();
-    if (st >= lo && (best === 0 || st < best)) best = st;
-  }
-  return best || null;
 }
 
 /**

@@ -70,8 +70,7 @@
 │ memo drafting│              │
 │    ● 47m     │              │
 ├──────────────┴──────────────┤
-│   SITTING    │   STANDING   │
-│              │     22m      │
+│      ▣ SITTING      │ 1h04  │
 └─────────────────────────────┘</pre>
   <p>The grid fills from the bottom row up, so the first entries in <code>CATEGORIES</code> land nearest your thumb. There is no bar above it and no chrome below it: the note and the clock belong to the block that is running, so they live inside the box that is running, and the ring around it breathes. The <code>+</code> box names a new category, up to ten; nothing can be renamed afterwards, because a key change would split every past event away from every future one in the rollup. There is no chrome below the grid: the lit button <em>is</em> the open block, so re-tapping it opens SPLIT, and when a closed block earns a mark the <code>+ = -</code> strip takes the posture row's place for six seconds — same slot, same height, so nothing above it moves.</p>
   <p>A tap that lands within a minute of the previous one arms the button rather than committing, and waits for a second tap. Taps that close together are far more often a brush than a decision, and the correction rule makes a brush destructive: it silently retitles the block you are actually in. Ignoring the question is the safe outcome — it forgets after four seconds and nothing was ever queued.</p>
@@ -82,10 +81,9 @@
 
   <h2>Posture</h2>
   <p>Posture is an overlay, not a seventh category. Categories are a partition — exactly one true at a time. You sit <em>while</em> doing deep work, meetings, meals.</p>
-  <p>A two-way row sits below the grid: <strong>sitting</strong> or <strong>standing</strong>, one always lit. Only sitting is written down. Standing is the absence of a SIT block rather than a row of its own, so which half is lit is a fact about the calendar and not a thing the browser has to remember — clear the storage and it still comes back right. Non-sitting time is computed at review as waking span minus sitting.</p>
-  <p>Whichever half is lit says how long it has been true. Sitting counts from the tap. Standing has nothing written down to count from, so it is read back out of the calendar — the moment the last SIT block closed, or the moment today's logging began, whichever is later, and both confined to today so a night's sleep is never reported as eleven hours on your feet. When today says nothing, the row says nothing.</p>
-  <p>Re-tapping the lit SITTING half adjusts its start time, since re-tapping the posture you are already in has nothing else to mean.</p>
-  <p>The only coupling in the entire app: tapping <code>BODY</code> closes an open SIT block and drops the row to standing. That is definitional, not inference. No accelerometer, no screen time, no heuristics, ever.</p>
+  <p>One button below the grid, reading <strong>SITTING</strong> or <strong>NOT SITTING</strong>. Only sitting is written down: not sitting is the absence of a SIT block rather than a row of its own, which is why the button needs nothing remembered to know what it says — clear the browser's storage and it still comes back right. Non-sitting time is computed at review as waking span minus sitting, and only sitting carries a duration, because only sitting has a start to count from.</p>
+  <p>That duration is also the way in to correcting when it started, which is the only moment such a correction means anything.</p>
+  <p>The only coupling in the entire app: tapping <code>BODY</code> closes an open SIT block and drops the button to not sitting. That is definitional, not inference. No accelerometer, no screen time, no heuristics, ever.</p>
 
   <h2>The numbers</h2>
   <p>There is no week screen. A daily trigger rebuilds two tabs of a Google Sheet straight from the calendars, and you read them where you do your thinking — which was never a phone.</p>
