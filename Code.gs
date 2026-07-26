@@ -803,6 +803,16 @@ function opDeleteSit_(op) {
  * formulas at these.
  * ═══════════════════════════════════════════════════════════════════ */
 
+/**
+ * The editor's Run button shows the execution log and never a return value, so
+ * anything a person is meant to read has to be logged as well as returned.
+ * Every function here that is run by hand goes through this.
+ */
+function say_(msg) {
+  try { Logger.log(msg); } catch (e) {}
+  return msg;
+}
+
 /** Entry point for the daily time-driven trigger. Safe to run by hand. */
 function dailyRollup() {
   var ss = openSheet_();
@@ -823,6 +833,8 @@ function dailyRollup() {
 
   writeGrid_(ss, DAILY_TAB, dailyGrid_(days, keys));
   writeGrid_(ss, WEEKLY_TAB, weeklyGrid_(days, keys));
+  say_('rolled up ' + days.length + ' days across ' + keys.length +
+       ' categories into ' + ss.getUrl());
   return { days: days.length, categories: keys.length, sheet: ss.getUrl() };
 }
 
@@ -1031,7 +1043,7 @@ function setupRollup() {
     lines.push('', 'ACTUAL is empty. If you have been logging, CAL_ACTUAL is ' +
       'pointing at the wrong calendar.');
   }
-  return lines.join('\n');
+  return say_(lines.join('\n'));
 }
 
 /**
@@ -1041,7 +1053,7 @@ function setupRollup() {
 function installDailyTrigger() {
   removeDailyTrigger();
   ScriptApp.newTrigger('dailyRollup').timeBased().atHour(ROLLUP_HOUR).everyDays(1).create();
-  return 'dailyRollup will run daily around ' + ROLLUP_HOUR + ':00 ' + tz_();
+  return say_('dailyRollup will run daily around ' + ROLLUP_HOUR + ':00 ' + tz_());
 }
 
 function removeDailyTrigger() {
@@ -1049,7 +1061,7 @@ function removeDailyTrigger() {
   ScriptApp.getProjectTriggers().forEach(function (t) {
     if (t.getHandlerFunction() === 'dailyRollup') { ScriptApp.deleteTrigger(t); gone++; }
   });
-  return 'removed ' + gone;
+  return say_('removed ' + gone + ' trigger' + (gone === 1 ? '' : 's'));
 }
 
 

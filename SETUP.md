@@ -335,7 +335,8 @@ the address bar. You do not need to extract the id; the app will take it out.
 `clasp push` overwrites it and a script property it cannot touch.)
 
 **Run `setupRollup` once.** Pick it from the function dropdown in the editor and
-press Run. It does everything else in one go:
+press Run, then read the **Execution log** panel underneath. It does everything
+else in one go:
 
 - checks the spreadsheet opens
 - installs the nightly trigger

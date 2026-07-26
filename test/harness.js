@@ -60,6 +60,8 @@ global.CalendarApp = {
   getCalendarById: id => CALS[id] || null
 };
 global.Session = { getScriptTimeZone: () => process.env.TZ || 'America/New_York' };
+const LOGGED = [];
+global.Logger = { log: m => { LOGGED.push(String(m)); } };
 global.LockService = { getUserLock: () => ({ waitLock() {}, releaseLock() {} }) };
 const SCRIPT_PROPS = {};
 global.PropertiesService = {
@@ -320,6 +322,7 @@ function reset(atMs) {
   Object.keys(STORE).forEach(k => delete STORE[k]);
   NOW = atMs !== undefined ? atMs : new Date(2026, 6, 20, 9, 0, 0, 0).getTime();
   ONLINE = true;
+  LOGGED.length = 0;
   global.PROPS_ = null;
   SHEETS.book.sheets = [];
   TRIGGERS.length = 0;
@@ -332,7 +335,7 @@ function reboot() {
   settle();
 }
 
-module.exports = { fireVisible: () => VIS.forEach(f => f()), chk, near, reset, reboot, META_ALLOWED, SCRIPT_PROPS, SHEETS, TRIGGERS,
+module.exports = { LOGGED, fireVisible: () => VIS.forEach(f => f()), chk, near, reset, reboot, META_ALLOWED, SCRIPT_PROPS, SHEETS, TRIGGERS,
   posture, activeKey, litPosture, noteBox, elapsedBox, addCell,
   clearPropCache: () => { global.PROPS_ = null; }, tap, tapSit, tapMark, wait, advance, settle, A, S, show, hhmm, $,
   CALS, NODES, STORE, desc,

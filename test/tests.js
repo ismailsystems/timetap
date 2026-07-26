@@ -976,6 +976,16 @@ chk('and counts what it found on each calendar', /ACTUAL {4}2/.test(report),
 chk('running it twice does not double the trigger',
   (setupRollup(), H.TRIGGERS.length) === 1, String(H.TRIGGERS.length));
 
+// The editor shows the execution log and never a return value, so anything a
+// person is meant to read has to reach Logger or it may as well not exist.
+chk('the report reaches the execution log, not just the return value',
+  H.LOGGED.some(l => /Rollup is set up/.test(l)), JSON.stringify(H.LOGGED.slice(-1)));
+chk('so does the trigger confirmation',
+  H.LOGGED.some(l => /will run daily around/.test(l)));
+chk('and the rollup says what it wrote',
+  H.LOGGED.some(l => /rolled up 90 days/.test(l)),
+  JSON.stringify(H.LOGGED.filter(l => /rolled up/.test(l)).slice(0, 1)));
+
 reset();
 H.SCRIPT_PROPS.SHEET_ID = 'book'; H.clearPropCache();
 const emptyReport = setupRollup();
