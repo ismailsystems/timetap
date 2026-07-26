@@ -182,6 +182,7 @@ class El {
   blur() { if (global.document.activeElement === this) global.document.activeElement = null; }
   addEventListener(t, fn) { (this._h[t] = this._h[t] || []).push(fn); }
   fire(t, ev) { (this._h[t] || []).forEach(f => f(ev || { target: this })); }
+  click() { this.fire('click', { target: this }); }
   querySelector(sel) {
     // Mirror two things the real parser does, because the shim otherwise hands
     // back a stub for any selector and hides genuine markup bugs:

@@ -867,6 +867,58 @@ chk('draining puts it back to hidden', el('sync').className === 's-synced' &&
   el('syncN').textContent === '', el('sync').className + ' ' + el('syncN').textContent);
 reset();
 
+console.log('\n31. the grid answers to a keyboard and announces itself');
+reset(); reboot();
+const cell = k => $('grid').children.find(c => c.dataset.key === k);
+// The empty cell is not a control and must not be in the tab order.
+chk('every control is reachable by tab, and only the controls',
+  $('grid').children.every(c => {
+    const isControl = c.dataset.key || c.dataset.add === '1';
+    return (c.getAttribute('tabindex') === '0') === !!isControl;
+  }),
+  $('grid').children.map(c => (c.dataset.key || (c.dataset.add ? '+' : '_')) + ':' +
+    c.getAttribute('tabindex')).join(' '));
+chk('cells announce a name',
+  $('grid').children.filter(c => c.dataset.key)
+    .every(c => (c.getAttribute('aria-label') || '').length > 0));
+chk('the add box says what it is',
+  addCell().getAttribute('aria-label') === 'add a category',
+  addCell().getAttribute('aria-label'));
+chk('nothing is pressed while idle',
+  $('grid').children.filter(c => c.dataset.key)
+    .every(c => c.getAttribute('aria-pressed') === 'false'));
+
+cell('DW').fire('keydown', { key: 'Enter', preventDefault: function () {} });
+settle();
+chk('Enter logs a category', A().length === 1 && A()[0].t === 'DW:', A().map(show).join(' | '));
+chk('and the lit one reports itself pressed',
+  cell('DW').getAttribute('aria-pressed') === 'true' &&
+  cell('MTG').getAttribute('aria-pressed') === 'false');
+
+wait(30);
+cell('BODY').fire('keydown', { key: ' ', preventDefault: function () {} });
+settle();
+chk('Space logs one too', A().length === 2 && A()[1].t === 'BODY:', A().map(show).join(' | '));
+
+const el31 = id => document.getElementById(id);
+chk('the posture button reports its state',
+  el31('postureBtn').getAttribute('aria-pressed') === 'false',
+  el31('postureBtn').getAttribute('aria-pressed'));
+posture('sit'); settle();
+chk('and flips it when sitting', el31('postureBtn').getAttribute('aria-pressed') === 'true');
+
+console.log('\n31b. the mark strip is always one tap from gone');
+reset(); reboot();
+tap('ADM'); wait(40); tap('DW'); settle();
+chk('strip up, posture row covered', !$('strip').hidden && $('posture').hidden);
+$('strip').fire('click', { target: { closest: function () { return null; } } });
+settle();
+chk('tapping the strip itself dismisses it', $('strip').hidden && !$('posture').hidden);
+chk('and the default mark still stands', A()[0].t === 'ADM: =', A()[0].t);
+posture('sit'); settle();
+chk('so the posture row is usable again', litPosture() === 'sit');
+reset();
+
 console.log('\n────────────────────────────────────────');
 console.log(H.pass + ' passed, ' + H.fail + ' failed');
 process.exit(H.fail ? 1 : 0);

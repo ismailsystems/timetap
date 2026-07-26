@@ -78,7 +78,14 @@
   }
   #postureBtn svg { width: 25px; height: 25px; }
   #postureBtn .pl { font-size: 14px; font-weight: 700; letter-spacing: .15em; }
-  #postureBtn.on { background: var(--panel3); color: var(--fg); }
+  /* Two channels, not one: a filled pill and full-brightness text. The label
+     names the state rather than the action, so the state has to be obvious
+     enough that nobody has to work out which of the two it is. */
+  #postureBtn.on {
+    background: var(--panel3); color: var(--fg);
+    box-shadow: inset 0 0 0 1px var(--line);
+  }
+  #postureBtn.on .pl { letter-spacing: .17em; }
   #postureBtn:active { background: var(--panel2); }
   /* Both selectors carry two ids so neither can be outranked by the element
      rule above, which is what left both icons on screen at once. */
@@ -121,6 +128,8 @@
   /* brightness, not a fixed grey: the background is now a different colour per
      button, so the pressed state has to work against any hue */
   .gbtn:active, .gbtn.tapped { filter: brightness(.86); transform: scale(.975); }
+  .gbtn:focus-visible { outline: 3px solid var(--fg); outline-offset: 3px; }
+  #postureBtn:focus-visible, #sitEdit:focus-visible { outline: 2px solid var(--fg); outline-offset: -2px; }
   /* The label as written in CONFIG, verbatim. The key still prefixes the
      calendar title and heads the rollup's columns; it is not what you aim at.
      White on a black highlight is 21:1 on every button, so legibility stops
@@ -171,8 +180,11 @@
   /* The add box. Outlined rather than filled, because it is not a category
      yet and must not read like one. */
   .gspacer { border-radius: 12px; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .045); }
+  /* Dashed, so a glance tells you it is a slot for a category rather than one
+     you can log against. Same size as the rest, per the grid's own rule. */
   .addcell {
-    background: var(--panel2); box-shadow: inset 0 0 0 1px var(--line);
+    background: var(--panel); box-shadow: none;
+    border: 2px dashed var(--line);
   }
   .addcell .k { background: none; color: var(--dim); font-size: 40px; font-weight: 300; padding: 0; }
   .addcell.naming .k { display: none; }
@@ -209,6 +221,7 @@
     align-items: center; background: var(--panel2); border-radius: 12px;
     padding: 0 6px 0 16px;
   }
+  #stripHead { cursor: pointer; }
   #stripHead { flex: 1; min-width: 0; font-size: 13px; color: var(--fg); letter-spacing: .02em;
     overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .strip-marks { display: flex; gap: 6px; }
@@ -265,7 +278,7 @@
   <div id="postureRow">
     <div id="posture">
       <div id="sync" class="s-synced"><span id="syncN"></span></div>
-      <button id="postureBtn">
+      <button id="postureBtn" aria-pressed="false" aria-label="sitting">
         <svg id="icSit" viewBox="0 0 24 24" aria-hidden="true">
           <circle cx="8.5" cy="4.6" r="2.4" fill="currentColor"/>
           <path d="M8.5 8.2v6.3h7v6.9M5.2 21.4h3.3" fill="none" stroke="currentColor"
@@ -278,7 +291,7 @@
         </svg>
         <span class="pl" id="postureLabel">NOT SITTING</span>
       </button>
-      <button id="sitEdit" class="off"><span id="sitEl"></span></button>
+      <button id="sitEdit" class="off" aria-label="adjust when sitting started"><span id="sitEl"></span></button>
     </div>
 
     <div id="strip" class="hidden">
@@ -706,7 +719,12 @@
       // the parser silently drops an <input> placed inside one.
       var b = document.createElement('div');
       b.className = 'gbtn';
+      // A div gets none of a button's semantics for free, so it has to be told:
+      // reachable, announced, and answering to a keyboard.
       b.setAttribute('role', 'button');
+      b.setAttribute('tabindex', '0');
+      b.setAttribute('aria-pressed', 'false');
+      b.setAttribute('aria-label', faceOf(c));
       b.dataset.key = c.key;
       b.innerHTML = '<span class="k"></span>' +
         '<input class="gn" type="text" placeholder="add a note" autocomplete="off" ' +
@@ -725,6 +743,9 @@
 
       CELL[c.key] = { box: b, note: gn, el: b.querySelector('.ge') };
       b.addEventListener('click', function () { confirmTap(b); tapCategory(c.key); });
+      b.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); b.click(); }
+      });
       g.appendChild(b);
     });
 
@@ -752,6 +773,8 @@
     var b = document.createElement('div');
     b.className = 'gbtn addcell';
     b.setAttribute('role', 'button');
+    b.setAttribute('tabindex', '0');
+    b.setAttribute('aria-label', 'add a category');
     b.dataset.add = '1';
     b.innerHTML = '<span class="k">+</span>' +
       '<input class="an" type="text" placeholder="name it" autocomplete="off" ' +
@@ -788,6 +811,9 @@
       b.classList.add('naming');
       an.focus();
     });
+    b.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); b.click(); }
+    });
     return b;
   }
 
@@ -801,6 +827,7 @@
     var now = Date.now();
 
     $('postureBtn').classList.toggle('on', !!S.sit);
+    $('postureBtn').setAttribute('aria-pressed', S.sit ? 'true' : 'false');
     $('postureLabel').textContent = S.sit ? 'SITTING' : 'NOT SITTING';
     // Only sitting has a duration, because only sitting is written down.
     $('sitEdit').classList.toggle('off', !S.sit);
@@ -814,6 +841,7 @@
       if (!k) continue;                                   // the add box
       var isOpen = !!S.open && k === S.open.key;
       kids[i].classList.toggle('active', isOpen);
+      kids[i].setAttribute('aria-pressed', isOpen ? 'true' : 'false');
       kids[i].classList.toggle('long',
         isOpen && (now - S.open.startMs) > CFG.longBlockMinutes * MS_MIN);
 
@@ -981,7 +1009,11 @@
 
   $('strip').addEventListener('click', function (e) {
     var b = e.target.closest('button[data-mark]');
-    if (b) applyMark(b.dataset.mark);
+    if (b) { applyMark(b.dataset.mark); return; }
+    // Anywhere else on the strip dismisses it. It covers the posture row for
+    // its six seconds, and without this there was nothing to tap to get the
+    // row back. "=" is already written, so dismissing costs nothing.
+    hideStrip();
   });
 
   $('postureBtn').addEventListener('click', toggleSit);
