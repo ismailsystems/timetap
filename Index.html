@@ -3,17 +3,27 @@
     --bg:      #000000;
     --panel:   #131417;
     --panel2:  #1b1d21;
+    --panel3:  #24272c;
     --line:    #2a2d33;
     --fg:      #f2f3f5;
-    --dim:     #8b9098;
-    --dimmer:  #5d626a;
+    --dim:     #949aa3;   /* text: >= 4.5:1 on --panel and --panel2 */
+    --mute:    #5d626a;   /* never text: rules, dots, inert marks */
     --flag:    #c9a227;
+    --bad:     #dc2127;
+
+    /* env() resolves to 0 inside the Apps Script iframe, so these are floors,
+       not decoration: the footer would otherwise sit in the home indicator's
+       swipe zone and the NOW bar under the Dynamic Island. */
+    --pad-t: max(env(safe-area-inset-top), 10px);
+    --pad-b: max(env(safe-area-inset-bottom), 28px);
+    --pad-x: max(env(safe-area-inset-left), 8px);
   }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body {
     margin: 0; padding: 0; height: 100%;
     background: var(--bg); color: var(--fg);
     font: 400 16px/1.3 -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif;
+    -webkit-text-size-adjust: 100%;
     overscroll-behavior: none;
   }
   body { user-select: none; -webkit-user-select: none; }
@@ -21,146 +31,156 @@
   .hidden { display: none !important; }
 
   #app {
-    display: flex; flex-direction: column;
+    position: relative;
+    display: flex; flex-direction: column; gap: 6px;
     height: 100dvh; height: 100vh;
-    padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
-    gap: 6px;
+    padding: var(--pad-t) var(--pad-x) var(--pad-b);
   }
 
-  /* ── sync dot ────────────────────────────────────────────────── */
-  #sync {
-    position: fixed; top: calc(env(safe-area-inset-top) + 8px); right: 12px;
-    width: 8px; height: 8px; border-radius: 50%; z-index: 40;
-    background: var(--dimmer); transition: background .2s linear;
-  }
-  #sync.s-pending { background: #c9a227; }
-  #sync.s-failed  { background: #dc2127; }
-  #sync.s-synced  { background: #2f3339; }
-
-  #err {
-    background: #2a1416; color: #ffb4ad; font-size: 12px;
-    padding: 7px 10px; border-radius: 6px; margin: 0 8px;
-    user-select: text; -webkit-user-select: text;
-  }
-
-  /* ── mark strip ──────────────────────────────────────────────── */
-  #strip { margin: 0 8px; background: var(--panel2); border-radius: 10px; padding: 10px 12px 8px; }
-  #stripHead { font-size: 13px; color: var(--dim); letter-spacing: .04em; margin-bottom: 8px; }
-  .strip-marks { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
-  .strip-marks button {
-    background: var(--panel); border: 1px solid var(--line); border-radius: 8px;
-    height: 52px; font-size: 26px; font-weight: 600;
-  }
-  .strip-marks button:active { background: #303338; }
-
-  /* ── now bar ─────────────────────────────────────────────────── */
+  /* ── now bar ─────────────────────────────────────────────────
+     Fixed height in every state. Nothing below it may ever move. */
   #nowbar {
-    margin: 0 8px; background: var(--panel); border-radius: 10px;
-    padding: 10px 12px; border-left: 3px solid transparent;
+    position: relative; flex: 0 0 74px;
+    background: var(--panel); border-radius: 10px;
+    padding: 11px 13px; border-left: 3px solid transparent;
   }
   #nowbar.long { border-left-color: var(--flag); }
-  #nowbar.idle .now-cat { color: var(--dimmer); }
+  #nowbar.idle .now-cat { color: var(--mute); }
   .now-cat { font-size: 13px; font-weight: 700; letter-spacing: .17em; color: var(--dim); }
-  .now-row { display: flex; align-items: baseline; gap: 10px; margin-top: 4px; }
-  .now-text { flex: 1; min-width: 0; font-size: 17px; color: var(--fg); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .now-row { display: flex; align-items: baseline; gap: 10px; margin-top: 7px; }
+  /* The note lives here, not in the footer: it describes this block, it no
+     longer duplicates a line 800px above it, and focusing it no longer puts
+     the caret behind the keyboard. */
+  #note {
+    flex: 1; min-width: 0; background: none; border: 0; padding: 0;
+    color: var(--fg); font-size: 17px; font-family: inherit; line-height: 22px;
+    user-select: text; -webkit-user-select: text;
+  }
+  #note::placeholder { color: var(--dim); }
+  #note:disabled { opacity: 1; }
   .now-el { font-variant-numeric: tabular-nums; font-size: 17px; color: var(--dim); }
 
-  /* ── sitting ─────────────────────────────────────────────────── */
-  #sitrow { margin: 0 8px; display: flex; gap: 6px; }
+  #sync { position: absolute; top: 11px; right: 12px; display: flex; align-items: center; gap: 5px; }
+  #sync::after { content: ''; width: 9px; height: 9px; border-radius: 50%; background: #2f3339; }
+  #sync.s-pending::after { background: var(--flag); }
+  #sync.s-failed::after  { background: var(--bad); }
+  #syncN { font-size: 11px; font-variant-numeric: tabular-nums; color: var(--dim); }
+  #syncN:empty { display: none; }
+
+  /* ── sitting ─────────────────────────────────────────────── */
+  #sitrow { flex: 0 0 48px; display: flex; gap: 6px; }
   #sitbar {
     flex: 1; display: flex; align-items: center; justify-content: space-between;
-    background: var(--panel); border-radius: 10px; padding: 12px;
+    background: var(--panel); border-radius: 10px; padding: 0 13px;
   }
   #sitbar.on { background: var(--panel2); }
   .sit-left { display: flex; align-items: center; gap: 10px; font-size: 14px; font-weight: 700; letter-spacing: .17em; color: var(--dim); }
   #sitbar.on .sit-left { color: var(--fg); }
   .sit-box { font-size: 18px; letter-spacing: 0; }
   .sit-right { display: flex; align-items: baseline; gap: 12px; }
-  .sit-hint { font-size: 11px; color: var(--dimmer); letter-spacing: 0; }
+  .sit-hint { font-size: 11px; color: var(--dim); letter-spacing: 0; }
   .sit-el { font-variant-numeric: tabular-nums; font-size: 15px; color: var(--dim); min-width: 46px; text-align: right; }
+  /* visibility, not display: the SITTING bar must not change width when the
+     control appears. */
   #sitAdj {
-    width: 46px; background: var(--panel); border-radius: 10px;
+    flex: 0 0 52px; background: var(--panel); border-radius: 10px;
     font-size: 11px; font-weight: 700; letter-spacing: .1em; color: var(--dim);
   }
+  #sitAdj.off { visibility: hidden; }
   #sitAdj:active { background: var(--panel2); }
 
-  /* ── grid ────────────────────────────────────────────────────── */
-  #grid { flex: 1; display: grid; gap: 6px; margin: 0 8px; min-height: 0; }
+  /* ── grid ────────────────────────────────────────────────── */
+  #grid { flex: 1 1 auto; display: grid; gap: 6px; min-height: 0; }
   .gbtn {
-    position: relative; background: var(--panel2); border-radius: 10px;
+    background: var(--panel2); border-radius: 12px;
     display: flex; flex-direction: column; align-items: center; justify-content: center;
-    gap: 4px; overflow: hidden; min-height: 0;
+    gap: 9px; overflow: hidden; min-height: 0;
+    transition: transform .12s ease-out, background .12s ease-out;
   }
-  .gbtn:active { background: #33373d; }
-  .gbtn .bar { position: absolute; top: 0; left: 0; right: 0; height: 4px; }
-  .gbtn .k { font-size: 27px; font-weight: 700; letter-spacing: .04em; }
-  .gbtn .l { font-size: 11px; color: var(--dim); letter-spacing: .08em; text-transform: uppercase; }
+  .gbtn:active, .gbtn.tapped { background: var(--panel3); transform: scale(.975); }
+  .gbtn .k { font-size: 30px; font-weight: 700; letter-spacing: .03em; line-height: 1; }
+  /* the accent sits against the key it identifies, not 190px away at the
+     top edge of the button */
+  .gbtn .bar { width: 30px; height: 3px; border-radius: 2px; }
+  .gbtn .l {
+    height: 13px; line-height: 13px; font-size: 11px; color: var(--dim);
+    letter-spacing: .08em; text-transform: uppercase;
+  }
   .gbtn.active { box-shadow: inset 0 0 0 2px var(--fg); }
-  .gbtn.active .l { color: var(--fg); }
 
-  /* ── footer ──────────────────────────────────────────────────── */
-  .footer { display: flex; gap: 6px; margin: 0 8px 8px; }
-  #note {
-    flex: 1; min-width: 0; background: var(--panel); border: 0; border-radius: 10px;
-    color: var(--fg); padding: 0 14px; height: 52px; font-size: 16px;
-    user-select: text; -webkit-user-select: text;
-  }
-  #note::placeholder { color: var(--dimmer); }
+  /* ── footer: SPLIT/WEEK, or the mark strip in their place ──
+     The strip swaps 1:1 with the buttons, so the grid never moves, and the
+     marks land in the thumb arc instead of the far corner of the screen. */
+  #footer { position: relative; flex: 0 0 54px; }
+  #footBtns, #strip { position: absolute; inset: 0; display: flex; gap: 6px; }
   .fbtn {
-    background: var(--panel); border-radius: 10px; height: 52px; padding: 0 16px;
+    flex: 1; background: var(--panel); border-radius: 10px;
     font-size: 13px; font-weight: 700; letter-spacing: .12em; color: var(--dim);
   }
   .fbtn:active { background: var(--panel2); }
   .fbtn:disabled { opacity: .35; }
+  #strip { align-items: center; background: var(--panel2); border-radius: 10px; padding: 0 6px 0 14px; }
+  #stripHead { flex: 1; min-width: 0; font-size: 13px; color: var(--fg); letter-spacing: .02em;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .strip-marks { display: flex; gap: 6px; }
+  .strip-marks button {
+    width: 74px; height: 42px; background: var(--panel); border-radius: 8px;
+    font-size: 22px; font-weight: 600;
+  }
+  .strip-marks button:active { background: var(--panel3); }
 
-  /* ── overlays ────────────────────────────────────────────────── */
+  /* Errors float above the footer so nothing in the layout shifts. */
+  #err {
+    position: absolute; left: var(--pad-x); right: var(--pad-x);
+    bottom: calc(var(--pad-b) + 60px); z-index: 20;
+    background: #2a1416; color: #ffb4ad; font-size: 12px;
+    padding: 9px 12px; border-radius: 8px;
+    user-select: text; -webkit-user-select: text;
+  }
+
+  /* ── overlays ────────────────────────────────────────────── */
   .view {
     position: fixed; inset: 0; background: var(--bg); z-index: 30;
-    display: flex; flex-direction: column;
-    padding: calc(env(safe-area-inset-top) + 8px) 8px calc(env(safe-area-inset-bottom) + 8px);
-    gap: 8px;
+    display: flex; flex-direction: column; gap: 8px;
+    padding: var(--pad-t) var(--pad-x) var(--pad-b);
   }
-  .vhead { display: flex; gap: 6px; align-items: center; }
-  .vhead .fbtn { flex: 0 0 auto; }
+  .vhead { display: flex; gap: 6px; align-items: center; flex: 0 0 48px; }
+  .vhead .fbtn { flex: 0 0 auto; padding: 0 18px; height: 100%; }
   .vtitle { flex: 1; text-align: center; font-size: 12px; font-weight: 700; letter-spacing: .17em; color: var(--dim); }
   #weekout {
-    flex: 1; overflow: auto; margin: 0; padding: 12px;
+    flex: 1; overflow: auto; margin: 0; padding: 14px;
     background: var(--panel); border-radius: 10px;
     font: 400 13px/1.55 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
     white-space: pre; color: var(--fg);
     user-select: text; -webkit-user-select: text;
   }
   .sheetbody { flex: 1; overflow: auto; display: flex; flex-direction: column; gap: 10px; }
-  .card { background: var(--panel); border-radius: 10px; padding: 14px; }
-  .card .lab { font-size: 11px; font-weight: 700; letter-spacing: .17em; color: var(--dim); margin-bottom: 8px; }
-  .card .big { font-size: 22px; font-variant-numeric: tabular-nums; }
-  .card .sub { font-size: 13px; color: var(--dim); margin-top: 6px; font-variant-numeric: tabular-nums; }
-  input[type=range] { width: 100%; margin: 14px 0 2px; accent-color: #8b9098; height: 34px; }
-  .ends { display: flex; justify-content: space-between; font-size: 11px; color: var(--dimmer); font-variant-numeric: tabular-nums; }
+  .card { background: var(--panel); border-radius: 10px; padding: 15px; }
+  .card .lab { font-size: 11px; font-weight: 700; letter-spacing: .17em; color: var(--dim); margin-bottom: 9px; }
+  .card .big { font-size: 24px; font-variant-numeric: tabular-nums; }
+  .card .sub { font-size: 13px; color: var(--dim); margin-top: 7px; font-variant-numeric: tabular-nums; }
+  input[type=range] { width: 100%; margin: 16px 0 2px; accent-color: #949aa3; height: 34px; }
+  .ends { display: flex; justify-content: space-between; font-size: 11px; color: var(--dim); font-variant-numeric: tabular-nums; }
   #splitGrid { display: grid; gap: 6px; }
-  .sbtn { background: var(--panel2); border-radius: 10px; padding: 16px 8px; font-size: 18px; font-weight: 700; position: relative; overflow: hidden; }
-  .sbtn .bar { position: absolute; top: 0; left: 0; right: 0; height: 3px; }
-  .sbtn:active { background: #33373d; }
+  .sbtn { background: var(--panel2); border-radius: 10px; padding: 15px 8px; font-size: 18px; font-weight: 700;
+    display: flex; flex-direction: column; align-items: center; gap: 7px; }
+  .sbtn .bar { width: 26px; height: 3px; border-radius: 2px; }
+  .sbtn:active { background: var(--panel3); }
   .danger { background: #2a1416; color: #ffb4ad; border-radius: 10px; height: 48px; font-size: 13px; font-weight: 700; letter-spacing: .1em; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .gbtn { transition: none; }
+    .gbtn:active, .gbtn.tapped { transform: none; }
+  }
 </style>
 
 <div id="app">
-  <div id="sync" class="s-synced"></div>
-  <div id="err" class="hidden"></div>
-
-  <div id="strip" class="hidden">
-    <div id="stripHead"></div>
-    <div class="strip-marks">
-      <button data-mark="+">+</button>
-      <button data-mark="=">=</button>
-      <button data-mark="-">-</button>
-    </div>
-  </div>
-
   <div id="nowbar" class="idle">
     <div class="now-cat" id="nowCat">NOW: IDLE</div>
+    <div id="sync" class="s-synced"><span id="syncN"></span></div>
     <div class="now-row">
-      <div class="now-text" id="nowText"></div>
+      <input id="note" type="text" placeholder="note" autocomplete="off" autocapitalize="none"
+             autocorrect="off" spellcheck="false" enterkeyhint="done" disabled>
       <div class="now-el" id="nowEl"></div>
     </div>
   </div>
@@ -173,16 +193,27 @@
         <span class="sit-el" id="sitEl"></span>
       </span>
     </button>
-    <button id="sitAdj" class="hidden">EDIT</button>
+    <button id="sitAdj" class="off">EDIT</button>
   </div>
 
   <div id="grid"></div>
 
-  <div class="footer">
-    <input id="note" type="text" placeholder="note" autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false" enterkeyhint="done">
-    <button id="btnSplit" class="fbtn">SPLIT</button>
-    <button id="btnWeek" class="fbtn">W</button>
+  <div id="footer">
+    <div id="footBtns">
+      <button id="btnSplit" class="fbtn">SPLIT</button>
+      <button id="btnWeek" class="fbtn">WEEK</button>
+    </div>
+    <div id="strip" class="hidden">
+      <div id="stripHead"></div>
+      <div class="strip-marks">
+        <button data-mark="+">+</button>
+        <button data-mark="=">=</button>
+        <button data-mark="-">-</button>
+      </div>
+    </div>
   </div>
+
+  <div id="err" class="hidden"></div>
 </div>
 
 <!-- ── week ─────────────────────────────────────────────────────── -->
@@ -191,7 +222,7 @@
     <button id="wPrev" class="fbtn">&larr;</button>
     <div class="vtitle">WEEK</div>
     <button id="wNext" class="fbtn">&rarr;</button>
-    <button id="wClose" class="fbtn">X</button>
+    <button id="wClose" class="fbtn">DONE</button>
   </div>
   <pre id="weekout">loading</pre>
 </div>
@@ -200,7 +231,7 @@
 <div id="sheetSplit" class="view hidden">
   <div class="vhead">
     <div class="vtitle">SPLIT</div>
-    <button id="spClose" class="fbtn">X</button>
+    <button id="spClose" class="fbtn">DONE</button>
   </div>
   <div class="sheetbody">
     <div class="card">
@@ -221,7 +252,7 @@
 <div id="sheetSit" class="view hidden">
   <div class="vhead">
     <div class="vtitle">SITTING START</div>
-    <button id="ssClose" class="fbtn">X</button>
+    <button id="ssClose" class="fbtn">DONE</button>
   </div>
   <div class="sheetbody">
     <div class="card">
@@ -231,7 +262,7 @@
       <div class="ends"><span id="ssLo"></span><span id="ssHi"></span></div>
       <div class="sub" id="ssSub"></div>
     </div>
-    <button id="ssApply" class="fbtn" style="width:100%">APPLY</button>
+    <button id="ssApply" class="fbtn" style="width:100%;height:48px">APPLY</button>
     <button id="ssDelete" class="danger">DISCARD THIS SIT BLOCK</button>
   </div>
 </div>
@@ -253,7 +284,7 @@
   /* ── state ─────────────────────────────────────────────────── */
 
   var S = { open: null, sit: null, lastTapMs: 0 };
-  var strip = null;          // {ref, key, durMs, timer}
+  var strip = null;          // {ref, key, durMs, hintMs, timer}
   var flushing = false, retryTimer = null, retryDelay = 4000;
   var noteTimer = null;
   var split = { atMs: 0, startMs: 0, nowMs: 0 };
@@ -274,10 +305,11 @@
 
   /* ── formatting ────────────────────────────────────────────── */
 
+  function pad2(n) { return String(n).replace(/^(\d)$/, '0$1'); }
   function fmtEl(ms) {
     if (!(ms > 0)) ms = 0;
     var m = Math.floor(ms / MS_MIN), h = Math.floor(m / 60);
-    return h ? (h + 'h' + String(m % 60).replace(/^(\d)$/, '0$1')) : (m + 'm');
+    return h ? (h + 'h' + pad2(m % 60)) : (m + 'm');
   }
   function fmtDur(ms) {
     var m = Math.max(0, Math.round(ms / MS_MIN)), h = Math.floor(m / 60);
@@ -285,13 +317,13 @@
   }
   function clock(ms) {
     var d = new Date(ms);
-    return String(d.getHours()).replace(/^(\d)$/, '0$1') + ':' + String(d.getMinutes()).replace(/^(\d)$/, '0$1');
+    return pad2(d.getHours()) + ':' + pad2(d.getMinutes());
   }
 
   /* ── queue ─────────────────────────────────────────────────── */
 
   function queue() { var q = ls(K_QUEUE, []); return Array.isArray(q) ? q : []; }
-  function setQueue(q) { lsSet(K_QUEUE, q); }
+  function setQueue(q) { lsSet(K_QUEUE, q); paintSync(); }
 
   function enqueue(op) {
     op.id = uid();
@@ -314,12 +346,16 @@
 
   /** Only the newest note per block needs to survive. */
   function enqueueText(ref, text, hintMs) {
-    var q = queue().filter(function (o) { return !(o.type === 'setText' && o.ref === ref); });
-    setQueue(q);
+    setQueue(queue().filter(function (o) { return !(o.type === 'setText' && o.ref === ref); }));
     enqueue({ type: 'setText', ref: ref, text: text, hintMs: hintMs });
   }
 
-  function setSync(cls) { $('sync').className = 's-' + cls; }
+  function setSync(cls) { $('sync').className = 's-' + cls; paintSync(); }
+  /** A grey dot in a corner is invisible. The unsent count is not. */
+  function paintSync() {
+    var n = queue().length;
+    $('syncN').textContent = n ? String(n) : '';
+  }
 
   function flush() {
     if (flushing || !hasRun) return;
@@ -327,7 +363,6 @@
     if (!q.length) { setSync('synced'); return; }
     flushing = true;
     setSync('pending');
-    var batch = q.slice(0, 40);
     google.script.run
       .withSuccessHandler(function (res) {
         flushing = false;
@@ -344,12 +379,12 @@
           if (queue().length) flush(); else setSync('synced');
         }
       })
-      .withFailureHandler(function (e) {
+      .withFailureHandler(function () {
         flushing = false;
         setSync('failed');
         scheduleRetry();
       })
-      .applyOps(batch);
+      .applyOps(q.slice(0, 40));
   }
 
   function scheduleRetry() {
@@ -418,6 +453,7 @@
     strip = p;
     $('stripHead').textContent = p.key + ' closed · ' + fmtEl(p.durMs);
     $('strip').classList.remove('hidden');
+    $('footBtns').classList.add('hidden');
     strip.timer = setTimeout(hideStrip, CFG.markTimeoutMs);          // "=" already written
   }
 
@@ -425,13 +461,12 @@
     if (strip && strip.timer) clearTimeout(strip.timer);
     strip = null;
     $('strip').classList.add('hidden');
+    $('footBtns').classList.remove('hidden');
   }
 
   function applyMark(mark) {
     if (!strip) return;
-    if (mark !== '=') {
-      enqueue({ type: 'setMark', ref: strip.ref, mark: mark, hintMs: strip.hintMs });
-    }
+    if (mark !== '=') enqueue({ type: 'setMark', ref: strip.ref, mark: mark, hintMs: strip.hintMs });
     hideStrip();
     flush();
   }
@@ -458,58 +493,93 @@
 
   /* ── render ────────────────────────────────────────────────── */
 
+  function colsFor(n) { return n <= 3 ? 1 : (n <= 6 ? 2 : 3); }
+
+  /**
+   * Fill the grid from the bottom row up, left to right within each row.
+   * CATEGORIES order still reads normally; it just lands where the thumb is,
+   * so the first entry is no longer stranded in the top-left corner.
+   */
+  function thumbOrder(cats, cols) {
+    var rows = [], i;
+    for (i = 0; i < cats.length; i += cols) rows.push(cats.slice(i, i + cols));
+    rows.reverse();
+    var out = [];
+    rows.forEach(function (r) { out = out.concat(r); });
+    return out;
+  }
+
+  /** Only show a caption where it says something the key does not. */
+  function captionFor(c) {
+    var k = String(c.key).replace(/[^a-z0-9]/gi, '').toLowerCase();
+    var l = String(c.label || '').replace(/[^a-z0-9]/gi, '').toLowerCase();
+    return (!l || l.indexOf(k) === 0) ? '' : c.label;
+  }
+
   function buildGrid() {
+    var cols = colsFor(CATS.length);
+
     var g = $('grid');
     g.innerHTML = '';
-    var cols = CATS.length <= 2 ? 1 : (CATS.length <= 4 ? 2 : 3);
     g.style.gridTemplateColumns = 'repeat(' + cols + ', 1fr)';
-    CATS.forEach(function (c) {
+    thumbOrder(CATS, cols).forEach(function (c) {
       var b = document.createElement('button');
       b.className = 'gbtn';
       b.dataset.key = c.key;
-      b.innerHTML = '<span class="bar"></span><span class="k"></span><span class="l"></span>';
-      b.querySelector('.bar').style.background = c.hex;
+      b.innerHTML = '<span class="k"></span><span class="bar"></span><span class="l"></span>';
       b.querySelector('.k').textContent = c.key;
-      b.querySelector('.l').textContent = c.label;
-      b.addEventListener('click', function () { tapCategory(c.key); });
+      b.querySelector('.bar').style.background = c.hex;
+      b.querySelector('.l').textContent = captionFor(c);
+      b.addEventListener('click', function () { confirmTap(b); tapCategory(c.key); });
       g.appendChild(b);
     });
 
+    // The split sheet is a picker, not a thumb surface: keep reading order.
     var sg = $('splitGrid');
     sg.innerHTML = '';
     sg.style.gridTemplateColumns = 'repeat(' + cols + ', 1fr)';
     CATS.forEach(function (c) {
       var b = document.createElement('button');
       b.className = 'sbtn';
-      b.innerHTML = '<span class="bar"></span>' + c.key;
+      b.innerHTML = '<span>' + c.key + '</span><span class="bar"></span>';
       b.querySelector('.bar').style.background = c.hex;
       b.addEventListener('click', function () { doSplit(c.key); });
       sg.appendChild(b);
     });
   }
 
+  /** One beat, 140ms, on the button that was actually hit. */
+  function confirmTap(b) {
+    b.classList.add('tapped');
+    setTimeout(function () { b.classList.remove('tapped'); }, 140);
+  }
+
   function render() {
     var now = Date.now();
     var bar = $('nowbar');
+    var note = $('note');
 
     if (S.open) {
       bar.classList.remove('idle');
       $('nowCat').textContent = 'NOW: ' + S.open.key;
-      $('nowText').textContent = S.open.text || '';
       $('nowEl').textContent = '● ' + fmtEl(now - S.open.startMs);
+      note.disabled = false;
+      note.placeholder = 'note';
       bar.classList.toggle('long', (now - S.open.startMs) > CFG.longBlockMinutes * MS_MIN);
     } else {
       bar.classList.add('idle');
       bar.classList.remove('long');
       $('nowCat').textContent = 'NOW: IDLE';
-      $('nowText').textContent = '';
       $('nowEl').textContent = '';
+      note.value = '';
+      note.disabled = true;
+      note.placeholder = '';
     }
 
     $('sitBox').innerHTML = S.sit ? '&#9635;' : '&#9634;';
     $('sitbar').classList.toggle('on', !!S.sit);
     $('sitEl').textContent = S.sit ? '● ' + fmtEl(now - S.sit.startMs) : '';
-    $('sitAdj').classList.toggle('hidden', !S.sit);
+    $('sitAdj').classList.toggle('off', !S.sit);
 
     $('btnSplit').disabled = !S.open;
 
@@ -517,13 +587,16 @@
     for (var i = 0; i < kids.length; i++) {
       kids[i].classList.toggle('active', !!S.open && kids[i].dataset.key === S.open.key);
     }
+    paintSync();
   }
 
   function tick() {
     var now = Date.now();
-    if (S.open) $('nowEl').textContent = '● ' + fmtEl(now - S.open.startMs);
+    if (S.open) {
+      $('nowEl').textContent = '● ' + fmtEl(now - S.open.startMs);
+      $('nowbar').classList.toggle('long', (now - S.open.startMs) > CFG.longBlockMinutes * MS_MIN);
+    }
     if (S.sit) $('sitEl').textContent = '● ' + fmtEl(now - S.sit.startMs);
-    if (S.open) $('nowbar').classList.toggle('long', (now - S.open.startMs) > CFG.longBlockMinutes * MS_MIN);
   }
 
   /* ── split ─────────────────────────────────────────────────── */
@@ -616,9 +689,9 @@
       S.open = st.open ? { ref: st.open.ref, key: st.open.key, text: st.open.text || '', startMs: st.open.startMs } : null;
       S.sit = st.sit ? { ref: st.sit.ref, startMs: st.sit.startMs } : null;
       S.lastTapMs = 0;
+      render();
       $('note').value = S.open ? (S.open.text || '') : '';
       saveState();
-      render();
     }
   }
 
@@ -674,7 +747,6 @@
   $('note').addEventListener('input', function () {
     if (!S.open) return;
     S.open.text = $('note').value;
-    $('nowText').textContent = S.open.text;
     saveState();
     if (noteTimer) clearTimeout(noteTimer);
     var ref = S.open.ref, hint = S.open.startMs, val = S.open.text;

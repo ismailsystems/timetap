@@ -94,6 +94,11 @@ surface of the app. There is no settings screen and there will never be one.
 - `CATEGORIES` — add or remove entries and the button grid, the week report
   and the mark rules all follow. Nothing else needs editing. Keys become the
   `"KEY:"` title prefix, so keep them short and uppercase.
+  **Order matters ergonomically:** the grid fills from the bottom row upward,
+  so the first entries land nearest your thumb and the last entries sit in the
+  top corners. Put what you tap most at the top of the array.
+  A category's `label` is only shown under the key when it says something the
+  key does not — `ADM`/Admin stays bare, `DW`/Deep work does not.
 - `autoMark` — `'+'`, `'='`, `'-'` or `null`. Non-null means that category
   never shows the mark strip; the mark is applied silently. `null` means the
   strip may appear.
@@ -210,7 +215,70 @@ ones are an empty `CAL_ACTUAL` and a calendar ID pasted with a trailing space.
 
 ---
 
-## 9. What lives where
+## 9. Push from the repo instead of pasting (optional)
+
+Copying three files into the editor by hand gets old fast, and it is how the
+two copies drift. `clasp` is Google's own CLI for this — it pushes the working
+tree straight into the script project.
+
+```bash
+npm install -g @google/clasp
+```
+
+**Turn the API on once** at
+[script.google.com/home/usersettings](https://script.google.com/home/usersettings)
+— set *Google Apps Script API* to **On**. Pushes fail with a `User has not
+enabled the Apps Script API` error until you do.
+
+**Log in.** This opens a browser for Google's consent screen, so run it
+yourself:
+
+```bash
+clasp login
+```
+
+**Point the repo at your script.** The ID is in **Project Settings → IDs →
+Script ID** (also the long string in the editor URL):
+
+```bash
+cd ~/Desktop/timetap && printf '{"scriptId":"YOUR_SCRIPT_ID","rootDir":"."}' > .clasp.json
+```
+
+`.clasp.json` is gitignored — it is specific to your machine and your script.
+`.claspignore` is committed, and it excludes everything except the three files
+that belong to Apps Script. Without it `clasp` would push `site/index.html`
+alongside `Index.html` and the docs site would land in your web app.
+
+**Then, after any edit:**
+
+```bash
+clasp push
+```
+
+That replaces the paste step. It does **not** replace the redeploy step — a
+push updates the code, but the web app URL keeps serving the pinned version
+until you cut a new one. Get the deployment ID once with `clasp deployments`,
+then:
+
+```bash
+clasp push && clasp deploy -i YOUR_DEPLOYMENT_ID -d "$(git rev-parse --short HEAD)"
+```
+
+One command, code live, deployment described by the commit it came from. Worth
+an alias.
+
+`clasp pull` goes the other way, if you ever edit in the browser and want the
+change back in git. Push and pull both overwrite wholesale, so pick one
+direction as the source of truth — the repo — and stay there.
+
+A GitHub Action can run `clasp push` on every commit to main, but it needs your
+`~/.clasprc.json` OAuth token in a repo secret. For a personal app deployed to
+an audience of one, that is a Google refresh token sitting in GitHub for very
+little gain. Local `clasp push` is the better trade.
+
+---
+
+## 10. What lives where
 
 | | |
 |---|---|

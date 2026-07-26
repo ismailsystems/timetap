@@ -1,0 +1,12 @@
+# clasp pushes everything it finds unless told otherwise, and this repo holds a
+# docs site, a workflow and a test harness that must never reach Apps Script —
+# site/index.html in particular would collide with Index.html.
+#
+# So: ignore everything, then allow back exactly the three files that are the
+# Apps Script project. New folders are excluded by default rather than by
+# remembering to add them here.
+**/**
+
+!appsscript.json
+!Code.gs
+!Index.html

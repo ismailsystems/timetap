@@ -1,3 +1,6 @@
 node_modules/
 .DS_Store
 _site/
+
+# holds your script id and is machine-specific; see SETUP.md section 10
+.clasp.json
