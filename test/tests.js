@@ -695,14 +695,15 @@ const shape = () => kidsOf().map(c => c.dataset.key || (c.dataset.add ? '+' : '_
 
 chk('always two columns', kidsOf().length % 2 === 0, String(kidsOf().length));
 chk('no box ever spans a row', kidsOf().every(c => !c.style.gridColumn), shape());
-chk('the add box is the very last cell',
-  kidsOf()[kidsOf().length - 1].dataset.add === '1', shape());
-chk('the first category sits beside it, in the bottom row',
-  kidsOf()[kidsOf().length - 2].dataset.key === 'DW', shape());
+chk('the add box is in the top row, furthest from the thumb',
+  kidsOf()[0].dataset.add === '1', shape());
+chk('the bottom row is two categories, not one and a button',
+  kidsOf()[kidsOf().length - 2].dataset.key === 'DW' &&
+  kidsOf()[kidsOf().length - 1].dataset.key === 'MTG', shape());
 // Bottom row first, left to right within a row: DW MTG ADM BODY REL FRAG.
 chk('categories run in config order up the grid',
-  shape() === 'FRAG _ BODY REL MTG ADM DW +', shape());
-chk('an odd count leaves one empty cell, in the top row',
+  shape() === '+ _ REL FRAG ADM BODY DW MTG', shape());
+chk('an odd count leaves one empty cell, also in the top row',
   kidsOf().filter(c => !c.dataset.key && c.dataset.add !== '1').length === 1 &&
   kidsOf().findIndex(c => !c.dataset.key && c.dataset.add !== '1') < 2, shape());
 
@@ -714,8 +715,9 @@ chk('ten cells exactly', kidsOf().length === 10, String(kidsOf().length));
 chk('no add box', kidsOf().every(c => c.dataset.add !== '1'));
 chk('every cell is a category', kidsOf().every(c => !!c.dataset.key), shape());
 chk('and nothing spans', kidsOf().every(c => !c.style.gridColumn));
-chk('the first category still holds the bottom row',
-  kidsOf()[kidsOf().length - 2].dataset.key === 'DW', shape());
+chk('the first two categories still hold the bottom row',
+  kidsOf()[kidsOf().length - 2].dataset.key === 'DW' &&
+  kidsOf()[kidsOf().length - 1].dataset.key === 'MTG', shape());
 reset();
 
 console.log('\n29. the rollup reports keys, not whatever had a colon in it');
@@ -831,6 +833,38 @@ tap('DW'); settle();
 const quiet = A().map(e => e.t + e.s + e.e).join('|');
 H.fireVisible(); settle();
 chk('a fresh block is left alone', A().map(e => e.t + e.s + e.e).join('|') === quiet);
+reset();
+
+console.log('\n30. idle is a state you can see');
+reset(); reboot();
+chk('nothing running dims the grid', $('grid')._cls.has('idle'));
+tap('DW'); settle();
+chk('a running block undims it', !$('grid')._cls.has('idle'));
+wait(30); tap('MTG'); tap('MTG'); settle();
+chk('switching keeps it undimmed', !$('grid')._cls.has('idle'));
+
+reset(D(2026, 7, 20, 8, 0)); reboot();
+tap('DW'); settle();
+H.setNow(D(2026, 7, 20, 17, 0));
+H.fireVisible(); settle();
+chk('and the stale guard leaving nothing open dims it again',
+  $('grid')._cls.has('idle') && activeKey() === null, String(activeKey()));
+
+console.log('\n30b. the sync pill is absent unless it has something to say');
+// document.getElementById is what the client uses; H.$ only sees nodes already made.
+const el = id => document.getElementById(id);
+reset(); reboot();
+chk('quiet means the synced class, which CSS hides',
+  el('sync').className === 's-synced', el('sync').className);
+H.setOnline(false);
+tap('DW'); settle();
+chk('a failure switches it to a class that shows', el('sync').className === 's-failed',
+  el('sync').className);
+chk('and it carries the count', el('syncN').textContent === '1', el('syncN').textContent);
+H.setOnline(true);
+advance(60000); settle(); settle();
+chk('draining puts it back to hidden', el('sync').className === 's-synced' &&
+  el('syncN').textContent === '', el('sync').className + ' ' + el('syncN').textContent);
 reset();
 
 console.log('\n────────────────────────────────────────');

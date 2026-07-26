@@ -48,10 +48,14 @@
      is left for a bar at the top to hold. */
   /* In the posture row, which is chrome, rather than floating over whichever
      category happens to be in the top right corner. */
+  /* Quiet means gone, not a shade darker. A failure then announces itself by
+     appearing, which is far harder to miss than a 9px dot changing colour —
+     and the posture label gets the middle of the row back. */
   #sync {
     flex: 0 0 auto; display: flex; align-items: center; gap: 5px;
     padding: 0 11px; border-radius: 9px; background: var(--panel2);
   }
+  #sync.s-synced { display: none; }
   #sync::after { content: ''; width: 9px; height: 9px; border-radius: 50%; background: #4b5057; }
   #sync.s-pending::after { background: var(--flag); }
   #sync.s-failed::after  { background: var(--bad); }
@@ -96,6 +100,17 @@
      the whole row the moment it gained a note and the grid shifted under the
      thumb. Every box is now the same height in every state. */
   #grid { flex: 1 1 auto; display: grid; gap: 6px; min-height: 0; grid-auto-rows: 1fr; }
+  /* Nothing running dims every box. One bright box against five dim ones is a
+     difference you catch without reading anything; the absence of a ring was
+     not, and mistaking idle for running is the one failure that puts a hole in
+     the record. The veil sits behind the label, so contrast is untouched. */
+  .gbtn::before {
+    content: ''; position: absolute; inset: 0; z-index: 0;
+    background: #000; opacity: 0; border-radius: 12px; pointer-events: none;
+    transition: opacity .25s ease-out;
+  }
+  #grid.idle .gbtn::before { opacity: .58; }
+  .gbtn .k, .gbtn .gn, .gbtn .ge, .gbtn .cf { position: relative; z-index: 1; }
   .gbtn {
     position: relative; cursor: pointer; font: inherit; color: inherit;
     background: var(--panel2); border-radius: 12px;
@@ -155,6 +170,7 @@
   }
   /* The add box. Outlined rather than filled, because it is not a category
      yet and must not read like one. */
+  .gspacer { border-radius: 12px; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .045); }
   .addcell {
     background: var(--panel2); box-shadow: inset 0 0 0 1px var(--line);
   }
@@ -237,7 +253,7 @@
   .danger { background: #2a1416; color: #ffb4ad; border-radius: 10px; height: 48px; font-size: 13px; font-weight: 700; letter-spacing: .1em; }
 
   @media (prefers-reduced-motion: reduce) {
-    .gbtn { transition: none; }
+    .gbtn, .gbtn::before { transition: none; }
     .gbtn:active, .gbtn.tapped { transform: none; }
     .gbtn.active { animation: none; }
   }
@@ -639,9 +655,10 @@
 
   /**
    * Lay the grid out as slots rather than as a list, because three things want
-   * different ends of it: the add box belongs in the very last cell, the first
-   * categories belong in the bottom rows where the thumb is, and any leftover
-   * cell belongs in the top row where nothing is lost.
+   * different parts of it: the categories belong in the bottom rows where the
+   * thumb is, and the two things that are not categories — the add box and any
+   * leftover cell — belong in the top row, furthest from it. Putting the add
+   * box last gave the rarest action on the screen the best corner on it.
    *
    * Returns one entry per slot: a category, null for the add box, or undefined
    * for an empty one.
@@ -651,7 +668,7 @@
     var slots = Math.max(cols, Math.ceil(total / cols) * cols);
     var out = [];
     for (var i = 0; i < slots; i++) out.push(undefined);
-    if (showAdd) out[slots - 1] = null;
+    if (showAdd) out[0] = null;
 
     var free = [];
     for (var r = (slots / cols) - 1; r >= 0; r--) {
@@ -788,6 +805,8 @@
     // Only sitting has a duration, because only sitting is written down.
     $('sitEdit').classList.toggle('off', !S.sit);
     $('sitEl').textContent = S.sit ? fmtEl(now - S.sit.startMs) : '';
+
+    $('grid').classList.toggle('idle', !S.open);
 
     var kids = $('grid').children;
     for (var i = 0; i < kids.length; i++) {

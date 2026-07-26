@@ -59,20 +59,20 @@
   <p>This survives a dead battery and a reinstall. On load the open block is found by querying the calendar, not by trusting the browser. The UI updates on tap; the write happens in the background, and a failed write is queued in localStorage — ordered and idempotent — then retried on the next interaction and on load.</p>
 
   <h2>The logger</h2>
-<pre>┌─────────────────────────────┐
-│              +              │
-├──────────────┬──────────────┤
+<pre>┌──────────────┬──────────────┐
+│      +       │              │
+├──────────────┼──────────────┤
 │    People    │  Fragments   │
 ├──────────────┼──────────────┤
 │    Admin     │     Body     │
 ├──────────────┼──────────────┤
+│ 47m          │              │
 │  Deep work   │   Meetings   │
 │ memo drafting│              │
-│    ● 47m     │              │
-├──────────────┴──────────────┤
-│      ▣ SITTING      │ 1h04  │
-└─────────────────────────────┘</pre>
-  <p>The grid fills from the bottom row up, so the first entries in <code>CATEGORIES</code> land nearest your thumb. There is no bar above it and no chrome below it: the note and the clock belong to the block that is running, so they live inside the box that is running, and the ring around it breathes. The <code>+</code> box names a new category, up to ten; nothing can be renamed afterwards, because a key change would split every past event away from every future one in the rollup. There is no chrome below the grid: the lit button <em>is</em> the open block, so re-tapping it opens SPLIT, and when a closed block earns a mark the <code>+ = -</code> strip takes the posture row's place for six seconds — same slot, same height, so nothing above it moves.</p>
+├──────────────┴──────┬───────┤
+│    ▣ SITTING        │ 1h04  │
+└─────────────────────┴───────┘</pre>
+  <p>The grid fills from the bottom row up, so the first entries in <code>CATEGORIES</code> land nearest your thumb. There is no bar above it and no chrome below it: the note and the clock belong to the block that is running, so they live inside the box that is running, and the ring around it breathes. When nothing is running every box dims, because the absence of a ring is a weak signal for the one failure that puts a hole in the record. The <code>+</code> box names a new category, up to ten; nothing can be renamed afterwards, because a key change would split every past event away from every future one in the rollup. There is no chrome below the grid: the lit button <em>is</em> the open block, so re-tapping it opens SPLIT, and when a closed block earns a mark the <code>+ = -</code> strip takes the posture row's place for six seconds — same slot, same height, so nothing above it moves.</p>
   <p>A tap that lands within a minute of the previous one arms the button rather than committing, and waits for a second tap. Taps that close together are far more often a brush than a decision, and the correction rule makes a brush destructive: it silently retitles the block you are actually in. Ignoring the question is the safe outcome — it forgets after four seconds and nothing was ever queued.</p>
 
   <h2>The mark</h2>
