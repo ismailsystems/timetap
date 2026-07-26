@@ -948,6 +948,41 @@ tap('DW'); settle();
 chk('and a running block lifts the veil', !$('grid')._cls.has('idle'));
 reset();
 
+console.log('\n33. setupRollup does the whole thing in one run');
+reset();
+let noSheet = null;
+try { setupRollup(); } catch (e) { noSheet = String(e.message || e); }
+chk('with no SHEET_ID it says exactly what to do',
+  !!noSheet && /SHEET_ID/.test(noSheet) && /Script properties/.test(noSheet), noSheet);
+
+// A URL pasted straight out of the address bar, not an extracted id.
+H.SCRIPT_PROPS.SHEET_ID = 'https://docs.google.com/spreadsheets/d/book/edit#gid=0';
+H.clearPropCache();
+chk('the id is taken out of a pasted URL', sheetIdFrom_(H.SCRIPT_PROPS.SHEET_ID) === 'book',
+  sheetIdFrom_(H.SCRIPT_PROPS.SHEET_ID));
+
+reboot();
+tap('DW'); wait(40); tap('MTG'); tap('MTG'); settle();
+const report = setupRollup();
+chk('it reports the sheet', /docs\.google\.com/.test(report), report.split('\n')[3]);
+chk('it installs the trigger', H.TRIGGERS.length === 1 && H.TRIGGERS[0].fn === 'dailyRollup',
+  String(H.TRIGGERS.length));
+chk('it fills both tabs there and then',
+  H.SHEETS.book.getSheetByName('daily').rows.length === 91 &&
+  H.SHEETS.book.getSheetByName('weekly').rows.length > 1);
+chk('and counts what it found on each calendar', /ACTUAL {4}2/.test(report),
+  report.split('\n').slice(-3).join(' | '));
+
+chk('running it twice does not double the trigger',
+  (setupRollup(), H.TRIGGERS.length) === 1, String(H.TRIGGERS.length));
+
+reset();
+H.SCRIPT_PROPS.SHEET_ID = 'book'; H.clearPropCache();
+const emptyReport = setupRollup();
+chk('an empty ACTUAL is called out rather than left to Sunday',
+  /ACTUAL is empty/.test(emptyReport), emptyReport.split('\n').slice(-1)[0]);
+reset();
+
 console.log('\n────────────────────────────────────────');
 console.log(H.pass + ' passed, ' + H.fail + ' failed');
 process.exit(H.fail ? 1 : 0);

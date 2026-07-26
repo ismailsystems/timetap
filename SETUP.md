@@ -327,24 +327,31 @@ the test suite cannot.
 There is no week screen in the app. The numbers go to a Google Sheet on a daily
 trigger, and you read them where you actually think — which was never a phone.
 
-**Create a spreadsheet.** Any blank one. Copy the id out of its URL:
+**Create a spreadsheet.** Any blank one. Copy its URL — the whole thing, out of
+the address bar. You do not need to extract the id; the app will take it out.
 
-```
-https://docs.google.com/spreadsheets/d/THIS_LONG_PART_HERE/edit
-```
+**Tell the app about it.** Project Settings → Script properties → add
+`SHEET_ID` and paste the URL. (The `SHEET_ID` literal in CONFIG works too, but
+`clasp push` overwrites it and a script property it cannot touch.)
 
-**Tell the app about it**, the same two ways the calendars work — a script
-property named `SHEET_ID` (preferred, and required if you sync with clasp), or
-the `SHEET_ID` literal in the CONFIG block.
+**Run `setupRollup` once.** Pick it from the function dropdown in the editor and
+press Run. It does everything else in one go:
 
-**Install the trigger.** In the editor, pick `installDailyTrigger` from the
-function dropdown and **Run**. It is idempotent: it clears any trigger it
-previously made, so running it twice does not give you two. `removeDailyTrigger`
-undoes it. You can also add the trigger by hand under the clock icon in the left
-sidebar — time-driven, day timer, function `dailyRollup`.
+- checks the spreadsheet opens
+- installs the nightly trigger
+- fills both tabs immediately, so you are not waiting until 3am to find out
+- reports how many events it found on each of the three calendars
 
-Run `dailyRollup` once by hand to confirm it works rather than waiting until
-3am to find out.
+That last part is the one to read. If `ACTUAL` comes back 0 and you have been
+logging, `CAL_ACTUAL` is pointing at the wrong calendar — worth knowing now
+rather than on Sunday.
+
+The first run will ask you to authorize again: the rollup added the
+`spreadsheets` and `script.scriptapp` scopes. Approve them, or the trigger fails
+silently overnight.
+
+Safe to run again whenever. It clears its own trigger before installing one, so
+it cannot leave you with two.
 
 ### What lands in the sheet
 

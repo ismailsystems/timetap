@@ -946,8 +946,19 @@ function round2_(n) { return Math.round((n || 0) * 100) / 100; }
 
 /* ── the spreadsheet ────────────────────────────────────────────── */
 
+/**
+ * Accepts the spreadsheet's id or the whole URL you copied out of the address
+ * bar, because being made to extract the id by hand is how a trailing space
+ * ends up in a config value.
+ */
+function sheetIdFrom_(raw) {
+  var v = String(raw == null ? '' : raw).trim();
+  var m = /\/spreadsheets\/d\/([A-Za-z0-9_-]+)/.exec(v);
+  return m ? m[1] : v;
+}
+
 function openSheet_() {
-  var id = prop_('SHEET_ID') || String(SHEET_ID || '').trim();
+  var id = sheetIdFrom_(prop_('SHEET_ID') || SHEET_ID);
   if (!id) {
     throw new Error('SHEET_ID is not set. Create a spreadsheet, take the id out ' +
       'of its URL, and put it in the CONFIG block of Code.gs or in a script ' +
@@ -971,6 +982,57 @@ function writeGrid_(ss, tabName, rows) {
 }
 
 /* ── the trigger ────────────────────────────────────────────────── */
+
+/**
+ * The whole rollup setup in one Run. Put the spreadsheet's URL (or its id) in a
+ * script property named SHEET_ID, then run this from the editor: it checks the
+ * sheet opens, installs the nightly trigger, fills both tabs immediately so you
+ * are not waiting until 3am to find out, and reports what it saw on each
+ * calendar so a mis-wired one is obvious now rather than on Sunday.
+ *
+ * Safe to run again. Nothing here is additive.
+ */
+function setupRollup() {
+  var raw = prop_('SHEET_ID') || SHEET_ID;
+  if (!sheetIdFrom_(raw)) {
+    throw new Error('SHEET_ID is not set.\n\n' +
+      'Create a spreadsheet, then: Project Settings -> Script properties -> ' +
+      'add SHEET_ID and paste its URL. Then run this again.');
+  }
+
+  var ss = openSheet_();
+  var trig = installDailyTrigger();
+  var res = dailyRollup();
+
+  var now = Date.now();
+  var lo = addLocalDaysMs_(localMidnightMs_(now), -(ROLLUP_DAYS - 1));
+  var hi = addLocalDaysMs_(localMidnightMs_(now), 1);
+  var seen = {
+    PLAN: readCal_(calId_('CAL_PLAN'), lo, hi).length,
+    ACTUAL: readCal_(calId_('CAL_ACTUAL'), lo, hi).length,
+    SITTING: readCal_(calId_('CAL_SITTING'), lo, hi).length
+  };
+
+  var lines = [
+    'Rollup is set up.',
+    '',
+    'sheet       ' + ss.getName(),
+    '            ' + ss.getUrl(),
+    'tabs        ' + DAILY_TAB + ', ' + WEEKLY_TAB + ' (rebuilt every run)',
+    'trigger     ' + trig,
+    'window      ' + res.days + ' days, ' + res.categories + ' categories',
+    '',
+    'events found in the last ' + ROLLUP_DAYS + ' days:',
+    '  PLAN      ' + seen.PLAN,
+    '  ACTUAL    ' + seen.ACTUAL,
+    '  SITTING   ' + seen.SITTING
+  ];
+  if (!seen.ACTUAL) {
+    lines.push('', 'ACTUAL is empty. If you have been logging, CAL_ACTUAL is ' +
+      'pointing at the wrong calendar.');
+  }
+  return lines.join('\n');
+}
 
 /**
  * Run once from the editor. Idempotent: clears any trigger it previously made
