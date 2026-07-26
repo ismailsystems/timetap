@@ -294,20 +294,31 @@ For **PLAN**:
 
 ## 8. Sanity check
 
-1. Open the app. NOW bar reads `NOW: IDLE`.
-2. Tap `ADM`. NOW bar switches to `NOW: ADM`, timer starts, sync dot goes
-   amber then dark. An event `ADM:` appears on ACTUAL, one minute long, with
-   `#open` in its description.
-3. Tap `DW` within 90 seconds. Still exactly one event on the calendar, now
-   titled `DW:`, same start time. That is the mis-tap rule.
-4. Tap the `NOT SITTING` button so it reads `SITTING`. A `SIT` event appears on
-   the SITTING calendar. Tap `BODY`. The SIT block closes at that instant, the
-   button falls back to `NOT SITTING`, and nothing else moves.
-5. In the editor, run `dailyRollup` once by hand and open your spreadsheet.
+1. Open the app. Every box is dimmed — that is what nothing running looks like.
+2. Tap `ADM`. Its box brightens, takes a white ring that breathes, and shows a
+   clock in its top left corner. An event `ADM:` appears on ACTUAL, one minute
+   long, with `#open` in its description.
+3. Tap `DW` within a minute. Nothing is written: the `DW` box arms itself and
+   says `TAP AGAIN`. Tap it again and there is still exactly one event on the
+   calendar, now titled `DW:`, with the original start time. That is the
+   confirmation gate and the mis-tap rule, in that order.
+4. Type into the note inside the lit box. The event's title picks it up.
+5. Wait a couple of minutes and tap the lit box itself. SPLIT opens on the
+   block that is running.
+6. Tap `NOT SITTING` so it reads `SITTING`. A `SIT` event appears on the
+   SITTING calendar and the button shows how long. Tap `BODY`. The SIT block
+   closes at that instant, the button falls back to `NOT SITTING`, and nothing
+   else moves.
+7. In the editor, run `dailyRollup` once by hand and open your spreadsheet.
    The `daily` and `weekly` tabs should be full of numbers.
 
-If the sync dot sits red, the message under it names the cause. The two common
+Nothing appears in the posture row unless a write is waiting or has failed. If
+a red pill shows up there, the message above it names the cause; the two common
 ones are an empty `CAL_ACTUAL` and a calendar ID pasted with a trailing space.
+
+Then paste `test/smoke.js` into the browser console, on the phone. It returns
+`{ pass, fail, failed }` and checks the things a screenshot would tell you and
+the test suite cannot.
 
 ---
 
