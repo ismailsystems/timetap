@@ -59,18 +59,21 @@
   <p>This survives a dead battery and a reinstall. On load the open block is found by querying the calendar, not by trusting the browser. The UI updates on tap; the write happens in the background, and a failed write is queued in localStorage — ordered and idempotent — then retried on the next interaction and on load.</p>
 
   <h2>The logger</h2>
-<pre>┌──────────────────────────┐
-│  NOW: DW                 │
-│  memo drafting     ● 47m │
-├──────────────────────────┤
-│  ▣ SITTING        ● 1h12 │
-├──────────────────────────┤
-│   DW    │   MTG   │  ADM │
-├─────────┼─────────┼──────┤
-│  BODY   │  PEOPLE │ FRAG │
-├──────────────────────────┤
-│  [ note ]    [SPLIT] [W] │
-└──────────────────────────┘</pre>
+<pre>┌─────────────────────────────┐
+│  NOW: DW                    │
+│  memo drafting        ● 47m │
+├──────────────┬──────────────┤
+│    People    │  Fragments   │
+├──────────────┼──────────────┤
+│    Admin     │     Body     │
+├──────────────┼──────────────┤
+│  Deep work   │   Meetings   │
+├──────────────┴──────────────┤
+│  ▣ SITTING           ● 1h12 │
+├──────────────┬──────────────┤
+│    SPLIT     │     WEEK     │
+└──────────────┴──────────────┘</pre>
+  <p>The grid fills from the bottom row up, so the first entries in <code>CATEGORIES</code> land nearest your thumb. The note lives in the NOW bar, beside the block it describes. When a closed block earns a mark, the <code>+ = -</code> strip takes the place of SPLIT and WEEK for six seconds — same row, same height, so nothing above it moves.</p>
 
   <h2>The mark</h2>
   <p>The mark belongs to the block that just <em>closed</em>, captured at the transition — the one moment you both know how it went and are already holding the phone. Never asked for on a block that is starting.</p>

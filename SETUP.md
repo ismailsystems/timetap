@@ -126,8 +126,10 @@ surface of the app. There is no settings screen and there will never be one.
   **Order matters ergonomically:** the grid fills from the bottom row upward,
   so the first entries land nearest your thumb and the last entries sit in the
   top corners. Put what you tap most at the top of the array.
-  A category's `label` is only shown under the key when it says something the
-  key does not — `ADM`/Admin stays bare, `DW`/Deep work does not.
+  The button shows the `label`, verbatim and full size, so write it the way you
+  want to read it. The `key` never appears on the grid — it is the record's
+  vocabulary: the `"KEY:"` prefix on every ACTUAL event and the row name in the
+  week report. Long labels wrap to two lines and still fit.
 - `autoMark` — `'+'`, `'='`, `'-'` or `null`. Non-null means that category
   never shows the mark strip; the mark is applied silently. `null` means the
   strip may appear.

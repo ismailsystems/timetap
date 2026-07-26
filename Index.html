@@ -67,19 +67,26 @@
   #syncN { font-size: 11px; font-variant-numeric: tabular-nums; color: var(--dim); }
   #syncN:empty { display: none; }
 
-  /* ── sitting ─────────────────────────────────────────────── */
-  #sitrow { flex: 0 0 48px; display: flex; gap: 6px; }
+  /* ── sitting ─────────────────────────────────────────────────
+     Below the grid, because it gets toggled as often as a category does and
+     it spent its life in the least reachable strip of the screen. Wide and
+     flat rather than a grid cell: it is an overlay, not a seventh category,
+     and it must never start looking like one. */
+  #sitrow { flex: 0 0 62px; display: flex; gap: 6px; }
   #sitbar {
     flex: 1; display: flex; align-items: center; justify-content: space-between;
-    background: var(--panel); border-radius: 10px; padding: 0 13px;
+    background: var(--panel); border-radius: 12px; padding: 0 16px;
+    border: 1px solid transparent;
+    transition: background .12s ease-out;
   }
-  #sitbar.on { background: var(--panel2); }
-  .sit-left { display: flex; align-items: center; gap: 10px; font-size: 14px; font-weight: 700; letter-spacing: .17em; color: var(--dim); }
+  #sitbar.on { background: var(--panel2); border-color: var(--line); }
+  #sitbar:active { background: var(--panel3); }
+  .sit-left { display: flex; align-items: center; gap: 12px; font-size: 16px; font-weight: 700; letter-spacing: .15em; color: var(--dim); }
   #sitbar.on .sit-left { color: var(--fg); }
-  .sit-box { font-size: 18px; letter-spacing: 0; }
+  .sit-box { font-size: 22px; letter-spacing: 0; line-height: 1; }
   .sit-right { display: flex; align-items: baseline; gap: 12px; }
   .sit-hint { font-size: 11px; color: var(--dim); letter-spacing: 0; }
-  .sit-el { font-variant-numeric: tabular-nums; font-size: 15px; color: var(--dim); min-width: 46px; text-align: right; }
+  .sit-el { font-variant-numeric: tabular-nums; font-size: 17px; color: var(--dim); min-width: 50px; text-align: right; }
   /* visibility, not display: the SITTING bar must not change width when the
      control appears. */
   #sitAdj {
@@ -97,16 +104,25 @@
     gap: 9px; overflow: hidden; min-height: 0;
     transition: transform .12s ease-out, background .12s ease-out;
   }
-  .gbtn:active, .gbtn.tapped { background: var(--panel3); transform: scale(.975); }
-  .gbtn .k { font-size: 30px; font-weight: 700; letter-spacing: .03em; line-height: 1; }
-  /* the accent sits against the key it identifies, not 190px away at the
-     top edge of the button */
-  .gbtn .bar { width: 30px; height: 3px; border-radius: 2px; }
-  .gbtn .l {
-    height: 13px; line-height: 13px; font-size: 11px; color: var(--dim);
-    letter-spacing: .08em; text-transform: uppercase;
+  /* brightness, not a fixed grey: the background is now a different colour per
+     button, so the pressed state has to work against any hue */
+  .gbtn:active, .gbtn.tapped { filter: brightness(.86); transform: scale(.975); }
+  /* The label as written in CONFIG, verbatim. The key still prefixes the
+     calendar title and names the week report row; it is not what you aim at.
+     White on a black highlight is 21:1 on every button, so legibility stops
+     depending on which colour the category happens to be. */
+  .gbtn .k {
+    background: #000; color: #fff;
+    font-size: 26px; font-weight: 700; line-height: 1.2; letter-spacing: .01em;
+    padding: 9px 15px; border-radius: 10px; max-width: calc(100% - 24px);
+    text-align: center; overflow-wrap: break-word; hyphens: none; text-wrap: balance;
   }
-  .gbtn.active { box-shadow: inset 0 0 0 2px var(--fg); }
+  /* --ring is black or white per button, whichever the server worked out sits
+     better on that colour, so the open-block marker can never sink into it.
+     Dimming the other five would have been the prettier signal and would have
+     dragged the darkest colours under contrast, which is the one thing this
+     is not allowed to cost. */
+  .gbtn.active { box-shadow: inset 0 0 0 6px var(--ring, #000); }
 
   /* ── footer: SPLIT/WEEK, or the mark strip in their place ──
      The strip swaps 1:1 with the buttons, so the grid never moves, and the
@@ -162,10 +178,12 @@
   input[type=range] { width: 100%; margin: 16px 0 2px; accent-color: #949aa3; height: 34px; }
   .ends { display: flex; justify-content: space-between; font-size: 11px; color: var(--dim); font-variant-numeric: tabular-nums; }
   #splitGrid { display: grid; gap: 6px; }
-  .sbtn { background: var(--panel2); border-radius: 10px; padding: 15px 8px; font-size: 18px; font-weight: 700;
-    display: flex; flex-direction: column; align-items: center; gap: 7px; }
-  .sbtn .bar { width: 26px; height: 3px; border-radius: 2px; }
-  .sbtn:active { background: var(--panel3); }
+  .sbtn { background: var(--panel2); border-radius: 10px; padding: 14px 8px;
+    display: flex; align-items: center; justify-content: center; }
+  .sbtn .f { background: #000; color: #fff; font-size: 16px; font-weight: 700;
+    padding: 7px 12px; border-radius: 8px; max-width: 100%;
+    text-align: center; line-height: 1.15; overflow-wrap: break-word; }
+  .sbtn:active { filter: brightness(.86); }
   .danger { background: #2a1416; color: #ffb4ad; border-radius: 10px; height: 48px; font-size: 13px; font-weight: 700; letter-spacing: .1em; }
 
   @media (prefers-reduced-motion: reduce) {
@@ -185,6 +203,8 @@
     </div>
   </div>
 
+  <div id="grid"></div>
+
   <div id="sitrow">
     <button id="sitbar">
       <span class="sit-left"><span class="sit-box" id="sitBox">&#9634;</span> SITTING</span>
@@ -195,8 +215,6 @@
     </button>
     <button id="sitAdj" class="off">EDIT</button>
   </div>
-
-  <div id="grid"></div>
 
   <div id="footer">
     <div id="footBtns">
@@ -509,12 +527,8 @@
     return out;
   }
 
-  /** Only show a caption where it says something the key does not. */
-  function captionFor(c) {
-    var k = String(c.key).replace(/[^a-z0-9]/gi, '').toLowerCase();
-    var l = String(c.label || '').replace(/[^a-z0-9]/gi, '').toLowerCase();
-    return (!l || l.indexOf(k) === 0) ? '' : c.label;
-  }
+  /** What you aim at. The key is the record's vocabulary, not the button's. */
+  function faceOf(c) { return c.label || c.key; }
 
   function buildGrid() {
     var cols = colsFor(CATS.length);
@@ -526,10 +540,10 @@
       var b = document.createElement('button');
       b.className = 'gbtn';
       b.dataset.key = c.key;
-      b.innerHTML = '<span class="k"></span><span class="bar"></span><span class="l"></span>';
-      b.querySelector('.k').textContent = c.key;
-      b.querySelector('.bar').style.background = c.hex;
-      b.querySelector('.l').textContent = captionFor(c);
+      b.innerHTML = '<span class="k"></span>';
+      b.querySelector('.k').textContent = faceOf(c);
+      b.style.background = c.hex;
+      b.style.setProperty('--ring', c.ring);
       b.addEventListener('click', function () { confirmTap(b); tapCategory(c.key); });
       g.appendChild(b);
     });
@@ -541,8 +555,9 @@
     CATS.forEach(function (c) {
       var b = document.createElement('button');
       b.className = 'sbtn';
-      b.innerHTML = '<span>' + c.key + '</span><span class="bar"></span>';
-      b.querySelector('.bar').style.background = c.hex;
+      b.innerHTML = '<span class="f"></span>';
+      b.querySelector('.f').textContent = faceOf(c);
+      b.style.background = c.hex;
       b.addEventListener('click', function () { doSplit(c.key); });
       sg.appendChild(b);
     });

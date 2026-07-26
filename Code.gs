@@ -28,9 +28,11 @@ var CAL_SITTING = '';   // written continuously by this app. Posture overlay.
  * Categories. Adding or removing one requires editing only this array —
  * the UI grid, the week report and the mark rules all lay out from here.
  *
- *   key      short uppercase token. Becomes the "KEY:" title prefix.
- *   label    human name, shown small under the key on the button.
- *   color    CalendarApp.EventColor.* — applied to the ACTUAL event.
+ *   key      short uppercase token. Becomes the "KEY:" title prefix and the
+ *            row name in the week report. Never appears on the grid.
+ *   label    what the button says, verbatim and full size. Write it to be read.
+ *   color    CalendarApp.EventColor.* — the ACTUAL event's colour, and the
+ *            button's background. See COLOR_HEX below for the eleven names.
  *   autoMark '+' | '=' | '-' | null.  Non-null means this category NEVER
  *            shows the mark strip; the mark is applied silently.
  */
@@ -78,12 +80,60 @@ var SIT_TITLE   = 'SIT';
 var MS_HOUR     = 3600000;
 var MS_MIN      = 60000;
 
-/** Google Calendar's palette, so the client can tint buttons to match events. */
+/**
+ * Google Calendar's event palette, so a button is exactly the colour of the
+ * event it writes. These are the eleven colours the Calendar UI renders today,
+ * not the paler set the Calendar API's colors endpoint still reports, which is
+ * why a button used to be a different shade from its own event.
+ *
+ *   EventColor    id   name        hex
+ *   PALE_BLUE      1   Lavender    #7986cb
+ *   PALE_GREEN     2   Sage        #33b679
+ *   MAUVE          3   Grape       #8e24aa
+ *   PALE_RED       4   Flamingo    #e67c73
+ *   YELLOW         5   Banana      #f6bf26
+ *   ORANGE         6   Tangerine   #f4511e
+ *   CYAN           7   Peacock     #039be5
+ *   GRAY           8   Graphite    #616161
+ *   BLUE           9   Blueberry   #3f51b5
+ *   GREEN         10   Basil       #0b8043
+ *   RED           11   Tomato      #d50000
+ */
 var COLOR_HEX = {
-  '1': '#a4bdfc', '2': '#7ae7bf', '3': '#dbadff', '4': '#ff887c',
-  '5': '#fbd75b', '6': '#ffb878', '7': '#46d6db', '8': '#9aa0a6',
-  '9': '#5484ed', '10': '#51b749', '11': '#dc2127'
+  '1': '#7986cb', '2': '#33b679', '3': '#8e24aa', '4': '#e67c73',
+  '5': '#f6bf26', '6': '#f4511e', '7': '#039be5', '8': '#616161',
+  '9': '#3f51b5', '10': '#0b8043', '11': '#d50000'
 };
+
+/** WCAG relative luminance of a #rrggbb colour. */
+function relLum_(hex) {
+  var c = String(hex).replace('#', '');
+  if (c.length === 3) c = c[0] + c[0] + c[1] + c[1] + c[2] + c[2];
+  function ch(i) {
+    var v = parseInt(c.substr(i, 2), 16) / 255;
+    return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4);
+  }
+  return 0.2126 * ch(0) + 0.7152 * ch(2) + 0.0722 * ch(4);
+}
+
+/** Contrast ratio between two colours, so the tests can police the palette. */
+function contrast_(a, b) {
+  var la = relLum_(a), lb = relLum_(b);
+  return (Math.max(la, lb) + 0.05) / (Math.min(la, lb) + 0.05);
+}
+
+/**
+ * Black or white for the active ring, whichever contrasts better with the
+ * button underneath it. The label does not need this — white on a black
+ * highlight is 21:1 on any colour — but the ring sits directly on the colour,
+ * and neither constant works alone: black falls to 2.98:1 on Grape, white to
+ * 1.69:1 on Banana. Picking the better of the two cannot go below 4.58:1 for
+ * any colour, because the two ratios always multiply to 21.
+ */
+function ringOn_(hex) {
+  var L = relLum_(hex);
+  return (1.05 / (L + 0.05)) > ((L + 0.05) / 0.05) ? '#ffffff' : '#000000';
+}
 
 /* ═══════════════════════════════════════════════════════════════════
  * Web app entry
@@ -111,11 +161,13 @@ function doGet() {
 function clientConfig_() {
   return {
     categories: CATEGORIES.map(function (c) {
+      var hex = COLOR_HEX[String(c.color)] || '#616161';
       return {
         key: c.key,
         label: c.label,
         color: String(c.color),
-        hex: COLOR_HEX[String(c.color)] || '#9aa0a6',
+        hex: hex,
+        ring: ringOn_(hex),
         autoMark: c.autoMark || null
       };
     }),
