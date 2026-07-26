@@ -626,13 +626,10 @@
       }
     }
     cats.forEach(function (cat, n) { if (n < free.length) out[free[n]] = cat; });
-
-    // Whatever is still empty would be a hole in the grid. Rather than leave
-    // one, let the box beside it take the whole row.
-    var holes = 0;
-    out.forEach(function (v) { if (v === undefined) holes++; });
-    var span = holes ? cols - holes + 1 : 1;
-    return { slots: out.filter(function (v) { return v !== undefined; }), span: span };
+    // Anything still undefined stays an empty cell. Every box is the same size
+    // and every row holds the same number of them; a box that spanned a row to
+    // close a gap would be buying a tidier grid with an inconsistent one.
+    return out;
   }
 
   /** What you aim at. The key is the record's vocabulary, not the button's. */
@@ -645,14 +642,14 @@
     var g = $('grid');
     g.innerHTML = '';
     g.style.gridTemplateColumns = 'repeat(' + cols + ', 1fr)';
-    var plan = layoutCells(CATS, cols, CATS.length < CFG.maxCategories);
-    plan.slots.forEach(function (c, i) {
-      if (c === null) {
-        var ac = buildAddCell();
-        if (i === 0 && plan.span > 1) ac.style.gridColumn = 'span ' + plan.span;
-        g.appendChild(ac);
+    layoutCells(CATS, cols, CATS.length < CFG.maxCategories).forEach(function (c) {
+      if (c === undefined) {
+        var sp = document.createElement('div');
+        sp.className = 'gspacer';
+        g.appendChild(sp);
         return;
       }
+      if (c === null) { g.appendChild(buildAddCell()); return; }
       // A div, not a button: <button> may not contain interactive content, so
       // the parser silently drops an <input> placed inside one.
       var b = document.createElement('div');
@@ -675,7 +672,6 @@
       gn.addEventListener('keydown', function (e) { if (e && e.key === 'Enter') gn.blur(); });
 
       CELL[c.key] = { box: b, note: gn, el: b.querySelector('.ge') };
-      if (i === 0 && plan.span > 1) b.style.gridColumn = 'span ' + plan.span;
       b.addEventListener('click', function () { confirmTap(b); tapCategory(c.key); });
       g.appendChild(b);
     });
