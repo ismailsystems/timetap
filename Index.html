@@ -121,10 +121,10 @@
   /* Pinned to a corner rather than stacked, so a running block's clock cannot
      push its own label around. Top left: the sync pill owns the top right. */
   .gbtn .ge {
-    position: absolute; top: 8px; left: 8px;
+    position: absolute; top: 7px; left: 9px; opacity: .72;
     background: #000; color: #fff;
-    font-size: 14px; font-weight: 700; font-variant-numeric: tabular-nums;
-    padding: 4px 9px; border-radius: 7px; letter-spacing: .02em;
+    font-size: 11px; font-weight: 600; font-variant-numeric: tabular-nums;
+    padding: 2px 6px; border-radius: 5px; letter-spacing: .04em;
   }
   .gbtn.long .ge { color: var(--flag); }
   /* Outside the button, not inside it. An inset ring has to contrast with the
@@ -146,7 +146,7 @@
   /* The add box. Outlined rather than filled, because it is not a category
      yet and must not read like one. */
   .addcell {
-    background: none; box-shadow: inset 0 0 0 2px var(--line);
+    background: var(--panel2); box-shadow: inset 0 0 0 1px var(--line);
   }
   .addcell .k { background: none; color: var(--dim); font-size: 40px; font-weight: 300; padding: 0; }
   .addcell.naming .k { display: none; }
@@ -605,16 +605,29 @@
   function colsFor(n) { return n <= 3 ? 1 : (n <= 10 ? 2 : 3); }
 
   /**
-   * Fill the grid from the bottom row up, left to right within each row.
-   * CATEGORIES order still reads normally; it just lands where the thumb is,
-   * so the first entry is no longer stranded in the top-left corner.
+   * Lay the grid out as slots rather than as a list, because three things want
+   * different ends of it: the add box belongs in the very last cell, the first
+   * categories belong in the bottom rows where the thumb is, and any leftover
+   * cell belongs in the top row where nothing is lost.
+   *
+   * Returns one entry per slot: a category, null for the add box, or undefined
+   * for an empty one.
    */
-  function thumbOrder(cats, cols) {
-    var rows = [], i;
-    for (i = 0; i < cats.length; i += cols) rows.push(cats.slice(i, i + cols));
-    rows.reverse();
+  function layoutCells(cats, cols, showAdd) {
+    var total = cats.length + (showAdd ? 1 : 0);
+    var slots = Math.max(cols, Math.ceil(total / cols) * cols);
     var out = [];
-    rows.forEach(function (r) { out = out.concat(r); });
+    for (var i = 0; i < slots; i++) out.push(undefined);
+    if (showAdd) out[slots - 1] = null;
+
+    var free = [];
+    for (var r = (slots / cols) - 1; r >= 0; r--) {
+      for (var c = 0; c < cols; c++) {
+        var ix = r * cols + c;
+        if (out[ix] === undefined) free.push(ix);
+      }
+    }
+    cats.forEach(function (cat, n) { if (n < free.length) out[free[n]] = cat; });
     return out;
   }
 
@@ -628,15 +641,7 @@
     var g = $('grid');
     g.innerHTML = '';
     g.style.gridTemplateColumns = 'repeat(' + cols + ', 1fr)';
-    var cells = CATS.slice();
-    if (CATS.length < CFG.maxCategories) cells.push(null);   // the add box
-    // Pad to a whole number of rows before reversing them. Without this the
-    // short row is not a row at all once flattened: every position after it
-    // slides by one, the first category loses the bottom row it was given, and
-    // the gap ends up in the most reachable corner on the screen.
-    while (cells.length % cols !== 0) cells.push(undefined);
-
-    thumbOrder(cells, cols).forEach(function (c) {
+    layoutCells(CATS, cols, CATS.length < CFG.maxCategories).forEach(function (c) {
       if (c === undefined) {
         var sp = document.createElement('div');
         sp.className = 'gspacer';
@@ -762,7 +767,7 @@
       var isArmed = !!armed && armed.key === k;
       kids[i].classList.toggle('arming', isArmed);
       if (cell) {
-        cell.el.textContent = isOpen ? '● ' + fmtEl(now - S.open.startMs) : '';
+        cell.el.textContent = isOpen ? fmtEl(now - S.open.startMs) : '';
         // Never overwrite what is being typed right now.
         if (cell.note !== document.activeElement) cell.note.value = isOpen ? (S.open.text || '') : '';
         var cf = kids[i].querySelector('.cf');
@@ -775,7 +780,7 @@
   function tick() {
     var now = Date.now();
     if (S.open && CELL[S.open.key]) {
-      CELL[S.open.key].el.textContent = '● ' + fmtEl(now - S.open.startMs);
+      CELL[S.open.key].el.textContent = fmtEl(now - S.open.startMs);
       CELL[S.open.key].box.classList.toggle('long',
         (now - S.open.startMs) > CFG.longBlockMinutes * MS_MIN);
     }
