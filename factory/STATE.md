@@ -1,9 +1,9 @@
 # Factory State
 project: timetap
-stage: 6
-stage_name: Third fresh-eyes review (after fix pass 2)
-last_updated: 2026-07-27 (fix pass 2 complete)
-next_action: Run a third independent review of branch factory/error-paths — /factory or /factory-review. It should be short: fix pass 2 was five small items, nothing parked and no open questions. What is unchecked is the fix pass itself, by anyone other than its author. Then stage 7, the proof video with auto-loom-proof.
+stage: 7
+stage_name: Proof video (stage 6 skipped by human decision)
+last_updated: 2026-07-27 (fix pass 2 complete; third review declined)
+next_action: "Stage 6 SKIPPED — the human declined the third fresh-eyes review on 2026-07-27, satisfied with fix pass 2. Fix pass 2 therefore stands self-checked only; its author is the only thing that has verified it. Before or instead of stage 7: factory/GUIDE.md Part 2 is now WRONG, not merely stale — its section \"The one thing that is broken, in plain words\" describes the double-tap data loss as a live bug and proposes a fix (remove one card instead of redrawing) that is not the fix that shipped and would not have been sufficient alone. The build uses arm/confirm. Fix that before anyone reads it. Also outstanding: branch factory/error-paths is 19 commits ahead of main, nothing pushed, main untouched at 0ad0214 — the round is not merged."
 notes: |
   FIX PASS 2 COMPLETE (2026-07-27). All five items in factory/FIXES-2.md done,
   five commits, nothing parked, nothing escalated, no questions for the human.
