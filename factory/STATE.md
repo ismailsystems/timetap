@@ -1,145 +1,135 @@
 # Factory State
 project: timetap
-stage: done
-stage_name: Line complete — plan, build, review, fixes, explanation, proof video
-last_updated: 2026-07-27 (proof video recorded)
-next_action: "Nothing outstanding in the factory. Proof video at factory/proof/out/timetap-error-paths-proof-demo.mp4 — 97.7s, 8 beats, 6 contract criteria shown on camera, engine verify PASSED (duration match, audio -24.8dB, QA frames). Every frame spot-checked against its narration by hand. The video is gitignored as build output; beats.json + serve-proof.mjs + test-results.html are committed and regenerate it. THE ONE THING LEFT, and it is the human's call: main is 26 commits ahead of origin/main and nothing has been pushed. Stage 6 SKIPPED — the human declined the third fresh-eyes review on 2026-07-27, satisfied with fix pass 2. Fix pass 2 therefore stands self-checked only; its author is the only thing that has verified it. Before or instead of stage 7: factory/GUIDE.md Part 2 is now WRONG, not merely stale — its section \"The one thing that is broken, in plain words\" describes the double-tap data loss as a live bug and proposes a fix (remove one card instead of redrawing) that is not the fix that shipped and would not have been sufficient alone. The build uses arm/confirm. Fix that before anyone reads it. Also outstanding: branch factory/error-paths is 19 commits ahead of main, nothing pushed, main untouched at 0ad0214 — the round is not merged."
+stage: 5
+stage_name: The loop builds it — waiting for the human to press the button
+last_updated: 2026-07-27 (handed off)
+next_action: "THE HUMAN LAUNCHES THE LOOP. Launch instructions are at the top of factory/HANDOFF-2.md. In Claude Code: /loop work through factory/HANDOFF-2.md exactly as written. Answer the agent's orientation questions first, let it append them to HANDOFF-2's Orientation Q&A section, then tell it to begin. Machine must stay awake (caffeinate -dims). In the morning: read the RUN SUMMARY at the top of factory/progress-2.md, then run /factory for the independent review. NEVER launch the loop on the human's behalf."
 notes: |
-  FIX PASS 2 COMPLETE (2026-07-27). All five items in factory/FIXES-2.md done,
-  five commits, nothing parked, nothing escalated, no questions for the human.
+  ROUND 2 — "the honest record round". Brief: factory/BRIEF-2.md.
+  Plan: factory/PLAN-2.md, 16 tasks in four stages, all criteria written.
 
-    F2-1 Index.html's discardDead docblock claimed "the list is NOT redrawn…
-         Nothing may move while a finger is down" — the second half is false, rows
-         do slide up. Rewritten per amendment A4 to name the guard the build has:
-         arm/confirm. factory/review-repro-2/tap-count.js folded into
-         test/headless.js as a checkTapCount phase and deleted from factory/.
-         Measured 1, 1, 2, 3 destroyed at 2, 3, 4, 6 taps — A4's table exactly —
-         with every destruction preceded by TAP AGAIN TO DISCARD under the finger.
-    F2-2 NUL rule now drives off git ls-files (or a walk with no .git) instead of
-         14 hand-written paths. Binary files get a named exemption, never an
-         extension filter; an unreadable file is a failure, not a silent skip.
-    F2-3 factory/BRIEF.md:71 and factory/PLAN.md:33 corrected to three scopes; the
-         rule widened from two files to every .md, with eight record files exempt
-         by name and reason. HANDOFF.md is on that list and is the weakest entry —
-         flagged in the comment rather than left to be found.
-    F2-4 §39d skips by name instead of crashing outside the four contracted zones.
-         Harness gained skip(), mirroring smoke.js. A skip is never counted in
-         passed; the summary prints ", 1 skipped" and lists it.
-    F2-5 progress.md's parked question marked ruled (A1) with its original text
-         kept, plus four more places in the file that read as open.
+  HANDED OFF 2026-07-27. factory/HANDOFF-2.md is the one self-contained file the
+  loop obeys. factory/progress-2.md and factory/log-2.md created so the loop's
+  first GATHER finds them. Branch factory/honest-record created off main at
+  a256bdf and checked out. Round 1's progress.md and log.md are read-only and the
+  handoff says so; round 2 writes the -2 files.
 
-  TWO THINGS FOUND WHILE FIXING, BOTH FIXED IN PLACE:
-    - .gitignore's `node_modules/` does not match a symlink pointing at a
-      directory, so a symlinked checkout handed the whole tree to the new NUL rule
-      (EISDIR). Non-regular files are now skipped out loud.
-    - §39d's old "there is a golden for this timezone" check could not survive as
-      written without becoming an assertion that cannot fail. Replaced by one that
-      can (the golden holds a non-empty grid for both tabs), vacuity-checked.
+  PRE-FLIGHT, run before handing over: 492 assertions / 0 failed; lint all clear
+  across 17 rules and 38 files; headless ok at 19 checks per viewport including
+  the drawer and tap-count phases. One repo change made to get there —
+  test/lint.js gained a ninth SCOPE_QUOTE_EXEMPT entry for factory/ROUND-1.md,
+  which quotes "one OAuth scope" twice as historical record. That text was
+  already exempt while it lived in STATE.md; archiving it moved the exemption
+  with it. The rule was verified still live (false claim appended to BRIEF-2.md,
+  lint failed by name, claim removed). NOT a weakening — but a reviewer should
+  confirm that judgment rather than take it on trust.
 
-  VERIFIED: 492 assertions green TWICE under all four contracted timezones — the
-  count is deliberately unchanged, F2-4's criteria require it. lint all clear, 17
-  rules. headless green at both viewports plus the drawer and tap-count phases.
-  deploy.sh re-exercised in a fixture copy with a stub clasp first on PATH: all
-  four failure gates (lint, suite, headless, missing browser) exit non-zero with
-  zero clasp calls, --no-test still deploys, and the happy path reached the push
-  step calling only the stub. appsscript.json byte-identical to main, golden rollup
-  fixture untouched, Code.gs untouched, Index.html changed in comments only.
+  CIRCUIT BREAKERS SET: 3 failures parks a task, 3 parked tasks ends the run,
+  hard cap 25 passes or 8 hours.
 
-  WHAT IS STILL UNCHECKED: fix pass 2, by anyone other than its author.
+  PROOF DEFINED 2026-07-27. A 31-assertion contract at the top of PLAN-2.md,
+  plus 6-10 acceptance criteria on every one of the 16 tasks, each tagged with
+  a test tier and each naming an action and an observable. Every task carries at
+  least one error-path criterion.
 
-  Review 2 history, unchanged below.
+  FOUR THINGS IN THE CRITERIA THAT ARE LOAD-BEARING, and that a review should
+  check are still honest rather than softened:
+    - C1's SWEEP (contract 28). For every whole second 0-120, one unconfirmed
+      tap on a different category must never change an existing block's key.
+      The individual window tests all pass against any two different constants;
+      only the sweep proves there is no reachable gap. Do not let it be replaced
+      by spot checks at 10s/45s.
+    - B2/B3's COLUMN INDEX assertions (contract 20). Existing column positions
+      are a contract with spreadsheet formulas that live outside this repo and
+      cannot be tested from inside it. Asserted against the golden fixture's
+      header row; the fixture diff must show columns APPENDED with nothing
+      moving. Flagged in B2 as a finding-and-stop if it fails against unmodified
+      code, because today's code already has the property.
+    - A5's GOLDEN comparison. It is what proves A5 changed the abnormal case
+      (guessed/unlogged time) and left the normal one alone. Without it, "waking
+      hours got smaller" is indistinguishable from "waking hours got broken".
+    - THREE MANDATORY VACUITY CHECKS, written into the tasks: A1 (revert the
+      regex, parse criteria must go red), A2 (revert ? to =, mark criteria go
+      red while boundary criteria stay green — the separation is the point), and
+      B5 (delete the sentence from each doc file ONE AT A TIME; a rule that only
+      fires when both change is a rule that will not fire).
 
-  REVIEW 2 (2026-07-27), fresh context, on the fix pass — verdict FIX FIRST.
-  Written to factory/REVIEW-2.md. factory/REVIEW.md is round 1, left unedited.
+  THE GOLDEN FIXTURE CHANGES TWICE this round, in B2/B3 and again in D1. Both
+  are expected and both are reviewable as diffs. Any other change to
+  test/fixtures/rollup-golden.json is a finding.
 
-  WHAT ROUND 2 CONFIRMED, by breaking the code at points it chose itself rather
-  than the ones the suite uses:
-    - The double-tap data loss is genuinely gone. Real Chromium, real coordinates:
-      two taps at one point remove exactly the entry aimed at. Arm/confirm survives
-      a late second tap, a drawer close and reopen, and a re-render underneath it.
-    - The rollup's per-tab honesty holds at three independent failure points
-      (second tab's write, first tab's write, grid build). No tab blanked, no stamp
-      newer than its own numbers, the two stamps visibly different after a partial
-      failure.
-    - 492 assertions green TWICE under all four contracted timezones. lint 17 rules
-      clear. headless green at both viewports. All three deploy.sh gates block and
-      the stub clasp is never called.
-    - Amendment A1's factual basis re-verified independently: with no meta tags the
-      page lays out at 980px and all 17 smoke checks still pass, 0 fail.
-    - HANDOFF.md contains only the three sanctioned amendments. No tampering.
-    - No secrets, no stubs, no out-of-scope files, one pinned dev dependency.
+  HOW THIS ROUND WAS CHOSEN. The user did not pick a feature; they asked to
+  stress test the app's conceptual model first, to settle whether it is
+  trustworthy and usable enough to adopt religiously. That stress test was run
+  against Code.gs and Index.html directly on 2026-07-27 and found six things.
+  The round is the fix list, not a feature.
 
-  FIX LIST (findings 2-5 need no decision):
-    2. The NUL-byte lint rule covers 14 named files, not "any file in the repo" as
-       assertion 26 says — a NUL appended to factory/log.md passed lint, exit 0.
-       Drive the rule off the tracked file list instead.
-    3. The scope-count rule reads README.md and SETUP.md only; factory/BRIEF.md:71
-       and factory/PLAN.md:33 still say "one OAuth scope" and pass.
-    4. test/tests.js crashes (TypeError at 39d) instead of skipping in any timezone
-       outside the contracted four — verified in Asia/Kolkata and Pacific/Chatham.
-    5. progress.md's "Parked questions" section still reads as an open question
-       that amendment A1 already answered.
+  THE FINDING THAT DROVE IT: the app can transition but never end. closeActual
+  is enqueued in exactly one place (Index.html:912) and is always paired with a
+  new openActual. So every night the last block is extended to midnight by
+  staleGuard_, marked "=", and is indistinguishable from a real block — and
+  because UNLOGGED lands on the ACTUAL calendar, every day's waking span starts
+  at 00:00, which makes both waking h and sitting % measure nothing.
 
-  THE ONE DECISION, RULED 2026-07-27 — Option A. Assertion 24's second sentence
-  ("discarding a row must not move another row's controls into the space it vacated")
-  described a mechanism the build does not use. Rows do still move; arm/confirm is
-  what makes that safe, and it is verified holding at 2, 3, 4 and 6 taps — every
-  destruction preceded by a button reading TAP AGAIN TO DISCARD. Recorded as
-  HANDOFF amendment A4, with assertion 24 rewritten in place. Freezing the layout was
-  considered and rejected: it puts an empty gap on screen, which is furniture that
-  says something the app has not decided to say.
+  HOW THIS ROUND WAS CHOSEN. The user did not pick a feature; they asked to
+  stress test the app's conceptual model first, to settle whether it is
+  trustworthy and usable enough to adopt religiously. That stress test was run
+  against Code.gs and Index.html directly on 2026-07-27 and found six things.
+  The round is the fix list, not a feature.
 
-  Fix list written to factory/FIXES-2.md, with factory/review-repro-2/tap-count.js as
-  a working harness for F2-1's tier-3 check (currently green, and it is the loop's job
-  to prove it goes red when arm/confirm is reverted).
+  THE FINDING THAT DROVE IT: the app can transition but never end. closeActual
+  is enqueued in exactly one place (Index.html:912) and is always paired with a
+  new openActual. So every night the last block is extended to midnight by
+  staleGuard_, marked "=", and is indistinguishable from a real block — and
+  because UNLOGGED lands on the ACTUAL calendar, every day's waking span starts
+  at 00:00, which makes both waking h and sitting % measure nothing.
 
-  Round 1 history, unchanged below.
+  THE SEVEN DECISIONS THE USER RULED (all in BRIEF-2 "Decisions made"):
+    1. All six findings this round, staged. ~16 tasks, above the 9-12 round 1
+       showed one night finishes cleanly. Knowingly accepted; stage boundaries
+       are what make a partial night survivable.
+    2. Finding 1 gets BOTH halves — an explicit STOP and honest labelling of
+       what the guard invents.
+    3. A guessed end is a fourth mark, "?", in the existing mark slot. Chosen
+       over a hidden #unbounded description token (invisible in the calendar,
+       the one place it matters) and over a separate UNBOUNDED event (needs a
+       split point the app has no evidence for).
+    4. Mark columns are per category per mark, APPENDED after every existing
+       column. Appending is load-bearing — README tells readers to point their
+       own formulas at these tabs.
+    5. The tap windows nest: MISTAP (20s) inside CONFIRM (60s), pinned by a lint
+       rule, and the armed button states which outcome the next tap produces.
+    6. STOP lives in the POSTURE ROW. The user chose this over a grid cell and
+       over a long-press, after both costs were put to them. Not to be reopened;
+       A4 exists to solve them.
+    7. STOP closes the open block AND any open SIT, opens nothing, and shows the
+       mark strip — ending a block is a close.
 
-  THE HUMAN'S THREE DECISIONS, ruled 2026-07-27, recorded as amendments A1-A3 under
-  "Contract amendments" in factory/HANDOFF.md:
-    A1. D2's criterion 6 is RETIRED, not met — no check in smoke.js is
-        viewport-sensitive (verified twice: no metas at all still passes all 17 at a
-        980px layout). Replaced by the layout-width control, 390 vs 980.
-    A2. Contract item 6 corrected from one OAuth scope to three. The manifest was
-        never wrong and is still byte-identical to main; the sentence was.
-    A3. The rollup's invariant is per-tab honesty, AND a failed write must never blank
-        a tab. Item 16 rewritten; assertions 24-27 added to the contract.
+  FIVE ASSUMPTIONS STATED RATHER THAN ASKED (BRIEF-2 "Assumptions"). The user
+  was shown all five and did not object. Flag if any turn out wrong:
+  whole-block recategorise reuses the existing SPLIT sheet; "?" is written by
+  the stale guard only; the PLAN parse count surfaces in the editor not the
+  grids; MISTAP starts at 20s; guessed and unlogged spans stop extending waking.
 
-  HANDOFF.md has now been edited twice, both sanctioned: the Orientation Q&A block
-  during the run, and these amendments by human decision. Nothing else in it changed.
+  THE ONE THING PARKED FOR REVIEW TIME: A5 changes what waking h means, so days
+  before and after this ships are not comparable and nothing in the sheet says
+  so. Whether the column gets renamed to force the issue is a decision for
+  stage 6, not for the loop.
 
-  FIXES APPLIED (all five findings, plus the two cosmetic ones):
-    F-1 the blocking data-loss bug. DISCARD arms then acts, reusing the app's own
-        arm/confirm idiom rather than a timing guard — structural, so it holds however
-        fast the taps are. Pinned by tier-1 37f/37g/37h/37i AND a real-browser
-        double-tap at fixed coordinates in test/headless.js.
-    F-2 both grids built before either is written; writeGrid_ writes then trims
-        instead of clearing first. §39e's stub now breaks getRange rather than
-        writeGrid_, which is why the loop's version could not see the blanking.
-    F-3 NUL byte gone, plus a lint rule over every text file.
-    F-4 progress.md's status line now matches its own table.
-    F-5 README corrected, plus a lint rule comparing doc scope counts to the manifest.
-    F-6 drawer refreshes while open; closing it leaves no rows behind.
+  CARRIED FORWARD FROM ROUND 1 (full record in factory/ROUND-1.md):
+    - Fix pass 2 was never independently reviewed. Stage A touches staleGuard_
+      and stage C touches the arm/confirm idiom, both fix-pass-2 territory.
+      Verify rather than assume.
+    - factory/GUIDE.md Part 2 still describes the round-1 double-tap bug as live
+      and proposes a fix that is not what shipped. Part 3 corrects it, five
+      inline markers point there, but a reader who skips them gets the wrong
+      story. This round's explain stage should fix it properly.
 
-  Every fix was vacuity-checked by reverting it in a fixture copy and confirming the
-  new test fails. Details per finding in factory/log.md.
+  BASELINE AT THE START OF THIS ROUND: 492 assertions green under four
+  contracted timezones, lint clear on 17 rules, headless green at both viewports
+  plus the drawer and tap-count phases. main level with origin/main at a256bdf.
 
-  VERIFIED AFTER THE FIX: 492 assertions (was 459), green twice in a row under all
-  four timezones. lint all clear, 17 rules. headless green at both viewports plus the
-  new drawer phase. deploy.sh re-exercised with a stub clasp first on PATH — nothing
-  pushed, real binary never invoked. Golden rollup fixture untouched and still
-  byte-identical in all four zones.
-
-  WHAT IS STILL UNCHECKED: the fixes themselves, by anyone other than their author.
-  That is why next_action is another review rather than the video.
-
-  Plan explained to user 2026-07-26 (GUIDE.md Part 1, post-office scene).
-  Build explained 2026-07-27 (GUIDE.md Part 2, same scene).
-  Fixes explained 2026-07-27 (GUIDE.md Part 3, same scene) — arm/confirm and why
-  "remove one card" was not enough, the two rulings, and the four rules that
-  claimed more than they checked. Part 2 is kept as the record of what was true
-  then, with five inline markers pointing at Part 3 where it has gone out of date;
-  the strongest is on its proposed fix, which is not the fix that shipped.
-
-  Product law still intact: nothing built or fixed this round interprets, scores or
-  advises. "TAP AGAIN TO DISCARD" states what the next tap will do and stops.
+  PRODUCT LAW, still binding: the app does not interpret, score or advise. Note
+  that nothing in this round breaks it — a stop button states a fact, a mark
+  column sums what you already said, and "found 12 plan events, parsed 0" is a
+  count. "?" is not a judgment; it is the absence of one.

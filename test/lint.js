@@ -341,7 +341,12 @@ const SCOPE_QUOTE_EXEMPT = {
   'factory/log.md':       'append-only build log — records the finding in its own words',
   'factory/progress.md':  'append-only progress record — records the finding in its own words',
   'factory/STATE.md':     'factory state — summarises the finding for the next stage',
-  'factory/HANDOFF.md':   'contract amendment A2 quotes the original wrong sentence; also never-edit'
+  'factory/HANDOFF.md':   'contract amendment A2 quotes the original wrong sentence; also never-edit',
+  /* Round 1's record, archived out of STATE.md when round 2 opened. Every hit in
+     it is a quotation: review 2's finding 3, and amendment A2's own wording. This
+     text was already exempt while it lived in STATE.md — moving it to its own file
+     moved the exemption with it rather than creating a new one. */
+  'factory/ROUND-1.md':   'round 1 archive — quotes review 2 and amendment A2 verbatim'
 };
 
 const scopeDocs = census.files.filter(f => /\.md$/i.test(f)).sort();
