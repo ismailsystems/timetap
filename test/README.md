@@ -49,7 +49,7 @@ properties of the file.
 | neither list declares a tag twice | a duplicate name hides a difference behind whichever copy is read last |
 | `doGet` and `test/headless.js` inject the same meta tags | the headless run would render a document the phone never loads, and pass while doing it |
 | every meta tag name is one Apps Script permits | `addMetaTag` throws at request time for any other name — a crash you only see on the deployed URL |
-| no source file contains a NUL byte | git calls the file binary, so `git diff` shows nothing and the file stops being reviewable |
+| no file in the repo contains a NUL byte | git calls the file binary, so `git diff` shows nothing and the file stops being reviewable |
 | the docs agree with the manifest about scope counts | README claimed one OAuth scope while the manifest asked for three, for long enough that a build contract quoted the claim as fact |
 
 ## `node test/headless.js`

@@ -9,6 +9,7 @@
  */
 const fs = require('fs');
 const path = require('path');
+const { execFileSync } = require('child_process');
 
 const ROOT = path.join(__dirname, '..');
 const html = fs.readFileSync(path.join(ROOT, 'Index.html'), 'utf8');
@@ -224,15 +225,72 @@ check('every meta tag name is one Apps Script permits',
 /* A stray NUL byte makes git classify the file as binary: `git diff` prints
    "Binary files differ" and shows nothing, and `git grep` skips it. test/headless.js
    shipped with one — a separator written as the byte itself rather than as '\0' —
-   so the whole headless runner was unreviewable for a round. Contract 26. */
-const TEXT_FILES = ['Code.gs', 'Index.html', 'appsscript.json', 'SETUP.md', 'README.md',
-                    'deploy.sh', 'package.json']
-  .map(f => path.join(ROOT, f))
-  .concat(fs.readdirSync(__dirname).filter(f => /\.(js|md)$/.test(f)).map(f => path.join(__dirname, f)));
-check('no source file contains a NUL byte',
-  TEXT_FILES.filter(f => fs.existsSync(f) && fs.readFileSync(f).includes(0))
-    .map(f => path.relative(ROOT, f)),
+   so the whole headless runner was unreviewable for a round. Contract 26.
+
+   Assertion 26 says "any file in the repo", so the list is the repo's own, not one
+   typed out here. A hand-written list was the first version of this rule and it
+   already had holes: factory/, site/, .github/ and test/fixtures/ were all outside
+   it, and a NUL appended to factory/log.md passed lint clean. A list that has to be
+   edited when a directory is added is a list that goes stale the first time nobody
+   remembers to edit it. */
+
+/** Every file the repo tracks, and how we worked that out. */
+function trackedFiles() {
+  if (fs.existsSync(path.join(ROOT, '.git'))) {
+    try {
+      const out = execFileSync('git', ['ls-files', '-z'], { cwd: ROOT, encoding: 'utf8' });
+      return { how: 'git ls-files', files: out.split('\0').filter(Boolean) };
+    } catch (e) { /* fall through to the walk */ }
+  }
+  /* A checkout with no git directory — an export, a tarball, a fixture copy — still
+     has to be lintable, so the rule walks instead. Same rule, different census: the
+     walk cannot ask what is tracked, so it skips the three things that are never
+     tracked here. `.clasp.json` is gitignored, machine-specific and holds a script
+     id; standing in for the tracked list means not reading it. */
+  const files = [];
+  (function walk(dir) {
+    for (const name of fs.readdirSync(dir).sort()) {
+      if (name === '.git' || name === 'node_modules' || name === '.clasp.json') continue;
+      const full = path.join(dir, name);
+      if (fs.statSync(full).isDirectory()) walk(full);
+      else files.push(path.relative(ROOT, full));
+    }
+  })(ROOT);
+  return { how: 'no git directory — walked the tree', files: files };
+}
+
+/* Tracked files that are genuinely binary and so cannot be reviewed as text.
+   Empty on purpose: there are none today. Putting a file here is a decision to
+   accept something nobody can diff, so it is named one line at a time with the
+   reason — never widened into an extension filter, which would silently swallow
+   the next Code.gs that grew a NUL. */
+const BINARY_EXEMPT = [];
+
+const census = trackedFiles();
+const nulBad = [], nulSkipped = [];
+for (const rel of census.files) {
+  const full = path.join(ROOT, rel);
+  let buf;
+  try {
+    if (!fs.existsSync(full)) continue;          // tracked but deleted in the worktree
+    buf = fs.readFileSync(full);
+  } catch (e) {
+    nulBad.push(rel + ' — could not be read at all: ' + ((e && e.message) || e));
+    continue;
+  }
+  if (!buf.includes(0)) continue;
+  if (BINARY_EXEMPT.indexOf(rel) >= 0) {
+    nulSkipped.push(rel + ' — exempt: declared binary in test/lint.js');
+  } else {
+    nulBad.push(rel + ' — contains a NUL byte, so git classifies it as binary');
+  }
+}
+check('no file in the repo contains a NUL byte', nulBad,
   'git treats a file with a NUL as binary, so its diffs become invisible to review');
+/* Which files were looked at, and which were not, said out loud — a rule that
+   quietly scanned nothing would print the same "ok" as one that scanned the repo. */
+console.log('         ' + census.files.length + ' files scanned (' + census.how + ')');
+nulSkipped.forEach(function (s) { console.log('         skipped ' + s); });
 
 /* The manifest asked for three OAuth scopes while README claimed one, for long
    enough that the claim was copied into a build contract as fact. A count in prose
