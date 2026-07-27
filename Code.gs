@@ -635,13 +635,30 @@ function staleGuard_(cal, ev, isActual, notes) {
 
   if (isActual) {
     var p = parseTitle_(ev.getTitle()) || { key: 'ADM', text: '', mark: null };
-    var cat = catOf_(p.key);
-    var mark = p.mark;
-    if (!mark) {
-      if (cat && cat.autoMark) mark = cat.autoMark;
-      else if (boundEnd - startMs >= MIN_MARK_MINUTES * MS_MIN) mark = '=';
-    }
-    ev.setTitle(buildTitle_(p.key, p.text, mark));
+    /*
+     * '?' — this block's end time is the app's guess, and the title says so.
+     *
+     * It used to write '=' once the bounded block was long enough, which made a
+     * phantom block indistinguishable from one the user actually closed. Every
+     * night the last block of the day was extended to midnight and marked as
+     * though the user had settled it.
+     *
+     * Three things this deliberately does not do:
+     *
+     *   - It does not consult the category's autoMark. An autoMark is a
+     *     standing claim about a kind of work; it cannot know when this
+     *     particular block stopped. A BODY block the app had to bound gets '?',
+     *     not '+'. An autoMark never overrides a guess.
+     *   - It does not check MIN_MARK_MINUTES. The guess is a fact about the end
+     *     time, not about the duration: a block bounded to one minute was still
+     *     ended by the app rather than by the user.
+     *   - It does not touch the boundary arithmetic above, which is unchanged.
+     *     Only the claim the title makes changes.
+     *
+     * SIT blocks never reach here — they carry no mark at all, and '?' is an
+     * ACTUAL-calendar concept. Contracts 13, 14, 15, 17.
+     */
+    ev.setTitle(buildTitle_(p.key, p.text, '?'));
   }
   endEventAt_(ev, boundEnd);
   writeDesc_(ev, refOf_(ev), false);

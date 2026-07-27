@@ -7,9 +7,9 @@ Round 1's progress record is `factory/progress.md` and is **read-only**.
 
 ## Status
 
-In progress. **1 of 16 tasks complete.** Stage A, task A2 next.
+In progress. **2 of 16 tasks complete.** Stage A, task A3 next.
 
-Suite: **527 passed / 0 failed** (baseline was 492), green in all four
+Suite: **553 passed / 0 failed** (baseline was 492), green in all four
 contracted timezones. Lint all clear. Headless ok, 19 checks per viewport.
 
 ## Tasks
@@ -17,7 +17,7 @@ contracted timezones. Lint all clear. Headless ok, 19 checks per viewport.
 | Task | Stage | Status | Attempts | Notes |
 |---|---|---|---|---|
 | A1 | A | **done** | 1 | vacuity check done. Checker found a contract-17 defect, fixed. Criterion 6 parked as Q1 — self-contradictory |
-| A2 | A | pending | 0 | vacuity check required |
+| A2 | A | **done** | 1 | vacuity check done, separation held. Checker found 2 defects, both fixed |
 | A3 | A | pending | 0 | |
 | A4 | A | pending | 0 | |
 | A5 | A | pending | 0 | |
@@ -49,7 +49,7 @@ to that commit and must stay so.
 | Check | Task | Status |
 |---|---|---|
 | Revert regex to `[+=\-]`, parse criteria go red | A1 | **done — 6 red, 521/6.** Reverted `MARKS` to `'+=-'`, which reverts the regex by construction. Details in `log-2.md` |
-| Revert `?` to `=`, mark criteria go red **while boundary criteria stay green** | A2 | not run |
+| Revert `?` to `=`, mark criteria go red **while boundary criteria stay green** | A2 | **done — 8 mark red, every boundary green.** Independently reproduced by the checker |
 | Delete the PLAN sentence from each doc **one at a time**, lint names that file | B5 | not run |
 
 ## Orientation
@@ -130,6 +130,59 @@ block as having gone well — which is the same class of dishonesty this round
 exists to remove — but it is a behaviour change outside any task in this round.
 Human's call.
 
+### Q4 (A2) — contract 17 and A1's criterion 4 cannot both be fully true
+
+Contract 17: *"No action a user can take produces `?`. Only `staleGuard_` writes
+it."* A1's criterion 4: *"Given an op carrying `mark: '?'`, when `applyOps` runs,
+then it is applied and its id appears in `applied` — not in `dropped`."*
+
+`validOp_` is the trust boundary for ops that came out of `localStorage`, and
+the file says so. Criterion 4 requires it to accept `?`, so an op carrying one
+is applied and a title gets a `?` that `staleGuard_` did not write. Before this
+round `validOp_` rejected it.
+
+**Not fixed, deliberately.** Rejecting `?` in `validOp_` would satisfy contract
+17's second sentence and directly violate an explicit acceptance criterion,
+which the guardrails forbid. Worth noting the route is narrow: it needs
+hand-editing `localStorage`, not any action the UI offers, so contract 17's
+first sentence still holds. `staleGuard_` writes its `?` through `ev.setTitle`
+directly and never through an op, so nothing in this round actually needs
+criterion 4. **Human ruling wanted:** keep criterion 4, or tighten `validOp_`.
+
+### Q5 (A2) — a title hand-edited in Google Calendar can still read as a guess
+
+A1 closed the write side: a note typed into the app can no longer land a `?` in
+the mark slot. The read side is unclosable by design. A user who types
+`DW: is this right ?` straight into Google Calendar gets it parsed as mark `?`:
+
+```
+"DW: a ?"  ->  {key:'DW', text:'a', mark:'?'}
+```
+
+`parseTitle_` cannot tell a `?` the app wrote from one a user typed, because the
+handoff's design puts both in the same single trailing character. Making parse
+ignore `?` would break A2 outright — `getState` has to read back what
+`staleGuard_` writes.
+
+**Not fixable inside this design.** It is a consequence of encoding the guess as
+a trailing mark, which contracts 13 and 18 mandate. Flagged so the reviewer sees
+it as a known limit rather than an oversight.
+
+### Q6 (A2) — contract 18 has one literal counterexample, and it predates the round
+
+Contract 18: *"Given **any** title carrying `?`, when it is parsed and rebuilt,
+then it round-trips byte-identical."* One form does not:
+
+```
+"UNLOGGED ?"  ->  "UNLOGGED: ?"
+```
+
+`parseTitle_` special-cases a bare `UNLOGGED` with no colon; `buildTitle_`
+always writes one. Pre-existing and identical for every mark at `a256bdf`
+(`"UNLOGGED -"` → `"UNLOGGED: -"`), so not a regression. Every other `?` form
+round-trips, including `"DW: ?"`, `"DW: why? ?"` and `"DW: a ? ?"`. Left alone
+as out of scope; contract 18's wording is what is wrong, not the code.
+
 ## Contract additions
 
 _Every bug found during the run gets a criterion written here first, then the
@@ -168,6 +221,34 @@ and all of Stage B, where a `?` block is excluded from the waking span
 text only when no mark follows it. Deliberately narrow: when a mark does follow,
 the note's `?` is preserved intact, which is strictly better than the pre-round
 behaviour it replaces.
+
+### Addition 2 (found at A2, by the checker) — a category could be configured to guess
+
+Categories added at runtime come out of the `EXTRA_CATEGORIES` script property,
+which nothing validates. A category carrying `autoMark: '?'` made `markFor`
+return `?` on an ordinary tapped close — no `staleGuard_` involved. That breaks
+contract 17 *and* A1's own criterion 7, which says `markFor` never produces `?`.
+Before this round `validOp_` rejected the resulting op, so the widening removed
+the backstop that had been making the documentation true.
+
+- [tier 1] Given a category configured with `autoMark: '?'`, when a block of it
+  is closed by an ordinary tap, then the title does not carry `?`, and the
+  normal duration rule applies instead.
+
+**Fixed in A2**, in `markFor` — the one place the criterion names. Test 42g.
+
+### Addition 3 (found at A2, by the checker) — bounding overwrites a mark that is no longer true
+
+`staleGuard_` used to preserve a mark already present on an open block; making
+`?` unconditional overwrites it. Only reachable by hand-editing a title in
+Google Calendar, since the app never marks an open block. The new behaviour is
+right — the app really did guess the end time — but it was a silent change with
+no criterion and no test, which the standing rule forbids.
+
+- [tier 1] Given an open block hand-titled `DW: memo =` that the app then has to
+  bound, then its mark becomes `?` and its text survives unchanged.
+
+**Recorded here, then pinned by test 42h.**
 
 
 ## Parked tasks

@@ -135,7 +135,9 @@ reboot();
 const a10 = A();
 chk('two events', a10.length === 2, a10.map(show).join(' | '));
 chk('DW bounded at 5h', near(a10[0].e - a10[0].s, 5 * 3600000), show(a10[0]));
-chk('DW marked', a10[0].t === 'DW: =', a10[0].t);
+/* A2: was 'DW: =', which claimed the user settled a block the app had bounded.
+ * The boundary assertions above and below this line are deliberately unchanged. */
+chk('DW marked as a guess, not as settled', a10[0].t === 'DW: ?', a10[0].t);
 chk('UNLOGGED - follows', a10[1].t === 'UNLOGGED -', a10[1].t);
 chk('UNLOGGED spans to now', a10[1].s === a10[0].e && near(a10[1].e, D(2026, 7, 20, 17, 0)), show(a10[1]));
 chk('no giant event', a10.every(e => (e.e - e.s) <= 5 * 3600000), a10.map(show).join(' | '));
@@ -2073,6 +2075,134 @@ for (const mk of MARKS41) {
 }
 chk('and every question-mark note still round-trips byte-identical',
   rt41f.length === 0, rt41f.join(' | '));
+reset();
+
+/* ── A2: a block the app had to guess the end of says so in its title ──
+ *
+ * The mark assertions and the boundary assertions are kept deliberately
+ * separate, and the vacuity check for this task depends on that separation:
+ * reverting '?' to '=' must turn the mark ones red while the boundary ones stay
+ * green. That is what proves the boundary assertions test arithmetic rather
+ * than testing the mark. */
+
+console.log('\n42. an overnight block is marked as a guess, not as settled');
+reset(D(2026, 7, 20, 22, 0)); reboot();
+tap('DW'); settle();
+H.setNow(D(2026, 7, 21, 7, 0));
+reboot();
+const a42 = A();
+chk('the block\'s title ends with "?"', /\?$/.test(a42[0].t), a42[0].t);
+chk('and not with "="', !/=$/.test(a42[0].t), a42[0].t);
+chk('it parses back as a guess', parseTitle_(a42[0].t).mark === '?', a42[0].t);
+
+console.log('\n42b. and the arithmetic that bounded it is untouched');
+/* Identical to the boundaries this code produced before this round. Asserted as
+ * times, not as "a mark was applied". */
+chk('exactly two events, and nothing else was written', a42.length === 2,
+  a42.map(show).join(' | '));
+chk('the block runs 22:00 to midnight',
+  near(a42[0].s, D(2026, 7, 20, 22, 0)) && near(a42[0].e, D(2026, 7, 21, 0, 0)),
+  show(a42[0]));
+chk('UNLOGGED runs midnight to now',
+  a42[1].t === 'UNLOGGED -' && a42[1].s === a42[0].e && near(a42[1].e, D(2026, 7, 21, 7, 0)),
+  show(a42[1]));
+
+console.log('\n42c. an autoMark never overrides a guess');
+reset(D(2026, 7, 20, 22, 0)); reboot();
+tap('BODY'); settle();                       // autoMark '+'
+H.setNow(D(2026, 7, 21, 7, 0));
+reboot();
+chk('BODY is marked "?", not "+"', parseTitle_(A()[0].t).mark === '?', A()[0].t);
+chk('and the "+" appears nowhere in it', !/\+/.test(A()[0].t), A()[0].t);
+
+reset(D(2026, 7, 20, 22, 0)); reboot();
+tap('FRAG'); settle();                       // autoMark '-'
+H.setNow(D(2026, 7, 21, 7, 0));
+reboot();
+chk('FRAG is marked "?", not "-"', parseTitle_(A()[0].t).mark === '?', A()[0].t);
+/* Guards the specific way this could go wrong: buildTitle_ writing both. */
+chk('and exactly one mark is on the title', A()[0].t === 'FRAG: ?', A()[0].t);
+
+console.log('\n42d. nothing is bounded that did not need bounding');
+reset(D(2026, 7, 20, 9, 0)); reboot();
+tap('DW'); settle();
+H.setNow(D(2026, 7, 20, 9, 0, 30));
+reboot();
+chk('inside the mis-tap window, nothing is bounded', A().length === 1, A().map(show).join(' | '));
+chk('the block is still open', /#open/.test(A()[0].d), show(A()[0]));
+chk('and carries no mark at all', A()[0].t === 'DW:', A()[0].t);
+
+reset(D(2026, 7, 20, 9, 0)); reboot();
+tap('DW'); settle();
+H.setNow(D(2026, 7, 20, 13, 0));             // 4h, under STALE_OPEN_HOURS, same day
+reboot();
+chk('under the stale threshold on the same day, nothing is bounded',
+  A().length === 1 && /#open/.test(A()[0].d), A().map(show).join(' | '));
+chk('and still no mark', A()[0].t === 'DW:', A()[0].t);
+
+console.log('\n42e. a SIT block carries no mark, guessed or otherwise');
+reset(D(2026, 7, 20, 22, 30)); reboot();
+tapSit(); settle();
+H.setNow(D(2026, 7, 21, 7, 0));
+reboot();
+chk('the SIT block is bounded at the day border',
+  near(S()[0].e, D(2026, 7, 21, 0, 0)), show(S()[0]));
+chk('its title is untouched', S()[0].t === 'SIT', S()[0].t);
+chk('no "?" reached the SITTING calendar', S().every(e => !/\?/.test(e.t)),
+  S().map(e => e.t).join(' | '));
+chk('and no UNLOGGED was written to it', S().length === 1, S().map(show).join(' | '));
+
+console.log('\n42f. a guess is a fact about the end time, not about the duration');
+/* Opened 23:59, bounded at midnight: one minute long, far under
+ * MIN_MARK_MINUTES, and still the app's guess rather than the user's. */
+reset(D(2026, 7, 20, 23, 59)); reboot();
+tap('DW'); settle();
+H.setNow(D(2026, 7, 21, 7, 0));
+reboot();
+const f42 = A();
+chk('the one-minute block still carries "?"', parseTitle_(f42[0].t).mark === '?', f42[0].t);
+chk('and it really was under MIN_MARK_MINUTES',
+  (f42[0].e - f42[0].s) < MIN_MARK_MINUTES * 60000,
+  String((f42[0].e - f42[0].s) / 60000) + 'm');
+
+console.log('\n42g. a category cannot be configured into producing a guess');
+/* Found by the checker. Categories added at runtime come out of the
+ * EXTRA_CATEGORIES script property, which nothing validates, so an autoMark of
+ * '?' was reachable by configuration — and it closed an ordinary tapped block
+ * as though the app had bounded it, with staleGuard_ nowhere near. Contract 17
+ * and A1's own criterion 7 both say markFor never produces '?'. */
+reset();
+H.SCRIPT_PROPS.EXTRA_CATEGORIES =
+  JSON.stringify([{ key: 'XX', label: 'Guessy', color: 5, autoMark: '?' }]);
+H.clearPropCache();
+reboot();
+chk('the category really is configured with a "?" autoMark',
+  clientConfig_().categories.some(c => c.key === 'XX' && c.autoMark === '?'),
+  JSON.stringify(clientConfig_().categories.map(c => [c.key, c.autoMark])));
+tap('XX'); wait(40); tap('DW'); advance(6000); settle();
+const g42 = A().filter(e => /^XX:/.test(e.t));
+chk('but an ordinary tap still does not write a guess',
+  g42.length === 1 && parseTitle_(g42[0].t).mark !== '?', g42.map(e => e.t).join(' | '));
+chk('it falls back to the normal duration rule instead',
+  parseTitle_(g42[0].t).mark === '=', g42.map(e => e.t).join(' | '));
+reset(); H.clearPropCache(); reboot();
+
+console.log('\n42h. bounding overwrites a mark that is no longer true');
+/* Also found by the checker, and recorded as contract addition 2 before this
+ * test was written. An open block can only carry a mark if someone hand-edited
+ * its title in Google Calendar — the app never writes one to an open block. If
+ * the app then has to guess where that block ended, the guess is the honest
+ * claim and the stale mark is not: whatever the title said before, the end time
+ * is the app's. */
+reset(D(2026, 7, 20, 22, 0)); reboot();
+tap('DW'); settle();
+const ev42 = H.CALS.actual.events[0];
+ev42.t = 'DW: memo =';                       // hand-edited in Google Calendar
+H.setNow(D(2026, 7, 21, 7, 0));
+reboot();
+chk('the stale "=" is replaced by the guess', parseTitle_(A()[0].t).mark === '?', A()[0].t);
+chk('and the text the user typed survives it',
+  parseTitle_(A()[0].t).text === 'memo', A()[0].t);
 reset();
 
 console.log('\n────────────────────────────────────────');

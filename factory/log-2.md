@@ -168,3 +168,75 @@ alone. Parked as Q2 for the human.
    down yet, and `test/tests.js` 41d referenced a parked question that did not
    yet exist in `progress-2.md`. Both now written. A record that describes work
    accurately only after someone checks is not a record.
+
+## [2026-07-27 11:2x] A2 | A block the app had to guess the end of says so in its title
+
+`staleGuard_` writes `?`. The block that used to derive a mark from the
+category's `autoMark` or from `MIN_MARK_MINUTES` is gone; a bounded ACTUAL block
+is marked `?` unconditionally. **The bounding arithmetic is untouched** — same
+`Math.min` of start + `STALE_OPEN_HOURS`, the day border and now.
+
+**Tests: 42, 42b, 42c, 42d, 42e, 42f, 42g, 42h. 527 → 553 assertions.**
+Four contracted timezones green; skips by name, not crashes, in others.
+
+One pre-existing assertion moved, and only one:
+`chk('DW marked', a10[0].t === 'DW: =')` → `'DW: ?'`. That assertion pinned the
+exact behaviour A2 exists to change. Its replacement is equally strict, and
+`git diff a256bdf -- test/tests.js | grep '^-'` shows it is the only removal in
+the round so far.
+
+**VACUITY CHECK — done, and the separation is the point.** Reverted `?` to `=`
+in the guard:
+
+```
+FAIL DW marked as a guess, not as settled        FAIL BODY is marked "?", not "+"
+FAIL the block's title ends with "?"             FAIL FRAG is marked "?", not "-"
+FAIL and not with "="                            FAIL and exactly one mark is on the title
+FAIL it parses back as a guess                   FAIL the one-minute block still carries "?"
+541 passed, 8 failed
+```
+
+Eight mark assertions red. **Every boundary assertion stayed green** — 22:00 to
+midnight, UNLOGGED midnight to now, the 5h cap, the SIT day border, the
+sub-`MIN_MARK_MINUTES` duration. That is what proves the boundary assertions are
+testing arithmetic and not the mark.
+
+**CHECKER — independent agent, contract and diff only, told to prove A2 fails.**
+It could not break the two things A2 is about. On the boundary arithmetic it did
+better than my own test: it built worktrees at `a256bdf` and at HEAD, ran 15
+scenarios across 8 timezones plus 16 DST scenarios, and diffed raw millisecond
+values rather than `near()`. Result — **nine differences, all of them titles,
+zero of them times.** It also constructed the cases I had not: a spring-forward
+inside the bounded span, Chile's non-existent local midnight, quarter-hour
+offsets (Chatham, Kathmandu), and the 299/300/301-minute threshold. Identical in
+every one.
+
+**Two defects it found, both fixed here.**
+
+1. **A category could be configured into producing a guess.** Categories added at
+   runtime come from the `EXTRA_CATEGORIES` script property, which nothing
+   validates, so `autoMark: '?'` made `markFor` return `?` on an ordinary tapped
+   close with `staleGuard_` nowhere near it. That breaks contract 17 *and* A1's
+   criterion 7, which says `markFor` never produces `?`. Before this round
+   `validOp_` rejected the resulting op — so A1's widening removed the backstop
+   that had been quietly making `Code.gs`'s own documentation true. Fixed in
+   `markFor`, the place the criterion names. Recorded as contract addition 2,
+   pinned by test 42g.
+2. **Bounding silently overwrote a mark already on an open block.** Deleting
+   `var mark = p.mark;` changed behaviour the code comment did not mention and no
+   test covered. The new behaviour is right — the app really did guess the end
+   time, and a stale `=` outliving its truth is the thing this round is removing
+   — but shipping it unrecorded is what the standing rule forbids. Recorded as
+   contract addition 3, pinned by test 42h. Only reachable by hand-editing a
+   title in Google Calendar; the app never marks an open block.
+
+**Three things it found that I did not fix, all parked with reasons** — Q4
+(contract 17 and A1 criterion 4 contradict each other at `validOp_`; fixing it
+would violate an explicit criterion), Q5 (a title hand-edited in Google Calendar
+can still read as a guess — unclosable while the guess lives in the trailing
+mark slot, which contracts 13 and 18 mandate), Q6 (`UNLOGGED ?` does not
+round-trip; pre-existing for every mark, so contract 18's "any title" is what is
+wrong). Details in `progress-2.md`.
+
+One test-hygiene fix on the way past: 42b had two `chk`s with the identical
+condition, counting one assertion twice. Merged.

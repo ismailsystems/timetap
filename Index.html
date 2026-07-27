@@ -851,7 +851,12 @@
 
   function markFor(key, durMs) {
     var c = catByKey[key];
-    if (c && c.autoMark) return { mark: c.autoMark, strip: false };
+    // '?' means the app had to guess where a block ended. It is never a property
+    // of a category, and this function must never return it — contract 17, only
+    // staleGuard_ writes one. Categories added at runtime come from a script
+    // property, so an autoMark of '?' is reachable by configuration rather than
+    // by code, and the guard belongs here rather than in a comment.
+    if (c && c.autoMark && c.autoMark !== '?') return { mark: c.autoMark, strip: false };
     if (durMs >= CFG.minMarkMinutes * MS_MIN) return { mark: '=', strip: true };
     return { mark: null, strip: false };
   }
