@@ -14,7 +14,8 @@
  * viewport. This is the cheapest thing that has all three. Every check below
  * corresponds to a bug that actually shipped.
  *
- * Returns { pass, fail, checks }. Anything in fail is a regression.
+ * Returns { pass, fail, failed, skipped }. Anything in fail is a regression.
+ * A skipped check is one this state could not reach; it is never a pass.
  */
 (function () {
   var out = [], px = function (n) { return Math.round(n); };
@@ -28,6 +29,10 @@
     else pass = false;
     out.push({ name: name, pass: pass, detail: detail || '' });
   }
+  /* A check that could not run in this state. Named so the total still adds up
+     to the number of checks the file contains, and never counted as a pass. */
+  var skipped = [];
+  function skip(name, why) { skipped.push({ name: name, why: why }); }
 
   var app = document.getElementById('app');
   var grid = document.getElementById('grid');
@@ -75,7 +80,12 @@
     ok('the lit ring is not the colour of the page', ring.indexOf(pageBg) < 0, ring);
     ok('the lit ring sits outside the box, not inset', ring.indexOf('inset') < 0, ring);
   } else {
-    ok('no block running, ring not checked', true, 'tap a category and re-run');
+    // Not "a check that passed": a check that did not run. Reporting it as a
+    // pass is the vacuous-assertion bug this file's own header warns about, and
+    // it makes the total underivable — you cannot tell a skipped check from a
+    // real one once both are counted the same way.
+    skip('the lit ring is not the colour of the page', 'no block running');
+    skip('the lit ring sits outside the box, not inset', 'no block running');
   }
 
   // ── geometry ────────────────────────────────────────────────────
@@ -161,5 +171,6 @@
   var pass = out.filter(function (c) { return c.pass; }).length;
   var fail = out.filter(function (c) { return !c.pass; });
   console.table(out);
-  return { pass: pass, fail: fail.length, failed: fail };
+  if (skipped.length) console.table(skipped);
+  return { pass: pass, fail: fail.length, failed: fail, skipped: skipped };
 })();

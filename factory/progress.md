@@ -17,7 +17,7 @@ A task is `done` only after the CHECKER step has independently re-verified it.
 | C2 | Both tabs carry a last-rebuilt stamp | done | 1 | 30 assertions (410 → 440, 4 zones, lint clear). Golden fixture `test/fixtures/rollup-golden.json` captured from d048ca3, before the stamp existed. CHECKER: 5 mutations, all caught. One existing test amended (see log). |
 | C3 | Last outcome readable by hand | done | 1 | 19 assertions (440 → 459, 4 zones, lint clear). `rollupStatus()`, runnable from the editor. CHECKER: 4 mutations, all caught. **Stage C complete.** |
 | D1 | A real browser opens Index.html | done | 1 | `test/headless.js` + `test/serve.js`, Playwright pinned 1.62.0 (exact). 3 new lint rules. CHECKER: 4 lint mutations + both missing-browser paths, all exit non-zero. Tier-4 canary: chromium-1234 launches on this machine. |
-| D2 | Harness serves the page as Apps Script does | pending | 0 | |
+| D2 | Harness serves the page as Apps Script does | done | 1 | 5 of 6 criteria met and verified. **Criterion 6 is PARKED — see F4**, with evidence and a question; not weakened, not declared met. Found and fixed F3. |
 | D3 | Desktop viewport too, reported separately | pending | 0 | |
 | D4 | Drift lint on the meta tags (HIGH RISK) | pending | 0 | |
 | D5 | deploy.sh gains a third gate | pending | 0 | |
@@ -28,11 +28,58 @@ A task is `done` only after the CHECKER step has independently re-verified it.
 <!-- Anything the handoff does not answer. Write the question and what you did
      instead (park the task, or proceed on a stated assumption). -->
 
-_none yet_
+**D2, criterion 6 (see F4 below).** No check in `smoke.js` is viewport-sensitive, and Blink
+re-lays-out when a viewport meta is appended, so "inject the tags after render and watch the
+viewport checks fail" cannot be demonstrated. I built the control that proves the injection
+point matters by a layout fact instead (390px with the tags, 980px without), and left the
+criterion as written unmet rather than redefining it. **Your call: accept the layout-fact
+control, or add a genuinely viewport-sensitive check to `smoke.js` (which changes the file
+the phone paste uses)?**
 
 ## Bugs found while building
 
 <!-- Standing rule: a bug gets a criterion here FIRST, then the fix. -->
+
+### F3 — `smoke.js` counts a check that cannot fail (found during D2)
+
+`test/smoke.js:78` reads `ok('no block running, ring not checked', true, ...)`. It is
+literally `true`, so it is a pass no matter what the page does, and it is counted in
+`pass`. That is the exact class `test/README.md:63` records — an assertion that cannot
+fail is worse than none, because it is counted. It also makes the check count
+underivable: 20 call sites, 18 executed, and no way to tell a skipped check from a real
+one.
+
+- [tier 3] Given no block is running, then the ring check is reported as **skipped**, not
+  as passed, and `pass` counts only checks that could have failed.
+- [tier 3] Given the runner, then `pass + fail + skipped` equals the number of `ok(` call
+  sites in the file — so a check added to `smoke.js` can never silently go unrun.
+
+### F4 — no check in `smoke.js` is viewport-sensitive, so D2's last criterion cannot be met as written (found during D2)
+
+D2's sixth criterion asks that injecting the meta tags *after* render make the
+viewport-dependent checks in `smoke.js` fail. Measured on Playwright 1.62.0 / chromium-1234:
+
+| metas | layout width | smoke result |
+|---|---|---|
+| before render | 390px (correct) | 18 pass, 0 fail |
+| after render | 390px — Blink re-lays-out on a dynamically added viewport meta | 18 pass, 0 fail |
+| never injected | 980px (definitively the wrong document) | 18 pass, 0 fail |
+
+Two independent reasons it fails: (1) "after" is indistinguishable from "before", because
+Blink re-runs layout when a viewport meta is appended; (2) more seriously, **even with no
+meta at all and a 980px layout, every smoke check still passes** — the checks are all
+relative (`app` height vs `window.innerHeight`, cells equal width, rows full), and those
+hold at any layout width. `smoke.js` opens by saying it exists to catch the viewport bug
+class; in a headless engine, where `dvh` and `vh` are equal, it structurally cannot.
+
+The injection point *does* matter — 390 vs 980 proves it. `smoke.js` just cannot see it.
+
+**PARKED for the human.** Question: should the control prove the injection point matters
+by a layout fact read from the live DOM (`documentElement.clientWidth` 390 with the metas
+vs 980 without), which is what the criterion is *for*? Or should `smoke.js` gain a genuinely
+viewport-sensitive check, which changes the file the phone paste uses? I have implemented
+the first and left the criterion unsatisfied rather than declaring it met. This is also
+direct evidence for the standing claim that the phone paste is not superseded.
 
 ### F1 — FIXED in B2 — the boot-time "set aside" banner erases itself (found during B1)
 
