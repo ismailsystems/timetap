@@ -488,3 +488,39 @@ at B1.
 Suite 636 / 0, twice in a row, in all four contracted zones. `appsscript.json`
 and `test/fixtures/rollup-golden.json` byte-identical to `a256bdf`. Exactly one
 test line removed all round, and it is A2's.
+
+## [2026-07-27 14:3x] B1 | The day's statistics know how each hour was marked
+
+`dayStats_` gains `d.marks[key][bucket]` beside the per-key totals it already
+produced. Five buckets — the four marks and unmarked — derived from `MARKS` via
+`MARK_BUCKETS`, so a fifth mark added later gets a bucket by construction rather
+than by someone remembering.
+
+The hours land in the total and in the bucket **from one measurement**, so a
+key's five buckets sum to its total by construction rather than by agreement.
+Every key gets every bucket including the ones that stay zero: a missing bucket
+and a zero one are different claims, and B2/B3 need every key the same width.
+
+Unmarked is a real bucket. A block closed under `MIN_MARK_MINUTES` legitimately
+carries no mark and its hours are as real as any other; an unrecognised trailing
+character (`DW: memo !`) parses as no mark and lands there too. There is no
+sixth bucket to land in.
+
+**Tests: 45 through 45f. 636 → 656 assertions.** Four contracted timezones
+green, lint clear, headless ok. `test/fixtures/rollup-golden.json` still
+untouched — it changes first at B2.
+
+**Mutation-tested before claiming it works**, which is the habit the last three
+checkers earned:
+
+| Mutation | Caught by |
+|---|---|
+| bucketing removed entirely | 8 assertions |
+| everything bucketed under one key | per-key sum loop, plus 45 and 45f |
+| hours double-counted into two buckets | per-key sum loop, plus 45 and 45c |
+| unmarked bucket dropped from `MARK_BUCKETS` | 5 assertions |
+
+The per-key sum is the load-bearing one and it is a loop over `rollupKeys_()`
+rather than hand-picked cases — it is what catches hours counted into the wrong
+key's bucket, which the totals alone cannot reveal because they would still add
+up.

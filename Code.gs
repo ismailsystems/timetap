@@ -418,6 +418,18 @@ function isMark_(m) {
   return typeof m === 'string' && m.length === 1 && MARKS.indexOf(m) >= 0;
 }
 
+/**
+ * The buckets a key's hours can fall into: the four marks, and unmarked.
+ *
+ * Unmarked is a real bucket, not a gap. A block closed under MIN_MARK_MINUTES
+ * legitimately carries no mark, and its hours are as real as any other — they
+ * have to land somewhere or a key's buckets stop summing to its total.
+ *
+ * Derived from MARKS so a fifth mark added later gets a bucket by construction
+ * rather than by someone remembering to add one here.
+ */
+var MARK_BUCKETS = MARKS.split('').concat(['']);
+
 function buildTitle_(key, text, mark) {
   var t = String(key || '').toUpperCase() + ':';
   var s = String(text == null ? '' : text).replace(/[\r\n]+/g, ' ').replace(/\s+/g, ' ').trim();
@@ -1032,9 +1044,17 @@ function rollupKeys_() {
 /** Everything the day is, as numbers. No ratios, no commentary. */
 function dayStats_(lo, hi, plan, actual, sit, keys) {
   var d = { ms: lo, ymd: ymd_(lo), dow: new Date(lo).getDay(),
-            plan: {}, actual: {}, switches: 0, waking: 0, sitting: 0,
+            plan: {}, actual: {}, marks: {}, switches: 0, waking: 0, sitting: 0,
             longestSit: 0, sitsOver90: 0 };
-  keys.forEach(function (k) { d.plan[k] = 0; d.actual[k] = 0; });
+  keys.forEach(function (k) {
+    d.plan[k] = 0;
+    d.actual[k] = 0;
+    /* Every key gets every bucket, always, including the ones that stay zero.
+       A missing bucket and a zero one are different claims, and a grid built
+       from these has to have the same width for every key. */
+    d.marks[k] = {};
+    MARK_BUCKETS.forEach(function (m) { d.marks[k][m] = 0; });
+  });
 
   plan.forEach(function (e) {
     var p = parseTitle_(e.title);
@@ -1044,7 +1064,21 @@ function dayStats_(lo, hi, plan, actual, sit, keys) {
   var first = null, last = null;
   actual.forEach(function (e) {
     var p = parseTitle_(e.title);
-    if (p && (p.key in d.actual)) d.actual[p.key] += clipHours_(e, lo, hi);
+    if (p && (p.key in d.actual)) {
+      /*
+       * The mark was already being parsed here and then dropped on the floor —
+       * discarded at the exact point it would have become a number. The same
+       * hours now land in the key's total and in the bucket for how the user
+       * marked them, from one measurement, so a key's five buckets sum to its
+       * total by construction rather than by agreement.
+       *
+       * An unrecognised trailing character parses as no mark at all, so it
+       * lands in the unmarked bucket. There is no sixth bucket to land in.
+       */
+      var h = clipHours_(e, lo, hi);
+      d.actual[p.key] += h;
+      d.marks[p.key][isMark_(p.mark) ? p.mark : ''] += h;
+    }
     if (e.start >= lo && e.start < hi) d.switches++;
 
     /*

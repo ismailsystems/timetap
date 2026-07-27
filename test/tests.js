@@ -2569,6 +2569,120 @@ chk('and both blocks still counted as switches',
   dayCell('2026-07-20', 'switches') === 2, String(dayCell('2026-07-20', 'switches')));
 reset();
 
+/* ── B1: the day's statistics know how each hour was marked ────────
+ *
+ * dayStats_ parsed the mark and then never read it, so it was discarded at the
+ * exact point it would have become a number. Five buckets per key: the four
+ * marks and unmarked. Unmarked is a real bucket — a block closed under
+ * MIN_MARK_MINUTES legitimately carries none, and its hours are as real as any
+ * other. */
+
+/* Reaches dayStats_ through the real rollup, then reads the day back off the
+ * one the rollup built, so nothing here depends on a private call signature. */
+const statsFor = (day, seed) => {
+  reset(D(2026, 7, 24, 15, 0)); goodSheet();
+  seed();
+  const lo = D(2026, 7, day, 0, 0), hi = D(2026, 7, day + 1, 0, 0);
+  return dayStats_(lo, hi,
+    H.CALS.plan.getEvents(new Date(lo), new Date(hi)).map(e => ({ title: e.t, start: e.s, end: e.e })),
+    H.CALS.actual.getEvents(new Date(lo), new Date(hi)).map(e => ({ title: e.t, start: e.s, end: e.e })),
+    H.CALS.sit.getEvents(new Date(lo), new Date(hi)).map(e => ({ title: e.t, start: e.s, end: e.e })),
+    rollupKeys_());
+};
+
+console.log('\n45. every hour is counted under the mark it carries');
+const s45 = statsFor(20, () => {
+  AC('DW: morning =', 20, 9, 0, 11, 0);
+  AC('DW: afternoon -', 20, 13, 0, 14, 0);
+  AC('MTG: standup ?', 20, 15, 0, 15, 30);
+});
+chk('DW = holds 2h', near(s45.marks.DW['='] * 3600000, 2 * 3600000), String(s45.marks.DW['=']));
+chk('DW - holds 1h', near(s45.marks.DW['-'] * 3600000, 1 * 3600000), String(s45.marks.DW['-']));
+chk('MTG ? holds 30m', near(s45.marks.MTG['?'] * 3600000, 0.5 * 3600000), String(s45.marks.MTG['?']));
+chk('and the existing DW total is still 3', near(s45.actual.DW * 3600000, 3 * 3600000),
+  String(s45.actual.DW));
+chk('DW + is zero, not missing', s45.marks.DW['+'] === 0, JSON.stringify(s45.marks.DW));
+chk('DW unmarked is zero, not missing', s45.marks.DW[''] === 0, JSON.stringify(s45.marks.DW));
+
+console.log('\n45b. a key\'s buckets always sum to its total — asserted per key');
+/* All five mark states across every configured category, then checked key by
+ * key. An aggregate check would pass while one key's hours were counted into
+ * another key's bucket. */
+const s45b = statsFor(20, () => {
+  let h = 0;
+  CATEGORIES.forEach(c => {
+    ['+', '=', '-', '?', null].forEach(m => {
+      AC(c.key + ': work' + (m ? ' ' + m : ''), 20, h % 24, 0, h % 24, 30);
+      h++;
+    });
+  });
+});
+const offBy = [];
+rollupKeys_().forEach(k => {
+  const sum = MARK_BUCKETS.reduce((a, m) => a + s45b.marks[k][m], 0);
+  if (Math.abs(sum - s45b.actual[k]) > 0.005) {
+    offBy.push(k + ': buckets ' + round2_(sum) + ' vs total ' + round2_(s45b.actual[k]));
+  }
+});
+chk('every key\'s five buckets sum to its total, to two decimals',
+  offBy.length === 0, offBy.join(' | '));
+chk('and the fixture really did exercise every category',
+  CATEGORIES.every(c => s45b.actual[c.key] > 0),
+  JSON.stringify(CATEGORIES.map(c => [c.key, round2_(s45b.actual[c.key])])));
+chk('across all five buckets',
+  MARK_BUCKETS.every(m => rollupKeys_().some(k => s45b.marks[k][m] > 0)),
+  JSON.stringify(MARK_BUCKETS.map(m => [m || '(unmarked)',
+    rollupKeys_().reduce((a, k) => a + s45b.marks[k][m], 0)])));
+
+console.log('\n45c. a block too short to carry a mark still lands somewhere');
+const s45c = statsFor(20, () => {
+  AC('DW: quick', 20, 9, 0, 9, 5);            // 5m, under MIN_MARK_MINUTES
+  AC('DW: proper =', 20, 10, 0, 12, 0);
+});
+chk('the unmarked 5 minutes are in the unmarked bucket',
+  near(s45c.marks.DW[''] * 3600000, 5 * 60000), String(s45c.marks.DW['']));
+chk('and are not dropped from the total',
+  near(s45c.actual.DW * 3600000, (2 * 60 + 5) * 60000), String(s45c.actual.DW));
+
+console.log('\n45d. an unrecognised trailing character makes no sixth bucket');
+const s45d = statsFor(20, () => { AC('DW: memo !', 20, 9, 0, 10, 0); });
+chk('it counts as unmarked', near(s45d.marks.DW[''] * 3600000, 3600000),
+  String(s45d.marks.DW['']));
+chk('and DW has exactly five buckets', Object.keys(s45d.marks.DW).length === 5,
+  JSON.stringify(Object.keys(s45d.marks.DW)));
+chk('which are the four marks and unmarked',
+  JSON.stringify(Object.keys(s45d.marks.DW).sort()) ===
+  JSON.stringify(['+', '-', '=', '?', ''].sort()),
+  JSON.stringify(Object.keys(s45d.marks.DW)));
+
+console.log('\n45e. a day with no events is all zeroes, and does not throw');
+let e45 = null, s45e = null;
+try { s45e = statsFor(20, () => { AC('DW: elsewhere', 22, 9, 0, 10, 0); }); }
+catch (e) { e45 = String((e && e.message) || e); }
+chk('nothing throws', e45 === null, String(e45));
+chk('every bucket of every key is 0',
+  rollupKeys_().every(k => MARK_BUCKETS.every(m => s45e.marks[k][m] === 0)),
+  JSON.stringify(s45e && s45e.marks));
+chk('and every key still has its full set of buckets',
+  rollupKeys_().every(k => Object.keys(s45e.marks[k]).length === 5),
+  JSON.stringify(rollupKeys_().map(k => [k, Object.keys(s45e.marks[k]).length])));
+
+console.log('\n45f. the existing per-key totals did not move');
+/* The golden fixture is the real guard here — section 39d compares both whole
+ * grids and is untouched by this task. This asserts the property directly. */
+const s45f = statsFor(20, () => {
+  AC('DW: a =', 20, 9, 0, 12, 0);
+  AC('MTG: b -', 20, 13, 0, 14, 30);
+  AC('UNLOGGED -', 20, 20, 0, 23, 0);
+});
+chk('DW total unchanged by bucketing', near(s45f.actual.DW * 3600000, 3 * 3600000),
+  String(s45f.actual.DW));
+chk('MTG total unchanged', near(s45f.actual.MTG * 3600000, 1.5 * 3600000),
+  String(s45f.actual.MTG));
+chk('UNLOGGED is bucketed too, under the mark it carries',
+  near(s45f.marks.UNLOGGED['-'] * 3600000, 3 * 3600000), JSON.stringify(s45f.marks.UNLOGGED));
+reset();
+
 console.log('\n────────────────────────────────────────');
 console.log(H.pass + ' passed, ' + H.fail + ' failed' +
             (H.skipped.length ? ', ' + H.skipped.length + ' skipped' : ''));

@@ -7,9 +7,9 @@ Round 1's progress record is `factory/progress.md` and is **read-only**.
 
 ## Status
 
-In progress. **5 of 16 tasks complete. Stage A is finished.** Stage B, task B1 next.
+In progress. **6 of 16 tasks complete.** Stage B, task B2 next.
 
-Suite: **636 passed / 0 failed** (baseline was 492), green in all four
+Suite: **656 passed / 0 failed** (baseline was 492), green in all four
 contracted timezones. Lint all clear. Headless ok, 19 checks per viewport.
 
 ## Tasks
@@ -21,7 +21,7 @@ contracted timezones. Lint all clear. Headless ok, 19 checks per viewport.
 | A3 | A | **done** | 1 | checker found 2 real bugs (stuck armed STOP, stale-read race) + 3 weak tests, all fixed |
 | A4 | A | **done** | 1 | checker found 4 mutations my phase missed; all now caught |
 | A5 | A | **done** | 1 | criteria all met; checker's 16-scenario x 6-zone differential moved nothing. Q9/Q10 parked |
-| B1 | B | pending | 0 | |
+| B1 | B | **done** | 1 | four mutations tried, all caught; golden untouched |
 | B2 | B | pending | 0 | golden fixture changes here |
 | B3 | B | pending | 0 | golden fixture changes here |
 | B4 | B | pending | 0 | |
