@@ -1,5 +1,60 @@
 # Progress — timetap error paths round
 
+## FIX PASS 2 SUMMARY (2026-07-27, after the second independent review)
+
+**Outcome: all five items in `factory/FIXES-2.md` are done. Nothing parked, nothing
+escalated, no open questions.** 492 assertions, green twice in a row under all four
+contracted timezones; `node test/lint.js` all clear, still 17 rules, two of them now
+covering what their contract assertions always claimed; `node test/headless.js` green at
+both viewports with a new tap-count phase; `./deploy.sh` re-exercised against a stub
+`clasp` and all three gates still block.
+
+| Item | Fix | Pinned by |
+|---|---|---|
+| F2-1. a comment claimed a guard the code does not have | `discardDead`'s docblock said "the list is NOT redrawn… Nothing may move while a finger is down". Half true: rows *do* slide up. Rewritten to name the guard that actually holds — arm/confirm — per amendment A4 | new `checkTapCount` phase in `test/headless.js`: 2, 3, 4 and 6 taps on one point destroy 1, 1, 2 and 3, each preceded by `TAP AGAIN TO DISCARD` |
+| F2-2. the NUL rule covered 14 files, not "any file in the repo" | census is now the repo's own — `git ls-files`, or a walk when there is no `.git` | a NUL in `factory/log.md`, `site/index.html`, `.github/workflows/pages.yml` and `test/fixtures/rollup-golden.json` each fails by name |
+| F2-3. two live docs still said "one OAuth scope" | `factory/BRIEF.md:71` and `factory/PLAN.md:33` corrected; the rule widened from two files to every `.md`, with eight record files exempt by name | reverting either doc fails lint by file and line; emptying the exemption list also fails, so the exemption is tested not assumed |
+| F2-4. the suite crashed in an uncontracted timezone | §39d reports as a named skip instead of dereferencing a golden that is not there | `TZ=Asia/Kolkata` and `TZ=Pacific/Chatham` run to completion, exit 0, 482 passed / 1 skipped |
+| F2-5. a settled question still read as open | the parked question is marked *ruled 2026-07-27, A1*, with its original text kept | four more places in the same file that read as open are marked too |
+
+**Two things were found while doing this list, both fixed in place:**
+
+- `.gitignore` says `node_modules/`, which matches a directory and not a symlink pointing
+  at one, so a checkout that symlinks its `node_modules` had the whole tree handed to the
+  new NUL rule and failed with `EISDIR`. The rule now skips anything that is not a regular
+  file, and says so out loud. The real repo never hit this; a developer's checkout would.
+- Replacing §39d's `chk('there is a golden for this timezone')` with a skip would have left
+  a hole in the count, and putting it back inside the guarded branch would have made it an
+  assertion that cannot fail — the class `test/README.md:63` records. It is replaced by one
+  that can fail (the golden holds a non-empty grid for both tabs), verified by emptying the
+  grids in a fixture copy.
+
+**Assertion count is 492 and deliberately unchanged.** F2-4's criteria require it: §39d must
+run in full in the four contracted zones with the count unchanged. F2-1 added a tier-3
+phase, F2-2 and F2-3 widened lint rules, F2-5 was documentation — none of those is a
+tier-1 assertion.
+
+**Every fix was vacuity-checked** by reverting it in a fixture copy under a scratchpad and
+confirming the new check fails. The repo was never left dirty by a test. `appsscript.json`
+is still byte-identical to `main`, the golden rollup fixture is untouched, `Code.gs` was not
+touched at all, and the only change to `Index.html` is comments.
+
+**To see it work:**
+
+```bash
+for z in America/New_York Europe/London Australia/Sydney UTC; do TZ=$z node test/tests.js | tail -1; done
+TZ=Asia/Kolkata node test/tests.js | tail -3     # 482 passed, 1 skipped — a named skip, not a crash
+node test/lint.js                                 # 17 rules; the NUL and scope rules now name their census
+node test/headless.js                             # both viewports, the drawer, and the tap count
+git log --oneline 7a9b731..HEAD                   # five commits, one per item
+```
+
+To watch the tap-count phase bite, revert `armDead` in a copy of `Index.html` so the first
+tap discards, then run `node test/headless.js` — it names each tap that destroyed an entry
+and what the button said at the time.
+
+---
+
 ## FIX PASS SUMMARY (2026-07-27, after the independent review)
 
 **Outcome: the five findings in `factory/REVIEW.md` are fixed, and the human's three

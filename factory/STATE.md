@@ -1,10 +1,54 @@
 # Factory State
 project: timetap
-stage: 5
-stage_name: One more loop pass (fix list from review 2)
-last_updated: 2026-07-27 (review 2)
-next_action: Run factory/FIXES-2.md as one loop pass on branch factory/error-paths. Five items, all small — a comment and a tier-3 check (F2-1), two lint rules widened to match their own assertions (F2-2, F2-3), a crash turned into a named skip (F2-4), and a stale parked question (F2-5). Then stage 6, a third fresh-eyes review, which should be short. Then stage 7, the proof video with auto-loom-proof.
+stage: 6
+stage_name: Third fresh-eyes review (after fix pass 2)
+last_updated: 2026-07-27 (fix pass 2 complete)
+next_action: Run a third independent review of branch factory/error-paths — /factory or /factory-review. It should be short: fix pass 2 was five small items, nothing parked and no open questions. What is unchecked is the fix pass itself, by anyone other than its author. Then stage 7, the proof video with auto-loom-proof.
 notes: |
+  FIX PASS 2 COMPLETE (2026-07-27). All five items in factory/FIXES-2.md done,
+  five commits, nothing parked, nothing escalated, no questions for the human.
+
+    F2-1 Index.html's discardDead docblock claimed "the list is NOT redrawn…
+         Nothing may move while a finger is down" — the second half is false, rows
+         do slide up. Rewritten per amendment A4 to name the guard the build has:
+         arm/confirm. factory/review-repro-2/tap-count.js folded into
+         test/headless.js as a checkTapCount phase and deleted from factory/.
+         Measured 1, 1, 2, 3 destroyed at 2, 3, 4, 6 taps — A4's table exactly —
+         with every destruction preceded by TAP AGAIN TO DISCARD under the finger.
+    F2-2 NUL rule now drives off git ls-files (or a walk with no .git) instead of
+         14 hand-written paths. Binary files get a named exemption, never an
+         extension filter; an unreadable file is a failure, not a silent skip.
+    F2-3 factory/BRIEF.md:71 and factory/PLAN.md:33 corrected to three scopes; the
+         rule widened from two files to every .md, with eight record files exempt
+         by name and reason. HANDOFF.md is on that list and is the weakest entry —
+         flagged in the comment rather than left to be found.
+    F2-4 §39d skips by name instead of crashing outside the four contracted zones.
+         Harness gained skip(), mirroring smoke.js. A skip is never counted in
+         passed; the summary prints ", 1 skipped" and lists it.
+    F2-5 progress.md's parked question marked ruled (A1) with its original text
+         kept, plus four more places in the file that read as open.
+
+  TWO THINGS FOUND WHILE FIXING, BOTH FIXED IN PLACE:
+    - .gitignore's `node_modules/` does not match a symlink pointing at a
+      directory, so a symlinked checkout handed the whole tree to the new NUL rule
+      (EISDIR). Non-regular files are now skipped out loud.
+    - §39d's old "there is a golden for this timezone" check could not survive as
+      written without becoming an assertion that cannot fail. Replaced by one that
+      can (the golden holds a non-empty grid for both tabs), vacuity-checked.
+
+  VERIFIED: 492 assertions green TWICE under all four contracted timezones — the
+  count is deliberately unchanged, F2-4's criteria require it. lint all clear, 17
+  rules. headless green at both viewports plus the drawer and tap-count phases.
+  deploy.sh re-exercised in a fixture copy with a stub clasp first on PATH: all
+  four failure gates (lint, suite, headless, missing browser) exit non-zero with
+  zero clasp calls, --no-test still deploys, and the happy path reached the push
+  step calling only the stub. appsscript.json byte-identical to main, golden rollup
+  fixture untouched, Code.gs untouched, Index.html changed in comments only.
+
+  WHAT IS STILL UNCHECKED: fix pass 2, by anyone other than its author.
+
+  Review 2 history, unchanged below.
+
   REVIEW 2 (2026-07-27), fresh context, on the fix pass — verdict FIX FIRST.
   Written to factory/REVIEW-2.md. factory/REVIEW.md is round 1, left unedited.
 
