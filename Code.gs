@@ -35,6 +35,11 @@ var CAL_SITTING = '';   // written continuously by this app. Posture overlay.
  *            button's background. See COLOR_HEX below for the eleven names.
  *   autoMark '+' | '=' | '-' | null.  Non-null means this category NEVER
  *            shows the mark strip; the mark is applied silently.
+ *
+ *            Deliberately not '?', even though MARKS now carries it. '?' means
+ *            the app had to guess where a block ended, which is a fact about
+ *            one block and never a property of a category. Contract 17: only
+ *            staleGuard_ writes it.
  */
 var CATEGORIES = [
   { key: 'DW',   label: 'Deep work', color: CalendarApp.EventColor.BLUE,       autoMark: null },
@@ -391,13 +396,66 @@ function removeCategory(key) {
  * Titles — ASCII marks only. Parsing depends on it.
  * ═══════════════════════════════════════════════════════════════════ */
 
+/**
+ * Every mark a title may carry, in one place.
+ *
+ * Three sites have to agree on this set — buildTitle_ writes it, parseTitle_
+ * reads it back, validOp_ decides which ops carrying one survive. Round 1 found
+ * two separate bugs in this format, and three hand-maintained copies of the same
+ * character set is how a third one gets written.
+ *
+ *   +  went well      =  neutral, the default      -  went badly
+ *   ?  the app had to guess where this block ended
+ *
+ * '?' is not a judgment, which is what would make it a product-law violation —
+ * it is the absence of one. Only staleGuard_ writes it. No action a user can
+ * take produces it, and markFor in Index.html cannot return it.
+ */
+var MARKS = '+=-?';
+
+/** One of MARKS, and exactly one — '+=' is a substring, not a mark. */
+function isMark_(m) {
+  return typeof m === 'string' && m.length === 1 && MARKS.indexOf(m) >= 0;
+}
+
 function buildTitle_(key, text, mark) {
   var t = String(key || '').toUpperCase() + ':';
   var s = String(text == null ? '' : text).replace(/[\r\n]+/g, ' ').replace(/\s+/g, ' ').trim();
+  /*
+   * Contract 17: only staleGuard_ may produce '?'. Without this, a note ending
+   * in a question mark — "is this right ?" — lands in the trailing slot and is
+   * read straight back as the app's own "I had to guess" mark, which makes a
+   * block the user annotated indistinguishable from a phantom one. The user's
+   * '?' disappeared from the note too.
+   *
+   * Only needed when no mark follows the text. When one does it occupies the
+   * trailing slot, the note's '?' is no longer in mark position, and it is left
+   * exactly as typed: "DW: is this right ? =" parses back to text
+   * "is this right ?" and mark "=". That is better than the pre-round
+   * behaviour, not worse.
+   *
+   * The identical hole exists for + = and -, and predates this round: a note
+   * ending in one has always been read back as that mark. Deliberately NOT
+   * changed here — contract 17 names '?', contract 7 says leave existing
+   * behaviour alone, and widening this is a product decision. Parked as Q2 in
+   * factory/progress-2.md.
+   */
+  if (!isMark_(mark)) {
+    while (/(?:^|\s)\?$/.test(s)) s = s.slice(0, -1).trim();
+  }
   if (s) t += ' ' + s;
-  if (mark === '+' || mark === '=' || mark === '-') t += ' ' + mark;
+  if (isMark_(mark)) t += ' ' + mark;
   return t;
 }
+
+/**
+ * The trailing mark, derived from MARKS so the write side and the read side
+ * cannot drift apart. Anchored to a single trailing character: "DW: memo ??"
+ * has text "memo ?" and mark "?", exactly as "DW: memo ==" already behaved.
+ * The class escape covers ] ^ and - so adding a mark later cannot silently
+ * turn the class into a range.
+ */
+var MARK_TAIL_RE_ = new RegExp('(?:^|\\s)([' + MARKS.replace(/[\]^\-\\]/g, '\\$&') + '])$');
 
 /**
  * "DW: memo drafting -"  ->  {key:'DW', text:'memo drafting', mark:'-'}
@@ -419,7 +477,7 @@ function parseTitle_(title) {
     rest = u[1].trim();
   }
   var mark = null;
-  var mm = /(?:^|\s)([+=\-])$/.exec(rest);
+  var mm = MARK_TAIL_RE_.exec(rest);
   if (mm) {
     mark = mm[1];
     rest = rest.slice(0, rest.length - 1).trim();
@@ -622,7 +680,7 @@ function validOp_(op) {
     var r = op[refs[j]];
     if (r !== undefined && !/^[A-Za-z0-9]{4,64}$/.test(String(r))) return false;
   }
-  if (op.mark !== undefined && op.mark !== null && '+=-'.indexOf(op.mark) < 0) return false;
+  if (op.mark !== undefined && op.mark !== null && !isMark_(op.mark)) return false;
   return true;
 }
 

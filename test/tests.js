@@ -1862,6 +1862,219 @@ chk('the record is readable again', REC() && REC().outcome === 'ok', JSON.string
 chk('and the report reads it', /Last run: succeeded/.test(rollupStatus()), rollupStatus());
 reset();
 
+/* ── A1: a title can carry a fourth mark, and it survives a round trip ──
+ *
+ * '?' means the app had to guess where a block ended. Nothing writes one yet —
+ * staleGuard_ starts writing it in A2. This section proves the widening on its
+ * own, before anything depends on it, because four call sites default to ADM
+ * when parsing fails: a regression here does not throw, it silently misfiles
+ * time. */
+
+console.log('\n41. the mark set widens by exactly one character');
+reset();
+chk('buildTitle_ writes "?"', buildTitle_('DW', 'memo drafting', '?') === 'DW: memo drafting ?',
+  buildTitle_('DW', 'memo drafting', '?'));
+const p41 = parseTitle_('DW: memo drafting ?');
+chk('and parseTitle_ reads it back as the mark', p41.mark === '?', JSON.stringify(p41));
+chk('leaving the "?" out of the text', p41.text === 'memo drafting', JSON.stringify(p41));
+chk('with the key intact', p41.key === 'DW', JSON.stringify(p41));
+
+/* The three older marks are untouched by the widening. */
+chk('"+" still parses', parseTitle_('DW: memo +').mark === '+');
+chk('"=" still parses', parseTitle_('DW: memo =').mark === '=');
+chk('"-" still parses', parseTitle_('DW: memo -').mark === '-');
+chk('an unmarked title still has no mark', parseTitle_('DW: memo').mark === null);
+
+console.log('\n41b. build -> parse -> rebuild is byte-identical, for every mark');
+/* A table rather than seven hand-written cases, so a fifth mark added later is
+ * covered by construction. The texts include ones that already end in a mark
+ * character: those are where a greedy regex would eat a character it should
+ * have left alone. */
+const MARKS41 = ['+', '=', '-', '?', null];
+const TEXTS41 = ['', 'memo', 'memo drafting', '  padded   spaces  ', 'memo +', 'a ?', 'C++'];
+const rt41 = [];
+for (const mk of MARKS41) {
+  for (const tx of TEXTS41) {
+    const built = buildTitle_('DW', tx, mk);
+    const parsed = parseTitle_(built);
+    if (!parsed) { rt41.push(built + ' -> did not parse at all'); continue; }
+    const rebuilt = buildTitle_(parsed.key, parsed.text, parsed.mark);
+    if (rebuilt !== built) rt41.push(JSON.stringify(built) + ' -> ' + JSON.stringify(rebuilt));
+  }
+}
+chk('every mark x text combination round-trips unchanged', rt41.length === 0,
+  rt41.join(' | '));
+chk('and the table actually covered all four marks plus unmarked',
+  MARKS41.length === 5 && TEXTS41.length === 7);
+
+console.log('\n41c. an op may carry "?", and still may not carry anything else');
+reset();
+const t41 = H.nowMs();
+const r41 = applyOps([
+  { id: 'a41', type: 'openActual',  ref: 'aaaabbbbccccdddd', key: 'DW', startMs: t41 },
+  { id: 'b41', type: 'closeActual', ref: 'aaaabbbbccccdddd', key: 'DW',
+    endMs: t41 + 3600000, mark: '?', text: 'memo' }
+]);
+chk('the op carrying "?" was applied', r41.applied.includes('b41'), JSON.stringify(r41.applied));
+chk('and not dropped', r41.dropped.length === 0, JSON.stringify(r41.dropped.map(d => d.id)));
+chk('so the title carries the guess', A()[0].t === 'DW: memo ?', A()[0].t);
+
+reset();
+const t41b = H.nowMs();
+const r41b = applyOps([
+  { id: 'a41b', type: 'openActual',  ref: 'aaaabbbbccccdddd', key: 'DW', startMs: t41b },
+  { id: 'b41b', type: 'closeActual', ref: 'aaaabbbbccccdddd', key: 'DW',
+    endMs: t41b + 3600000, mark: 'x' }
+]);
+chk('an op carrying "x" is still dropped',
+  r41b.dropped.length === 1 && r41b.dropped[0].id === 'b41b',
+  JSON.stringify(r41b.dropped.map(d => d.id)));
+/* '+=' is a substring of the mark set, so an indexOf test would have admitted
+ * it. The widening admits exactly one new character, not one new substring. */
+reset();
+const r41c = applyOps([
+  { id: 'a41c', type: 'openActual', ref: 'aaaabbbbccccdddd', key: 'DW', startMs: H.nowMs() },
+  { id: 'b41c', type: 'closeActual', ref: 'aaaabbbbccccdddd', key: 'DW',
+    endMs: H.nowMs() + 3600000, mark: '+=' }
+]);
+chk('and so is a two-character mark', r41c.dropped.length === 1, JSON.stringify(r41c.dropped));
+
+console.log('\n41d. the mark anchors to one trailing character, "?" exactly like "="');
+/* HANDOFF-2.md A1 asks for "DW: memo ??" to parse as mark "?" and text "memo ?",
+ * justifying it as "exactly as it already does for =". Those two halves
+ * contradict each other: today "DW: memo ==" parses as mark null, text
+ * "memo ==", because the regex requires start-of-string or whitespace before
+ * the mark. Making the literal expectation true means dropping that guard,
+ * which would also make "DW: C++" parse as mark "+" and text "DW: C+", and
+ * would change "=" behaviour that contract assertion 7 requires be left alone.
+ *
+ * So the justification is what is implemented and what is asserted here: the
+ * new character behaves identically to the old ones, whatever that behaviour
+ * is. The literal expectation is recorded as unmet in factory/progress-2.md,
+ * not quietly dropped. See the parked question there. */
+/* Compared mark-for-mark and text-for-text, since the two texts differ by
+ * construction. The claim is that the new character is treated by the same
+ * rule as the old ones, not that the two titles parse to the same object. */
+const dbl41 = ['+', '=', '-', '?'].map(m => parseTitle_('DW: memo ' + m + m));
+chk('every doubled mark is treated the same way as every other',
+  dbl41.every(p => p.mark === dbl41[0].mark), JSON.stringify(dbl41));
+chk('and that way is "the second one is text, not a mark"',
+  dbl41.every((p, i) => p.mark === null && p.text === 'memo ' + '+=-?'[i] + '+=-?'[i]),
+  JSON.stringify(dbl41));
+chk('a single trailing "?" is a mark', parseTitle_('DW: memo ?').mark === '?');
+chk('a doubled one is text, exactly as a doubled "=" is',
+  parseTitle_('DW: memo ??').mark === null && parseTitle_('DW: memo ??').text === 'memo ??',
+  JSON.stringify(parseTitle_('DW: memo ??')));
+chk('and "C++" keeps both its plusses',
+  parseTitle_('DW: C++').text === 'C++' && parseTitle_('DW: C++').mark === null,
+  JSON.stringify(parseTitle_('DW: C++')));
+
+console.log('\n41e. no action a user can take produces "?" — contract 17');
+/* markFor lives inside Index.html's IIFE, so this asserts the observable claim
+ * the contract actually makes rather than reaching into a private function: no
+ * sequence of taps, at any duration, ever writes a "?" into a title. The two
+ * inputs markFor reads are the category and the duration, and both are swept.
+ *
+ * The autoMark assertion below closes the only other door: markFor returns
+ * c.autoMark, '=' or null, so the single way it could ever return '?' is a
+ * category configured with one. */
+chk('no configured category carries "?" as its autoMark',
+  CATEGORIES.every(c => c.autoMark !== '?'),
+  JSON.stringify(CATEGORIES.map(c => [c.key, c.autoMark])));
+
+const guessed41 = [];
+for (const cat of CATEGORIES.map(c => c.key)) {
+  for (let mins = 0; mins <= 480; mins += 20) {
+    reset(); reboot();
+    tap(cat);
+    if (mins) wait(mins);
+    // Two taps: past the confirm window the first acts and the second lands on
+    // the freshly lit block as a no-op; inside it, the first arms and the
+    // second confirms. One shape covers the whole sweep.
+    tap(cat === 'DW' ? 'MTG' : 'DW');
+    tap(cat === 'DW' ? 'MTG' : 'DW');
+    settle();
+    const bad = A().filter(e => /\?\s*$/.test(e.t));
+    if (bad.length) guessed41.push(cat + '@' + mins + 'm: ' + bad.map(e => e.t).join(','));
+  }
+}
+chk('no tap sequence at any duration from 0 to 8 hours ever wrote a "?"',
+  guessed41.length === 0, guessed41.slice(0, 6).join(' | '));
+/* The sweep above is only worth anything if it actually wrote blocks. Asserted
+ * against the last iteration rather than restating the check above it, which
+ * would pass just as happily against an empty calendar. */
+chk('and the sweep was writing blocks, not sweeping an empty calendar',
+  A().length >= 2 && A().every(e => /^[A-Z]+:/.test(e.t)),
+  A().length + ' events: ' + A().map(e => e.t).join(','));
+chk('over all six configured categories', CATEGORIES.length === 6);
+reset();
+
+console.log('\n41f. a note the user typed can never impersonate the app\'s guess');
+/* Found by the checker against A1 as first written, and recorded as contract
+ * addition 1 in factory/progress-2.md before being fixed here. A note ending in
+ * a question mark landed in the trailing mark slot and was read straight back
+ * as "the app had to guess", which would have made an annotated block
+ * indistinguishable from a phantom one all the way through Stage B. */
+reset(); reboot();
+tap('DW');
+noteBox().value = 'is this right ?'; noteBox().fire('input');
+advance(1000); settle();
+wait(5);                                    // under MIN_MARK_MINUTES, so no mark
+tap('MTG'); tap('MTG'); settle();
+const n41 = parseTitle_(A()[0].t);
+chk('the block closed with no mark, not with a guess', n41.mark === null,
+  A()[0].t + ' -> ' + JSON.stringify(n41));
+chk('and nothing on the calendar claims to be a guess',
+  A().every(e => !/\?\s*$/.test(e.t)), A().map(e => e.t).join(' | '));
+
+reset(); reboot();
+tap('DW');
+noteBox().value = 'is this right ?'; noteBox().fire('input');
+advance(1000); settle();
+wait(40);                                   // over MIN_MARK_MINUTES, so "=" follows
+tap('MTG'); tap('MTG'); advance(6000); settle();
+const n41b = parseTitle_(A()[0].t);
+chk('with a mark following it, the note keeps its "?"', n41b.text === 'is this right ?',
+  A()[0].t + ' -> ' + JSON.stringify(n41b));
+chk('and the mark is the one the app applied', n41b.mark === '=', JSON.stringify(n41b));
+
+/* The narrowness is the point: the strip only happens when the trailing slot is
+ * otherwise empty. Asserted directly, so a later widening of it is visible. */
+chk('a bare trailing "?" is stripped when nothing follows it',
+  buildTitle_('DW', 'is this right ?', null) === 'DW: is this right',
+  buildTitle_('DW', 'is this right ?', null));
+chk('and kept when something does',
+  buildTitle_('DW', 'is this right ?', '=') === 'DW: is this right ? =',
+  buildTitle_('DW', 'is this right ?', '='));
+chk('a "?" inside the note is never touched',
+  buildTitle_('DW', 'why? because', null) === 'DW: why? because',
+  buildTitle_('DW', 'why? because', null));
+chk('nor one that is not in mark position',
+  buildTitle_('DW', 'what ??', null) === 'DW: what ??',
+  buildTitle_('DW', 'what ??', null));
+
+/* Error paths: a note made only of marks, and the round trip over all of it. */
+let thrown41 = null;
+let only41 = null;
+try { only41 = buildTitle_('DW', '? ? ?', null); } catch (e) { thrown41 = String(e); }
+chk('a note of nothing but question marks does not throw', thrown41 === null, String(thrown41));
+chk('and parses to no mark', only41 !== null && parseTitle_(only41).mark === null,
+  String(only41) + ' -> ' + JSON.stringify(only41 && parseTitle_(only41)));
+
+const rt41f = [];
+for (const mk of MARKS41) {
+  for (const tx of ['is this right ?', 'what ??', 'why? because', '? ? ?', '?']) {
+    const built = buildTitle_('DW', tx, mk);
+    const parsed = parseTitle_(built);
+    if (!parsed) { rt41f.push(built + ' -> did not parse'); continue; }
+    const rebuilt = buildTitle_(parsed.key, parsed.text, parsed.mark);
+    if (rebuilt !== built) rt41f.push(JSON.stringify(built) + ' -> ' + JSON.stringify(rebuilt));
+  }
+}
+chk('and every question-mark note still round-trips byte-identical',
+  rt41f.length === 0, rt41f.join(' | '));
+reset();
+
 console.log('\n────────────────────────────────────────');
 console.log(H.pass + ' passed, ' + H.fail + ' failed' +
             (H.skipped.length ? ', ' + H.skipped.length + ' skipped' : ''));
