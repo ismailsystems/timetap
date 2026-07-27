@@ -108,5 +108,38 @@ check('no writable handle to the PLAN calendar',
     ? ['a PLAN calendar handle exists'] : [],
   'PLAN is read through readCal_ only, so no code path can write to it');
 
+/* The repo has dev tooling now, and the four source files still must not. Apps
+   Script has no module loader and no build step: an import or a CDN URL in any
+   of them is a blank screen on the phone, not a build error anyone would see. */
+const manifest = fs.readFileSync(path.join(ROOT, 'appsscript.json'), 'utf8');
+const SOURCES = { 'Code.gs': code, 'Index.html': html, 'appsscript.json': manifest };
+check('the source files pull nothing in',
+  Object.keys(SOURCES).filter(function (name) {
+    const body = name === 'Code.gs' ? codeNoComments
+               : name === 'Index.html' ? stripComments(script) + markup + style
+               : SOURCES[name];
+    return /\brequire\s*\(|^\s*import\s|\bfrom\s+['"][^'"]+['"]\s*;|<script[^>]+\bsrc=|https?:\/\/(cdn|unpkg|jsdelivr)/mi.test(body);
+  }),
+  'no import, require or CDN URL: Apps Script has no module loader and no build step');
+
+/* The browser is tooling, not a dependency of the app. If it ever moves to
+   dependencies it ships with nothing that can use it. */
+let pkg = null;
+try { pkg = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8')); } catch (e) {}
+check('the headless browser is a dev dependency',
+  !pkg ? ['package.json is missing or unreadable']
+       : (pkg.dependencies && Object.keys(pkg.dependencies).length
+            ? ['runtime dependencies: ' + Object.keys(pkg.dependencies).join(', ')]
+            : (pkg.devDependencies && pkg.devDependencies.playwright ? [] : ['playwright is not in devDependencies'])),
+  'nothing in this repo is deployed with the app, so nothing belongs in dependencies');
+
+/* A caret would let the browser move under a pinned expectation, which is the
+   one thing the tier-4 canary cannot tell apart from a real break. */
+check('the browser version is pinned exactly',
+  (pkg && pkg.devDependencies && pkg.devDependencies.playwright &&
+   !/^\d+\.\d+\.\d+$/.test(pkg.devDependencies.playwright))
+    ? ['playwright: ' + pkg.devDependencies.playwright] : [],
+  'an exact version, so "the pinned browser still launches" means something');
+
 console.log(fails ? '\n' + fails + ' failed\n' : '\nall clear\n');
 process.exit(fails ? 1 : 0);
