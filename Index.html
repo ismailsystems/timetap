@@ -809,12 +809,18 @@
    * waiting in the queue is pending, not lost, and discarding must never reach
    * it. A tap on a row that has already gone finds no match and does nothing.
    *
-   * The discarded row is removed on its own, and the list is NOT redrawn. Redrawing
-   * rebuilt every row, which slid the next one up into the space the finger had
-   * just left and put its DISCARD button under that finger — so a double tap threw
-   * away a second write the reader had never looked at. The token guard below
-   * cannot catch that, because the second tap lands on a genuinely different row
-   * holding a genuinely valid token. Nothing may move while a finger is down.
+   * The discarded row is removed on its own rather than by redrawing the list, so
+   * the other rows keep their armed state and their identity. What it does NOT do
+   * is hold the layout still: removing one row from a flex column slides every row
+   * below it up by exactly the amount redrawing did, so a second tap in the same
+   * place does land on a different row's button.
+   *
+   * That is safe, and arm/confirm is why. The row that slides under the finger
+   * arrives unarmed, so the tap that lands on it can only arm it — destroying it
+   * would need a further, deliberate tap against a button already reading
+   * TAP AGAIN TO DISCARD. Contract assertion 24 and amendment A4; pinned by the
+   * tap-count phase in test/headless.js, which counts what a real browser destroys
+   * at 2, 3, 4 and 6 taps on one fixed point.
    */
   function discardDead(token) {
     var d = ls(K_DEAD, []);
@@ -829,7 +835,8 @@
     else { closeDead(); hideErr(); }
   }
 
-  /** Take one row out of the drawer, leaving every other row where it was. */
+  /** Take one row out of the drawer, leaving every other row's state untouched.
+      The rows below it do slide up — see discardDead above for why that is safe. */
   function dropRow(token) {
     var host = $('deadList'), kids = host.children;
     for (var i = 0; i < kids.length; i++) {

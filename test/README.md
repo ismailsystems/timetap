@@ -65,6 +65,14 @@ a finger has already committed to. That is precisely how a single-tap DISCARD us
 destroy a second write the reader had never looked at, while a test named "discarding
 the same row twice is a no-op" passed.
 
+A second drawer phase counts rather than watches: it taps one fixed point 2, 3, 4 and
+6 times and checks that 1, 1, 2 and 3 entries left, and — the part that actually
+matters — that **every** tap which destroyed an entry found a button already reading
+`TAP AGAIN TO DISCARD` under the finger. Rows *do* slide up when one is removed; what
+makes that safe is arm/confirm, not a frozen layout, and this is the check that pins
+it (contract assertion 24, amendment A4). Revert `armDead` to discard on the first tap
+and it fails naming the tap number and what the button said at the time.
+
 ```bash
 npm install          # once; installs the pinned headless browser
 node test/headless.js

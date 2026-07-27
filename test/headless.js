@@ -252,6 +252,116 @@ async function checkDrawer(browser, view, page) {
   return problems;
 }
 
+/**
+ * The same drawer, counted rather than watched: what does N taps on one fixed
+ * point actually destroy?
+ *
+ * checkDrawer above pins the ordinary accident — one double tap, one entry gone,
+ * and it is the entry aimed at. This phase pins the property underneath it, which
+ * is what contract assertion 24 names after amendment A4: rows DO slide up when
+ * one is removed, and what keeps that safe is that DISCARD arms on the first tap
+ * and acts on the second. So a run of taps at one point destroys one entry per
+ * *pair* of taps, and — the part that actually matters — every destruction is
+ * preceded, at that same coordinate, by a button already reading TAP AGAIN TO
+ * DISCARD. Nothing is ever destroyed by a tap onto an unarmed button.
+ *
+ * Freezing the layout would also have prevented the original bug and is not what
+ * the build does; see amendment A4 in factory/HANDOFF.md for why it was rejected.
+ * A check that asserted the layout stood still would pass on a build that does not
+ * exist and fail on the one that does.
+ */
+const TAP_COUNTS = [2, 3, 4, 6];
+const TAP_SEED_SIZE = 5;
+const tapSeed = () => Array.from({ length: TAP_SEED_SIZE }, (_, i) => ({
+  at: i + 1, why: 'entry-' + (i + 1), key: 'K' + i, startMs: i + 1,
+  op: { id: String(i), type: 'setMark', ref: 'r' + i }
+}));
+
+/** Open the drawer on a freshly seeded page and hand back the page. */
+async function openDrawerWith(ctx, page, seed) {
+  const pg = await ctx.newPage();
+  const errors = [];
+  pg.on('pageerror', e => errors.push(String((e && e.message) || e)));
+  await pg.route(DRAWER_ORIGIN, r =>
+    r.fulfill({ status: 200, contentType: 'text/html; charset=utf-8', body: documentFor(page, true) }));
+  await pg.addInitScript(serverStub);
+  await pg.addInitScript(d => localStorage.setItem('tt.dead.v1', JSON.stringify(d)), seed);
+  await pg.goto(DRAWER_ORIGIN, { waitUntil: 'load' });
+  await pg.waitForTimeout(300);
+  await pg.locator('#err').click();
+  await pg.waitForTimeout(150);
+  return { pg, errors };
+}
+
+async function tapNTimes(browser, view, page, taps) {
+  const ctx = await browser.newContext({
+    viewport: { width: view.width, height: view.height },
+    isMobile: !!view.isMobile, hasTouch: !!view.isMobile,
+    deviceScaleFactor: view.isMobile ? 3 : 1
+  });
+  try {
+    const { pg, errors } = await openDrawerWith(ctx, page, tapSeed());
+    const left = () => pg.evaluate(() =>
+      JSON.parse(localStorage.getItem('tt.dead.v1') || '[]').map(e => e.why));
+
+    const box = await pg.locator('#deadList .deadrow').nth(0).locator('button.danger').boundingBox();
+    if (!box) return { trace: [], end: [], destroyed: 0, errors: errors.concat('no DISCARD button to aim at') };
+    const x = Math.round(box.x + box.width / 2), y = Math.round(box.y + box.height / 2);
+
+    const trace = [];
+    for (let i = 0; i < taps; i++) {
+      const before = await left();
+      // What the button under the finger says *before* this tap lands. This is
+      // the whole check: a tap that destroys must find an armed button here.
+      const said = await pg.evaluate(([px, py]) => {
+        const el = document.elementFromPoint(px, py);
+        const btn = el && el.closest ? el.closest('button.danger') : null;
+        return btn ? btn.textContent : '(nothing under the finger)';
+      }, [x, y]);
+      await pg.mouse.click(x, y);
+      await pg.waitForTimeout(90);
+      const after = await left();
+      trace.push({ tap: i + 1, said: said, destroyed: before.length - after.length });
+    }
+    await pg.waitForTimeout(200);
+    const end = await left();
+    return { trace, end, at: x + ',' + y, destroyed: TAP_SEED_SIZE - end.length, errors };
+  } finally {
+    await ctx.close();
+  }
+}
+
+async function checkTapCount(browser, view, page) {
+  const problems = [];
+  console.log('\ntap count on one fixed point (' + view.name + ', ' +
+              TAP_SEED_SIZE + ' set aside)');
+  for (const taps of TAP_COUNTS) {
+    const r = await tapNTimes(browser, view, page, taps);
+    const want = Math.floor(taps / 2);
+    console.log('  ' + String(taps).padStart(2) + ' taps at ' + (r.at || '?') +
+                ' -> ' + r.destroyed + ' destroyed (expected ' + want + '), left ' +
+                JSON.stringify(r.end));
+
+    const unarmed = r.trace.filter(t => t.destroyed > 0 && t.said !== 'TAP AGAIN TO DISCARD');
+    if (unarmed.length) {
+      problems.push('tap count: with ' + taps + ' taps at one point, ' + unarmed.length +
+                    ' entr' + (unarmed.length === 1 ? 'y was' : 'ies were') +
+                    ' destroyed by a tap onto a button that had not armed the row first:\n' +
+                    unarmed.map(t => '    - tap ' + t.tap + ' destroyed ' + t.destroyed +
+                                     ' while the button said ' + JSON.stringify(t.said)).join('\n'));
+    }
+    if (r.destroyed !== want) {
+      problems.push('tap count: ' + taps + ' taps at one point destroyed ' + r.destroyed +
+                    ' entries, not the ' + want + ' that arm/confirm allows. Trace:\n' +
+                    r.trace.map(t => '    - tap ' + t.tap + ': button said ' +
+                                     JSON.stringify(t.said) + ' -> destroyed ' + t.destroyed).join('\n'));
+    }
+    if (r.errors.length) problems.push('tap count: at ' + taps + ' taps the page threw: ' +
+                                       r.errors.join(' | '));
+  }
+  return problems;
+}
+
 /** Same list, same content strings, order not meaningful. */
 function sameMetas(a, b) {
   const norm = list => list.map(m => m[0] + '\0' + m[1]).sort();
@@ -374,6 +484,7 @@ async function main() {
     }
     problems = problems.concat(await checkInjectionMatters(browser, VIEWS[0], page));
     problems = problems.concat(await checkDrawer(browser, VIEWS[0], page));
+    problems = problems.concat(await checkTapCount(browser, VIEWS[0], page));
   } finally {
     await browser.close();
   }

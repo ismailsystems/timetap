@@ -306,8 +306,12 @@ sign-off runs them too.
 
 24. Given several set-aside writes and the drawer open, when DISCARD is tapped twice
     in quick succession at one fixed screen position, then exactly one entry leaves
-    the dead list, and it is the entry whose row was under the finger. Discarding a
-    row must not move another row's controls into the space it vacated.
+    the dead list, and it is the entry whose row was under the finger. No entry is
+    ever discarded without its own arm and confirm on a button that says what the
+    next tap will do.
+    *(Amended 2026-07-27 by human decision — see Contract amendments A4. The original
+    added "discarding a row must not move another row's controls into the space it
+    vacated", which describes a mechanism the build did not use and does not have.)*
 25. Given a tab whose write fails after the tab has been opened, then that tab still
     holds its previous numbers and its previous stamp. `writeGrid_` must never leave
     a tab emptied by a failure.
@@ -365,6 +369,45 @@ Two things follow, and both are required:
 this ruling and without escalating the change — that was the loop overstepping, not
 the invariant being wrong. It stands, and its stub is replaced by one that fails
 *inside* `writeGrid_` so the blanking path is actually reachable.
+
+**A4 — Assertion 24 names the guard the build actually has: arm and confirm, not a
+frozen layout.** *(Human decision, 2026-07-27, after the second independent review —
+`factory/REVIEW-2.md`.)*
+
+Assertion 24 was written during the first review, before the fix existed, and its
+second sentence guessed at the mechanism: "discarding a row must not move another
+row's controls into the space it vacated." The build met the goal a different way.
+Rows still move — removing one row from a flex column slides every row below it up by
+exactly the same amount that redrawing the list did — and what prevents the data loss
+is that DISCARD now arms on the first tap and acts on the second.
+
+Measured in a real browser, five entries, clicking one fixed point 90ms apart:
+
+| taps at one point | entries destroyed |
+|---|---|
+| 2 | 1 |
+| 3 | 1 |
+| 4 | 2 |
+| 6 | 3 |
+
+That is arm/confirm working, not failing: every destruction after the first costs its
+own deliberate confirm against a button reading `TAP AGAIN TO DISCARD`. The harm the
+assertion exists to prevent — an ordinary accidental double tap silently destroying a
+second, unread write — is gone and verified gone.
+
+The second sentence is therefore **replaced, not weakened**, by the property that
+actually holds and that a test can pin. Freezing the layout was considered and
+rejected: it would leave a visible empty gap in the drawer, which is furniture on
+screen that says something, and this app does not put things on screen that say
+things it has not decided to say.
+
+Two things follow, and both are required:
+- The comment at `Index.html:812-817` must stop claiming "the list is NOT redrawn…
+  Nothing may move while a finger is down." It is not true of the code, and it is the
+  first thing the next person to touch this will read.
+- A tier-3 check must pin the arm/confirm property directly: four rapid taps at one
+  point destroy at most two, and the second destruction was armed and labelled before
+  it happened.
 
 ---
 

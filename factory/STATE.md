@@ -1,14 +1,55 @@
 # Factory State
 project: timetap
-stage: 6
-stage_name: Fresh-eyes review (of the fix pass)
-last_updated: 2026-07-27 07:00
-next_action: Run /factory-review once more, in a NEW context, on the fix diff only (the last commit). The fixes were written by the same agent that found the findings, so they have not been independently checked — that is the one gap left. If that review comes back SHIP, stage 7 is the proof video with auto-loom-proof.
+stage: 5
+stage_name: One more loop pass (fix list from review 2)
+last_updated: 2026-07-27 (review 2)
+next_action: Run factory/FIXES-2.md as one loop pass on branch factory/error-paths. Five items, all small — a comment and a tier-3 check (F2-1), two lint rules widened to match their own assertions (F2-2, F2-3), a crash turned into a named skip (F2-4), and a stale parked question (F2-5). Then stage 6, a third fresh-eyes review, which should be short. Then stage 7, the proof video with auto-loom-proof.
 notes: |
-  Round complete and fixed. Two documents carry the history: factory/REVIEW.md is the
-  independent review as written (left unedited — it is the record of what was true
-  before the fix), and the FIX PASS SUMMARY at the top of factory/progress.md is what
-  changed afterwards.
+  REVIEW 2 (2026-07-27), fresh context, on the fix pass — verdict FIX FIRST.
+  Written to factory/REVIEW-2.md. factory/REVIEW.md is round 1, left unedited.
+
+  WHAT ROUND 2 CONFIRMED, by breaking the code at points it chose itself rather
+  than the ones the suite uses:
+    - The double-tap data loss is genuinely gone. Real Chromium, real coordinates:
+      two taps at one point remove exactly the entry aimed at. Arm/confirm survives
+      a late second tap, a drawer close and reopen, and a re-render underneath it.
+    - The rollup's per-tab honesty holds at three independent failure points
+      (second tab's write, first tab's write, grid build). No tab blanked, no stamp
+      newer than its own numbers, the two stamps visibly different after a partial
+      failure.
+    - 492 assertions green TWICE under all four contracted timezones. lint 17 rules
+      clear. headless green at both viewports. All three deploy.sh gates block and
+      the stub clasp is never called.
+    - Amendment A1's factual basis re-verified independently: with no meta tags the
+      page lays out at 980px and all 17 smoke checks still pass, 0 fail.
+    - HANDOFF.md contains only the three sanctioned amendments. No tampering.
+    - No secrets, no stubs, no out-of-scope files, one pinned dev dependency.
+
+  FIX LIST (findings 2-5 need no decision):
+    2. The NUL-byte lint rule covers 14 named files, not "any file in the repo" as
+       assertion 26 says — a NUL appended to factory/log.md passed lint, exit 0.
+       Drive the rule off the tracked file list instead.
+    3. The scope-count rule reads README.md and SETUP.md only; factory/BRIEF.md:71
+       and factory/PLAN.md:33 still say "one OAuth scope" and pass.
+    4. test/tests.js crashes (TypeError at 39d) instead of skipping in any timezone
+       outside the contracted four — verified in Asia/Kolkata and Pacific/Chatham.
+    5. progress.md's "Parked questions" section still reads as an open question
+       that amendment A1 already answered.
+
+  THE ONE DECISION, RULED 2026-07-27 — Option A. Assertion 24's second sentence
+  ("discarding a row must not move another row's controls into the space it vacated")
+  described a mechanism the build does not use. Rows do still move; arm/confirm is
+  what makes that safe, and it is verified holding at 2, 3, 4 and 6 taps — every
+  destruction preceded by a button reading TAP AGAIN TO DISCARD. Recorded as
+  HANDOFF amendment A4, with assertion 24 rewritten in place. Freezing the layout was
+  considered and rejected: it puts an empty gap on screen, which is furniture that
+  says something the app has not decided to say.
+
+  Fix list written to factory/FIXES-2.md, with factory/review-repro-2/tap-count.js as
+  a working harness for F2-1's tier-3 check (currently green, and it is the loop's job
+  to prove it goes red when arm/confirm is reverted).
+
+  Round 1 history, unchanged below.
 
   THE HUMAN'S THREE DECISIONS, ruled 2026-07-27, recorded as amendments A1-A3 under
   "Contract amendments" in factory/HANDOFF.md:
