@@ -20,7 +20,7 @@ A task is `done` only after the CHECKER step has independently re-verified it.
 | D2 | Harness serves the page as Apps Script does | done | 1 | 5 of 6 criteria met and verified. **Criterion 6 is PARKED — see F4**, with evidence and a question; not weakened, not declared met. Found and fixed F3. |
 | D3 | Desktop viewport too, reported separately | done | 1 | Both viewports labelled with their dimensions and reported separately. CHECKER: a phone-only CSS break fails phone / passes desktop / exits 1 naming phone; zero checks at one viewport exits 1 even though the other passed. |
 | D4 | Drift lint on the meta tags (HIGH RISK) | done | 1 | All 6 criteria verified against fixture copies, plus 2 extra vacuity guards. **META-TEST PERFORMED**: neutering the rule makes exactly criteria 2, 3 and 4 stop detecting — three, as required. See log for the full transcript. |
-| D5 | deploy.sh gains a third gate | pending | 0 | |
+| D5 | deploy.sh gains a third gate | done | 1 | All 5 criteria exercised with a stub `clasp` prepended to PATH and a dummy `.clasp.json` in a fixture copy — the real `.clasp.json` was never read and no real deployment happened. **Stage D complete.** |
 | E1 | Docs describe what now exists | pending | 0 | |
 
 ## Parked questions for the human
