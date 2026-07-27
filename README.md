@@ -1,6 +1,11 @@
 # timetap
 
-A personal time-logging web app. Google Apps Script, four files, no dependencies.
+A personal time-logging web app. Google Apps Script, four files that import
+nothing and need no build step.
+
+The repo has dev-only test tooling with one dependency (a headless browser, used
+by `test/headless.js`). None of it is deployed: what goes up is the four files
+below, exactly as they are.
 
 **Automate capture. Never automate judgment.**
 
