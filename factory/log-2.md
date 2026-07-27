@@ -240,3 +240,83 @@ wrong). Details in `progress-2.md`.
 
 One test-hygiene fix on the way past: 42b had two `chk`s with the identical
 condition, counting one assertion twice. Merged.
+
+## [2026-07-27 12:1x] A3 | STOP ends the day, and opens nothing
+
+A `#stopBtn` in the posture row. First tap arms, second ends the day: the open
+block closes at that instant, any open SIT closes at the same instant, and
+nothing opens. No new server op — `closeActual` and `closeSit` already worked
+standalone, so `Code.gs` is untouched by this task.
+
+**Tests: 43 through 43l. 553 → 616 assertions.** Four timezones green, twice in
+a row. Lint clear, headless ok. `appsscript.json` and
+`test/fixtures/rollup-golden.json` both byte-identical to `a256bdf`.
+
+**CHECKER — and this one earned its keep.** It found two real bugs, and proved
+three of my tests could not fail. Everything below came from it.
+
+**Bug 1: an armed STOP could get stuck armed, forever, covering the row.**
+`tapCategory` disarms STOP, and the re-tap-the-lit-block branch returns
+*without* rendering — while disarming had already cancelled the timer whose
+repaint would have fixed it. Because the armed state takes the whole posture
+row, the result was a black bar reading TAP AGAIN TO STOP sitting on top of the
+posture toggle and the sit clock, permanently, doing nothing when tapped. The
+checker confirmed it in real Chromium at both viewports, with
+`document.elementFromPoint` returning `stopBtn` over the posture button's
+centre. `disarmStop()` now reports whether it disarmed anything, and the caller
+repaints. Test 43l.
+
+**Bug 2: a server answer older than the STOP undid it.** The risk HANDOFF-2.md
+predicted for this task, and it was real. `getState` takes no server lock,
+`applyOps` does, so the two round trips can finish in either order. A `getState`
+computed *before* the STOP and delivered *after* it repopulated `S.open` with
+the block the user had just ended, and the next tap then closed it at the wrong
+time — losing the end time the user chose. `adoptServerState`'s existing
+queue-length guard cannot catch this: by the time the answer lands, the STOP has
+applied and the queue is empty. Fixed with a `localGen` counter bumped by every
+`enqueue`; a read carries the generation it was issued under and is dropped if
+anything was written since. Test 43k.
+
+**Two things that made bug 2 hard to see, both fixed in the harness.**
+
+1. The shim computed a call's answer at *delivery* time, so a slow call was
+   merely late, never stale. Real Apps Script computes when the call arrives and
+   the answer travels back. `setCallLag(name, ms)` now models that — answer
+   computed now, delivered later — which is what makes the race expressible at
+   all. The default 5ms path is unchanged.
+2. `reboot()` dropped the old instance's tick interval but not its
+   `visibilitychange` handler, so every reboot left another client listening.
+   `fireVisible()` woke all of them, each holding its own `S` and all rendering
+   into one shared DOM. A zombie instance was undoing what the live one had just
+   done — and it looked exactly like a product bug. I chased it as one before
+   finding the second `getState`. `VIS` is now cleared on reboot, beside the
+   line that already did this for timers.
+
+**Three tests that could not fail, all found by the checker, all now proved.**
+
+- 43d's "nothing was queued" read the *calendar*, not the queue. It passed
+  against a build the checker mutated to enqueue a spurious op on every arm.
+- 43g's "no mark on the closed block" asserted `A()[0].t === 'DW:'`, which is
+  equally true of a block that never closed. Closed-ness is now asserted first.
+- 43e never checked the queue at all.
+
+Its mutation testing also showed that making `armStop` act on the **first** tap
+reddened only 3 of 40 assertions. Single-tap-writes-nothing assertions added to
+43b, 43c, 43f and 43g, so the arm/confirm half is now pinned as hard as the
+close half.
+
+**Both new regression tests were then proved non-vacuous the same way:**
+reverting the repaint fix turns 4 assertions red; reverting the stale-read guard
+turns 2 red. Restored, 616 / 0 both times.
+
+Also from the checker, and taken: the armed `aria-label` never changed, so a
+screen reader announced "end the day" in both states and the whole arm/confirm
+distinction was inaudible — it now tracks the visible text. `#stopBtn` joined
+the `:focus-visible` rule with the row's other two controls. And STOP stays
+dimmed while armed over an already-ended day, so arming with nothing to end no
+longer looks like it is about to do something.
+
+**Q7 parked:** a STOP whose closes never reach the server still becomes a
+phantom block plus `UNLOGGED` the next morning. Judged honest — the user is told
+in a persistent banner and the write is in the drawer — but it reads against
+contract 16 as literally worded, so it wants a human decision.

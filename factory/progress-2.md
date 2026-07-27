@@ -7,9 +7,9 @@ Round 1's progress record is `factory/progress.md` and is **read-only**.
 
 ## Status
 
-In progress. **2 of 16 tasks complete.** Stage A, task A3 next.
+In progress. **3 of 16 tasks complete.** Stage A, task A4 next.
 
-Suite: **553 passed / 0 failed** (baseline was 492), green in all four
+Suite: **616 passed / 0 failed** (baseline was 492), green in all four
 contracted timezones. Lint all clear. Headless ok, 19 checks per viewport.
 
 ## Tasks
@@ -18,7 +18,7 @@ contracted timezones. Lint all clear. Headless ok, 19 checks per viewport.
 |---|---|---|---|---|
 | A1 | A | **done** | 1 | vacuity check done. Checker found a contract-17 defect, fixed. Criterion 6 parked as Q1 — self-contradictory |
 | A2 | A | **done** | 1 | vacuity check done, separation held. Checker found 2 defects, both fixed |
-| A3 | A | pending | 0 | |
+| A3 | A | **done** | 1 | checker found 2 real bugs (stuck armed STOP, stale-read race) + 3 weak tests, all fixed |
 | A4 | A | pending | 0 | |
 | A5 | A | pending | 0 | |
 | B1 | B | pending | 0 | |
@@ -167,6 +167,25 @@ ignore `?` would break A2 outright — `getState` has to read back what
 **Not fixable inside this design.** It is a consequence of encoding the guess as
 a trailing mark, which contracts 13 and 18 mandate. Flagged so the reviewer sees
 it as a known limit rather than an oversight.
+
+### Q7 (A3) — a STOP whose closes never reach the server still becomes a phantom
+
+If the server rejects every call, STOP's two closes retry, are set aside after
+`MAX_OP_TRIES`, and the block stays `#open` on the calendar. The next morning
+`staleGuard_` bounds it and writes `UNLOGGED` — exactly the phantom this round
+removes — even though the user did close the day.
+
+```
+STOP at 19:00, server rejecting -> set aside
+next morning: "DW: ?" 09:00-14:00 | "UNLOGGED -" 14:00-08:00
+banner: "1 write was set aside after repeated failures"
+```
+
+**Judged honest and left alone.** The user is told, in a banner that persists,
+and the set-aside drawer holds the write. The alternative — the client
+pretending the day ended when the calendar says otherwise — is the dishonesty
+this round exists to remove. Flagged because it reads against contract 16 as
+literally worded, and that deserves a human decision rather than a silent pass.
 
 ### Q6 (A2) — contract 18 has one literal counterexample, and it predates the round
 

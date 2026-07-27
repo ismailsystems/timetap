@@ -312,6 +312,7 @@ global.navigator = { onLine: true };
 
 let ONLINE = true;
 const CALLS = [];
+const CALL_LAG = {};        // call name -> ms; answer computed now, delivered later
 global.google = {
   script: {
     run: (() => {
@@ -322,6 +323,28 @@ global.google = {
         ['applyOps', 'getState', 'addCategory'].forEach(name => {
           b[name] = (...args) => {
             CALLS.push(name);
+            /* The default path answers in 5ms and computes the answer when it
+               answers, which is close enough for everything that does not care
+               about two round trips overlapping.
+
+               A lagged call is different, and the difference is the whole
+               point: the server computes its answer NOW and the network hands
+               it back later. That is what makes an answer stale rather than
+               merely late — it describes the moment the call arrived, not the
+               moment it was delivered. getState takes no server lock and
+               applyOps does (Code.gs), so the two really can overlap this way,
+               and a test cannot express that race unless the shim models it. */
+            const lag = CALL_LAG[name];
+            if (lag !== undefined) {
+              let r, err = null;
+              try { r = global[name](...args); } catch (e) { err = e; }
+              setTimeout(() => {
+                if (!ONLINE) return b._fail && b._fail(new Error('offline'));
+                if (err) return b._fail && b._fail(err);
+                b._ok && b._ok(r);
+              }, lag);
+              return;
+            }
             setTimeout(() => {
               if (!ONLINE) return b._fail && b._fail(new Error('offline'));
               let r;
@@ -357,6 +380,11 @@ const posture = k => {
   if (litPosture() !== k) { $('postureBtn').fire('click'); settle(); }
 };
 const tapSit = () => posture('sit');
+// One tap arms, the second ends the day. Deliberately NOT a helper that does
+// both: every criterion about STOP is about which of the two taps acts.
+const tapStop = () => { $('stopBtn').fire('click'); settle(); };
+const stopArmedNow = () => $('stopBtn')._cls.has('arming');
+const stopLabel = () => $('stopBtn').textContent;
 const noteBox = () => {
   const b = $('grid').children.find(c => c._cls.has('active'));
   return b ? b.querySelector('.gn') : null;
@@ -413,6 +441,13 @@ function reset(atMs) {
 }
 function reboot() {
   timers = timers.filter(t => !t.iv);          // drop the tick interval from the old instance
+  /* And its visibilitychange handler, for the same reason. A real reload
+     replaces the page; this shim keeps one DOM and runs a second copy of the
+     client over it, so without this every reboot left another instance
+     listening. fireVisible() then woke all of them, each holding its own S and
+     each rendering into the shared DOM — a zombie could undo what the live
+     instance had just done, and the failure looked exactly like a product bug. */
+  VIS.length = 0;
   Object.keys(NODES).forEach(k => delete NODES[k]);
   vm.runInThisContext(script(), { filename: 'Index.html' });
   settle();
@@ -420,10 +455,15 @@ function reboot() {
 
 module.exports = { LOGGED, fireVisible: () => VIS.forEach(f => f()), chk, skip, near, reset, reboot, META_ALLOWED, SCRIPT_PROPS, SHEETS, TRIGGERS,
   posture, activeKey, litPosture, noteBox, elapsedBox, addCell,
-  clearPropCache: () => { global.PROPS_ = null; }, tap, tapSit, tapMark, wait, advance, settle, A, S, show, hhmm, $,
+  clearPropCache: () => { global.PROPS_ = null; }, tap, tapSit, tapMark, tapStop, stopArmedNow, stopLabel,
+  wait, advance, settle, A, S, show, hhmm, $,
   CALS, NODES, STORE, desc,
   get pass() { return pass; }, get fail() { return fail; }, get skipped() { return skipped; },
   setOnline: v => { ONLINE = v; },
+  // The call's answer is computed immediately and delivered `ms` later, so a
+  // test can put a genuinely stale read in flight. Pass null to restore the
+  // default 5ms compute-on-delivery behaviour.
+  setCallLag: (name, ms) => { if (ms === null) delete CALL_LAG[name]; else CALL_LAG[name] = ms; },
   // Pass a message to make every server call reject with it; pass null to stop.
   setServerReject: m => { REJECT = (m === null || m === undefined || m === false) ? null : String(m); },
   nowMs: () => NOW,

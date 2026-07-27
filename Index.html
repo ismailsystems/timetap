@@ -101,6 +101,28 @@
   }
   #sitEdit.off { display: none; }
   #sitEdit:active { background: var(--panel3); }
+  /* The only control that closes without opening. It ends the day: the open
+     block stops, any open SIT stops, and nothing starts. */
+  #stopBtn {
+    flex: 0 0 auto; padding: 0 16px; border-radius: 9px;
+    font-size: 14px; font-weight: 700; letter-spacing: .15em;
+    color: var(--dim); background: var(--panel2);
+  }
+  #stopBtn:active { background: var(--panel3); }
+  /* Nothing open means nothing to end. Dimmed, never disabled — a control that
+     vanishes or stops responding teaches you not to trust it, and tapping it
+     with nothing running is harmless. */
+  #stopBtn.inert { opacity: .45; }
+  /* Armed, it takes the whole row the way #strip does. TAP AGAIN TO STOP does
+     not fit a 90px slot, and an armed STOP nobody notices is a day that never
+     gets closed. Two channels, not one: the text changes and so does the shape,
+     so this reads as armed without relying on colour. */
+  #stopBtn.arming {
+    position: absolute; inset: 4px; z-index: 2;
+    padding: 0; opacity: 1;
+    color: var(--bg); background: var(--fg);
+    box-shadow: inset 0 0 0 2px var(--fg);
+  }
 
   /* ── grid ────────────────────────────────────────────────── */
   /* 1fr rows, not auto. Auto rows size to their content, so the lit box grew
@@ -129,7 +151,7 @@
      button, so the pressed state has to work against any hue */
   .gbtn:active, .gbtn.tapped { filter: brightness(.86); transform: scale(.975); }
   .gbtn:focus-visible { outline: 3px solid var(--fg); outline-offset: 3px; }
-  #postureBtn:focus-visible, #sitEdit:focus-visible { outline: 2px solid var(--fg); outline-offset: -2px; }
+  #postureBtn:focus-visible, #sitEdit:focus-visible, #stopBtn:focus-visible { outline: 2px solid var(--fg); outline-offset: -2px; }
   /* The label as written in CONFIG, verbatim. The key still prefixes the
      calendar title and heads the rollup's columns; it is not what you aim at.
      White on a black highlight is 21:1 on every button, so legibility stops
@@ -309,6 +331,7 @@
         <span class="pl" id="postureLabel">NOT SITTING</span>
       </button>
       <button id="sitEdit" class="off" aria-label="adjust when sitting started"><span id="sitEl"></span></button>
+      <button id="stopBtn" aria-label="end the day">STOP</button>
     </div>
 
     <div id="strip" class="hidden">
@@ -396,8 +419,23 @@
   var S = { open: null, sit: null, lastTapMs: 0 };
   var strip = null;          // {ref, key, durMs, hintMs, timer}
   var armed = null;          // {key, timer} — a tap waiting to be confirmed
+  var stopArmed = null;      // {timer} — a STOP waiting to be confirmed
   var CELL = {};             // key -> {box, note, el}, so the lit one is O(1)
   var flushing = false, retryTimer = null, retryDelay = 4000, lastStateMs = 0;
+  /*
+   * Bumped by every local write. getState takes no server lock and applyOps
+   * does, so the two run concurrently and can finish in either order: a
+   * getState computed before a write can arrive after it, describing a moment
+   * that has already passed. The queue-length guard in adoptServerState does
+   * not catch it, because by then the write has applied and the queue is empty.
+   *
+   * STOP is where this stopped being theoretical. Every other control closes a
+   * block by opening another, so a stale answer swapped one open block for
+   * another and the damage was invisible. STOP's whole claim is that nothing is
+   * open, and a stale answer brings the ended day back to life and moves the
+   * end time the user chose.
+   */
+  var localGen = 0;
   var noteTimer = null;
   var split = { atMs: 0, startMs: 0, nowMs: 0 };
   var sitEdit = { lo: 0, hi: 0, atMs: 0 };
@@ -440,6 +478,7 @@
   function enqueue(op) {
     op.id = uid();
     op.ts = Date.now();
+    localGen++;                // any server answer older than this is stale
     noteBlock(op);
     var q = queue();
     q.push(op);
@@ -878,6 +917,11 @@
 
   function tapCategory(key) {
     var now = Date.now();
+    // A STOP left armed while the user carries on working would end the day on
+    // a single later tap, which is not what that tap would look like. The
+    // repaint is not optional: the branch below returns without rendering, and
+    // disarming has already cancelled the timer that would have repainted.
+    if (disarmStop()) render();
     if (S.open && S.open.key === key) {
       // The lit button is the open block, so re-tapping it means "correct
       // this", exactly as re-tapping the lit SITTING half means "correct when
@@ -978,6 +1022,69 @@
       S.sit = { ref: ref, startMs: now };
       enqueue({ type: 'openSit', ref: ref, startMs: now });
     }
+    saveState(); render(); flush();
+  }
+
+  /* ── ending the day ────────────────────────────────────────── */
+
+  /*
+   * Every other control in the app closes a block by opening the next one, so
+   * the app could transition but never end. Left alone overnight, the last
+   * block of the day was extended to midnight by staleGuard_ and an UNLOGGED
+   * event covered the rest — a phantom block, every night, that nobody asked
+   * for. This is the one control that closes without opening.
+   *
+   * It needs no new server op: closeActual and closeSit already work standalone.
+   */
+
+  var STOP_LABEL = 'STOP';
+  var STOP_ARMED = 'TAP AGAIN TO STOP';
+
+  /* Returns true if it actually disarmed something, so a caller that is about
+     to return without rendering knows it owes the button a repaint. Clearing
+     the timer also cancels the repaint that timer would have done. */
+  function disarmStop() {
+    if (!stopArmed) return false;
+    if (stopArmed.timer) clearTimeout(stopArmed.timer);
+    stopArmed = null;
+    return true;
+  }
+
+  /** First press arms, second press ends the day. Mirrors armDead. */
+  function armStop() {
+    if (stopArmed) {
+      disarmStop();
+      endDay();
+      return;
+    }
+    disarm();                 // an armed category and an armed STOP at once is a trap
+    // Repaint when it forgets, or the button keeps offering a confirmation it is
+    // no longer holding — the same reason arm() repaints.
+    stopArmed = { timer: setTimeout(function () { disarmStop(); render(); },
+                                    CFG.confirmTimeoutMs) };
+    render();
+  }
+
+  function endDay() {
+    var now = Date.now();
+
+    // A close is a close: the mark strip appears here exactly as it does on a
+    // transition, and markFor's threshold applies unchanged.
+    if (S.open) {
+      var dur = now - S.open.startMs;
+      var m = markFor(S.open.key, dur);
+      enqueue({ type: 'closeActual', ref: S.open.ref, key: S.open.key, endMs: now,
+                mark: m.mark, text: S.open.text || '' });
+      var pending = m.strip
+        ? { ref: S.open.ref, key: S.open.key, durMs: dur, hintMs: S.open.startMs }
+        : null;
+      S.open = null;
+      if (pending) showStrip(pending); else hideStrip();
+    }
+
+    // Same instant, and closeSit is already a no-op when nothing is open.
+    closeSit(now);
+
     saveState(); render(); flush();
   }
 
@@ -1161,6 +1268,18 @@
     $('sitEdit').classList.toggle('off', !S.sit);
     $('sitEl').textContent = S.sit ? fmtEl(now - S.sit.startMs) : '';
 
+    // The armed label states what the next tap will do, and stops there. The
+    // aria-label tracks it, or a screen reader announces "end the day" in both
+    // states and the whole arm/confirm distinction is inaudible.
+    $('stopBtn').classList.toggle('arming', !!stopArmed);
+    $('stopBtn').textContent = stopArmed ? STOP_ARMED : STOP_LABEL;
+    $('stopBtn').setAttribute('aria-label',
+      stopArmed ? 'tap again to end the day' : 'end the day');
+    // Nothing open and nothing sitting means nothing to end. Still dimmed while
+    // armed, so arming over an already-ended day does not look like it is about
+    // to do something.
+    $('stopBtn').classList.toggle('inert', !S.open && !S.sit);
+
     $('grid').classList.toggle('idle', !S.open);
 
     var kids = $('grid').children;
@@ -1262,7 +1381,11 @@
 
   /* ── boot ──────────────────────────────────────────────────── */
 
-  function adoptServerState(st) {
+  function adoptServerState(st, gen) {
+    // A read that was already in flight when the user wrote something describes
+    // a moment that has passed. The queue-length check below cannot see it: by
+    // the time the answer lands the write has applied and the queue is empty.
+    if (gen !== localGen) return;
     // Anything the user did while the round trip was in flight wins.
     if (!queue().length) {
       S.open = st.open ? { ref: st.open.ref, key: st.open.key, text: st.open.text || '', startMs: st.open.startMs } : null;
@@ -1306,11 +1429,12 @@
   }
 
   function loadServerState() {
+    var gen = localGen;
     google.script.run
       .withSuccessHandler(function (st) {
         lastStateMs = Date.now();
         hideErr();
-        adoptServerState(st);
+        adoptServerState(st, gen);
       })
       .withFailureHandler(function (e) { showErr(String((e && e.message) || e)); })
       .getState();
@@ -1341,6 +1465,7 @@
     hideStrip();
   });
 
+  $('stopBtn').addEventListener('click', armStop);
   $('postureBtn').addEventListener('click', toggleSit);
   $('sitEdit').addEventListener('click', openSitEdit);
 

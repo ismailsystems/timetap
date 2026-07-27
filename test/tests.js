@@ -2205,6 +2205,235 @@ chk('and the text the user typed survives it',
   parseTitle_(A()[0].t).text === 'memo', A()[0].t);
 reset();
 
+/* ── A3: STOP ends the day, and opens nothing ──────────────────────
+ *
+ * The first control in the app that closes without opening, which makes it the
+ * first thing that can leave the app in a state no existing test covers:
+ * nothing open, queue draining, adoptServerState arriving afterwards. */
+
+const tapStop = H.tapStop, stopArmedNow = H.stopArmedNow, stopLabel = H.stopLabel;
+const openEvents = () => A().filter(e => /#open/.test(e.d));
+const openSits = () => S().filter(e => /#open/.test(e.d));
+
+console.log('\n43. STOP closes the block and the SIT, and opens nothing');
+reset(); reboot();
+tapSit(); wait(10); tap('DW'); wait(40); settle();
+const before43 = { a: A().length, s: S().length };
+tapStop();
+chk('one tap only arms it', stopArmedNow(), stopLabel());
+chk('and nothing has been written yet', A().length === before43.a && S().length === before43.s,
+  'A ' + A().length + ' S ' + S().length);
+tapStop(); settle();
+chk('ACTUAL holds exactly one event', A().length === 1, A().map(show).join(' | '));
+chk('SITTING holds exactly one event', S().length === 1, S().map(show).join(' | '));
+chk('neither calendar gained an event',
+  A().length === before43.a && S().length === before43.s,
+  'A ' + A().length + '/' + before43.a + ' S ' + S().length + '/' + before43.s);
+chk('nothing is left open on ACTUAL', openEvents().length === 0, A().map(show).join(' | '));
+chk('nothing is left open on SITTING', openSits().length === 0, S().map(show).join(' | '));
+chk('both close at the same instant', A()[0].e === S()[0].e,
+  show(A()[0]) + ' / ' + show(S()[0]));
+chk('and the grid shows the idle state', activeKey() === null && $('grid')._cls.has('idle'),
+  String(activeKey()));
+
+console.log('\n43b. a running block and no SIT leaves SITTING untouched');
+reset(); reboot();
+tap('DW'); wait(30); settle();
+tapStop();
+chk('one tap leaves the block open', openEvents().length === 1, A().map(show).join(' | '));
+tapStop(); settle();
+chk('the block closed', A().length === 1 && openEvents().length === 0, A().map(show).join(' | '));
+chk('the SITTING calendar is untouched', S().length === 0, S().map(show).join(' | '));
+
+console.log('\n43c. an open SIT and no block leaves ACTUAL untouched');
+reset(); reboot();
+tapSit(); wait(30); settle();
+tapStop();
+chk('one tap leaves the SIT open', openSits().length === 1, S().map(show).join(' | '));
+tapStop(); settle();
+chk('the SIT closed', S().length === 1 && openSits().length === 0, S().map(show).join(' | '));
+chk('the ACTUAL calendar is untouched', A().length === 0, A().map(show).join(' | '));
+chk('and the posture button says so', litPosture() === 'stand', String(litPosture()));
+
+console.log('\n43d. an armed STOP that is never confirmed does nothing');
+reset(); reboot();
+tap('DW'); wait(30); settle();
+tapStop();
+chk('armed', stopArmedNow(), stopLabel());
+advance(CONFIRM_TIMEOUT_MS + 100); settle();
+chk('it forgets', !stopArmedNow(), stopLabel());
+chk('and returns to its resting label', stopLabel() === 'STOP', stopLabel());
+chk('the block is still open', openEvents().length === 1, A().map(show).join(' | '));
+/* Reads the queue, not the calendar. A calendar assertion is true of a build
+ * that queued a spurious op and had not flushed it yet. */
+chk('and the queue is empty', JSON.parse(H.STORE['tt.queue.v1'] || '[]').length === 0,
+  H.STORE['tt.queue.v1'] || '[]');
+
+console.log('\n43e. with nothing to end, STOP writes nothing and complains about nothing');
+reset(); reboot();
+chk('it is visibly inert to begin with', $('stopBtn')._cls.has('inert'));
+tapStop();
+chk('arming it writes nothing', JSON.parse(H.STORE['tt.queue.v1'] || '[]').length === 0,
+  H.STORE['tt.queue.v1'] || '[]');
+tapStop(); settle();
+chk('and confirming it queues no op',
+  JSON.parse(H.STORE['tt.queue.v1'] || '[]').length === 0, H.STORE['tt.queue.v1'] || '[]');
+chk('no event on ACTUAL', A().length === 0, A().map(show).join(' | '));
+chk('no event on SITTING', S().length === 0, S().map(show).join(' | '));
+chk('and no error banner', $('err').hidden !== false || $('err')._cls.has('hidden'),
+  String($('err').textContent));
+
+console.log('\n43f. ending a long enough block shows the mark strip, as a transition does');
+reset(); reboot();
+tap('DW'); wait(40); settle();
+tapStop();
+chk('one tap shows no strip and closes nothing',
+  $('strip').hidden && openEvents().length === 1, A().map(show).join(' | '));
+tapStop(); settle();
+chk('the strip is visible', !$('strip').hidden);
+chk('and names the block and its duration',
+  $('stripHead').textContent === 'DW closed · 40m', $('stripHead').textContent);
+tapMark('+');
+chk('and the mark it offers still lands', A()[0].t === 'DW: +', A()[0].t);
+
+console.log('\n43g. ending a short block shows no strip and applies no mark');
+reset(); reboot();
+tap('DW'); wait(5); settle();
+tapStop();
+chk('one tap writes nothing', openEvents().length === 1, A().map(show).join(' | '));
+tapStop(); settle();
+chk('no strip', $('strip').hidden);
+/* The closed-ness is asserted first. "DW:" is equally true of a block that is
+ * still running, so on its own the mark assertion below proves nothing. */
+chk('the block actually closed', A().length === 1 && openEvents().length === 0,
+  A().map(show).join(' | '));
+chk('and carries no mark', A()[0].t === 'DW:', A()[0].t);
+
+console.log('\n43h. a day closed by STOP is still closed after a reload');
+reset(); reboot();
+tapSit(); wait(5); tap('DW'); wait(45); settle();
+tapStop(); tapStop(); settle(); settle();
+reboot();
+chk('nothing renders as running', activeKey() === null, String(activeKey()));
+chk('getState finds no open block on ACTUAL', openEvents().length === 0, A().map(show).join(' | '));
+chk('nor on SITTING', openSits().length === 0, S().map(show).join(' | '));
+/* The night this round exists to fix: nothing is left for staleGuard_ to bound,
+ * so no phantom block and no UNLOGGED appear the next morning. */
+H.setNow(H.nowMs() + 14 * 3600000);
+reboot();
+chk('and the next morning writes no phantom block and no UNLOGGED',
+  A().length === 1 && !A().some(e => /UNLOGGED/.test(e.t)), A().map(show).join(' | '));
+chk('the block still carries the mark its close applied',
+  parseTitle_(A()[0].t).mark === '=', A()[0].t);
+
+console.log('\n43i. STOP is a write like any other and does not bypass the queue');
+reset(); reboot();
+tapSit(); wait(5); tap('DW'); wait(30); settle();
+H.setServerReject('nope');
+tapStop(); tapStop(); settle();
+chk('the UI shows nothing running immediately', activeKey() === null, String(activeKey()));
+chk('and no SIT either', litPosture() === 'stand', String(litPosture()));
+const q43 = JSON.parse(H.STORE['tt.queue.v1'] || '[]');
+chk('both closes are sitting in the queue', q43.length >= 2, JSON.stringify(q43.map(o => o.type)));
+chk('one of them closes the block', q43.some(o => o.type === 'closeActual'),
+  JSON.stringify(q43.map(o => o.type)));
+chk('one of them closes the sit', q43.some(o => o.type === 'closeSit'),
+  JSON.stringify(q43.map(o => o.type)));
+/* Guarded on a non-empty queue: "nothing opens" is true of an empty queue too,
+ * and that is not what this is asserting. */
+chk('and neither of them opens anything',
+  q43.length > 0 && !q43.some(o => o.type === 'openActual' || o.type === 'openSit'),
+  JSON.stringify(q43.map(o => o.type)));
+H.setServerReject(null);
+
+console.log('\n43j. confirming twice in quick succession queues exactly one close');
+reset(); reboot();
+tap('DW'); wait(30); settle();
+H.setServerReject('nope');
+tapStop(); tapStop();                       // armed, then confirmed
+tapStop(); tapStop();                       // armed, then confirmed again
+settle();
+const q43j = JSON.parse(H.STORE['tt.queue.v1'] || '[]');
+chk('exactly one close is queued',
+  q43j.filter(o => o.type === 'closeActual').length === 1,
+  JSON.stringify(q43j.map(o => o.type)));
+H.setServerReject(null);
+reset();
+
+console.log('\n43k. an armed STOP that gets disarmed stops looking armed');
+/* Found by the checker. tapCategory disarms STOP, and the re-tap-the-lit-block
+ * branch returns without rendering — and disarming has already cancelled the
+ * timer whose repaint would have fixed it. The button was left reading
+ * TAP AGAIN TO STOP forever, and because the armed state takes the whole
+ * posture row, it sat on top of the posture toggle and the sit clock: a black
+ * bar promising to end the day, that did nothing when tapped. */
+reset(); reboot();
+tap('DW'); advance(10000); settle();
+tapStop();
+chk('armed', stopArmedNow(), stopLabel());
+tap('DW');                                   // re-tap the lit block
+chk('re-tapping the lit block disarms it', !stopArmedNow(), stopLabel());
+chk('and it says STOP again', stopLabel() === 'STOP', stopLabel());
+advance(60000); settle();
+chk('and it is still saying STOP a minute later', stopLabel() === 'STOP', stopLabel());
+chk('the block was never closed by any of that',
+  openEvents().length === 1, A().map(show).join(' | '));
+
+/* The other branch of the same return: past the mis-tap window, re-tapping the
+ * lit block opens SPLIT rather than falling through. */
+reset(); reboot();
+tap('DW'); wait(5); settle();
+tapStop();
+chk('armed again', stopArmedNow(), stopLabel());
+tap('DW');
+chk('opening SPLIT also disarms it', !stopArmedNow(), stopLabel());
+chk('and SPLIT did open', splitOpen());
+
+/* Tapping a different category disarms it too. */
+reset(); reboot();
+tap('DW'); wait(5); settle();
+tapStop();
+tap('MTG'); settle();
+chk('switching category disarms it', !stopArmedNow(), stopLabel());
+
+console.log('\n43l. a server answer older than the STOP does not undo it');
+/* Also found by the checker, and the risk HANDOFF-2.md names for this task.
+ * getState takes no server lock and applyOps does, so the two round trips can
+ * finish in either order. A getState computed before the STOP, arriving after
+ * it, used to repopulate S.open with the block the user had just ended — and
+ * the next tap then closed it at the wrong time, losing the end the user chose.
+ * The queue-length guard could not catch it: by the time the answer lands, the
+ * STOP has applied and the queue is empty. */
+reset(); reboot();
+tapSit(); wait(5); tap('DW'); wait(40); settle(); settle();
+chk('the day is running before any of this', openEvents().length === 1 && openSits().length === 1,
+  A().map(show).join(' | '));
+
+// Make the read slow, then start one, so it is in flight when STOP lands.
+H.setCallLag('getState', 400);
+H.setNow(H.nowMs() + 11 * 60000);            // makes refreshOnReturn count it overdue
+H.fireVisible();
+// STOP now, and let its own round trip finish first.
+$('stopBtn').fire('click'); $('stopBtn').fire('click');
+advance(60); settle();
+const endedAt = A()[0] && A()[0].e;
+chk('the day ended', activeKey() === null && openEvents().length === 0,
+  A().map(show).join(' | '));
+chk('and the queue drained, so the old guard would not fire',
+  JSON.parse(H.STORE['tt.queue.v1'] || '[]').length === 0, H.STORE['tt.queue.v1'] || '[]');
+
+advance(500); settle();                      // the stale read finally lands
+chk('the stale answer does not bring the block back', activeKey() === null,
+  String(activeKey()));
+chk('nor the SIT', litPosture() === 'stand', String(litPosture()));
+chk('nothing reopened on either calendar',
+  openEvents().length === 0 && openSits().length === 0,
+  A().map(show).join(' | ') + ' // ' + S().map(show).join(' | '));
+chk('and the end time the user chose is untouched', A()[0].e === endedAt,
+  show(A()[0]));
+H.setCallLag('getState', null);
+reset();
+
 console.log('\n────────────────────────────────────────');
 console.log(H.pass + ' passed, ' + H.fail + ' failed' +
             (H.skipped.length ? ', ' + H.skipped.length + ' skipped' : ''));
