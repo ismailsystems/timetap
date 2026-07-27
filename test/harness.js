@@ -200,6 +200,7 @@ class El {
   }
   setAttribute(k, v) { this._attrs = this._attrs || {}; this._attrs[k] = String(v); }
   getAttribute(k) { return (this._attrs || {})[k] ?? null; }
+  removeAttribute(k) { if (this._attrs) delete this._attrs[k]; }
   focus() { global.document.activeElement = this; }
   blur() { if (global.document.activeElement === this) global.document.activeElement = null; }
   addEventListener(t, fn) { (this._h[t] = this._h[t] || []).push(fn); }
@@ -221,7 +222,8 @@ class El {
 }
 const NODES = {};
 const INIT_CLS = { strip:'hidden', err:'hidden', week:'hidden', sheetSplit:'hidden',
-                   sheetSit:'hidden', sitAdj:'hidden', nowbar:'idle', sync:'s-synced' };
+                   sheetSit:'hidden', sheetDead:'hidden', sitAdj:'hidden',
+                   nowbar:'idle', sync:'s-synced' };
 function mkNode(id) {
   const e = new El('div');
   if (INIT_CLS[id]) e.className = INIT_CLS[id];

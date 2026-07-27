@@ -239,6 +239,21 @@
     padding: 9px 12px; border-radius: 8px;
     user-select: text; -webkit-user-select: text;
   }
+  #err.tappable { cursor: pointer; }
+  #err.tappable::after { content: ' ›'; font-weight: 700; }
+
+  /* ── set-aside writes ────────────────────────────────────── */
+  .deadrow { background: var(--panel); border-radius: 10px; padding: 13px; }
+  .deadrow .dwhen {
+    font-size: 11px; font-weight: 700; letter-spacing: .17em; color: var(--dim);
+    font-variant-numeric: tabular-nums;
+  }
+  .deadrow .dwhat { font-size: 15px; margin-top: 7px; }
+  .deadrow .dwhy {
+    font-size: 12px; color: #ffb4ad; margin-top: 7px;
+    word-break: break-word; user-select: text; -webkit-user-select: text;
+  }
+  #deadList { display: flex; flex-direction: column; gap: 9px; }
 
   /* ── overlays ────────────────────────────────────────────── */
   .view {
@@ -305,6 +320,17 @@
   </div>
 
   <div id="err" class="hidden"></div>
+</div>
+
+<!-- ── set-aside writes ─────────────────────────────────────────── -->
+<div id="sheetDead" class="view hidden">
+  <div class="vhead">
+    <div class="vtitle">SET ASIDE</div>
+    <button id="dgClose" class="fbtn">DONE</button>
+  </div>
+  <div class="sheetbody">
+    <div id="deadList"></div>
+  </div>
 </div>
 
 <!-- ── split ────────────────────────────────────────────────────── -->
@@ -636,8 +662,77 @@
     }, retryDelay);
   }
 
-  function showErr(msg) { var e = $('err'); e.textContent = msg; e.classList.remove('hidden'); }
-  function hideErr() { $('err').classList.add('hidden'); }
+  function showErr(msg) {
+    var e = $('err'); e.textContent = msg; e.classList.remove('hidden');
+    paintErr();
+  }
+
+  /**
+   * Clearing a transient error must not clear a standing fact. A write that was
+   * set aside stays set aside until someone deals with it by hand, so the banner
+   * falls back to saying so instead of going quiet. Before this, a successful
+   * state load erased the boot-time notice on its way in, which left it visible
+   * only when the load had ALSO failed — visible exactly when it was no use.
+   */
+  function hideErr() {
+    if (deadCount()) { showErr(deadMsg()); return; }
+    $('err').classList.add('hidden');
+    paintErr();
+  }
+
+  function deadMsg() {
+    var n = deadCount();
+    return n + (n === 1 ? ' write was' : ' writes were') + ' set aside after repeated failures';
+  }
+
+  /** The banner is a door only when there is something behind it. */
+  function paintErr() {
+    var e = $('err');
+    if (deadCount()) {
+      e.classList.add('tappable');
+      e.setAttribute('role', 'button');
+      e.setAttribute('tabindex', '0');
+      e.setAttribute('aria-label', 'show the writes that were set aside');
+    } else {
+      e.classList.remove('tappable');
+      e.removeAttribute('role');
+      e.removeAttribute('tabindex');
+      e.removeAttribute('aria-label');
+    }
+  }
+
+  function openDead() {
+    if (!deadCount()) return;
+    renderDead();
+    $('sheetDead').classList.remove('hidden');
+  }
+
+  function closeDead() { $('sheetDead').classList.add('hidden'); }
+
+  /** One row per set-aside write, newest first. */
+  function renderDead() {
+    var host = $('deadList');
+    host.innerHTML = '';
+    deadRows().forEach(function (r) {
+      var row = document.createElement('div');
+      row.className = 'deadrow';
+
+      var when = document.createElement('div');
+      when.className = 'dwhen';
+      when.textContent = r.when + ' · ' + r.key;
+
+      var what = document.createElement('div');
+      what.className = 'dwhat';
+      what.textContent = 'tried to ' + r.what + ', block started ' + r.started;
+
+      var why = document.createElement('div');
+      why.className = 'dwhy';
+      why.textContent = r.why;
+
+      row.appendChild(when); row.appendChild(what); row.appendChild(why);
+      host.appendChild(row);
+    });
+  }
 
   /* ── logging ───────────────────────────────────────────────── */
 
@@ -1069,10 +1164,7 @@
     }
     buildGrid();
     render();
-    if (deadCount()) {
-      showErr(deadCount() + ' write' + (deadCount() > 1 ? 's' : '') +
-              ' were set aside after repeated failures');
-    }
+    if (deadCount()) showErr(deadMsg());
 
     if (!hasRun) { showErr('google.script.run unavailable'); return; }
 
@@ -1133,6 +1225,12 @@
 
   $('postureBtn').addEventListener('click', toggleSit);
   $('sitEdit').addEventListener('click', openSitEdit);
+
+  $('err').addEventListener('click', function () { openDead(); });
+  $('err').addEventListener('keydown', function (e) {
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openDead(); }
+  });
+  $('dgClose').addEventListener('click', closeDead);
 
   $('spClose').addEventListener('click', function () { $('sheetSplit').classList.add('hidden'); });
   $('spRange').addEventListener('input', renderSplit);

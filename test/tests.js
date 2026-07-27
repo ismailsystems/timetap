@@ -1191,6 +1191,125 @@ chk('the legacy entry was left alone, not rewritten',
   DEAD().length === 1 && DEAD()[0].key === undefined, JSON.stringify(DEAD()));
 reset();
 
+/* ── B2: the banner is a door ─────────────────────────────────────── */
+
+const uiRows = () => (H.NODES['deadList'] ? H.NODES['deadList'].children : []);
+// `el` (declared above) goes through document; `$` hands back only nodes the
+// client has already touched, and a drawer that was never opened has none —
+// which is exactly the case worth asserting about.
+const rowText = r => r.children.map(c => c.textContent).join(' | ');
+// Two writes the server will never accept, plus the block index that a real
+// session would have left behind for them.
+function seedTwoDead() {
+  reset();
+  H.STORE['tt.queue.v1'] = JSON.stringify([
+    { id: 'd1', type: 'openActual', ref: 'refaaaa1', key: 'DW', startMs: D(2026, 7, 20, 9, 0) },
+    { id: 'd2', type: 'setMark', ref: 'refbbbb2', mark: '+', hintMs: D(2026, 7, 20, 10, 0) }
+  ]);
+  H.STORE['tt.blocks.v1'] = JSON.stringify({
+    refaaaa1: { key: 'DW', startMs: D(2026, 7, 20, 9, 0) },
+    refbbbb2: { key: 'MTG', startMs: D(2026, 7, 20, 10, 0) }
+  });
+  H.setServerReject('the calendar refused');
+  reboot();
+  pump(() => Q().length === 0, 2000, 61000);
+  H.setServerReject(null);
+  reboot();                                  // a fresh, healthy load
+}
+
+console.log('\n36. the banner survives a healthy load and opens a drawer');
+seedTwoDead();
+chk('both writes were set aside', DEAD().length === 2, JSON.stringify(DEAD().map(d => d.op.type)));
+chk('the banner is visible after a load that succeeded', !$('err').hidden, $('err').textContent);
+chk('and it counts them in a sentence that parses',
+  $('err').textContent === '2 writes were set aside after repeated failures',
+  $('err').textContent);
+chk('it announces itself as a door',
+  $('err').getAttribute('role') === 'button' && $('err').getAttribute('tabindex') === '0',
+  $('err').getAttribute('role') + '/' + $('err').getAttribute('tabindex'));
+$('err').click(); settle();
+chk('tapping it opens the drawer', !$('sheetDead').hidden);
+chk('holding exactly two rows', uiRows().length === 2, String(uiRows().length));
+chk('newest first', /save the mark/.test(rowText(uiRows()[0])), rowText(uiRows()[0]));
+chk('oldest last', /start a block/.test(rowText(uiRows()[1])), rowText(uiRows()[1]));
+
+console.log('\n36b. every row says when, which, what and why');
+const r36 = rowText(uiRows()[0]);
+chk('a clock time', /\d{1,2}:\d\d (AM|PM)/.test(r36), r36);
+chk('the category the mark belonged to', /MTG/.test(r36), r36);
+chk('what it was trying to do, in words', /tried to save the mark/.test(r36), r36);
+chk('never the op type', !/setMark|closeActual|openActual/.test(r36), r36);
+chk('and why it failed', /the calendar refused/.test(r36), r36);
+chk('the other row names its own category', /DW/.test(rowText(uiRows()[1])), rowText(uiRows()[1]));
+
+console.log('\n36c. closing the drawer gives the grid back');
+$('dgClose').click(); settle();
+chk('the drawer is closed', $('sheetDead').hidden);
+chk('the banner is still there, because the writes still are', !$('err').hidden, $('err').textContent);
+tap('DW');
+chk('and a category tap still opens a block', activeKey() === 'DW', String(activeKey()));
+chk('which reached the calendar', A().length === 1, A().map(show).join(' | '));
+reset();
+
+console.log('\n36d. no set-aside writes, no door');
+reset(); reboot();
+chk('the banner is hidden', $('err').hidden);
+chk('it is not focusable', $('err').getAttribute('tabindex') === null,
+  String($('err').getAttribute('tabindex')));
+$('err').click(); settle();
+chk('and tapping where it would be does nothing', el('sheetDead').hidden);
+reset();
+
+console.log('\n36e. a write type the drawer has no words for still renders');
+reset();
+H.STORE['tt.dead.v1'] = JSON.stringify([
+  { at: D(2026, 7, 20, 11, 0), why: 'server said no', key: 'DW',
+    startMs: D(2026, 7, 20, 10, 30), op: { type: 'frobnicate', ref: 'refcccc3' } }
+]);
+let b2Threw = null;
+try { reboot(); $('err').click(); settle(); } catch (e) { b2Threw = String(e && e.message || e); }
+chk('nothing throws', b2Threw === null, String(b2Threw));
+chk('the row is there', uiRows().length === 1, String(uiRows().length));
+chk('showing the raw type rather than a blank row',
+  /frobnicate/.test(rowText(uiRows()[0])), rowText(uiRows()[0]));
+chk('and it still says why', /server said no/.test(rowText(uiRows()[0])), rowText(uiRows()[0]));
+reset();
+
+console.log('\n36f. an entry from an older version renders its gaps as unknown (B1 criterion 5)');
+reset();
+H.STORE['tt.dead.v1'] = JSON.stringify([
+  { at: D(2026, 7, 20, 9, 15), why: 'whatever went wrong', op: { type: 'setMark', ref: 'oldref00' } }
+]);
+let b2Legacy = null;
+try { reboot(); $('err').click(); settle(); } catch (e) { b2Legacy = String(e && e.message || e); }
+chk('nothing throws on the legacy shape', b2Legacy === null, String(b2Legacy));
+chk('the row renders', uiRows().length === 1, String(uiRows().length));
+const r36f = uiRows().length ? rowText(uiRows()[0]) : '';
+chk('the missing category reads as unknown', /unknown category/.test(r36f), r36f);
+chk('the missing start reads as unknown', /unknown start/.test(r36f), r36f);
+chk('what it was doing is still known', /save the mark/.test(r36f), r36f);
+chk('and no cell is simply blank', !/\|\s*\|/.test(r36f), r36f);
+reset();
+
+console.log('\n36h. one write reads as one write');
+reset();
+H.STORE['tt.dead.v1'] = JSON.stringify([
+  { at: D(2026, 7, 20, 11, 0), why: 'server said no', key: 'DW',
+    startMs: D(2026, 7, 20, 10, 30), op: { type: 'setMark', ref: 'refdddd4' } }
+]);
+reboot();
+chk('the count agrees with its verb',
+  $('err').textContent === '1 write was set aside after repeated failures',
+  $('err').textContent);
+reset();
+
+console.log('\n36g. the drawer\'s markup is declared, not invented');
+reset();
+chk('the sheet exists in the markup', !!el('sheetDead'));
+chk('its close button exists', !!el('dgClose'));
+chk('its list exists', !!el('deadList'));
+reset();
+
 console.log('\n────────────────────────────────────────');
 console.log(H.pass + ' passed, ' + H.fail + ' failed');
 process.exit(H.fail ? 1 : 0);
