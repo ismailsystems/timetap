@@ -41,14 +41,16 @@ all clear; `node test/headless.js` green at both viewports. 13 commits on `facto
 nothing pushed, `main` untouched.
 
 **Two things need your decision. Neither is a blocked task.**
+*(Both ruled 2026-07-27 — amendments A1 and A2. Kept as asked; neither is open.)*
 
-1. **D2's sixth criterion is unmet, deliberately** (F4). "Inject the meta tags after render and
+1. **D2's sixth criterion is unmet, deliberately** (F4). **→ Ruled: retired, amendment A1.** "Inject the meta tags after render and
    watch the viewport checks fail" cannot be demonstrated: Blink re-lays-out when a viewport meta
    is appended, and — more importantly — *no check in `smoke.js` is viewport-sensitive at all*.
    With no meta tags whatsoever the page lays out at 980px and all 17 checks still pass. I built a
    control that proves the injection point matters by layout width (390 vs 980) and left the
    criterion unsatisfied rather than redefining it to match what I had built.
-2. **Contract item 6 is wrong about the baseline** (F5). It says one OAuth scope; there have always
+2. **Contract item 6 is wrong about the baseline** (F5). **→ Ruled: the sentence is corrected to
+   three, the manifest is not touched, amendment A2.** It said one OAuth scope; there have always
    been three, and all three are load-bearing. `appsscript.json` is byte-identical to `main`.
 
 **Per-task status:** all 13 `done`. Findings F1, F2, F3 found and fixed; F4 and F5 reported, not
@@ -100,19 +102,37 @@ A task is `done` only after the CHECKER step has independently re-verified it.
 <!-- Anything the handoff does not answer. Write the question and what you did
      instead (park the task, or proceed on a stated assumption). -->
 
-**D2, criterion 6 (see F4 below).** No check in `smoke.js` is viewport-sensitive, and Blink
-re-lays-out when a viewport meta is appended, so "inject the tags after render and watch the
-viewport checks fail" cannot be demonstrated. I built the control that proves the injection
-point matters by a layout fact instead (390px with the tags, 980px without), and left the
-criterion as written unmet rather than redefining it. **Your call: accept the layout-fact
-control, or add a genuinely viewport-sensitive check to `smoke.js` (which changes the file
-the phone paste uses)?**
+**Nothing is open. One question was parked here and it has been answered.**
+
+**D2, criterion 6 (see F4 below) — RULED 2026-07-27, HANDOFF amendment A1.**
+
+*The ruling:* the layout-fact control is accepted. D2's sixth criterion is **retired, not
+met and not weakened**, and `smoke.js` is left alone — adding a viewport-sensitive check
+to it would change the file the phone paste uses, to satisfy a criterion whose factual
+premise turned out to be false. The control that replaces it proves the same thing by a
+fact read from the live DOM: 390px with the meta tags, 980px without. Amendment A1 in
+`factory/HANDOFF.md` carries the full reasoning and the evidence.
+
+*The question as it was asked, kept so the record still shows what was put to the human:*
+
+> No check in `smoke.js` is viewport-sensitive, and Blink re-lays-out when a viewport meta
+> is appended, so "inject the tags after render and watch the viewport checks fail" cannot
+> be demonstrated. I built the control that proves the injection point matters by a layout
+> fact instead (390px with the tags, 980px without), and left the criterion as written
+> unmet rather than redefining it. **Your call: accept the layout-fact control, or add a
+> genuinely viewport-sensitive check to `smoke.js` (which changes the file the phone paste
+> uses)?**
 
 ## Bugs found while building
 
 <!-- Standing rule: a bug gets a criterion here FIRST, then the fix. -->
 
-### F5 — contract item 6 was already false before this round started (found at final sign-off)
+### F5 — RULED 2026-07-27 (amendment A2) — contract item 6 was already false before this round started (found at final sign-off)
+
+**Closed.** Contract item 6 now says three scopes; the manifest was never touched and is
+still byte-identical to `main`. `README.md` was corrected, `factory/BRIEF.md:71` and
+`factory/PLAN.md:33` were corrected in fix pass 2 (F2-3), and a lint rule now compares
+every `.md` in the repo against `appsscript.json`. The finding as it was reported follows.
 
 The Contract says "`appsscript.json` still asks for exactly one OAuth scope". It asks for
 three, and it asked for three at the branch point: `calendar`, `spreadsheets` and
@@ -127,7 +147,12 @@ Reported rather than actioned. The Contract sentence is wrong about the baseline
 code. `README.md` and the handoff's own orientation table both describe the manifest as
 "one OAuth scope", so the same stale claim appears in more than one place.
 
-### F3 — `smoke.js` counts a check that cannot fail (found during D2)
+### F3 — FIXED during D2 — `smoke.js` counts a check that cannot fail (found during D2)
+
+**Closed.** `smoke.js` returns `{ pass, fail, failed, skipped }`, the ring checks report as
+skipped rather than passed, and `test/headless.js` fails the run unless
+`pass + fail + skipped` equals the number of `ok(` call sites in the file. Both criteria
+below pass. The finding as it was reported follows.
 
 `test/smoke.js:78` reads `ok('no block running, ring not checked', true, ...)`. It is
 literally `true`, so it is a pass no matter what the page does, and it is counted in
@@ -141,7 +166,12 @@ one.
 - [tier 3] Given the runner, then `pass + fail + skipped` equals the number of `ok(` call
   sites in the file — so a check added to `smoke.js` can never silently go unrun.
 
-### F4 — no check in `smoke.js` is viewport-sensitive, so D2's last criterion cannot be met as written (found during D2)
+### F4 — RULED 2026-07-27 (amendment A1) — no check in `smoke.js` is viewport-sensitive, so D2's last criterion cannot be met as written (found during D2)
+
+**Closed.** The layout-fact control was accepted and D2's sixth criterion is retired — not
+met, not weakened. `smoke.js` is unchanged. The finding as it was reported follows,
+including the question that was put to the human, which is answered above under "Parked
+questions" and in full in amendment A1.
 
 D2's sixth criterion asks that injecting the meta tags *after* render make the
 viewport-dependent checks in `smoke.js` fail. Measured on Playwright 1.62.0 / chromium-1234:
@@ -161,7 +191,8 @@ class; in a headless engine, where `dvh` and `vh` are equal, it structurally can
 
 The injection point *does* matter — 390 vs 980 proves it. `smoke.js` just cannot see it.
 
-**PARKED for the human.** Question: should the control prove the injection point matters
+**PARKED for the human — since answered; see the heading above.** Question: should the
+control prove the injection point matters
 by a layout fact read from the live DOM (`documentElement.clientWidth` 390 with the metas
 vs 980 without), which is what the criterion is *for*? Or should `smoke.js` gain a genuinely
 viewport-sensitive check, which changes the file the phone paste uses? I have implemented
