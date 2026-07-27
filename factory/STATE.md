@@ -134,9 +134,12 @@ notes: |
   That is why next_action is another review rather than the video.
 
   Plan explained to user 2026-07-26 (GUIDE.md Part 1, post-office scene).
-  Build explained 2026-07-27 (GUIDE.md Part 2, same scene). Part 2 predates this fix
-  pass — it describes the double-tap bug as open. Worth a short Part 3, or an edit to
-  Part 2, once the fix has been independently reviewed.
+  Build explained 2026-07-27 (GUIDE.md Part 2, same scene).
+  Fixes explained 2026-07-27 (GUIDE.md Part 3, same scene) — arm/confirm and why
+  "remove one card" was not enough, the two rulings, and the four rules that
+  claimed more than they checked. Part 2 is kept as the record of what was true
+  then, with five inline markers pointing at Part 3 where it has gone out of date;
+  the strongest is on its proposed fix, which is not the fix that shipped.
 
   Product law still intact: nothing built or fixed this round interprets, scores or
   advises. "TAP AGAIN TO DISCARD" states what the next tap will do and stops.

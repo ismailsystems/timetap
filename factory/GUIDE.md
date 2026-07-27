@@ -295,6 +295,13 @@ crash.
 
 ### The one thing that is broken, in plain words
 
+> **⚠ Fixed since this was written — see Part 3.** This section describes the bug as
+> it stood on 2026-07-27, before the fix pass. It is kept because it is the clearest
+> account of what was wrong, and because the fix only makes sense if you know what it
+> was fixing. The letter-destroying double tap is gone and verified gone. **The fix
+> proposed at the end of this section is not the fix that shipped, and would not have
+> been enough on its own** — Part 3 explains why.
+
 The review found a real bug and it is the reason the build isn't finished.
 
 ```mermaid
@@ -330,6 +337,11 @@ old shopfront checklist, which has nothing about the shelf on it.
 
 The fix is small: when a card is discarded, remove just that one card instead of
 redrawing the list. Then nothing moves under your finger.
+
+> **⚠ That last paragraph is wrong, and finding out why was the useful part.**
+> Removing just the one card *does* stop the list being rebuilt — but the cards below
+> it still slide up into the gap, by exactly the same distance. Nothing about "remove
+> one card" holds the layout still. See Part 3.
 
 ### The inspector's honest limits
 
@@ -370,7 +382,9 @@ plainly why.
 **1. A passing test is not the same as a working feature.** This round produced the
 cleanest possible demonstration: 459 checks, green under four different world
 clocks, three runs in a row — and a feature that throws away your data on a
-double-tap. The test wasn't fake or lazy. It tested the right idea in an
+double-tap. *(459 was the count that day; it is 492 now, and the double-tap is
+fixed — Part 3. The lesson is the point, and the lesson stands.)* The test wasn't
+fake or lazy. It tested the right idea in an
 environment where that idea can't go wrong. Whenever a test runs somewhere simpler
 than reality, ask what reality does that the simpler place can't.
 
@@ -381,6 +395,8 @@ returned quietly would look better and tell you less — the exact bargain this
 codebase's rule ("automate capture, never automate judgment") exists to refuse.
 
 **3. One rollup problem is still open, and it's a judgment call, not a bug hunt.**
+*(You ruled on it on 2026-07-27 — you took the per-tab reading, and added a
+condition the build hadn't thought of. Part 3.)*
 The van rebuilds two tabs, daily then weekly. If the second one fails halfway, the
 daily tab already carries today's date while the weekly tab sits empty. Is that a
 lie? Arguably not — the daily tab genuinely *was* rebuilt today, and its stamp is
@@ -390,6 +406,9 @@ test for *that*, and moved on without asking you — which is the one move it wa
 allowed to make. Not because its answer is wrong; because it's yours to give.
 
 ### What you can now say
+
+*(Sentence 1 was true on 2026-07-27 and is not true any more. Part 3 gives you the
+replacement.)*
 
 1. "The drawer identifies each set-aside write by a fingerprint rather than its
    position, which correctly blocks re-discarding a stale entry — but the list
@@ -403,3 +422,215 @@ allowed to make. Not because its answer is wrong; because it's yours to give.
    width from the live DOM — 390 with them, 980 without — because no check in
    `smoke.js` is viewport-sensitive, which is also the clearest proof that the
    phone paste hasn't been superseded."
+
+---
+
+# Part 3 — What the two fix passes changed, explained
+
+## The shelf learned to ask before it throws anything away
+*2026-07-27 — after two independent reviews and two fix passes*
+
+Same post office. Part 2 ended with one thing broken and two things waiting on
+your decision. All three are closed. Here is what actually happened, and one place
+where the obvious fix turned out to be the wrong one — which is the most useful
+thing in this section.
+
+### The whole thing in one picture
+
+```mermaid
+flowchart TD
+    A["You tap DISCARD<br/>on a card"] --> B["The button changes to<br/>TAP AGAIN TO DISCARD"]
+    B -->|"you tap the same card again"| C["Now it is thrown away"]
+    B -->|"you tap somewhere else"| D["It quietly goes back<br/>to saying DISCARD"]
+    B -->|"you walk away"| D
+    C --> E["Cards below slide up<br/>— and that is fine"]
+    E --> F["The card now under your finger<br/>was never asked"]
+```
+
+The last two boxes are the whole idea. Read them again in a second if the fix
+below feels too simple.
+
+### The fix Part 2 proposed, and why it wasn't enough
+
+Part 2 said: *stop rebuilding the whole list; remove just the one card, and then
+nothing moves under your finger.*
+
+Half right. The list did get rebuilt, and it doesn't any more. But picture the
+shelf physically. Three cards stacked in a column. Take the top one away — by any
+method at all — and the second card **slides up into the space it left**. It does
+not matter whether you rebuilt the stack or lifted one card out of it; the cards
+below move up by exactly the same distance either way. That is just what a stack
+does when you remove something from the middle of it.
+
+So "remove one card" fixed a real inefficiency and fixed **nothing** about the
+danger. The second tap of a fast double tap still lands on a different card's
+button.
+
+This is worth sitting with, because it is the kind of mistake that reads as
+correct. The proposed fix named a *mechanism* (stop redrawing) and assumed it
+delivered a *property* (nothing moves). Nobody checked that the mechanism actually
+delivered the property. A real browser checked it later, and it didn't.
+
+### The fix that shipped: the button asks first
+
+```mermaid
+flowchart LR
+    A["Card arrives on the shelf"] --> B["Its button says DISCARD"]
+    B --> C["First tap: it asks<br/>TAP AGAIN TO DISCARD"]
+    C --> D["Second tap on the SAME card:<br/>gone"]
+    E["A card that slid up<br/>under your finger"] --> F["Still says DISCARD<br/>— it was never asked"]
+```
+
+Instead of trying to freeze the shelf, the app made throwing a card away take
+**two deliberate taps on the same card**. The first tap doesn't destroy anything;
+it changes the button to read `TAP AGAIN TO DISCARD`. Only a second tap on that
+same, already-asked card actually throws it away. After a few seconds of nothing
+happening, it forgets and goes back to saying `DISCARD`.
+
+Now walk the dangerous case through it. You double-tap fast. The first tap asks
+the top card. The card is thrown away only on your second tap — and *that* second
+tap is what destroys it, so one card dies, which is the one you were looking at.
+Any card that slides up into the gap arrives **unasked**, so a stray tap landing
+on it can only ever ask it. Destroying it would need yet another deliberate tap,
+against a button that is by then visibly saying `TAP AGAIN TO DISCARD`.
+
+Nothing here depends on how *fast* you tap. That's the property that makes it a
+real fix rather than a timing trick — a timing guard would have a speed that beats
+it, and this doesn't.
+
+**The app already worked this way elsewhere**, which is why this is the right fix
+and not a clever one. Tapping a category on the main grid already lights up and
+waits for a second tap before it commits. The shelf now borrows the front
+counter's own manners instead of inventing new ones.
+
+### How we know, rather than believe
+
+The machine now taps the same spot on the glass over and over and counts the
+bodies:
+
+| taps on one fixed point | cards destroyed |
+|---|---|
+| 2 | 1 |
+| 3 | 1 |
+| 4 | 2 |
+| 6 | 3 |
+
+One card per *pair* of taps — exactly what "ask, then act" predicts. And the check
+records something stricter than the count: before every single tap it reads what
+the button under the finger actually said, and it fails the whole run if any tap
+that destroyed a card found anything other than `TAP AGAIN TO DISCARD` waiting
+there. So it isn't checking a number that happens to look right; it's checking that
+no card ever died without being asked first.
+
+Then we broke it on purpose. Take a copy of the app, put the old
+throw-it-away-on-the-first-tap behaviour back, and the check goes red and names the
+offending taps — *"tap 1 destroyed 1 while the button said DISCARD"*. A check that
+stays green whether or not the thing it's checking is present is worse than no
+check at all, because it gets counted. Every fix in both passes was broken like
+this on purpose to prove its check was awake.
+
+### The two decisions you made
+
+**The van and the two tabs.** Part 2 left this open: the van rebuilds the daily tab
+then the weekly tab, and if it dies in between, the daily tab carries today's date
+while the weekly one doesn't. Is that lying?
+
+You ruled it isn't — the daily tab really *was* rebuilt today, and its stamp is
+telling the truth about itself. **Each tab's date describes that tab, and nothing
+else.** But you added a condition the build hadn't thought of, and it turned out to
+matter more than the original question:
+
+```mermaid
+flowchart LR
+    A["Van starts writing a tab"] --> B["OLD: wipe the tab first,<br/>then write"]
+    B -->|"write fails here"| C["Tab is now EMPTY<br/>no numbers, no date"]
+    A --> D["NEW: write over it,<br/>then tidy up any leftovers"]
+    D -->|"write fails here"| E["Tab still holds last week's<br/>numbers AND last week's date"]
+```
+
+A failed delivery must never leave a tab **blank**. Blank is worse than stale:
+stale numbers with an old date on them tell you the truth about themselves, while
+an empty tab tells you nothing at all and doesn't even look wrong. The van used to
+wipe a tab clean before writing it, so a failure halfway through left you with
+nothing. Now it writes over the old numbers and tidies up afterwards. A tab either
+gets fully rebuilt, or keeps its old numbers *and* its old date, together.
+
+**The inspector's blind spot.** You accepted the layout-width proof — 390 pixels
+wide with the signs, 980 without — instead of adding a width-sensitive check to the
+shopfront checklist. That checklist is the file you paste into your phone, and
+changing it to satisfy a requirement whose premise turned out to be false would
+have been the tail wagging the dog. Your phone paste is untouched and still
+required.
+
+### Four rules that were only pretending to cover everything
+
+The second review went looking for checks that claimed more than they did, and
+found four. None of them was a bug you'd ever see; all four were a promise the
+project had made to itself and quietly wasn't keeping.
+
+```mermaid
+flowchart TD
+    A["A rule says<br/>'every file in the repo'"] --> B["It actually read<br/>a hand-typed list of 14"]
+    B --> C["Add a new folder<br/>— it is silently outside"]
+    C --> D["FIX: ask the project<br/>which files it has"]
+```
+
+- **"No file anywhere may contain a hidden junk character."** It checked fourteen
+  files someone had typed out by hand. The entire `factory/` folder — this guide
+  included — was outside it. It now asks the project itself for the list of files,
+  so adding a folder can't create a blind spot.
+- **"No document anywhere may state the wrong number of Google permissions."** It
+  read two documents. Two others still said the wrong number, and one of them was
+  the *brief* — which is exactly how the wrong number got copied into the build
+  contract in the first place. It now reads every document, with the handful of
+  files that quote the old mistake *on purpose* (the reviews, the logs) named one at
+  a time with the reason.
+- **The suite crashed in the wrong time zone.** Every day-boundary in this app
+  depends on where you are, so the tests run under four world clocks. Run them under
+  a fifth and the suite hit a missing reference and died mid-run with a stack trace.
+  It now says plainly *"skipped: no reference grid for Asia/Kolkata"* and carries on
+  — and a skip is never counted as a pass, so a run that couldn't check everything
+  looks different from one that did.
+- **A settled question still read as an open one.** This guide's own Part 2 was part
+  of that problem, which is why you're reading Part 3.
+
+### The parts most likely to confuse you
+
+**1. "It doesn't get rebuilt" and "nothing moves" are different sentences.** This is
+the whole lesson of this part. A fix that names how it works is not the same as a
+fix that names what must be true. When someone tells you a mechanism, ask what
+property it's supposed to guarantee — and then ask who checked that it does. Here
+the mechanism was real, the property was false, and only a real browser could tell
+the difference.
+
+**2. The count didn't go up, and that's correct.** Both fix passes ended at 492
+checks. It's tempting to read a flat number as "nothing happened", but one of the
+items *required* it: the timezone fix had to leave the four normal time zones
+running exactly as many checks as before, or it would have been quietly skipping
+something. The work went into a real-browser check, two widened rules, and this
+document — none of which is counted in that number.
+
+**3. Nobody independently reviewed the fixes.** Two reviews ran on the build. The
+fixes that came out of the *second* one were checked by the same process that wrote
+them — every criterion was run, and every check was deliberately broken to prove it
+could fail, so this is "verified by its author" rather than "assumed". It is still
+one pair of eyes. You chose that trade knowingly on 2026-07-27; it's recorded here
+so nobody later mistakes it for an oversight.
+
+### What you can now say
+
+1. "Discarding a set-aside write arms on the first tap and commits on the second,
+   which is what makes a fast double tap safe — rows below *do* slide up into the
+   vacated space, but a row that arrives under the finger is unarmed, so it can't be
+   destroyed by a tap that was never aimed at it. It's pinned by a real-browser
+   check that taps one fixed coordinate and asserts nothing was destroyed without
+   the button reading `TAP AGAIN TO DISCARD` first."
+2. "The rollup's invariant is per-tab honesty: each tab's stamp describes that tab
+   alone. And `writeGrid_` writes before it trims rather than clearing first, so a
+   write that fails partway leaves a tab's old numbers and old stamp together
+   instead of blanking it — stale is honest, empty isn't."
+3. "Two lint rules were asserting more than they checked — one read fourteen
+   hand-listed files while claiming every file in the repo, the other read two
+   documents while claiming every document — so both now derive their file list from
+   the repo itself rather than from a list that goes stale when someone adds a
+   directory."
