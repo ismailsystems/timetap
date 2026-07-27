@@ -356,6 +356,7 @@
   var K_QUEUE = 'tt.queue.v1';
   var K_STATE = 'tt.state.v1';
   var K_DEAD  = 'tt.dead.v1';
+  var K_BLOCKS = 'tt.blocks.v1';
   var MS_MIN = 60000;
 
   var CATS = CFG.categories;
@@ -411,9 +412,69 @@
   function enqueue(op) {
     op.id = uid();
     op.ts = Date.now();
+    noteBlock(op);
     var q = queue();
     q.push(op);
     setQueue(q);
+  }
+
+  /**
+   * A write that gets set aside has to say which block it belonged to, and most
+   * ops cannot: setMark, setText and closeSit name a ref and nothing else. A ref
+   * is meaningless to someone holding a phone in front of Google Calendar trying
+   * to fix the damage by hand.
+   *
+   * So every op that does know its category or its start leaves that behind
+   * here, keyed by ref, for quarantine() to look up later. It lives in
+   * localStorage and not in memory because a write is set aside five failures
+   * after it was made, which can easily be a later session than the one that
+   * made it. Nothing here goes to the server: the op on the wire is unchanged.
+   */
+  function blockIdx() {
+    var m = ls(K_BLOCKS, {});
+    return (m && typeof m === 'object' && !Array.isArray(m)) ? m : {};
+  }
+
+  function noteBlock(op) {
+    if (!op) return;
+    var idx = blockIdx();
+    if (op.ref) {
+      var e = idx[op.ref] || {};
+      if (op.key) e.key = op.key;
+      // Only a start is a start. closeActual carries endMs, which is the one
+      // time that must never be recorded as when the block began.
+      if ((op.type === 'openActual' || op.type === 'openSit' ||
+           op.type === 'setSitStart') && isFinite(op.startMs)) e.startMs = op.startMs;
+      if (e.startMs === undefined && isFinite(op.hintMs)) e.startMs = op.hintMs;
+      idx[op.ref] = e;
+    }
+    if (op.newRef) {
+      var n = idx[op.newRef] || {};
+      if (op.newKey) n.key = op.newKey;
+      if (isFinite(op.atMs)) n.startMs = op.atMs;   // the split is the new block's start
+      idx[op.newRef] = n;
+    }
+    saveBlocks(idx);
+  }
+
+  /** One entry per block, so this grows forever unless it is bounded. */
+  function saveBlocks(idx) {
+    var keys = Object.keys(idx);
+    if (keys.length > 200) {
+      keys.sort(function (a, b) { return (idx[a].startMs || 0) - (idx[b].startMs || 0); });
+      keys.slice(0, keys.length - 200).forEach(function (k) { delete idx[k]; });
+    }
+    lsSet(K_BLOCKS, idx);
+  }
+
+  /** What a set-aside op can say about the block it belonged to. */
+  function blockInfo(op) {
+    var e = (op && op.ref && blockIdx()[op.ref]) || {};
+    var startMs = null;
+    if ((op.type === 'openActual' || op.type === 'openSit') && isFinite(op.startMs)) startMs = op.startMs;
+    if (startMs === null && isFinite(op.hintMs)) startMs = op.hintMs;
+    if (startMs === null && isFinite(e.startMs)) startMs = e.startMs;
+    return { key: op.key || e.key || null, startMs: startMs };
   }
 
   /** Coalesce a still-pending open into a correction. Returns true if absorbed. */
@@ -423,6 +484,9 @@
       if (q[i].type === 'openActual' && q[i].ref === ref) { q[i].key = key; hit = true; }
       if (q[i].type === 'splitActual' && q[i].newRef === ref) { q[i].newKey = key; hit = true; }
     }
+    // A corrected tap changes which category the block is, so the record of
+    // what it belonged to has to move with it.
+    if (hit) q.forEach(noteBlock);
     if (hit) setQueue(q);
     return hit;
   }
@@ -507,7 +571,9 @@
     }
     var dead = ls(K_DEAD, []);
     if (!Array.isArray(dead)) dead = [];
-    dead.push({ at: Date.now(), why: err.message, op: q[i] });
+    var info = blockInfo(q[i]);
+    dead.push({ at: Date.now(), why: err.message, op: q[i],
+                key: info.key, startMs: info.startMs });
     lsSet(K_DEAD, dead.slice(-50));
     q.splice(i, 1);
     setQueue(q);
@@ -517,6 +583,48 @@
   function deadCount() {
     var d = ls(K_DEAD, []);
     return Array.isArray(d) ? d.length : 0;
+  }
+
+  /**
+   * What each op was trying to do, in the words someone would use to describe
+   * it to themselves. The row says what happened and stops there: a set-aside
+   * write is a fact, and what to do about it is the reader's call.
+   */
+  var OP_WORDS = {
+    openActual:   'start a block',
+    closeActual:  'close a block',
+    recategorize: 'change the category',
+    setMark:      'save the mark',
+    setText:      'save the note',
+    splitActual:  'split a block',
+    openSit:      'start sitting',
+    closeSit:     'stop sitting',
+    setSitStart:  'correct when sitting started',
+    deleteSit:    'remove a sitting block'
+  };
+
+  /**
+   * The dead list as rows a person can read, newest first. Entries written by
+   * an older version have none of the block fields, and an entry that cannot
+   * say something says so rather than rendering blank — a row with an empty
+   * cell reads like there was nothing there, which is a different claim.
+   */
+  function deadRows() {
+    var d = ls(K_DEAD, []);
+    if (!Array.isArray(d)) return [];
+    var rows = [];
+    for (var i = 0; i < d.length; i++) {
+      var e = d[i] || {}, op = e.op || {};
+      rows.push({
+        i: i,
+        when:    isFinite(e.at) ? clock(e.at) : 'unknown time',
+        key:     e.key || op.key || 'unknown category',
+        started: isFinite(e.startMs) ? clock(e.startMs) : 'unknown start',
+        what:    OP_WORDS[op.type] || (op.type ? String(op.type) : 'unknown write'),
+        why:     e.why || 'no reason recorded'
+      });
+    }
+    return rows.reverse();
   }
 
   function scheduleRetry() {

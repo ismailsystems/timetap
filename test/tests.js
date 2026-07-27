@@ -1104,6 +1104,93 @@ chk('the oldest ten were dropped, not the newest',
   DEAD().length ? DEAD()[0].op.ref + '..' + DEAD()[DEAD().length - 1].op.ref : '(empty)');
 reset();
 
+console.log('\n35. a set-aside write says which block it belonged to');
+reset(); reboot();
+tap('ADM');
+const b1Start = H.nowMs();
+wait(52); tap('DW');                       // ADM closes, the strip offers a mark
+chk('the strip is up, so a mark is possible', !$('strip').hidden);
+chk('and everything so far is written', Q().length === 0, JSON.stringify(Q()));
+H.setServerReject('calendar said no');
+tapMark('+');
+pump(() => DEAD().length > 0);
+chk('the mark was set aside', DEAD().length === 1, JSON.stringify(DEAD()));
+chk('a setMark names the category the mark belonged to',
+  DEAD().length === 1 && DEAD()[0].key === 'ADM',
+  DEAD().length ? String(DEAD()[0].key) : '(none)');
+chk('and that block\'s start time',
+  DEAD().length === 1 && near(DEAD()[0].startMs, b1Start),
+  DEAD().length ? new Date(DEAD()[0].startMs) + ' vs ' + new Date(b1Start) : '(none)');
+chk('the op itself never carried a category — the index did',
+  DEAD().length === 1 && !DEAD()[0].op.key, JSON.stringify(DEAD()[0] && DEAD()[0].op));
+reset();
+
+console.log('\n35b. a closeActual names the block being closed');
+reset(); reboot();
+tap('DW');
+const b1Open = H.nowMs();
+wait(30);
+H.setServerReject('calendar said no');
+tap('MTG');                                // closeActual(DW) leads the queue
+pump(() => DEAD().length > 0);
+chk('the close was set aside', DEAD().length === 1, JSON.stringify(DEAD().map(d => d.op.type)));
+chk('and it names the category being closed',
+  DEAD().length === 1 && DEAD()[0].op.type === 'closeActual' && DEAD()[0].key === 'DW',
+  DEAD().length ? DEAD()[0].op.type + '/' + DEAD()[0].key : '(none)');
+chk('with the start of the block, not its end',
+  DEAD().length === 1 && near(DEAD()[0].startMs, b1Open),
+  DEAD().length ? new Date(DEAD()[0].startMs) + ' vs ' + new Date(b1Open) : '(none)');
+reset();
+
+console.log('\n35c. an openActual names the category that was tapped');
+reset(); reboot();
+H.setServerReject('calendar said no');
+const b1Tap = H.nowMs();
+tap('FRAG');
+pump(() => DEAD().length > 0);
+chk('the open was set aside', DEAD().length === 1, JSON.stringify(DEAD().map(d => d.op.type)));
+chk('and it names the tapped category',
+  DEAD().length === 1 && DEAD()[0].key === 'FRAG',
+  DEAD().length ? String(DEAD()[0].key) : '(none)');
+chk('and when it was tapped',
+  DEAD().length === 1 && near(DEAD()[0].startMs, b1Tap),
+  DEAD().length ? String(DEAD()[0].startMs) : '(none)');
+reset();
+
+console.log('\n35d. a category removed since still reads back by name');
+reset();
+addCategory('Scratch');
+const scratch = clientConfig_().categories.slice(-1)[0].key;
+reboot();
+H.setServerReject('calendar said no');
+tap(scratch);
+pump(() => DEAD().length > 0);
+chk('the write was set aside', DEAD().length === 1, JSON.stringify(DEAD()));
+removeCategory(scratch);
+H.clearPropCache();
+chk('the category really is gone',
+  !clientConfig_().categories.some(c => c.key === scratch),
+  JSON.stringify(clientConfig_().categories.map(c => c.key)));
+let b1Read = null, b1Threw = null;
+try { b1Read = DEAD()[0].key; } catch (e) { b1Threw = String(e); }
+chk('the entry still names the key rather than going blank',
+  b1Read === scratch, 'read=' + b1Read + ' threw=' + b1Threw);
+reset();
+
+console.log('\n35e. an entry from an older version is still readable');
+reset();
+H.STORE['tt.dead.v1'] = JSON.stringify([
+  { at: D(2026, 7, 20, 9, 15), why: 'whatever went wrong', op: { type: 'setMark', ref: 'oldref00' } }
+]);
+let b1Boot = null;
+try { reboot(); } catch (e) { b1Boot = String(e && e.message || e); }
+chk('booting on a legacy entry does not throw', b1Boot === null, String(b1Boot));
+// Whether that message survives the state load is finding F1, fixed and asserted in B2.
+chk('and the boot message counted it', /set aside/.test($('err').textContent), $('err').textContent);
+chk('the legacy entry was left alone, not rewritten',
+  DEAD().length === 1 && DEAD()[0].key === undefined, JSON.stringify(DEAD()));
+reset();
+
 console.log('\n────────────────────────────────────────');
 console.log(H.pass + ' passed, ' + H.fail + ' failed');
 process.exit(H.fail ? 1 : 0);

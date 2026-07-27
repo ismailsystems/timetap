@@ -10,7 +10,7 @@ A task is `done` only after the CHECKER step has independently re-verified it.
 | Task | Title | Status | Attempts | Notes |
 |---|---|---|---|---|
 | A1 | Force a server failure; prove a write is set aside | done | 1 | All 5 criteria pass against **unmodified** `Index.html` — no finding, nothing to park. 21 new assertions (298 → 319), green under all 4 zones, lint clear. Checker: mutation-tested, see log. |
-| B1 | A set-aside write identifies its block | pending | 0 | |
+| B1 | A set-aside write identifies its block | in progress | 1 | Criteria 1-4 verified (18 assertions, 319 → 337, 4 zones, lint clear, mutation-checked). **Criterion 5 (a legacy entry renders its missing parts as "unknown") needs a surface that renders — verified in B2, not weakened.** Found F1 and F2 on the way. |
 | B2 | Banner opens a drawer of set-aside writes | pending | 0 | |
 | B3 | Discard an entry; banner clears with the last | pending | 0 | |
 | C1 | A failed rollup records why | pending | 0 | |
@@ -34,4 +34,28 @@ _none yet_
 
 <!-- Standing rule: a bug gets a criterion here FIRST, then the fix. -->
 
-_none yet_
+### F1 — the boot-time "set aside" banner erases itself (found during B1, fix lands in B2)
+
+`boot()` calls `showErr(...)` with the set-aside count (`Index.html:964`), then drains and
+calls `loadServerState()`, whose success handler calls `hideErr()` (`Index.html:906`). On
+any healthy load the message is wiped before it can be read. It survives only when the
+state load *also* fails — i.e. the message is visible exactly when it is least useful.
+Contract item 9 requires the banner visible whenever a write has been set aside, so this
+blocks B2 rather than being cosmetic.
+
+Criteria (must pass before F1 is considered fixed):
+
+- [tier 1] Given at least one set-aside write and a *healthy* server, when the app boots
+  and the state load succeeds, then the banner is still visible.
+- [tier 1] Given no set-aside writes, when the app boots and a transient error is shown
+  and then cleared, then the banner is hidden — `hideErr()` still works for its own cases.
+- [tier 1] Given a set-aside write and a later successful flush, then the banner does not
+  get erased by that success either.
+
+### F2 — the count reads "1 write were set aside" (found during B1, fix lands in B2)
+
+`Index.html:964` pluralises the noun but not the verb, so a single entry reads
+`1 write were set aside after repeated failures`.
+
+- [tier 1] Given exactly one set-aside write, then the message reads "1 write was set
+  aside"; given two, "2 writes were set aside".
