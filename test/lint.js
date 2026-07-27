@@ -141,5 +141,85 @@ check('the browser version is pinned exactly',
     ? ['playwright: ' + pkg.devDependencies.playwright] : [],
   'an exact version, so "the pinned browser still launches" means something');
 
+/* ── the two meta-tag lists that have to agree ──────────────────────
+ *
+ * Apps Script ignores meta tags written into the HTML file and injects the ones
+ * doGet asks for through addMetaTag. The headless harness has to inject the
+ * same list or it renders a document the phone never loads — and it would go on
+ * passing while doing it, which is worse than not rendering at all.
+ *
+ * The lists live in two files on purpose (deriving one from the other makes the
+ * comparison self-fulfilling), so this rule is the only thing holding them
+ * together. It is the single check that makes rendering locally honest rather
+ * than a convenient fiction.
+ */
+const APPS_SCRIPT_META = ['viewport', 'apple-mobile-web-app-capable',
+                          'mobile-web-app-capable', 'google-site-verification'];
+const headlessSrc = fs.readFileSync(path.join(__dirname, 'headless.js'), 'utf8');
+
+function metasFromDoGet(src) {
+  const out = [], re = /\.addMetaTag\(\s*'([^']*)'\s*,\s*'([^']*)'\s*\)/g;
+  let m;
+  while ((m = re.exec(src))) out.push([m[1], m[2]]);
+  return out;
+}
+function metasFromHarness(src) {
+  const block = /META_TAGS\s*=\s*\[([\s\S]*?)\n\];/.exec(src);
+  if (!block) return [];
+  const out = [], re = /\[\s*'([^']*)'\s*,\s*'([^']*)'\s*\]/g;
+  let m;
+  while ((m = re.exec(block[1]))) out.push([m[1], m[2]]);
+  return out;
+}
+
+const doGetMetas = metasFromDoGet(codeNoComments);
+const harnessMetas = metasFromHarness(headlessSrc);
+
+/* Everything below compares two lists. If either parsed as empty, every one of
+   those comparisons passes while comparing nothing — the vacuous-assertion bug
+   test/README.md:63 records. So an empty list is a failure in its own right. */
+check('both meta tag lists were actually found',
+  (doGetMetas.length ? [] : ['Code.gs: no addMetaTag calls parsed out of doGet'])
+    .concat(harnessMetas.length ? [] : ['test/headless.js: no META_TAGS entries parsed']),
+  'an empty list would make every comparison below pass without comparing anything');
+
+/* A repeated name would collapse when the lists are keyed by name, hiding a
+   difference behind whichever copy happened to be last. */
+const dupes = list => list.map(t => t[0])
+  .filter((n, i, a) => a.indexOf(n) !== i)
+  .filter((n, i, a) => a.indexOf(n) === i);
+check('neither list declares the same meta tag twice',
+  dupes(doGetMetas).map(n => 'Code.gs: ' + n)
+    .concat(dupes(harnessMetas).map(n => 'test/headless.js: ' + n)),
+  'a duplicate name hides a difference behind whichever copy is read last');
+
+const byName = list => new Map(list);
+const dg = byName(doGetMetas), hn = byName(harnessMetas);
+const drift = [];
+dg.forEach(function (content, name) {
+  if (!hn.has(name)) {
+    drift.push(name + ' — doGet sends it, test/headless.js does not inject it');
+  } else if (hn.get(name) !== content) {
+    drift.push(name + ' — same tag, different content: doGet has "' + content +
+               '", test/headless.js has "' + hn.get(name) + '"');
+  }
+});
+hn.forEach(function (content, name) {
+  if (!dg.has(name)) {
+    drift.push(name + ' — test/headless.js injects it, doGet does not send it');
+  }
+});
+check('doGet and the headless harness inject the same meta tags', drift,
+  'the harness must render the document Apps Script serves, not a near miss');
+
+/* Anything outside the four permitted names throws at request time, which is a
+   crash you only ever see on the deployed URL. */
+check('every meta tag name is one Apps Script permits',
+  doGetMetas.map(t => t[0]).filter(n => APPS_SCRIPT_META.indexOf(n) < 0)
+    .map(n => 'Code.gs: ' + n)
+    .concat(harnessMetas.map(t => t[0]).filter(n => APPS_SCRIPT_META.indexOf(n) < 0)
+      .map(n => 'test/headless.js: ' + n)),
+  'addMetaTag throws "not allowed in this context" at request time for any other name');
+
 console.log(fails ? '\n' + fails + ' failed\n' : '\nall clear\n');
 process.exit(fails ? 1 : 0);
