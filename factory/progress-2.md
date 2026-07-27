@@ -7,7 +7,7 @@ Round 1's progress record is `factory/progress.md` and is **read-only**.
 
 ## Status
 
-In progress. **9 of 16 tasks complete.** Stage B, task B5 next.
+In progress. **10 of 16 tasks complete. Stage B is finished — the milestone stage.** Stage C, task C1 next.
 
 Suite: **716 passed / 0 failed** (baseline was 492), green in all four
 contracted timezones. Lint all clear. Headless ok, 19 checks per viewport.
@@ -25,7 +25,7 @@ contracted timezones. Lint all clear. Headless ok, 19 checks per viewport.
 | B2 | B | **done** | 1 | golden deliberately NOT regenerated — see Q11 |
 | B3 | B | **done** | 1 | done in the same pass as B2; reason in log-2.md |
 | B4 | B | **done** | 1 | three mutations tried, all caught |
-| B5 | B | pending | 0 | vacuity check required |
+| B5 | B | **done** | 1 | vacuity check done, both halves one file at a time, plus key-drift |
 | C1 | C | pending | 0 | the sweep is the load-bearing criterion |
 | C2 | C | pending | 0 | |
 | C3 | C | pending | 0 | |
@@ -50,7 +50,7 @@ to that commit and must stay so.
 |---|---|---|
 | Revert regex to `[+=\-]`, parse criteria go red | A1 | **done — 6 red, 521/6.** Reverted `MARKS` to `'+=-'`, which reverts the regex by construction. Details in `log-2.md` |
 | Revert `?` to `=`, mark criteria go red **while boundary criteria stay green** | A2 | **done — 8 mark red, every boundary green.** Independently reproduced by the checker |
-| Delete the PLAN sentence from each doc **one at a time**, lint names that file | B5 | not run |
+| Delete the PLAN sentence from each doc **one at a time**, lint names that file | B5 | **done — each half fails alone and names the right file.** A third revert renamed the example key out of `CATEGORIES` and both files were named |
 
 ## Orientation
 

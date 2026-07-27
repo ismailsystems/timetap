@@ -17,6 +17,12 @@ writes an **ACTUAL** calendar (record, written continuously) and a **SITTING**
 calendar (posture overlay). Comparing them is a weekly manual ritual the app
 does not participate in beyond emitting raw numbers.
 
+A PLAN event only counts if its title begins with a category key and a colon.
+`DW: ship the memo` counts toward `plan DW`; `Deep work — memo` counts toward
+nothing, and the ratio column stays blank. The app never guesses what an
+unparsed title meant — `rollupStatus` reports how many of them it could read,
+and stops there.
+
 ## Files
 
 | File | What it is |

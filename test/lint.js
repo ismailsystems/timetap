@@ -333,6 +333,65 @@ const NUMBER_WORDS = ['zero', 'one', 'two', 'three', 'four', 'five', 'six'];
    makes this entry the weakest one in the list — a wrong count introduced anywhere
    else in HANDOFF.md would not be caught. It is named here so the next reviewer
    sees the gap rather than discovering it. */
+/*
+ * The one thing about PLAN that was never written down.
+ *
+ * SETUP.md's PLAN section read, in full, "Nothing to configure" — and then
+ * documented `plan DW` and `DW ratio` columns as though they populated
+ * themselves. Nothing in the repo said that a PLAN event only counts if its
+ * title begins with a category key and a colon, so a plan written as
+ * "Deep work — memo" contributed zero forever and the ratio column stayed
+ * blank with nothing anywhere explaining it.
+ *
+ * Two halves, and both matter. The rule has to be STATED, in both files that
+ * describe the PLAN calendar. And the worked example has to use a key the app
+ * actually has: this rule reads CATEGORIES out of Code.gs and checks the
+ * example against it, so the docs cannot drift into demonstrating a key that
+ * was renamed or removed. A worked example naming a key that does not exist is
+ * worse than no example.
+ */
+const PLAN_DOCS = ['SETUP.md', 'README.md'];
+const CATEGORY_KEYS = (() => {
+  const block = codeNoComments.match(/var CATEGORIES\s*=\s*\[([\s\S]*?)\];/);
+  if (!block) return [];
+  return (block[1].match(/key:\s*'([A-Za-z0-9_]+)'/g) || [])
+    .map(m => m.replace(/.*'([A-Za-z0-9_]+)'.*/, '$1'));
+})();
+const planBad = [];
+// If this list is empty the two checks below would pass while comparing
+// nothing, which is the failure mode this whole file exists to avoid.
+if (!CATEGORY_KEYS.length) {
+  planBad.push('could not read any key out of the CATEGORIES array in Code.gs, ' +
+               'so the example check below would have passed vacuously');
+}
+PLAN_DOCS.forEach(rel => {
+  const full = path.join(ROOT, rel);
+  if (!fs.existsSync(full)) { planBad.push(rel + ' is missing'); return; }
+  const text = fs.readFileSync(full, 'utf8');
+  /* Flattened before matching. Prose in a markdown file wraps wherever the
+     line length says it should, and a rule that only matches an unwrapped
+     sentence fails the moment someone reflows a paragraph — which reads as
+     "the docs stopped saying it" when they still do. */
+  const flat = text.replace(/\s+/g, ' ');
+  if (!/title begins with a category key and a colon/i.test(flat)) {
+    planBad.push(rel + ' does not say that a PLAN event only counts if its ' +
+                 'title begins with a category key and a colon');
+  }
+  // A worked example: some KEY, then a colon, then words.
+  const examples = (flat.match(/`([A-Za-z0-9_]+):\s[^`]+`/g) || [])
+    .map(m => m.replace(/^`([A-Za-z0-9_]+):[\s\S]*$/, '$1'));
+  const good = examples.filter(k => CATEGORY_KEYS.indexOf(k) >= 0);
+  if (!examples.length) {
+    planBad.push(rel + ' states the rule but shows no worked example of a title');
+  } else if (!good.length) {
+    planBad.push(rel + ' shows examples (' + examples.join(', ') +
+                 ') but none uses a key CATEGORIES defines (' +
+                 CATEGORY_KEYS.join(', ') + ')');
+  }
+});
+check('the docs say how a PLAN event has to be titled, and show a real key', planBad,
+  'a plan written any other way counts toward nothing, and the sheet cannot say why');
+
 const SCOPE_QUOTE_EXEMPT = {
   'factory/REVIEW.md':    'review 1 — quotes README\'s wrong sentence as the finding',
   'factory/REVIEW-2.md':  'review 2 — quotes BRIEF\'s and PLAN\'s wrong sentences as the finding',

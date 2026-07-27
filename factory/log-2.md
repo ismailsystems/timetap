@@ -619,3 +619,75 @@ lint clear, headless ok.
 | "parsed" counts regex matches rather than configured keys | 5 assertions, including 49c |
 | a failed run overwrites the counts with zeroes | 49h, both halves |
 | reported as a bare pair of integers | 5 assertions across 49b and 49d |
+
+## [2026-07-27 16:0x] B5 | The docs say the one thing about PLAN that was never written down — STAGE B COMPLETE
+
+`SETUP.md`'s PLAN section read, in full, "Nothing to configure" — and then
+documented `plan DW` and `DW ratio` columns as though they populated
+themselves. Both files now state the rule, with a worked example, and an
+18th lint rule pins the claim.
+
+The rule has two halves and both matter. The sentence has to be **stated**, in
+both files that describe the PLAN calendar. And the worked example has to use a
+key the app actually has: the rule reads `CATEGORIES` out of `Code.gs` and
+checks the example against it, so the docs cannot drift into demonstrating a key
+that was renamed or removed. A worked example naming a key that does not exist
+is worse than no example.
+
+It also refuses to run on an empty key list. If the `CATEGORIES` regex ever
+stops matching, the example check would pass while comparing nothing — the exact
+failure mode this file exists to prevent, and the one round 1 wrote its
+meta-tag rules to avoid.
+
+**VACUITY CHECK — done, all three halves.**
+
+```
+sentence removed from SETUP.md only
+  FAIL - SETUP.md does not say that a PLAN event only counts if its title
+         begins with a category key and a colon
+
+sentence removed from README.md only
+  FAIL - README.md does not say that a PLAN event only counts if its title
+         begins with a category key and a colon
+
+DW renamed to DEEP in the CATEGORIES array
+  FAIL - SETUP.md shows examples (DW) but none uses a key CATEGORIES defines
+  FAIL - README.md shows examples (DW) but none uses a key CATEGORIES defines
+```
+
+Each half fails **alone** and names the right file, which is the separation the
+handoff demanded: a rule that only fires when both files change is a rule that
+will not fire.
+
+**One thing the first version got wrong, worth writing down.** The rule matched
+against the raw file and SETUP.md wraps between "and a" and "colon", so it
+reported the sentence missing when it was there. Prose in markdown wraps
+wherever line length says it should, and a rule that only matches an unwrapped
+sentence fails the moment someone reflows a paragraph — reading as "the docs
+stopped saying it" when they still do. It now flattens whitespace first.
+
+Lint: **18 rules**, the 17 that existed plus this one. Contract 3 satisfied so
+far; C1 adds the last one.
+
+---
+
+**STAGE B IS COMPLETE — the milestone stage.**
+
+What it claims: *every hour in the rollup is traceable to either something the
+user said or something visibly marked as the app's guess.* What is actually
+true now:
+
+- Every hour lands in a bucket for how it was marked, and a key's five buckets
+  sum to its total by construction (B1).
+- Both tabs carry those buckets as columns, appended so that no existing column
+  moved (B2, B3), which section 46 asserts against a header frozen before this
+  round began.
+- The rollup says how much of PLAN it could read, in words, and never guesses
+  what it could not (B4).
+- The one rule that governs whether a plan event counts at all is written down
+  in both docs, with an example checked against the source (B5).
+
+Suite **716 / 0** in all four contracted zones. Lint all clear across 18 rules.
+Headless ok at 20 checks per viewport. `test/fixtures/rollup-golden.json` and
+`appsscript.json` still byte-identical to `a256bdf`. Exactly one test line
+removed all round, and it is still A2's.
