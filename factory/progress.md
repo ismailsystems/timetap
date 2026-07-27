@@ -1,5 +1,44 @@
 # Progress — timetap error paths round
 
+## RUN SUMMARY
+
+**Outcome: complete.** All 13 tasks done, none parked. 298 → **459 assertions**, green under
+America/New_York, Europe/London, Australia/Sydney and UTC, twice in a row; `node test/lint.js`
+all clear; `node test/headless.js` green at both viewports. 13 commits on `factory/error-paths`,
+nothing pushed, `main` untouched.
+
+**Two things need your decision. Neither is a blocked task.**
+
+1. **D2's sixth criterion is unmet, deliberately** (F4). "Inject the meta tags after render and
+   watch the viewport checks fail" cannot be demonstrated: Blink re-lays-out when a viewport meta
+   is appended, and — more importantly — *no check in `smoke.js` is viewport-sensitive at all*.
+   With no meta tags whatsoever the page lays out at 980px and all 17 checks still pass. I built a
+   control that proves the injection point matters by layout width (390 vs 980) and left the
+   criterion unsatisfied rather than redefining it to match what I had built.
+2. **Contract item 6 is wrong about the baseline** (F5). It says one OAuth scope; there have always
+   been three, and all three are load-bearing. `appsscript.json` is byte-identical to `main`.
+
+**Per-task status:** all 13 `done`. Findings F1, F2, F3 found and fixed; F4 and F5 reported, not
+actioned.
+
+**To see it work:**
+
+```bash
+node test/tests.js                                    # 459 assertions
+for z in America/New_York Europe/London Australia/Sydney UTC; do TZ=$z node test/tests.js | tail -1; done
+node test/lint.js                                     # includes the meta-tag drift rule
+npm install && node test/headless.js                  # renders in a real browser, both viewports
+./deploy.sh --help                                    # three test layers
+git log --oneline main..HEAD                          # 13 commits, one per task
+```
+
+To watch the drift rule bite, change one meta tag in `doGet` (`Code.gs:181-183`) without changing
+`META_TAGS` in `test/headless.js`, then run `node test/lint.js`. It names the tag and says which
+side is missing it.
+
+---
+
+
 handoff: factory/HANDOFF.md
 branch: factory/error-paths
 baseline at launch: 298 assertions green under 4 timezones, `node test/lint.js` clear
@@ -39,6 +78,21 @@ the phone paste uses)?**
 ## Bugs found while building
 
 <!-- Standing rule: a bug gets a criterion here FIRST, then the fix. -->
+
+### F5 — contract item 6 was already false before this round started (found at final sign-off)
+
+The Contract says "`appsscript.json` still asks for exactly one OAuth scope". It asks for
+three, and it asked for three at the branch point: `calendar`, `spreadsheets` and
+`script.scriptapp`. The file is **byte-identical to `main`** and was never touched on this
+branch (`git diff main..HEAD -- appsscript.json` is empty).
+
+The three are all load-bearing: the rollup writes a spreadsheet and the nightly trigger is
+installed through `ScriptApp`. Deleting two to make the assertion true would break the
+rollup and the trigger — satisfying a sentence by breaking the app.
+
+Reported rather than actioned. The Contract sentence is wrong about the baseline, not the
+code. `README.md` and the handoff's own orientation table both describe the manifest as
+"one OAuth scope", so the same stale claim appears in more than one place.
 
 ### F3 — `smoke.js` counts a check that cannot fail (found during D2)
 
