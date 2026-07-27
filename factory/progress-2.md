@@ -49,6 +49,34 @@ to that commit and must stay so.
 | Revert `?` to `=`, mark criteria go red **while boundary criteria stay green** | A2 | not run |
 | Delete the PLAN sentence from each doc **one at a time**, lint names that file | B5 | not run |
 
+## Orientation
+
+`HANDOFF-2.md`'s Orientation section asks for the Q&A to be appended to that
+file. Its Guardrails say never to edit that file, under a heading reading "never
+violate". The guardrail wins; orientation is recorded here, which the operating
+loop already names as the loop's memory across restarts. Conflict flagged for
+the reviewer.
+
+**Questions to the human: none.** 112 criteria are specified against exact line
+numbers, and the document's own instruction for genuine mid-run ambiguity is to
+park it here rather than ask.
+
+**Two naming choices made rather than parked** — both cheap to change at review,
+neither worth stalling the run over:
+
+- D1's "a key named for what it is" does not name the key. Using `UNPARSED`.
+- D2's partial-week marker does not name the column. Will be decided at D2 and
+  recorded here.
+
+**Pre-flight finding, before task A1.** The baseline recorded above as green was
+not. `node test/lint.js` failed on `factory/log-2.md:22` — the handoff's own
+pre-flight entry quotes the stale round-1 scope claim, so the scope-count rule
+caught its own paperwork. Resolved by adding `factory/log-2.md` to
+`SCOPE_QUOTE_EXEMPT` on the rationale `factory/log.md` already carries. Full
+reasoning and the cost of that choice are in `factory/log-2.md`. Baseline is
+green as of that fix, and it is the real starting line: 492 / 0, lint all clear,
+headless ok at 19 checks per viewport.
+
 ## Parked questions
 
 _None yet. Anything the handoff does not answer goes here with the task parked,

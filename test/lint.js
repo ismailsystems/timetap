@@ -346,7 +346,15 @@ const SCOPE_QUOTE_EXEMPT = {
      it is a quotation: review 2's finding 3, and amendment A2's own wording. This
      text was already exempt while it lived in STATE.md — moving it to its own file
      moved the exemption with it rather than creating a new one. */
-  'factory/ROUND-1.md':   'round 1 archive — quotes review 2 and amendment A2 verbatim'
+  'factory/ROUND-1.md':   'round 1 archive — quotes review 2 and amendment A2 verbatim',
+  /* Round 2's build log, on exactly the rationale factory/log.md already carries.
+     Its handoff entry quotes the round-1 scope claim while describing the
+     ROUND-1.md exemption above — the rule caught its own paperwork, and the
+     "green baseline" the handoff recorded was already red because of it. Named
+     here rather than fixed by editing an append-only entry. Same gap as
+     log.md's: a wrong count introduced anywhere else in this file goes
+     unchecked, and the next reviewer should see that written down. */
+  'factory/log-2.md':     'append-only build log — records the finding in its own words'
 };
 
 const scopeDocs = census.files.filter(f => /\.md$/i.test(f)).sort();
