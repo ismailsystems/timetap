@@ -1,6 +1,11 @@
 # timetap
 
-A personal time-logging web app. Google Apps Script, four files, no dependencies.
+A personal time-logging web app. Google Apps Script, four files that import
+nothing and need no build step.
+
+The repo has dev-only test tooling with one dependency (a headless browser, used
+by `test/headless.js`). None of it is deployed: what goes up is the four files
+below, exactly as they are.
 
 **Automate capture. Never automate judgment.**
 
@@ -16,7 +21,7 @@ does not participate in beyond emitting raw numbers.
 
 | File | What it is |
 |---|---|
-| [`appsscript.json`](appsscript.json) | Manifest. One OAuth scope. Set your timezone here. |
+| [`appsscript.json`](appsscript.json) | Manifest. Three OAuth scopes, all load-bearing. Set your timezone here. |
 | [`Code.gs`](Code.gs) | Server. CONFIG block, calendar reads/writes, week aggregation. |
 | [`Index.html`](Index.html) | Client. All HTML/CSS/JS inlined. No CDN, no build step. |
 | [`SETUP.md`](SETUP.md) | Deployment steps and the required Google Calendar settings. |

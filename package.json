@@ -1,0 +1,13 @@
+{
+  "name": "timetap-dev",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Dev-only tooling for timetap. The four source files (Code.gs, Index.html, appsscript.json, SETUP.md) import nothing and have no build step; nothing here is deployed to Apps Script.",
+  "scripts": {
+    "test": "node test/tests.js && node test/lint.js",
+    "headless": "node test/headless.js"
+  },
+  "devDependencies": {
+    "playwright": "1.62.0"
+  }
+}

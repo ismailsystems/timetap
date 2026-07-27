@@ -7,6 +7,15 @@
 #   ./deploy.sh --no-pull        skip the git pull
 #   ./deploy.sh --no-test        skip the checks (they are the point; think twice)
 #
+# Three test layers run before anything ships:
+#
+#   1. static checks       test/lint.js
+#   2. the offline suite   test/tests.js, under three timezones
+#   3. the headless render  test/headless.js, in a real browser engine
+#
+# If the browser is not installed the deploy stops rather than going ahead
+# without layer 3. A skipped run is never a pass.
+#
 # Requires clasp (npm install -g @google/clasp), a clasp login, and a
 # .clasp.json pointing at your script. See SETUP.md section 10.
 
@@ -77,6 +86,14 @@ if [ "$DO_TEST" -eq 1 ]; then
       fi
       printf '  %-18s %s\n' "$z" "$(printf '%s\n' "$OUT" | tail -1)"
     done
+    # The third layer, in a real browser engine. A missing browser stops the
+    # deploy instead of being waved through: reporting a run that never
+    # happened as a pass is how a rendering bug reaches the phone.
+    if ! OUT=$(node test/headless.js 2>&1); then
+      printf '%s\n' "$OUT"
+      die "headless checks failed. Nothing deployed."
+    fi
+    printf '%s\n' "$OUT" | tail -1
   fi
 else
   step "checks ${D}(skipped)${R}"

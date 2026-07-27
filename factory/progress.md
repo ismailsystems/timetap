@@ -1,0 +1,281 @@
+# Progress — timetap error paths round
+
+## FIX PASS 2 SUMMARY (2026-07-27, after the second independent review)
+
+**Outcome: all five items in `factory/FIXES-2.md` are done. Nothing parked, nothing
+escalated, no open questions.** 492 assertions, green twice in a row under all four
+contracted timezones; `node test/lint.js` all clear, still 17 rules, two of them now
+covering what their contract assertions always claimed; `node test/headless.js` green at
+both viewports with a new tap-count phase; `./deploy.sh` re-exercised against a stub
+`clasp` and all three gates still block.
+
+| Item | Fix | Pinned by |
+|---|---|---|
+| F2-1. a comment claimed a guard the code does not have | `discardDead`'s docblock said "the list is NOT redrawn… Nothing may move while a finger is down". Half true: rows *do* slide up. Rewritten to name the guard that actually holds — arm/confirm — per amendment A4 | new `checkTapCount` phase in `test/headless.js`: 2, 3, 4 and 6 taps on one point destroy 1, 1, 2 and 3, each preceded by `TAP AGAIN TO DISCARD` |
+| F2-2. the NUL rule covered 14 files, not "any file in the repo" | census is now the repo's own — `git ls-files`, or a walk when there is no `.git` | a NUL in `factory/log.md`, `site/index.html`, `.github/workflows/pages.yml` and `test/fixtures/rollup-golden.json` each fails by name |
+| F2-3. two live docs still said "one OAuth scope" | `factory/BRIEF.md:71` and `factory/PLAN.md:33` corrected; the rule widened from two files to every `.md`, with eight record files exempt by name | reverting either doc fails lint by file and line; emptying the exemption list also fails, so the exemption is tested not assumed |
+| F2-4. the suite crashed in an uncontracted timezone | §39d reports as a named skip instead of dereferencing a golden that is not there | `TZ=Asia/Kolkata` and `TZ=Pacific/Chatham` run to completion, exit 0, 482 passed / 1 skipped |
+| F2-5. a settled question still read as open | the parked question is marked *ruled 2026-07-27, A1*, with its original text kept | four more places in the same file that read as open are marked too |
+
+**Two things were found while doing this list, both fixed in place:**
+
+- `.gitignore` says `node_modules/`, which matches a directory and not a symlink pointing
+  at one, so a checkout that symlinks its `node_modules` had the whole tree handed to the
+  new NUL rule and failed with `EISDIR`. The rule now skips anything that is not a regular
+  file, and says so out loud. The real repo never hit this; a developer's checkout would.
+- Replacing §39d's `chk('there is a golden for this timezone')` with a skip would have left
+  a hole in the count, and putting it back inside the guarded branch would have made it an
+  assertion that cannot fail — the class `test/README.md:63` records. It is replaced by one
+  that can fail (the golden holds a non-empty grid for both tabs), verified by emptying the
+  grids in a fixture copy.
+
+**Assertion count is 492 and deliberately unchanged.** F2-4's criteria require it: §39d must
+run in full in the four contracted zones with the count unchanged. F2-1 added a tier-3
+phase, F2-2 and F2-3 widened lint rules, F2-5 was documentation — none of those is a
+tier-1 assertion.
+
+**Every fix was vacuity-checked** by reverting it in a fixture copy under a scratchpad and
+confirming the new check fails. The repo was never left dirty by a test. `appsscript.json`
+is still byte-identical to `main`, the golden rollup fixture is untouched, `Code.gs` was not
+touched at all, and the only change to `Index.html` is comments.
+
+**To see it work:**
+
+```bash
+for z in America/New_York Europe/London Australia/Sydney UTC; do TZ=$z node test/tests.js | tail -1; done
+TZ=Asia/Kolkata node test/tests.js | tail -3     # 482 passed, 1 skipped — a named skip, not a crash
+node test/lint.js                                 # 17 rules; the NUL and scope rules now name their census
+node test/headless.js                             # both viewports, the drawer, and the tap count
+git log --oneline 7a9b731..HEAD                   # five commits, one per item
+```
+
+To watch the tap-count phase bite, revert `armDead` in a copy of `Index.html` so the first
+tap discards, then run `node test/headless.js` — it names each tap that destroyed an entry
+and what the button said at the time.
+
+---
+
+## FIX PASS SUMMARY (2026-07-27, after the independent review)
+
+**Outcome: the five findings in `factory/REVIEW.md` are fixed, and the human's three
+decisions are recorded in the contract.** 459 → **492 assertions**, green under all four
+timezones; `node test/lint.js` all clear with two new rules; `node test/headless.js` green
+at both viewports and now also drives the drawer at real coordinates.
+
+| Finding | Fix | Pinned by |
+|---|---|---|
+| 1. double-tap on DISCARD destroyed two writes | DISCARD arms on the first tap and acts on the second — the app's existing arm/confirm idiom. A row sliding into the vacated space is never armed. | tier-1 §37f/37g/37i, and a real-browser double-tap in `test/headless.js` |
+| 2. a failed rollup stamped the daily tab as current | both grids built before either is written; `writeGrid_` writes then trims instead of clearing first, so a failed write leaves a tab's old numbers and old stamp together | §39e (stub now breaks `getRange`, so `clear()` is reachable), §39f, §39g |
+| 3. NUL byte made `test/headless.js` binary to git | raw byte → `'\0'` escape | new lint rule over every text file |
+| 4. summary said "none parked" with D2 unmet | D2's criterion 6 formally retired by human decision (amendment A1); status below is accurate | — |
+| 5. README claimed one OAuth scope | corrected to three | new lint rule comparing the docs to the manifest |
+
+Every fix was checked for vacuity by reverting it in a fixture copy and confirming the
+new test fails. **D2 criterion 6 is retired, not met** — see amendment A1 in HANDOFF.md.
+
+**The three decisions, as ruled by the human on 2026-07-27** (recorded in full under
+"Contract amendments" in `factory/HANDOFF.md`):
+
+1. **D2 criterion 6 retired**, replaced by the layout-width control the build produced.
+   No check in `smoke.js` is viewport-sensitive, verified twice independently.
+2. **Contract item 6 corrected** to three OAuth scopes. The manifest is untouched and
+   still byte-identical to `main`.
+3. **The rollup's invariant is per-tab honesty**, plus: a failed write must never blank
+   a tab. Item 16 rewritten; assertions 24–27 added.
+
+**Original run summary follows, with its status line corrected.**
+
+---
+
+## RUN SUMMARY
+
+**Outcome: 12 of 13 tasks done; D2 parked on one criterion** (since retired by human
+decision — see the fix pass above). 298 → **459 assertions**, green under
+America/New_York, Europe/London, Australia/Sydney and UTC, twice in a row; `node test/lint.js`
+all clear; `node test/headless.js` green at both viewports. 13 commits on `factory/error-paths`,
+nothing pushed, `main` untouched.
+
+**Two things need your decision. Neither is a blocked task.**
+*(Both ruled 2026-07-27 — amendments A1 and A2. Kept as asked; neither is open.)*
+
+1. **D2's sixth criterion is unmet, deliberately** (F4). **→ Ruled: retired, amendment A1.** "Inject the meta tags after render and
+   watch the viewport checks fail" cannot be demonstrated: Blink re-lays-out when a viewport meta
+   is appended, and — more importantly — *no check in `smoke.js` is viewport-sensitive at all*.
+   With no meta tags whatsoever the page lays out at 980px and all 17 checks still pass. I built a
+   control that proves the injection point matters by layout width (390 vs 980) and left the
+   criterion unsatisfied rather than redefining it to match what I had built.
+2. **Contract item 6 is wrong about the baseline** (F5). **→ Ruled: the sentence is corrected to
+   three, the manifest is not touched, amendment A2.** It said one OAuth scope; there have always
+   been three, and all three are load-bearing. `appsscript.json` is byte-identical to `main`.
+
+**Per-task status:** all 13 `done`. Findings F1, F2, F3 found and fixed; F4 and F5 reported, not
+actioned.
+
+**To see it work:**
+
+```bash
+node test/tests.js                                    # 459 assertions
+for z in America/New_York Europe/London Australia/Sydney UTC; do TZ=$z node test/tests.js | tail -1; done
+node test/lint.js                                     # includes the meta-tag drift rule
+npm install && node test/headless.js                  # renders in a real browser, both viewports
+./deploy.sh --help                                    # three test layers
+git log --oneline main..HEAD                          # 13 commits, one per task
+```
+
+To watch the drift rule bite, change one meta tag in `doGet` (`Code.gs:181-183`) without changing
+`META_TAGS` in `test/headless.js`, then run `node test/lint.js`. It names the tag and says which
+side is missing it.
+
+---
+
+
+handoff: factory/HANDOFF.md
+branch: factory/error-paths
+baseline at launch: 298 assertions green under 4 timezones, `node test/lint.js` clear
+
+Status values: `pending` · `in progress` · `done` · `PARKED`
+A task is `done` only after the CHECKER step has independently re-verified it.
+
+| Task | Title | Status | Attempts | Notes |
+|---|---|---|---|---|
+| A1 | Force a server failure; prove a write is set aside | done | 1 | All 5 criteria pass against **unmodified** `Index.html` — no finding, nothing to park. 21 new assertions (298 → 319), green under all 4 zones, lint clear. Checker: mutation-tested, see log. |
+| B1 | A set-aside write identifies its block | done | 1 | All 5 criteria verified. 1-4 in section 35-35d; criterion 5 verified in section 36f once B2 gave it a surface to render on. Found F1 and F2 on the way. |
+| B2 | Banner opens a drawer of set-aside writes | done | 1 | 35 assertions (337 → 372, 4 zones, lint clear). Fixes F1 and F2. CHECKER: 7 mutations, all caught — one of them (singular verb) only after I noticed my tests covered the plural case alone. |
+| B3 | Discard an entry; banner clears with the last | done | 1 | 19 assertions (372 → 391, 4 zones, lint clear). CHECKER: 3 mutations, all caught — position-based identity, discard reaching into the queue, drawer not closing on the last entry. |
+| C1 | A failed rollup records why | done | 1 | 19 assertions (391 → 410, 4 zones, lint clear). Record-then-rethrow into script property `ROLLUP_LAST`. CHECKER: 3 mutations, all caught. |
+| C2 | Both tabs carry a last-rebuilt stamp | done | 1 | 30 assertions (410 → 440, 4 zones, lint clear). Golden fixture `test/fixtures/rollup-golden.json` captured from d048ca3, before the stamp existed. CHECKER: 5 mutations, all caught. One existing test amended (see log). |
+| C3 | Last outcome readable by hand | done | 1 | 19 assertions (440 → 459, 4 zones, lint clear). `rollupStatus()`, runnable from the editor. CHECKER: 4 mutations, all caught. **Stage C complete.** |
+| D1 | A real browser opens Index.html | done | 1 | `test/headless.js` + `test/serve.js`, Playwright pinned 1.62.0 (exact). 3 new lint rules. CHECKER: 4 lint mutations + both missing-browser paths, all exit non-zero. Tier-4 canary: chromium-1234 launches on this machine. |
+| D2 | Harness serves the page as Apps Script does | PARKED → resolved | 1 | 5 of 6 criteria met and verified. **Criterion 6 was PARKED — see F4**; not weakened, not declared met. **Retired 2026-07-27 by human decision** (HANDOFF amendment A1), replaced by the layout-width control. Found and fixed F3. |
+| D3 | Desktop viewport too, reported separately | done | 1 | Both viewports labelled with their dimensions and reported separately. CHECKER: a phone-only CSS break fails phone / passes desktop / exits 1 naming phone; zero checks at one viewport exits 1 even though the other passed. |
+| D4 | Drift lint on the meta tags (HIGH RISK) | done | 1 | All 6 criteria verified against fixture copies, plus 2 extra vacuity guards. **META-TEST PERFORMED**: neutering the rule makes exactly criteria 2, 3 and 4 stop detecting — three, as required. See log for the full transcript. |
+| D5 | deploy.sh gains a third gate | done | 1 | All 5 criteria exercised with a stub `clasp` prepended to PATH and a dummy `.clasp.json` in a fixture copy — the real `.clasp.json` was never read and no real deployment happened. **Stage D complete.** |
+| E1 | Docs describe what now exists | done | 1 | README no longer claims the repo has no dependencies; test/README documents the headless runner, the six new lint rules in its existing table idiom, and why the phone paste is not superseded. Count corrected 253 → 459. Every command named was run. |
+
+## Parked questions for the human
+
+<!-- Anything the handoff does not answer. Write the question and what you did
+     instead (park the task, or proceed on a stated assumption). -->
+
+**Nothing is open. One question was parked here and it has been answered.**
+
+**D2, criterion 6 (see F4 below) — RULED 2026-07-27, HANDOFF amendment A1.**
+
+*The ruling:* the layout-fact control is accepted. D2's sixth criterion is **retired, not
+met and not weakened**, and `smoke.js` is left alone — adding a viewport-sensitive check
+to it would change the file the phone paste uses, to satisfy a criterion whose factual
+premise turned out to be false. The control that replaces it proves the same thing by a
+fact read from the live DOM: 390px with the meta tags, 980px without. Amendment A1 in
+`factory/HANDOFF.md` carries the full reasoning and the evidence.
+
+*The question as it was asked, kept so the record still shows what was put to the human:*
+
+> No check in `smoke.js` is viewport-sensitive, and Blink re-lays-out when a viewport meta
+> is appended, so "inject the tags after render and watch the viewport checks fail" cannot
+> be demonstrated. I built the control that proves the injection point matters by a layout
+> fact instead (390px with the tags, 980px without), and left the criterion as written
+> unmet rather than redefining it. **Your call: accept the layout-fact control, or add a
+> genuinely viewport-sensitive check to `smoke.js` (which changes the file the phone paste
+> uses)?**
+
+## Bugs found while building
+
+<!-- Standing rule: a bug gets a criterion here FIRST, then the fix. -->
+
+### F5 — RULED 2026-07-27 (amendment A2) — contract item 6 was already false before this round started (found at final sign-off)
+
+**Closed.** Contract item 6 now says three scopes; the manifest was never touched and is
+still byte-identical to `main`. `README.md` was corrected, `factory/BRIEF.md:71` and
+`factory/PLAN.md:33` were corrected in fix pass 2 (F2-3), and a lint rule now compares
+every `.md` in the repo against `appsscript.json`. The finding as it was reported follows.
+
+The Contract says "`appsscript.json` still asks for exactly one OAuth scope". It asks for
+three, and it asked for three at the branch point: `calendar`, `spreadsheets` and
+`script.scriptapp`. The file is **byte-identical to `main`** and was never touched on this
+branch (`git diff main..HEAD -- appsscript.json` is empty).
+
+The three are all load-bearing: the rollup writes a spreadsheet and the nightly trigger is
+installed through `ScriptApp`. Deleting two to make the assertion true would break the
+rollup and the trigger — satisfying a sentence by breaking the app.
+
+Reported rather than actioned. The Contract sentence is wrong about the baseline, not the
+code. `README.md` and the handoff's own orientation table both describe the manifest as
+"one OAuth scope", so the same stale claim appears in more than one place.
+
+### F3 — FIXED during D2 — `smoke.js` counts a check that cannot fail (found during D2)
+
+**Closed.** `smoke.js` returns `{ pass, fail, failed, skipped }`, the ring checks report as
+skipped rather than passed, and `test/headless.js` fails the run unless
+`pass + fail + skipped` equals the number of `ok(` call sites in the file. Both criteria
+below pass. The finding as it was reported follows.
+
+`test/smoke.js:78` reads `ok('no block running, ring not checked', true, ...)`. It is
+literally `true`, so it is a pass no matter what the page does, and it is counted in
+`pass`. That is the exact class `test/README.md:63` records — an assertion that cannot
+fail is worse than none, because it is counted. It also makes the check count
+underivable: 20 call sites, 18 executed, and no way to tell a skipped check from a real
+one.
+
+- [tier 3] Given no block is running, then the ring check is reported as **skipped**, not
+  as passed, and `pass` counts only checks that could have failed.
+- [tier 3] Given the runner, then `pass + fail + skipped` equals the number of `ok(` call
+  sites in the file — so a check added to `smoke.js` can never silently go unrun.
+
+### F4 — RULED 2026-07-27 (amendment A1) — no check in `smoke.js` is viewport-sensitive, so D2's last criterion cannot be met as written (found during D2)
+
+**Closed.** The layout-fact control was accepted and D2's sixth criterion is retired — not
+met, not weakened. `smoke.js` is unchanged. The finding as it was reported follows,
+including the question that was put to the human, which is answered above under "Parked
+questions" and in full in amendment A1.
+
+D2's sixth criterion asks that injecting the meta tags *after* render make the
+viewport-dependent checks in `smoke.js` fail. Measured on Playwright 1.62.0 / chromium-1234:
+
+| metas | layout width | smoke result |
+|---|---|---|
+| before render | 390px (correct) | 18 pass, 0 fail |
+| after render | 390px — Blink re-lays-out on a dynamically added viewport meta | 18 pass, 0 fail |
+| never injected | 980px (definitively the wrong document) | 18 pass, 0 fail |
+
+Two independent reasons it fails: (1) "after" is indistinguishable from "before", because
+Blink re-runs layout when a viewport meta is appended; (2) more seriously, **even with no
+meta at all and a 980px layout, every smoke check still passes** — the checks are all
+relative (`app` height vs `window.innerHeight`, cells equal width, rows full), and those
+hold at any layout width. `smoke.js` opens by saying it exists to catch the viewport bug
+class; in a headless engine, where `dvh` and `vh` are equal, it structurally cannot.
+
+The injection point *does* matter — 390 vs 980 proves it. `smoke.js` just cannot see it.
+
+**PARKED for the human — since answered; see the heading above.** Question: should the
+control prove the injection point matters
+by a layout fact read from the live DOM (`documentElement.clientWidth` 390 with the metas
+vs 980 without), which is what the criterion is *for*? Or should `smoke.js` gain a genuinely
+viewport-sensitive check, which changes the file the phone paste uses? I have implemented
+the first and left the criterion unsatisfied rather than declaring it met. This is also
+direct evidence for the standing claim that the phone paste is not superseded.
+
+### F1 — FIXED in B2 — the boot-time "set aside" banner erases itself (found during B1)
+
+`boot()` calls `showErr(...)` with the set-aside count (`Index.html:964`), then drains and
+calls `loadServerState()`, whose success handler calls `hideErr()` (`Index.html:906`). On
+any healthy load the message is wiped before it can be read. It survives only when the
+state load *also* fails — i.e. the message is visible exactly when it is least useful.
+Contract item 9 requires the banner visible whenever a write has been set aside, so this
+blocks B2 rather than being cosmetic.
+
+Criteria (must pass before F1 is considered fixed):
+
+- [tier 1] Given at least one set-aside write and a *healthy* server, when the app boots
+  and the state load succeeds, then the banner is still visible.
+- [tier 1] Given no set-aside writes, when the app boots and a transient error is shown
+  and then cleared, then the banner is hidden — `hideErr()` still works for its own cases.
+- [tier 1] Given a set-aside write and a later successful flush, then the banner does not
+  get erased by that success either.
+
+### F2 — FIXED in B2 — the count reads "1 write were set aside" (found during B1)
+
+`Index.html:964` pluralises the noun but not the verb, so a single entry reads
+`1 write were set aside after repeated failures`.
+
+- [tier 1] Given exactly one set-aside write, then the message reads "1 write was set
+  aside"; given two, "2 writes were set aside".

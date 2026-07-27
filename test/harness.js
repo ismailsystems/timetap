@@ -78,6 +78,12 @@ global.Utilities = {
   formatDate: (d, tz, fmt) => {
     const p = n => String(n).padStart(2, '0');
     if (fmt === 'yyyy-MM-dd') return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate());
+    // node's local getters follow TZ, which is what Session.getScriptTimeZone()
+    // reports here, so the two agree the way they do on Apps Script.
+    if (fmt === 'yyyy-MM-dd HH:mm') {
+      return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()) +
+             ' ' + p(d.getHours()) + ':' + p(d.getMinutes());
+    }
     throw new Error('unsupported format ' + fmt);
   }
 };
@@ -97,14 +103,58 @@ class FHtmlOutput {
   setXFrameOptionsMode(m) { this.xframe = m; return this; }
   getContent() { return this.content; }
 }
+/* A real sheet is allocated larger than its data (1000x26 for a new one), and
+   writing a smaller grid over a bigger one leaves the old cells behind until
+   something clears them. writeGrid_ depends on that: it writes first and trims
+   afterwards, so that a write which throws cannot leave the tab empty. A shim
+   whose setValues just replaced the whole array could not tell the two orders
+   apart. `rows` stays the tight rectangle of meaningful data, which is what the
+   assertions and the golden fixture read. */
+const ALLOC_ROWS = 1000, ALLOC_COLS = 26;
 class FSheet {
   constructor(name) { this.name = name; this.rows = []; this.frozen = 0; }
   getName() { return this.name; }
   clear() { this.rows = []; return this; }
   setFrozenRows(n) { this.frozen = n; return this; }
+  getMaxRows() { return Math.max(ALLOC_ROWS, this.rows.length); }
+  getMaxColumns() {
+    return Math.max(ALLOC_COLS, this.rows.reduce((w, r) => Math.max(w, r.length), 0));
+  }
+  _trim() {
+    const blank = v => v === '' || v === null || v === undefined;
+    while (this.rows.length && this.rows[this.rows.length - 1].every(blank)) this.rows.pop();
+    let w = this.rows.reduce((m, r) => Math.max(m, r.length), 0);
+    while (w > 0 && this.rows.every(r => blank(r[w - 1]))) {
+      this.rows.forEach(r => { if (r.length >= w) r.length = w - 1; });
+      w--;
+    }
+  }
   getRange(r, c, nr, nc) {
     const sh = this;
-    return { setValues(v) { sh.rows = v.map(x => x.slice()); return this; } };
+    const touch = (row, col, val) => {
+      while (sh.rows.length < row) sh.rows.push([]);
+      const line = sh.rows[row - 1];
+      while (line.length < col) line.push('');
+      line[col - 1] = val;
+    };
+    return {
+      setValues(v) {
+        v.forEach((line, i) => line.forEach((val, j) => touch(r + i, c + j, val)));
+        sh._trim();
+        return this;
+      },
+      // Only cells that exist are blanked; a real clear of unallocated space is
+      // a no-op you cannot observe.
+      clearContent() {
+        for (let i = r; i < r + nr; i++) {
+          const line = sh.rows[i - 1];
+          if (!line) continue;
+          for (let j = c; j < c + nc; j++) if (j - 1 < line.length) line[j - 1] = '';
+        }
+        sh._trim();
+        return this;
+      }
+    };
   }
 }
 class FSpreadsheet {
@@ -158,6 +208,22 @@ let code = fs.readFileSync(SRC + 'Code.gs', 'utf8')
   .replace("var CAL_SITTING = '';", "var CAL_SITTING = 'sit';");
 vm.runInThisContext(code, { filename: 'Code.gs' });
 
+/* A server rejection and a dropped connection are different failures, and the
+ * client is deliberately built to tell them apart. A rejection comes back
+ * through the *success* handler as a non-empty errors array (Code.gs:629) and
+ * counts against the op's try count; setOnline(false) fires the failure handler
+ * and does not count, because retrying is exactly what a network failure wants
+ * (Index.html:497). Only the first path can ever set a write aside, and nothing
+ * in the shim could reach it, so it gets a switch of its own. Wrapping applyOp_
+ * rather than applyOps keeps the real errors/applied/dropped bookkeeping and the
+ * real stop-at-first-failure ordering in play. */
+const realApplyOp_ = global.applyOp_;
+let REJECT = null;
+global.applyOp_ = function () {
+  if (REJECT !== null) throw new Error(REJECT);
+  return realApplyOp_.apply(this, arguments);
+};
+
 /* ── DOM shim ──────────────────────────────────────────────────── */
 class El {
   constructor(tag) {
@@ -184,6 +250,7 @@ class El {
   }
   setAttribute(k, v) { this._attrs = this._attrs || {}; this._attrs[k] = String(v); }
   getAttribute(k) { return (this._attrs || {})[k] ?? null; }
+  removeAttribute(k) { if (this._attrs) delete this._attrs[k]; }
   focus() { global.document.activeElement = this; }
   blur() { if (global.document.activeElement === this) global.document.activeElement = null; }
   addEventListener(t, fn) { (this._h[t] = this._h[t] || []).push(fn); }
@@ -201,11 +268,13 @@ class El {
     return this._stubs[sel] || (this._stubs[sel] = new El('span'));
   }
   appendChild(c) { this.children.push(c); return c; }
+  removeChild(c) { const i = this.children.indexOf(c); if (i >= 0) this.children.splice(i, 1); return c; }
   get hidden() { return this._cls.has('hidden'); }
 }
 const NODES = {};
 const INIT_CLS = { strip:'hidden', err:'hidden', week:'hidden', sheetSplit:'hidden',
-                   sheetSit:'hidden', sitAdj:'hidden', nowbar:'idle', sync:'s-synced' };
+                   sheetSit:'hidden', sheetDead:'hidden', sitAdj:'hidden',
+                   nowbar:'idle', sync:'s-synced' };
 function mkNode(id) {
   const e = new El('div');
   if (INIT_CLS[id]) e.className = INIT_CLS[id];
@@ -314,15 +383,28 @@ const show = e => `"${e.t}" ${hhmm(e.s)}-${hhmm(e.e)}${/#open/.test(e.d) ? ' OPE
 // seconds. The tolerance is for that bookkeeping and nothing else.
 const near = (a, b, tol) => Math.abs(a - b) <= (tol === undefined ? 750 : tol);
 let pass = 0, fail = 0;
+const skipped = [];
 function chk(label, cond, detail) {
   if (cond) { pass++; console.log('  ok   ' + label); }
   else { fail++; console.log('  FAIL ' + label + (detail ? '\n         ' + detail : '')); }
+}
+/**
+ * A check this run could not reach, reported the way smoke.js reports one: named,
+ * with the reason, and counted nowhere near `pass`. A skip that quietly passed
+ * would be the counted-assertion-that-cannot-fail class again — see
+ * test/README.md:63 — and a run with a skip has to look different from a run
+ * without one.
+ */
+function skip(label, why) {
+  skipped.push({ label: label, why: why });
+  console.log('  skip ' + label + '\n         ' + why);
 }
 function reset(atMs) {
   CALS.plan.events = []; CALS.actual.events = []; CALS.sit.events = []; CALS.alt.events = [];
   Object.keys(STORE).forEach(k => delete STORE[k]);
   NOW = atMs !== undefined ? atMs : new Date(2026, 6, 20, 9, 0, 0, 0).getTime();
   ONLINE = true;
+  REJECT = null;
   LOGGED.length = 0;
   global.PROPS_ = null;
   SHEETS.book.sheets = [];
@@ -336,10 +418,13 @@ function reboot() {
   settle();
 }
 
-module.exports = { LOGGED, fireVisible: () => VIS.forEach(f => f()), chk, near, reset, reboot, META_ALLOWED, SCRIPT_PROPS, SHEETS, TRIGGERS,
+module.exports = { LOGGED, fireVisible: () => VIS.forEach(f => f()), chk, skip, near, reset, reboot, META_ALLOWED, SCRIPT_PROPS, SHEETS, TRIGGERS,
   posture, activeKey, litPosture, noteBox, elapsedBox, addCell,
   clearPropCache: () => { global.PROPS_ = null; }, tap, tapSit, tapMark, wait, advance, settle, A, S, show, hhmm, $,
   CALS, NODES, STORE, desc,
-  get pass() { return pass; }, get fail() { return fail; },
-  setOnline: v => { ONLINE = v; }, nowMs: () => NOW,
+  get pass() { return pass; }, get fail() { return fail; }, get skipped() { return skipped; },
+  setOnline: v => { ONLINE = v; },
+  // Pass a message to make every server call reject with it; pass null to stop.
+  setServerReject: m => { REJECT = (m === null || m === undefined || m === false) ? null : String(m); },
+  nowMs: () => NOW,
   setNow: v => { NOW = v; } };

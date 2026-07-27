@@ -735,9 +735,16 @@ const hdr = H.SHEETS.book.getSheetByName('daily').rows[0];
 const known = clientConfig_().categories.map(c => c.key).concat(['UNLOGGED']);
 const fixed = ['date', 'day', 'switches', 'waking h', 'sitting h', 'sitting %',
                'longest sit min', 'sits over 90'];
-const invented = hdr.filter(h => !fixed.includes(h) && !h.startsWith('plan ') && !known.includes(h));
+// The last-rebuilt stamp (C2) also lives in row 1, past the last data column.
+// It is excluded by name rather than by loosening the filter, and pinned below,
+// so a column genuinely invented from a title still fails this.
+const invented = hdr.filter(h => !fixed.includes(h) && !h.startsWith('plan ') &&
+                                 !known.includes(h) && !/^last rebuilt /.test(h));
 chk('no column invented from a clock time or a subject line',
   invented.length === 0, invented.join(' '));
+chk('and the only non-column cell in the header is the one stamp',
+  hdr.filter(h => /^last rebuilt /.test(h)).length === 1,
+  JSON.stringify(hdr.filter(h => /^last rebuilt /.test(h))));
 chk('UNLOGGED is still reported', hdr.includes('UNLOGGED'));
 chk('a real category prefix is still counted',
   H.SHEETS.book.getSheetByName('weekly').rows[1][hdr.indexOf('plan DW') >= 0 ? 1 : 1] !== undefined);
@@ -1014,6 +1021,852 @@ const dedicated = setupRollup();
 chk('a dedicated sheet gets no such warning', !/other tabs/.test(dedicated));
 reset();
 
+/* ── A1: a server rejection is a different failure from a dropped connection ──
+ * Everything downstream of here (the drawer, what a dead entry knows about
+ * itself) is only honestly testable if a failure can be forced on demand. These
+ * assert what today's unmodified client already does. */
+
+const Q = () => JSON.parse(H.STORE['tt.queue.v1'] || '[]');
+const DEAD = () => JSON.parse(H.STORE['tt.dead.v1'] || '[]');
+const headTries = () => { const q = Q(); return q.length ? (q[0].tries || 0) : null; };
+// The backoff starts at 4s and doubles to a 60s ceiling (Index.html:522), so the
+// step has to be smaller than the gap being counted or one advance swallows the
+// whole early ladder — 4+8+16+32s inside a single 61s jump, five attempts where
+// the test meant to observe one. Small steps to count attempts exactly; big
+// steps only once the delay has pinned at its ceiling.
+function pump(cond, cap, stepMs) {
+  const step = stepMs === undefined ? 1000 : stepMs;
+  for (let i = 0; i < (cap === undefined ? 200 : cap) && !cond(); i++) { advance(step); settle(); }
+  return cond();
+}
+
+console.log('\n34. a server rejection travels the server path, not the offline one');
+reset();
+H.setServerReject('server said no');
+const rej = applyOps([{ id: 'srv1', type: 'openActual', ref: 'aaaabbbbccccdddd',
+                        key: 'DW', startMs: Date.now() }]);
+chk('the rejection comes back through errors, not as a thrown call',
+  rej.errors.length === 1, JSON.stringify(rej.errors));
+chk('the error names the op that caused it',
+  rej.errors.length === 1 && rej.errors[0].id === 'srv1', JSON.stringify(rej.errors));
+chk('and carries the thrown message',
+  rej.errors.length === 1 && /server said no/.test(rej.errors[0].message),
+  JSON.stringify(rej.errors));
+chk('nothing was applied', rej.applied.length === 0, JSON.stringify(rej.applied));
+chk('and nothing reached the calendar', A().length === 0, A().map(show).join(' | '));
+reset();
+
+console.log('\n34b. five rejections set the write aside — and four do not');
+reset(); reboot();
+H.setServerReject('calendar is not having it');
+tap('DW');
+chk('the write is queued', Q().length === 1, JSON.stringify(Q().map(o => o.type)));
+pump(() => (headTries() || 0) >= 4 || DEAD().length > 0);
+chk('after four attempts it is still queued', Q().length === 1, JSON.stringify(Q()));
+chk('and nothing has been set aside yet', DEAD().length === 0, JSON.stringify(DEAD()));
+chk('four is really four', headTries() === 4, String(headTries()));
+// Stop at the fifth attempt whether or not it set anything aside. Pumping until
+// a dead entry appears would pass just as happily on a client that gave up on
+// the sixth — the threshold has to be observed, not waited for.
+pump(() => DEAD().length > 0 || (headTries() || 0) >= 5);
+chk('the fifth attempt sets it aside, and not one later',
+  DEAD().length === 1, 'dead=' + DEAD().length + ' tries=' + headTries());
+chk('and it leaves the queue', Q().length === 0, JSON.stringify(Q()));
+chk('the reason kept is the server\'s own message',
+  DEAD().length === 1 && /calendar is not having it/.test(DEAD()[0].why),
+  DEAD().length ? DEAD()[0].why : '(none)');
+chk('the op it set aside is the one that failed',
+  DEAD().length === 1 && DEAD()[0].op.type === 'openActual',
+  DEAD().length ? DEAD()[0].op.type : '(none)');
+chk('and the user was told', !$('err').hidden, $('err').textContent);
+reset();
+
+console.log('\n34c. a network failure is never counted against an op');
+reset(); reboot();
+H.setOnline(false);
+tap('DW');
+chk('the write is queued', Q().length === 1, JSON.stringify(Q().map(o => o.type)));
+for (let i = 0; i < 8; i++) { advance(61000); settle(); }
+chk('after eight retries it is still queued', Q().length === 1, JSON.stringify(Q()));
+chk('nothing was set aside', DEAD().length === 0, JSON.stringify(DEAD()));
+chk('and no try was counted against it', !Q()[0].tries, String(Q()[0] && Q()[0].tries));
+H.setOnline(true);
+reset();
+
+console.log('\n34d. the dead list is capped at fifty, keeping the newest');
+reset();
+const many = [];
+for (let i = 0; i < 60; i++) {
+  many.push({ id: 'op' + i, type: 'openActual', ref: 'ref' + String(i).padStart(5, '0'),
+              key: 'DW', startMs: Date.now() + i * 60000 });
+}
+H.STORE['tt.queue.v1'] = JSON.stringify(many);
+H.setServerReject('still no');
+reboot();
+pump(() => Q().length === 0, 2000, 61000);
+chk('every one of the sixty left the queue', Q().length === 0, String(Q().length));
+chk('the dead list holds exactly fifty', DEAD().length === 50, String(DEAD().length));
+chk('the oldest ten were dropped, not the newest',
+  DEAD().length === 50 && DEAD()[0].op.ref === 'ref00010' && DEAD()[49].op.ref === 'ref00059',
+  DEAD().length ? DEAD()[0].op.ref + '..' + DEAD()[DEAD().length - 1].op.ref : '(empty)');
+reset();
+
+console.log('\n35. a set-aside write says which block it belonged to');
+reset(); reboot();
+tap('ADM');
+const b1Start = H.nowMs();
+wait(52); tap('DW');                       // ADM closes, the strip offers a mark
+chk('the strip is up, so a mark is possible', !$('strip').hidden);
+chk('and everything so far is written', Q().length === 0, JSON.stringify(Q()));
+H.setServerReject('calendar said no');
+tapMark('+');
+pump(() => DEAD().length > 0);
+chk('the mark was set aside', DEAD().length === 1, JSON.stringify(DEAD()));
+chk('a setMark names the category the mark belonged to',
+  DEAD().length === 1 && DEAD()[0].key === 'ADM',
+  DEAD().length ? String(DEAD()[0].key) : '(none)');
+chk('and that block\'s start time',
+  DEAD().length === 1 && near(DEAD()[0].startMs, b1Start),
+  DEAD().length ? new Date(DEAD()[0].startMs) + ' vs ' + new Date(b1Start) : '(none)');
+chk('the op itself never carried a category — the index did',
+  DEAD().length === 1 && !DEAD()[0].op.key, JSON.stringify(DEAD()[0] && DEAD()[0].op));
+reset();
+
+console.log('\n35b. a closeActual names the block being closed');
+reset(); reboot();
+tap('DW');
+const b1Open = H.nowMs();
+wait(30);
+H.setServerReject('calendar said no');
+tap('MTG');                                // closeActual(DW) leads the queue
+pump(() => DEAD().length > 0);
+chk('the close was set aside', DEAD().length === 1, JSON.stringify(DEAD().map(d => d.op.type)));
+chk('and it names the category being closed',
+  DEAD().length === 1 && DEAD()[0].op.type === 'closeActual' && DEAD()[0].key === 'DW',
+  DEAD().length ? DEAD()[0].op.type + '/' + DEAD()[0].key : '(none)');
+chk('with the start of the block, not its end',
+  DEAD().length === 1 && near(DEAD()[0].startMs, b1Open),
+  DEAD().length ? new Date(DEAD()[0].startMs) + ' vs ' + new Date(b1Open) : '(none)');
+reset();
+
+console.log('\n35c. an openActual names the category that was tapped');
+reset(); reboot();
+H.setServerReject('calendar said no');
+const b1Tap = H.nowMs();
+tap('FRAG');
+pump(() => DEAD().length > 0);
+chk('the open was set aside', DEAD().length === 1, JSON.stringify(DEAD().map(d => d.op.type)));
+chk('and it names the tapped category',
+  DEAD().length === 1 && DEAD()[0].key === 'FRAG',
+  DEAD().length ? String(DEAD()[0].key) : '(none)');
+chk('and when it was tapped',
+  DEAD().length === 1 && near(DEAD()[0].startMs, b1Tap),
+  DEAD().length ? String(DEAD()[0].startMs) : '(none)');
+reset();
+
+console.log('\n35d. a category removed since still reads back by name');
+reset();
+addCategory('Scratch');
+const scratch = clientConfig_().categories.slice(-1)[0].key;
+reboot();
+H.setServerReject('calendar said no');
+tap(scratch);
+pump(() => DEAD().length > 0);
+chk('the write was set aside', DEAD().length === 1, JSON.stringify(DEAD()));
+removeCategory(scratch);
+H.clearPropCache();
+chk('the category really is gone',
+  !clientConfig_().categories.some(c => c.key === scratch),
+  JSON.stringify(clientConfig_().categories.map(c => c.key)));
+let b1Read = null, b1Threw = null;
+try { b1Read = DEAD()[0].key; } catch (e) { b1Threw = String(e); }
+chk('the entry still names the key rather than going blank',
+  b1Read === scratch, 'read=' + b1Read + ' threw=' + b1Threw);
+reset();
+
+console.log('\n35e. an entry from an older version is still readable');
+reset();
+H.STORE['tt.dead.v1'] = JSON.stringify([
+  { at: D(2026, 7, 20, 9, 15), why: 'whatever went wrong', op: { type: 'setMark', ref: 'oldref00' } }
+]);
+let b1Boot = null;
+try { reboot(); } catch (e) { b1Boot = String(e && e.message || e); }
+chk('booting on a legacy entry does not throw', b1Boot === null, String(b1Boot));
+// Whether that message survives the state load is finding F1, fixed and asserted in B2.
+chk('and the boot message counted it', /set aside/.test($('err').textContent), $('err').textContent);
+chk('the legacy entry was left alone, not rewritten',
+  DEAD().length === 1 && DEAD()[0].key === undefined, JSON.stringify(DEAD()));
+reset();
+
+/* ── B2: the banner is a door ─────────────────────────────────────── */
+
+const uiRows = () => (H.NODES['deadList'] ? H.NODES['deadList'].children : []);
+// `el` (declared above) goes through document; `$` hands back only nodes the
+// client has already touched, and a drawer that was never opened has none —
+// which is exactly the case worth asserting about.
+const rowText = r => r.children.map(c => c.textContent).join(' | ');
+// Two writes the server will never accept, plus the block index that a real
+// session would have left behind for them.
+function seedTwoDead() {
+  reset();
+  H.STORE['tt.queue.v1'] = JSON.stringify([
+    { id: 'd1', type: 'openActual', ref: 'refaaaa1', key: 'DW', startMs: D(2026, 7, 20, 9, 0) },
+    { id: 'd2', type: 'setMark', ref: 'refbbbb2', mark: '+', hintMs: D(2026, 7, 20, 10, 0) }
+  ]);
+  H.STORE['tt.blocks.v1'] = JSON.stringify({
+    refaaaa1: { key: 'DW', startMs: D(2026, 7, 20, 9, 0) },
+    refbbbb2: { key: 'MTG', startMs: D(2026, 7, 20, 10, 0) }
+  });
+  H.setServerReject('the calendar refused');
+  reboot();
+  pump(() => Q().length === 0, 2000, 61000);
+  H.setServerReject(null);
+  reboot();                                  // a fresh, healthy load
+}
+
+console.log('\n36. the banner survives a healthy load and opens a drawer');
+seedTwoDead();
+chk('both writes were set aside', DEAD().length === 2, JSON.stringify(DEAD().map(d => d.op.type)));
+chk('the banner is visible after a load that succeeded', !$('err').hidden, $('err').textContent);
+chk('and it counts them in a sentence that parses',
+  $('err').textContent === '2 writes were set aside after repeated failures',
+  $('err').textContent);
+chk('it announces itself as a door',
+  $('err').getAttribute('role') === 'button' && $('err').getAttribute('tabindex') === '0',
+  $('err').getAttribute('role') + '/' + $('err').getAttribute('tabindex'));
+$('err').click(); settle();
+chk('tapping it opens the drawer', !$('sheetDead').hidden);
+chk('holding exactly two rows', uiRows().length === 2, String(uiRows().length));
+chk('newest first', /save the mark/.test(rowText(uiRows()[0])), rowText(uiRows()[0]));
+chk('oldest last', /start a block/.test(rowText(uiRows()[1])), rowText(uiRows()[1]));
+
+console.log('\n36b. every row says when, which, what and why');
+const r36 = rowText(uiRows()[0]);
+chk('a clock time', /\d{1,2}:\d\d (AM|PM)/.test(r36), r36);
+chk('the category the mark belonged to', /MTG/.test(r36), r36);
+chk('what it was trying to do, in words', /tried to save the mark/.test(r36), r36);
+chk('never the op type', !/setMark|closeActual|openActual/.test(r36), r36);
+chk('and why it failed', /the calendar refused/.test(r36), r36);
+chk('the other row names its own category', /DW/.test(rowText(uiRows()[1])), rowText(uiRows()[1]));
+
+console.log('\n36c. closing the drawer gives the grid back');
+$('dgClose').click(); settle();
+chk('the drawer is closed', $('sheetDead').hidden);
+chk('the banner is still there, because the writes still are', !$('err').hidden, $('err').textContent);
+tap('DW');
+chk('and a category tap still opens a block', activeKey() === 'DW', String(activeKey()));
+chk('which reached the calendar', A().length === 1, A().map(show).join(' | '));
+reset();
+
+console.log('\n36d. no set-aside writes, no door');
+reset(); reboot();
+chk('the banner is hidden', $('err').hidden);
+chk('it is not focusable', $('err').getAttribute('tabindex') === null,
+  String($('err').getAttribute('tabindex')));
+$('err').click(); settle();
+chk('and tapping where it would be does nothing', el('sheetDead').hidden);
+reset();
+
+console.log('\n36e. a write type the drawer has no words for still renders');
+reset();
+H.STORE['tt.dead.v1'] = JSON.stringify([
+  { at: D(2026, 7, 20, 11, 0), why: 'server said no', key: 'DW',
+    startMs: D(2026, 7, 20, 10, 30), op: { type: 'frobnicate', ref: 'refcccc3' } }
+]);
+let b2Threw = null;
+try { reboot(); $('err').click(); settle(); } catch (e) { b2Threw = String(e && e.message || e); }
+chk('nothing throws', b2Threw === null, String(b2Threw));
+chk('the row is there', uiRows().length === 1, String(uiRows().length));
+chk('showing the raw type rather than a blank row',
+  /frobnicate/.test(rowText(uiRows()[0])), rowText(uiRows()[0]));
+chk('and it still says why', /server said no/.test(rowText(uiRows()[0])), rowText(uiRows()[0]));
+reset();
+
+console.log('\n36f. an entry from an older version renders its gaps as unknown (B1 criterion 5)');
+reset();
+H.STORE['tt.dead.v1'] = JSON.stringify([
+  { at: D(2026, 7, 20, 9, 15), why: 'whatever went wrong', op: { type: 'setMark', ref: 'oldref00' } }
+]);
+let b2Legacy = null;
+try { reboot(); $('err').click(); settle(); } catch (e) { b2Legacy = String(e && e.message || e); }
+chk('nothing throws on the legacy shape', b2Legacy === null, String(b2Legacy));
+chk('the row renders', uiRows().length === 1, String(uiRows().length));
+const r36f = uiRows().length ? rowText(uiRows()[0]) : '';
+chk('the missing category reads as unknown', /unknown category/.test(r36f), r36f);
+chk('the missing start reads as unknown', /unknown start/.test(r36f), r36f);
+chk('what it was doing is still known', /save the mark/.test(r36f), r36f);
+chk('and no cell is simply blank', !/\|\s*\|/.test(r36f), r36f);
+reset();
+
+console.log('\n36h. one write reads as one write');
+reset();
+H.STORE['tt.dead.v1'] = JSON.stringify([
+  { at: D(2026, 7, 20, 11, 0), why: 'server said no', key: 'DW',
+    startMs: D(2026, 7, 20, 10, 30), op: { type: 'setMark', ref: 'refdddd4' } }
+]);
+reboot();
+chk('the count agrees with its verb',
+  $('err').textContent === '1 write was set aside after repeated failures',
+  $('err').textContent);
+reset();
+
+console.log('\n36g. the drawer\'s markup is declared, not invented');
+reset();
+chk('the sheet exists in the markup', !!el('sheetDead'));
+chk('its close button exists', !!el('dgClose'));
+chk('its list exists', !!el('deadList'));
+reset();
+
+/* ── B3: an entry can be discarded once it has been dealt with ────── */
+
+const dropBtn = r => r.children.find(c => c.tag === 'button');
+// DISCARD arms on the first tap and acts on the second — the same two-step the
+// grid uses for a consequential tap. See section 37f for why: a single-tap
+// discard let the next row slide under the finger, so a double tap destroyed a
+// second write the reader had never seen. Every assertion below is unchanged;
+// only the gesture that reaches it is.
+const discard = r => { const b = dropBtn(r); b.click(); settle(); b.click(); settle(); };
+// The same window the grid's arm/confirm uses, read from the real config rather
+// than written down here.
+const CFG_CONFIRM_TIMEOUT = clientConfig_().confirmTimeoutMs;
+
+console.log('\n37. discarding one of two leaves the other and the drawer open');
+seedTwoDead();
+$('err').click(); settle();
+chk('two rows to start', uiRows().length === 2, String(uiRows().length));
+const keptText = rowText(uiRows()[1]);
+discard(uiRows()[0]);
+chk('one row remains', uiRows().length === 1, String(uiRows().length));
+chk('and it is the one not discarded', rowText(uiRows()[0]) === keptText, rowText(uiRows()[0]));
+chk('the dead list in storage holds one', DEAD().length === 1, JSON.stringify(DEAD()));
+chk('the drawer stays open', !$('sheetDead').hidden);
+chk('and the banner now counts one', $('err').textContent === '1 write was set aside after repeated failures',
+  $('err').textContent);
+
+console.log('\n37b. discarding the last one closes the drawer and clears the banner');
+discard(uiRows()[0]);
+chk('the dead list is empty', DEAD().length === 0, JSON.stringify(DEAD()));
+chk('the drawer closed itself', $('sheetDead').hidden);
+chk('the banner is hidden', $('err').hidden, $('err').textContent);
+chk('and it is no longer a door', $('err').getAttribute('role') === null,
+  String($('err').getAttribute('role')));
+
+console.log('\n37c. and it stays gone across a reload');
+reboot();
+chk('no set-aside message on the next load', $('err').hidden, $('err').textContent);
+chk('the dead list is still empty', DEAD().length === 0, JSON.stringify(DEAD()));
+reset();
+
+console.log('\n37d. discarding never touches pending work');
+reset();
+H.STORE['tt.dead.v1'] = JSON.stringify([
+  { at: D(2026, 7, 20, 11, 0), why: 'server said no', key: 'DW',
+    startMs: D(2026, 7, 20, 10, 30), op: { type: 'setMark', ref: 'refdddd4', id: 'dead1' } }
+]);
+H.STORE['tt.queue.v1'] = JSON.stringify([
+  { id: 'pending1', type: 'openActual', ref: 'refeeee5', key: 'MTG', startMs: D(2026, 7, 20, 11, 30) }
+]);
+H.setOnline(false);                            // so the pending write cannot drain
+reboot();
+const qBefore = H.STORE['tt.queue.v1'];
+chk('there is a pending write', Q().length === 1, JSON.stringify(Q()));
+$('err').click(); settle();
+discard(uiRows()[0]);
+chk('the set-aside entry is gone', DEAD().length === 0, JSON.stringify(DEAD()));
+chk('the queue is byte-for-byte unchanged', H.STORE['tt.queue.v1'] === qBefore,
+  H.STORE['tt.queue.v1'] + ' vs ' + qBefore);
+H.setOnline(true);
+reset();
+
+console.log('\n37e. a button whose row has already gone discards nothing');
+seedTwoDead();
+$('err').click(); settle();
+const staleRow = dropBtn(uiRows()[0]);
+const survivor = rowText(uiRows()[1]);
+discard(uiRows()[0]);
+chk('the row was discarded', DEAD().length === 1, JSON.stringify(DEAD()));
+let b3Threw = null;
+try { staleRow.click(); settle(); staleRow.click(); settle(); }
+catch (e) { b3Threw = String(e && e.message || e); }
+chk('tapping its detached button throws nothing', b3Threw === null, String(b3Threw));
+chk('and takes nothing with it', DEAD().length === 1, JSON.stringify(DEAD()));
+chk('the surviving row is the one that should have survived',
+  uiRows().length === 1 && rowText(uiRows()[0]) === survivor,
+  uiRows().length ? rowText(uiRows()[0]) : '(none)');
+reset();
+
+/* Contract assertion 24. A single-tap discard let the rows below slide up into
+   the space the finger had just left, so a double tap destroyed a second write
+   the reader had never looked at. The token guard cannot catch that: the second
+   tap lands on a genuinely different row holding a genuinely valid token. Both
+   taps of a double tap must therefore resolve to the row that was aimed at.
+   The tier-3 twin of this, in a real browser at real coordinates, is in
+   test/headless.js — the shim cannot express a control moving under a finger. */
+console.log('\n37f. a double tap discards the row it was aimed at, and only that row');
+seedTwoDead();
+$('err').click(); settle();
+chk('two rows to start', uiRows().length === 2, String(uiRows().length));
+const aimedAt = rowText(uiRows()[0]);
+const bystander = rowText(uiRows()[1]);
+const aimedBtn = dropBtn(uiRows()[0]);
+chk('the button reads DISCARD before anything is tapped',
+  aimedBtn.textContent === 'DISCARD', aimedBtn.textContent);
+aimedBtn.click(); settle();
+chk('one tap discards nothing at all', DEAD().length === 2, JSON.stringify(DEAD().length));
+chk('it arms instead, and says so', aimedBtn.textContent === 'TAP AGAIN TO DISCARD',
+  aimedBtn.textContent);
+chk('and the row is still on screen', uiRows().length === 2, String(uiRows().length));
+aimedBtn.click(); settle();
+chk('the second tap discards exactly one', DEAD().length === 1, JSON.stringify(DEAD()));
+chk('and it is the row that was aimed at — the bystander survives',
+  uiRows().length === 1 && rowText(uiRows()[0]) === bystander,
+  'aimed at: ' + aimedAt + '  ||  left: ' + (uiRows().length ? rowText(uiRows()[0]) : '(none)'));
+
+console.log('\n37g. the row that slides up into the gap is not armed');
+chk('the survivor is not carrying an armed button',
+  dropBtn(uiRows()[0]).textContent === 'DISCARD', dropBtn(uiRows()[0]).textContent);
+// A third tap in the same place lands on the survivor. It must arm it, never
+// discard it — that is the whole mechanism of the bug this section pins.
+dropBtn(uiRows()[0]).click(); settle();
+chk('a stray tap on it arms rather than discards', DEAD().length === 1, JSON.stringify(DEAD()));
+chk('the drawer is still open with its one row',
+  !$('sheetDead').hidden && uiRows().length === 1, String(uiRows().length));
+reset();
+
+console.log('\n37h. an armed row forgets, so a stale confirmation cannot land later');
+seedTwoDead();
+$('err').click(); settle();
+const forgetful = dropBtn(uiRows()[0]);
+forgetful.click(); settle();
+chk('it is armed', forgetful.textContent === 'TAP AGAIN TO DISCARD', forgetful.textContent);
+advance(CFG_CONFIRM_TIMEOUT + 1000); settle();
+chk('after the timeout it has disarmed itself', forgetful.textContent === 'DISCARD',
+  forgetful.textContent);
+forgetful.click(); settle();
+chk('so the next tap arms again rather than discarding', DEAD().length === 2,
+  JSON.stringify(DEAD().length));
+reset();
+
+console.log('\n37i. arming one row disarms any other');
+seedTwoDead();
+$('err').click(); settle();
+const rowA = dropBtn(uiRows()[0]), rowB = dropBtn(uiRows()[1]);
+rowA.click(); settle();
+rowB.click(); settle();
+chk('the first row went back to DISCARD', rowA.textContent === 'DISCARD', rowA.textContent);
+chk('the second is the armed one', rowB.textContent === 'TAP AGAIN TO DISCARD', rowB.textContent);
+rowA.click(); settle();
+chk('tapping the first again only re-arms it', DEAD().length === 2, JSON.stringify(DEAD().length));
+chk('and the second disarmed', rowB.textContent === 'DISCARD', rowB.textContent);
+reset();
+
+console.log('\n37j. a write set aside while the drawer is open appears in it');
+reset(); reboot();
+tap('ADM'); wait(52); tap('DW');
+H.setServerReject('the calendar refused');
+tapMark('+');
+pump(() => DEAD().length > 0);
+$('err').click(); settle();
+chk('one row on screen', uiRows().length === 1, String(uiRows().length));
+tap('FRAG'); wait(30); tap('DW'); tapMark('+');
+pump(() => DEAD().length > 1);
+chk('the new one is on the shelf too, without reopening the drawer',
+  uiRows().length === 2, 'rows=' + uiRows().length + ' dead=' + DEAD().length);
+H.setServerReject(null);
+reset();
+
+console.log('\n37k. closing the drawer leaves nothing behind in it');
+seedTwoDead();
+$('err').click(); settle();
+chk('two rows while open', uiRows().length === 2, String(uiRows().length));
+$('dgClose').click(); settle();
+chk('the drawer is closed', $('sheetDead').hidden);
+chk('and holds no rows at all', uiRows().length === 0, String(uiRows().length));
+$('err').click(); settle();
+chk('reopening rebuilds both rows', uiRows().length === 2, String(uiRows().length));
+reset();
+
+/* ── C1: a failed rollup records why, where the failure cannot erase it ── */
+
+const REC = () => {
+  const raw = H.SCRIPT_PROPS.ROLLUP_LAST;
+  return raw === undefined ? null : JSON.parse(raw);
+};
+const goodSheet = () => { H.SCRIPT_PROPS.SHEET_ID = 'book'; H.clearPropCache(); };
+const brokenSheet = () => { H.SCRIPT_PROPS.SHEET_ID = 'no-such-book'; H.clearPropCache(); };
+
+console.log('\n38. a working rollup returns what it always did, and says so');
+reset(); goodSheet();
+tap('DW'); wait(40); tap('MTG'); wait(20); tap('DW');
+const r38 = dailyRollup();
+chk('it still returns days, categories and sheet',
+  r38 && typeof r38.days === 'number' && typeof r38.categories === 'number' &&
+  typeof r38.sheet === 'string', JSON.stringify(r38));
+chk('the record says the run succeeded', REC() && REC().outcome === 'ok', JSON.stringify(REC()));
+chk('with a timestamp', REC() && near(REC().lastSuccessMs, H.nowMs(), 2000),
+  REC() ? String(REC().lastSuccessMs) : '(none)');
+chk('and no failure is claimed', REC() && !REC().lastFailureMs, JSON.stringify(REC()));
+reset();
+
+console.log('\n38b. a sheet that cannot be opened records the failure and rethrows');
+reset(); brokenSheet();
+let e38 = null;
+try { dailyRollup(); } catch (e) { e38 = String(e && e.message || e); }
+chk('the error is rethrown so the platform marks the run failed', e38 !== null, String(e38));
+chk('and it names the sheet it could not open', /no-such-book/.test(e38 || ''), String(e38));
+chk('the record says it failed', REC() && REC().outcome === 'failed', JSON.stringify(REC()));
+chk('with the reason kept', REC() && /no-such-book/.test(REC().lastFailureWhy || ''),
+  REC() ? String(REC().lastFailureWhy) : '(none)');
+chk('and a timestamp', REC() && near(REC().lastFailureMs, H.nowMs(), 2000),
+  REC() ? String(REC().lastFailureMs) : '(none)');
+reset();
+
+console.log('\n38c. a failure never erases the last good run');
+reset(); goodSheet();
+tap('DW'); wait(30); tap('MTG');
+dailyRollup();
+const okAt = REC().lastSuccessMs;
+chk('a success is on record', REC().outcome === 'ok' && okAt > 0, JSON.stringify(REC()));
+wait(60);
+brokenSheet();
+try { dailyRollup(); } catch (e) {}
+chk('the newer failure is recorded', REC().outcome === 'failed', JSON.stringify(REC()));
+chk('and the last success is still there, to the millisecond',
+  REC().lastSuccessMs === okAt, REC().lastSuccessMs + ' vs ' + okAt);
+chk('the two are distinguishable', REC().lastFailureMs > REC().lastSuccessMs,
+  REC().lastFailureMs + ' vs ' + REC().lastSuccessMs);
+reset();
+
+console.log('\n38d. a failure partway through the write is recorded too');
+reset(); goodSheet();
+tap('DW'); wait(30); tap('MTG');
+const realWriteGrid = global.writeGrid_;
+global.writeGrid_ = function () { throw new Error('the sheet went away mid-write'); };
+let e38d = null;
+try { dailyRollup(); } catch (e) { e38d = String(e && e.message || e); }
+global.writeGrid_ = realWriteGrid;
+chk('it rethrew', /mid-write/.test(e38d || ''), String(e38d));
+chk('the failure is on record with its reason',
+  REC() && REC().outcome === 'failed' && /mid-write/.test(REC().lastFailureWhy || ''),
+  JSON.stringify(REC()));
+reset();
+
+console.log('\n38e. a success after a failure reads as current');
+reset(); brokenSheet();
+try { dailyRollup(); } catch (e) {}
+const failAt = REC().lastFailureMs;
+chk('the failure is on record', REC().outcome === 'failed', JSON.stringify(REC()));
+wait(60);
+goodSheet();
+tap('DW'); wait(20); tap('MTG');
+dailyRollup();
+chk('the run now reads as ok', REC().outcome === 'ok', JSON.stringify(REC()));
+chk('the success is the newer of the two', REC().lastSuccessMs > failAt,
+  REC().lastSuccessMs + ' vs ' + failAt);
+chk('and the old failure is still on record, not erased',
+  REC().lastFailureMs === failAt && /no-such-book/.test(REC().lastFailureWhy || ''),
+  JSON.stringify(REC()));
+reset();
+
+/* ── C2: both tabs say when they were last rebuilt ────────────────── */
+
+const tabRows = name => {
+  const sh = H.SHEETS.book.getSheetByName(name);
+  return sh ? sh.rows : null;
+};
+const stampsIn = rows => {
+  const found = [];
+  (rows || []).forEach((r, i) => r.forEach((c, j) => {
+    if (typeof c === 'string' && /^last rebuilt /.test(c)) found.push({ i, j, c });
+  }));
+  return found;
+};
+
+console.log('\n39. both tabs carry a last-rebuilt stamp');
+reset(); goodSheet();
+tap('DW'); wait(40); tap('MTG'); wait(20); tap('DW');
+dailyRollup();
+const dStamps = stampsIn(tabRows('daily'));
+const wStamps = stampsIn(tabRows('weekly'));
+chk('the daily tab has exactly one stamp', dStamps.length === 1, JSON.stringify(dStamps));
+chk('the weekly tab has exactly one stamp', wStamps.length === 1, JSON.stringify(wStamps));
+chk('the daily stamp is in row 1', dStamps.length === 1 && dStamps[0].i === 0,
+  dStamps.length ? String(dStamps[0].i) : '(none)');
+chk('past the last data column',
+  dStamps.length === 1 && dStamps[0].j === tabRows('daily')[1].length - 1,
+  dStamps.length ? dStamps[0].j + ' vs ' + (tabRows('daily')[1].length - 1) : '(none)');
+chk('nothing else sits in that column',
+  tabRows('daily').slice(1).every(r => r[dStamps[0].j] === ''),
+  JSON.stringify(tabRows('daily').slice(1, 3).map(r => r[dStamps[0].j])));
+chk('it reads as a date and a time',
+  /^last rebuilt \d{4}-\d\d-\d\d \d\d:\d\d /.test(dStamps[0].c), dStamps[0].c);
+chk('and it names the script timezone',
+  dStamps[0].c.slice(-Session.getScriptTimeZone().length) === Session.getScriptTimeZone(),
+  dStamps[0].c + ' / ' + Session.getScriptTimeZone());
+chk('the clock in it is local, not UTC',
+  dStamps[0].c.indexOf(' ' + String(new Date(H.nowMs()).getHours()).padStart(2, '0') + ':') > 0,
+  dStamps[0].c + ' / local hour ' + new Date(H.nowMs()).getHours());
+chk('the stamp states a fact and stops',
+  !/stale|out of date|should|check|warning|⚠/i.test(dStamps[0].c), dStamps[0].c);
+
+console.log('\n39b. running twice rewrites the stamp, it does not accumulate');
+const firstStamp = dStamps[0].c;
+wait(120);
+dailyRollup();
+chk('still exactly one stamp in daily', stampsIn(tabRows('daily')).length === 1,
+  JSON.stringify(stampsIn(tabRows('daily'))));
+chk('still exactly one in weekly', stampsIn(tabRows('weekly')).length === 1,
+  JSON.stringify(stampsIn(tabRows('weekly'))));
+chk('and it moved on', stampsIn(tabRows('daily'))[0].c !== firstStamp,
+  stampsIn(tabRows('daily'))[0].c + ' vs ' + firstStamp);
+
+console.log('\n39c. a failed run never refreshes the stamp');
+const beforeFail = stampsIn(tabRows('daily'))[0].c;
+const rowsBefore = JSON.stringify(tabRows('daily'));
+wait(120);
+brokenSheet();
+let e39 = null;
+try { dailyRollup(); } catch (e) { e39 = String(e && e.message || e); }
+chk('the run failed', e39 !== null, String(e39));
+chk('the stamp in the sheet is untouched', stampsIn(tabRows('daily'))[0].c === beforeFail,
+  stampsIn(tabRows('daily'))[0].c + ' vs ' + beforeFail);
+chk('and so is every other cell', JSON.stringify(tabRows('daily')) === rowsBefore);
+reset();
+
+console.log('\n39e. a tab\'s stamp is never newer than that tab\'s own numbers');
+reset(); goodSheet();
+tap('DW'); wait(40); tap('MTG');
+dailyRollup();
+const weeklyBefore = JSON.stringify(tabRows('weekly'));
+const dailyStampBefore = stampsIn(tabRows('daily'))[0].c;
+wait(180);
+// Break the tab itself, not writeGrid_. Stubbing the function meant its own
+// clear() never ran, so the case that actually blanked a tab was unreachable
+// from here — the review found it by breaking getRange instead. Contract 25.
+const weeklySheet = H.SHEETS.book.getSheetByName(WEEKLY_TAB);
+const realGetRange = weeklySheet.getRange;
+weeklySheet.getRange = function () { throw new Error('weekly tab is protected'); };
+let e39e = null;
+try { dailyRollup(); } catch (e) { e39e = String(e && e.message || e); }
+weeklySheet.getRange = realGetRange;
+chk('the run failed partway', /weekly tab is protected/.test(e39e || ''), String(e39e));
+chk('the weekly tab is untouched — old numbers, old stamp, together',
+  JSON.stringify(tabRows('weekly')) === weeklyBefore);
+// Contract 25. writeGrid_ used to clear before it wrote, so a write that threw
+// left the tab with no numbers AND no stamp — worse than stale, because nothing
+// in the spreadsheet said anything had gone wrong.
+chk('and it is not empty — a failed write never blanks a tab',
+  tabRows('weekly').length > 0, 'weekly rows=' + tabRows('weekly').length);
+chk('it still carries exactly its own old stamp',
+  stampsIn(tabRows('weekly')).length === 1, JSON.stringify(stampsIn(tabRows('weekly'))));
+chk('the daily tab got new numbers and a new stamp, also together',
+  stampsIn(tabRows('daily'))[0].c !== dailyStampBefore,
+  stampsIn(tabRows('daily'))[0].c + ' vs ' + dailyStampBefore);
+chk('and the failure is on record', REC() && REC().outcome === 'failed', JSON.stringify(REC()));
+reset();
+
+/* Contract 16 as amended, and 25. A failure while BUILDING a grid must leave both
+   tabs alone — which is why both grids are now built before either is written. */
+console.log('\n39f. a failure before any write leaves both tabs exactly as they were');
+reset(); goodSheet();
+tap('DW'); wait(40); tap('MTG');
+dailyRollup();
+const bothBefore = JSON.stringify([tabRows('daily'), tabRows('weekly')]);
+wait(180);
+const realWeeklyGrid = global.weeklyGrid_;
+global.weeklyGrid_ = function () { throw new Error('could not build the weekly grid'); };
+let e39f = null;
+try { dailyRollup(); } catch (e) { e39f = String(e && e.message || e); }
+global.weeklyGrid_ = realWeeklyGrid;
+chk('the run failed', /could not build the weekly grid/.test(e39f || ''), String(e39f));
+chk('neither tab was touched — not even the one that would have been written first',
+  JSON.stringify([tabRows('daily'), tabRows('weekly')]) === bothBefore);
+chk('each tab still holds exactly one stamp',
+  stampsIn(tabRows('daily')).length === 1 && stampsIn(tabRows('weekly')).length === 1,
+  JSON.stringify(stampsIn(tabRows('daily'))) + ' / ' + JSON.stringify(stampsIn(tabRows('weekly'))));
+chk('and the failure is on record with its reason',
+  REC() && REC().outcome === 'failed' && /weekly grid/.test(REC().lastFailureWhy || ''),
+  JSON.stringify(REC()));
+chk('while the last success is still on record',
+  REC() && !!REC().lastSuccessMs, JSON.stringify(REC()));
+reset();
+
+/* A smaller grid must not leave the bigger one's cells behind now that the write
+   happens before the trim rather than after a clear. */
+console.log('\n39g. a later, smaller grid leaves none of the bigger one behind');
+reset(); goodSheet();
+dailyRollup();
+const wideDaily = tabRows('daily')[0].length;
+H.SHEETS.book.getSheetByName('daily').getRange(1, wideDaily + 4, 1, 1).setValues([['LEFTOVER']]);
+chk('a stray cell is sitting past the grid',
+  tabRows('daily')[0].indexOf('LEFTOVER') >= 0, JSON.stringify(tabRows('daily')[0].slice(-3)));
+wait(120);
+dailyRollup();
+chk('the next run cleared it away',
+  tabRows('daily')[0].indexOf('LEFTOVER') < 0, JSON.stringify(tabRows('daily')[0].slice(-3)));
+chk('and the grid still holds exactly one stamp',
+  stampsIn(tabRows('daily')).length === 1, JSON.stringify(stampsIn(tabRows('daily'))));
+reset();
+
+console.log('\n39d. the stamp shifts no row and no column that was there before');
+
+/*
+ * The golden is the grid this rollup produced before the stamp existed, captured
+ * per timezone because every day boundary in this app is timezone-dependent.
+ *
+ * Two things can go wrong before a single assertion runs, and they are different
+ * problems that deserve different answers. The fixture being unreadable is a
+ * broken checkout: the suite cannot do its job, so it says why and stops. The
+ * fixture simply having no entry for the current zone is a developer working in a
+ * fifth zone — contract item 2 names four — so the section is skipped by name and
+ * the rest of the run continues. Neither is a stack trace, and neither is a pass:
+ * this section used to report "FAIL there is a golden for this timezone" and then
+ * dereference the missing golden on the next line, aborting the run.
+ */
+function loadGolden() {
+  let g;
+  try {
+    g = require('./fixtures/rollup-golden.json');
+  } catch (e) {
+    /* First line only: a MODULE_NOT_FOUND message carries the whole require stack
+       after it, which buries the one sentence that says what to do. */
+    console.log('\n  test/fixtures/rollup-golden.json could not be read: ' +
+                String((e && e.message) || e).split('\n')[0]);
+    console.log('  It is the record of the grid this rollup produced before the stamp');
+    console.log('  existed, and section 39d cannot mean anything without it.');
+    console.log('  Restore it with:  git checkout -- test/fixtures/rollup-golden.json\n');
+    process.exit(1);
+  }
+  if (!g || !g.byZone || typeof g.byZone !== 'object' || !Object.keys(g.byZone).length) {
+    console.log('\n  test/fixtures/rollup-golden.json parsed but holds no byZone map of');
+    console.log('  golden grids, so section 39d has nothing to compare against.');
+    console.log('  Restore it with:  git checkout -- test/fixtures/rollup-golden.json\n');
+    process.exit(1);
+  }
+  return g;
+}
+
+const GOLD = loadGolden();
+const ZONE = Session.getScriptTimeZone();
+const gz = GOLD.byZone[ZONE];
+
+if (!gz) {
+  H.skip('39d. the stamp shifts no row and no column that was there before',
+    'no golden grid captured for ' + ZONE + '. The fixture holds ' +
+    Object.keys(GOLD.byZone).sort().join(', ') + ' — the four zones contract item 2 ' +
+    'names. Run the suite in one of those to exercise this section.');
+} else {
+  chk('the golden for this timezone holds a grid for both tabs',
+    !!(gz.grids && gz.grids.daily && gz.grids.daily.length &&
+       gz.grids.weekly && gz.grids.weekly.length),
+    ZONE + ': ' + JSON.stringify(Object.keys(gz.grids || {})));
+  reset(D(2026, 7, 20, 9, 0)); reboot();
+  goodSheet();
+  tap('DW');  wait(40);
+  tap('MTG'); wait(50);
+  tap('ADM'); wait(30);
+  tap('DW');  wait(20);
+  tap('FRAG');
+  const now39 = dailyRollup();
+  chk('the same run still reports the same shape',
+    now39.days === gz.days && now39.categories === gz.categories,
+    JSON.stringify(now39) + ' vs ' + JSON.stringify({ days: gz.days, categories: gz.categories }));
+  ['daily', 'weekly'].forEach(tab => {
+    const gold = gz.grids[tab], live = tabRows(tab);
+    const gw = gold[0].length;
+    chk(tab + ': same number of rows', live.length === gold.length,
+      live.length + ' vs ' + gold.length);
+    let firstDiff = null;
+    for (let i = 0; i < gold.length && firstDiff === null; i++) {
+      for (let j = 0; j < gw; j++) {
+        if (String(live[i][j]) !== String(gold[i][j])) {
+          firstDiff = 'row ' + i + ' col ' + j + ': ' + JSON.stringify(live[i][j]) +
+                      ' vs golden ' + JSON.stringify(gold[i][j]);
+          break;
+        }
+      }
+    }
+    chk(tab + ': every pre-existing cell is byte-identical', firstDiff === null, String(firstDiff));
+    chk(tab + ': exactly one new column', live[0].length === gw + 1,
+      live[0].length + ' vs ' + (gw + 1));
+    chk(tab + ': and the only thing in it is the stamp',
+      /^last rebuilt /.test(live[0][gw]) && live.slice(1).every(r => r[gw] === ''),
+      JSON.stringify(live.slice(0, 3).map(r => r[gw])));
+  });
+}
+reset();
+
+/* ── C3: the last outcome, readable when the sheet is not ─────────── */
+
+console.log('\n40. the report names the last success and the last failure');
+reset(); goodSheet();
+tap('DW'); wait(30); tap('MTG');
+dailyRollup();
+wait(120);
+brokenSheet();
+try { dailyRollup(); } catch (e) {}
+H.LOGGED.length = 0;
+const rep = rollupStatus();
+chk('it says the last run failed', /Last run: failed/.test(rep), rep);
+chk('it names when the last success was',
+  rep.indexOf(stampTime_(REC().lastSuccessMs)) > 0, rep);
+chk('it names when the last failure was',
+  rep.indexOf(stampTime_(REC().lastFailureMs)) > 0, rep);
+chk('and what the failure was', /no-such-book/.test(rep), rep);
+chk('nothing reads as undefined', !/undefined/.test(rep), rep);
+chk('the same string reaches the log', H.LOGGED.indexOf(rep) >= 0,
+  JSON.stringify(H.LOGGED));
+chk('it reports and does not advise',
+  !/should|must|you need|recommend|⚠|warning/i.test(rep), rep);
+reset();
+
+console.log('\n40b. nothing on record says so in plain words');
+reset();
+H.LOGGED.length = 0;
+let rep40b = null, e40b = null;
+try { rep40b = rollupStatus(); } catch (e) { e40b = String(e && e.message || e); }
+chk('it does not throw', e40b === null, String(e40b));
+chk('it says no rollup has run', /No rollup has run yet/.test(rep40b || ''), String(rep40b));
+chk('nothing reads as undefined', !/undefined/.test(rep40b || ''), String(rep40b));
+chk('and it still reaches the log', H.LOGGED.indexOf(rep40b) >= 0, JSON.stringify(H.LOGGED));
+reset();
+
+console.log('\n40c. a record that cannot be read says that, rather than throwing');
+reset();
+H.SCRIPT_PROPS.ROLLUP_LAST = 'this is not json {{{';
+H.LOGGED.length = 0;
+let rep40c = null, e40c = null;
+try { rep40c = rollupStatus(); } catch (e) { e40c = String(e && e.message || e); }
+chk('it does not throw', e40c === null, String(e40c));
+chk('it says the record cannot be read',
+  /cannot be read/.test(rep40c || ''), String(rep40c));
+chk('and names the property to clear', /ROLLUP_LAST/.test(rep40c || ''), String(rep40c));
+chk('nothing reads as undefined', !/undefined/.test(rep40c || ''), String(rep40c));
+reset();
+
+console.log('\n40d. a record holding the wrong shape entirely is still not a crash');
+reset();
+H.SCRIPT_PROPS.ROLLUP_LAST = '["an","array","not","an","object"]';
+let rep40d = null, e40d = null;
+try { rep40d = rollupStatus(); } catch (e) { e40d = String(e && e.message || e); }
+chk('it does not throw', e40d === null, String(e40d));
+chk('and it says it cannot read the record', /cannot be read/.test(rep40d || ''), String(rep40d));
+reset();
+
+console.log('\n40e. a run after an unreadable record starts a clean one');
+reset(); goodSheet();
+H.SCRIPT_PROPS.ROLLUP_LAST = 'not json at all';
+tap('DW'); wait(20); tap('MTG');
+dailyRollup();
+chk('the record is readable again', REC() && REC().outcome === 'ok', JSON.stringify(REC()));
+chk('and the report reads it', /Last run: succeeded/.test(rollupStatus()), rollupStatus());
+reset();
+
 console.log('\n────────────────────────────────────────');
-console.log(H.pass + ' passed, ' + H.fail + ' failed');
+console.log(H.pass + ' passed, ' + H.fail + ' failed' +
+            (H.skipped.length ? ', ' + H.skipped.length + ' skipped' : ''));
+/* A skip is never folded into `passed`. A run that could not reach a section has
+   to be visibly different from one that ran everything, or the count says the
+   suite did more than it did. */
+H.skipped.forEach(s => console.log('  skipped: ' + s.label + '\n    ' + s.why));
 process.exit(H.fail ? 1 : 0);

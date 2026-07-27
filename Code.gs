@@ -813,8 +813,104 @@ function say_(msg) {
   return msg;
 }
 
-/** Entry point for the daily time-driven trigger. Safe to run by hand. */
+/* ── what the last rollup did ───────────────────────────────────────
+ *
+ * The record lives in a script property and not in the spreadsheet, because
+ * the likeliest way the rollup fails is openSheet_ refusing a bad or revoked
+ * SHEET_ID — and a record kept inside the sheet would be unreachable in exactly
+ * the case it exists for. Script properties stay writable when the sheet does
+ * not.
+ */
+var ROLLUP_PROP = 'ROLLUP_LAST';
+
+/** null: nothing recorded. false: something recorded, but unreadable. */
+function readRollupRecord_() {
+  var raw;
+  try { raw = PropertiesService.getScriptProperties().getProperty(ROLLUP_PROP); }
+  catch (e) { return false; }
+  if (raw === null || raw === undefined || raw === '') return null;
+  try {
+    var v = JSON.parse(raw);
+    return (v && typeof v === 'object' && !Array.isArray(v)) ? v : false;
+  } catch (e) { return false; }
+}
+
+/**
+ * A failure records itself without erasing the last success. Knowing the
+ * numbers went stale eleven days ago is the whole point; a record that forgot
+ * the last good run would only be able to say that something is wrong now.
+ */
+function recordRollup_(ok, why) {
+  var rec = readRollupRecord_();
+  if (!rec) rec = {};
+  var now = Date.now();
+  rec.outcome = ok ? 'ok' : 'failed';
+  rec.atMs = now;
+  if (ok) {
+    rec.lastSuccessMs = now;
+  } else {
+    rec.lastFailureMs = now;
+    rec.lastFailureWhy = why;
+  }
+  // Recording must never become the thing that breaks the rollup.
+  try {
+    PropertiesService.getScriptProperties().setProperty(ROLLUP_PROP, JSON.stringify(rec));
+  } catch (e) {}
+}
+
+/**
+ * Entry point for the daily time-driven trigger. Safe to run by hand.
+ *
+ * Record, then rethrow. The recording is what makes a failure findable later;
+ * it is not a reason to swallow the error, so the platform's own execution list
+ * still shows the run as failed.
+ */
 function dailyRollup() {
+  try {
+    var out = rollupOnce_();
+    recordRollup_(true, null);
+    return out;
+  } catch (e) {
+    recordRollup_(false, String((e && e.message) || e));
+    throw e;
+  }
+}
+
+/**
+ * Run this from the editor when the stamp in a tab looks old and the next
+ * question is why. It answers from the script property, so it still works in
+ * the case that produces most stale stamps: the spreadsheet cannot be opened
+ * at all.
+ *
+ * It reports what is on record and stops. Whether eleven days is a problem is
+ * not something this can know.
+ */
+function rollupStatus() {
+  var rec = readRollupRecord_();
+  if (rec === null) {
+    return say_('No rollup has run yet, so there is nothing on record. ' +
+                'Run setupRollup to install the nightly trigger, or dailyRollup ' +
+                'to build the tabs now.');
+  }
+  if (rec === false) {
+    return say_('There is a rollup record but it cannot be read. Delete the ' +
+                'script property ' + ROLLUP_PROP + ' and run dailyRollup to ' +
+                'start a fresh one.');
+  }
+  var lines = [];
+  lines.push('Last run: ' + (rec.outcome === 'ok' ? 'succeeded' : 'failed') +
+             (rec.atMs ? ' at ' + stampTime_(rec.atMs) : ''));
+  lines.push('Last success: ' +
+             (rec.lastSuccessMs ? stampTime_(rec.lastSuccessMs) : 'none on record'));
+  lines.push('Last failure: ' +
+             (rec.lastFailureMs
+               ? stampTime_(rec.lastFailureMs) + ', ' +
+                 (rec.lastFailureWhy || 'no reason recorded')
+               : 'none on record'));
+  return say_(lines.join('\n'));
+}
+
+function rollupOnce_() {
   var ss = openSheet_();
   var todayStart = localMidnightMs_(Date.now());
   var firstDay = addLocalDaysMs_(todayStart, -(ROLLUP_DAYS - 1));
@@ -831,8 +927,12 @@ function dailyRollup() {
     days.push(dayStats_(s, addLocalDaysMs_(s, 1), plan, actual, sit, keys));
   }
 
-  writeGrid_(ss, DAILY_TAB, dailyGrid_(days, keys));
-  writeGrid_(ss, WEEKLY_TAB, weeklyGrid_(days, keys));
+  // Both grids are built before either is written, so a failure while building
+  // one leaves both tabs exactly as they were rather than half-rebuilt.
+  var daily  = stampGrid_(dailyGrid_(days, keys));
+  var weekly = stampGrid_(weeklyGrid_(days, keys));
+  writeGrid_(ss, DAILY_TAB, daily);
+  writeGrid_(ss, WEEKLY_TAB, weekly);
   say_('rolled up ' + days.length + ' days across ' + allCategories_().length +
        ' categories into ' + ss.getUrl());
   return { days: days.length, categories: keys.length, sheet: ss.getUrl() };
@@ -981,15 +1081,53 @@ function openSheet_() {
   return ss;
 }
 
-/** Replace the tab's contents wholesale. Values only: no formatting opinions. */
+/**
+ * When the tab was last rebuilt, stated and nothing more. A date is a fact; how
+ * old is too old is the reader's call.
+ *
+ * It goes in row 1, in the first column after the last data column. README
+ * tells you to point formulas from your own tabs at these ones, and a stamp row
+ * above the data would silently shift every row reference already written
+ * against it. The grid is rebuilt wholesale every run, so the stamp is part of
+ * the grid rather than something patched in afterwards — which is also why
+ * there is exactly one of them however many times the rollup runs.
+ */
+function stampGrid_(rows) {
+  if (!rows.length) return rows;
+  var width = 0;
+  rows.forEach(function (r) { if (r.length > width) width = r.length; });
+  rows.forEach(function (r) { while (r.length < width) r.push(''); });
+  rows[0][width] = 'last rebuilt ' + stampTime_(Date.now());
+  return rows;
+}
+
+/** A moment, in the script's own timezone, said the same way everywhere. */
+function stampTime_(ms) {
+  var tz = Session.getScriptTimeZone();
+  return Utilities.formatDate(new Date(ms), tz, 'yyyy-MM-dd HH:mm') + ' ' + tz;
+}
+
+/**
+ * Replace the tab's contents wholesale. Values only: no formatting opinions.
+ *
+ * Write first, then trim what the previous grid left behind. It used to clear
+ * first, which meant a write that failed after the clear left the tab **empty** —
+ * so a rollup that broke partway through its second tab wiped that tab's numbers
+ * and its stamp together, and nothing in the spreadsheet said why. Old numbers
+ * next to their own old stamp are honest; a blank tab is not. setValues is one
+ * call: it either lands or throws, and if it throws nothing here has run yet.
+ */
 function writeGrid_(ss, tabName, rows) {
   var sh = ss.getSheetByName(tabName) || ss.insertSheet(tabName);
-  sh.clear();
-  if (!rows.length) return;
+  if (!rows.length) { sh.clear(); return; }
   var width = 0;
   rows.forEach(function (r) { if (r.length > width) width = r.length; });
   rows.forEach(function (r) { while (r.length < width) r.push(''); });
   sh.getRange(1, 1, rows.length, width).setValues(rows);
+  // Anything beyond the new grid is last run's leftovers, not data.
+  var maxRow = sh.getMaxRows(), maxCol = sh.getMaxColumns();
+  if (maxRow > rows.length) sh.getRange(rows.length + 1, 1, maxRow - rows.length, maxCol).clearContent();
+  if (maxCol > width) sh.getRange(1, width + 1, rows.length, maxCol - width).clearContent();
   sh.setFrozenRows(1);
 }
 

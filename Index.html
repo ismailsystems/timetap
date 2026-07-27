@@ -239,6 +239,23 @@
     padding: 9px 12px; border-radius: 8px;
     user-select: text; -webkit-user-select: text;
   }
+  #err.tappable { cursor: pointer; }
+  #err.tappable::after { content: ' ›'; font-weight: 700; }
+
+  /* ── set-aside writes ────────────────────────────────────── */
+  .deadrow { background: var(--panel); border-radius: 10px; padding: 13px; }
+  .deadrow .dwhen {
+    font-size: 11px; font-weight: 700; letter-spacing: .17em; color: var(--dim);
+    font-variant-numeric: tabular-nums;
+  }
+  .deadrow .dwhat { font-size: 15px; margin-top: 7px; }
+  .deadrow .dwhy {
+    font-size: 12px; color: #ffb4ad; margin-top: 7px;
+    word-break: break-word; user-select: text; -webkit-user-select: text;
+  }
+  .deadrow .danger { width: 100%; height: 40px; margin-top: 11px; }
+  .deadrow .danger.arming { box-shadow: 0 0 0 3px var(--flag); }
+  #deadList { display: flex; flex-direction: column; gap: 9px; }
 
   /* ── overlays ────────────────────────────────────────────── */
   .view {
@@ -307,6 +324,17 @@
   <div id="err" class="hidden"></div>
 </div>
 
+<!-- ── set-aside writes ─────────────────────────────────────────── -->
+<div id="sheetDead" class="view hidden">
+  <div class="vhead">
+    <div class="vtitle">SET ASIDE</div>
+    <button id="dgClose" class="fbtn">DONE</button>
+  </div>
+  <div class="sheetbody">
+    <div id="deadList"></div>
+  </div>
+</div>
+
 <!-- ── split ────────────────────────────────────────────────────── -->
 <div id="sheetSplit" class="view hidden">
   <div class="vhead">
@@ -356,6 +384,7 @@
   var K_QUEUE = 'tt.queue.v1';
   var K_STATE = 'tt.state.v1';
   var K_DEAD  = 'tt.dead.v1';
+  var K_BLOCKS = 'tt.blocks.v1';
   var MS_MIN = 60000;
 
   var CATS = CFG.categories;
@@ -411,9 +440,69 @@
   function enqueue(op) {
     op.id = uid();
     op.ts = Date.now();
+    noteBlock(op);
     var q = queue();
     q.push(op);
     setQueue(q);
+  }
+
+  /**
+   * A write that gets set aside has to say which block it belonged to, and most
+   * ops cannot: setMark, setText and closeSit name a ref and nothing else. A ref
+   * is meaningless to someone holding a phone in front of Google Calendar trying
+   * to fix the damage by hand.
+   *
+   * So every op that does know its category or its start leaves that behind
+   * here, keyed by ref, for quarantine() to look up later. It lives in
+   * localStorage and not in memory because a write is set aside five failures
+   * after it was made, which can easily be a later session than the one that
+   * made it. Nothing here goes to the server: the op on the wire is unchanged.
+   */
+  function blockIdx() {
+    var m = ls(K_BLOCKS, {});
+    return (m && typeof m === 'object' && !Array.isArray(m)) ? m : {};
+  }
+
+  function noteBlock(op) {
+    if (!op) return;
+    var idx = blockIdx();
+    if (op.ref) {
+      var e = idx[op.ref] || {};
+      if (op.key) e.key = op.key;
+      // Only a start is a start. closeActual carries endMs, which is the one
+      // time that must never be recorded as when the block began.
+      if ((op.type === 'openActual' || op.type === 'openSit' ||
+           op.type === 'setSitStart') && isFinite(op.startMs)) e.startMs = op.startMs;
+      if (e.startMs === undefined && isFinite(op.hintMs)) e.startMs = op.hintMs;
+      idx[op.ref] = e;
+    }
+    if (op.newRef) {
+      var n = idx[op.newRef] || {};
+      if (op.newKey) n.key = op.newKey;
+      if (isFinite(op.atMs)) n.startMs = op.atMs;   // the split is the new block's start
+      idx[op.newRef] = n;
+    }
+    saveBlocks(idx);
+  }
+
+  /** One entry per block, so this grows forever unless it is bounded. */
+  function saveBlocks(idx) {
+    var keys = Object.keys(idx);
+    if (keys.length > 200) {
+      keys.sort(function (a, b) { return (idx[a].startMs || 0) - (idx[b].startMs || 0); });
+      keys.slice(0, keys.length - 200).forEach(function (k) { delete idx[k]; });
+    }
+    lsSet(K_BLOCKS, idx);
+  }
+
+  /** What a set-aside op can say about the block it belonged to. */
+  function blockInfo(op) {
+    var e = (op && op.ref && blockIdx()[op.ref]) || {};
+    var startMs = null;
+    if ((op.type === 'openActual' || op.type === 'openSit') && isFinite(op.startMs)) startMs = op.startMs;
+    if (startMs === null && isFinite(op.hintMs)) startMs = op.hintMs;
+    if (startMs === null && isFinite(e.startMs)) startMs = e.startMs;
+    return { key: op.key || e.key || null, startMs: startMs };
   }
 
   /** Coalesce a still-pending open into a correction. Returns true if absorbed. */
@@ -423,6 +512,9 @@
       if (q[i].type === 'openActual' && q[i].ref === ref) { q[i].key = key; hit = true; }
       if (q[i].type === 'splitActual' && q[i].newRef === ref) { q[i].newKey = key; hit = true; }
     }
+    // A corrected tap changes which category the block is, so the record of
+    // what it belonged to has to move with it.
+    if (hit) q.forEach(noteBlock);
     if (hit) setQueue(q);
     return hit;
   }
@@ -507,16 +599,73 @@
     }
     var dead = ls(K_DEAD, []);
     if (!Array.isArray(dead)) dead = [];
-    dead.push({ at: Date.now(), why: err.message, op: q[i] });
+    var info = blockInfo(q[i]);
+    dead.push({ at: Date.now(), why: err.message, op: q[i],
+                key: info.key, startMs: info.startMs });
     lsSet(K_DEAD, dead.slice(-50));
     q.splice(i, 1);
     setQueue(q);
     showErr('gave up on one write and set it aside: ' + err.message);
+    // If the reader is standing at the shelf when a new one lands, put it on the
+    // shelf rather than making them close the drawer and open it again.
+    if (!$('sheetDead').classList.contains('hidden')) renderDead();
   }
 
   function deadCount() {
     var d = ls(K_DEAD, []);
     return Array.isArray(d) ? d.length : 0;
+  }
+
+  /**
+   * What each op was trying to do, in the words someone would use to describe
+   * it to themselves. The row says what happened and stops there: a set-aside
+   * write is a fact, and what to do about it is the reader's call.
+   */
+  var OP_WORDS = {
+    openActual:   'start a block',
+    closeActual:  'close a block',
+    recategorize: 'change the category',
+    setMark:      'save the mark',
+    setText:      'save the note',
+    splitActual:  'split a block',
+    openSit:      'start sitting',
+    closeSit:     'stop sitting',
+    setSitStart:  'correct when sitting started',
+    deleteSit:    'remove a sitting block'
+  };
+
+  /**
+   * The dead list as rows a person can read, newest first. Entries written by
+   * an older version have none of the block fields, and an entry that cannot
+   * say something says so rather than rendering blank — a row with an empty
+   * cell reads like there was nothing there, which is a different claim.
+   */
+  /**
+   * A row's position is not its identity: discarding one renumbers every entry
+   * after it, so a second tap on a row that has already gone would land on
+   * whatever slid into its place. The token survives that.
+   */
+  function deadToken(e) {
+    var op = (e && e.op) || {};
+    return [(e && e.at) || '', op.id || '', op.type || '', op.ref || ''].join('|');
+  }
+
+  function deadRows() {
+    var d = ls(K_DEAD, []);
+    if (!Array.isArray(d)) return [];
+    var rows = [];
+    for (var i = 0; i < d.length; i++) {
+      var e = d[i] || {}, op = e.op || {};
+      rows.push({
+        token: deadToken(e),
+        when:    isFinite(e.at) ? clock(e.at) : 'unknown time',
+        key:     e.key || op.key || 'unknown category',
+        started: isFinite(e.startMs) ? clock(e.startMs) : 'unknown start',
+        what:    OP_WORDS[op.type] || (op.type ? String(op.type) : 'unknown write'),
+        why:     e.why || 'no reason recorded'
+      });
+    }
+    return rows.reverse();
   }
 
   function scheduleRetry() {
@@ -528,8 +677,175 @@
     }, retryDelay);
   }
 
-  function showErr(msg) { var e = $('err'); e.textContent = msg; e.classList.remove('hidden'); }
-  function hideErr() { $('err').classList.add('hidden'); }
+  function showErr(msg) {
+    var e = $('err'); e.textContent = msg; e.classList.remove('hidden');
+    paintErr();
+  }
+
+  /**
+   * Clearing a transient error must not clear a standing fact. A write that was
+   * set aside stays set aside until someone deals with it by hand, so the banner
+   * falls back to saying so instead of going quiet. Before this, a successful
+   * state load erased the boot-time notice on its way in, which left it visible
+   * only when the load had ALSO failed — visible exactly when it was no use.
+   */
+  function hideErr() {
+    if (deadCount()) { showErr(deadMsg()); return; }
+    $('err').classList.add('hidden');
+    paintErr();
+  }
+
+  function deadMsg() {
+    var n = deadCount();
+    return n + (n === 1 ? ' write was' : ' writes were') + ' set aside after repeated failures';
+  }
+
+  /** The banner is a door only when there is something behind it. */
+  function paintErr() {
+    var e = $('err');
+    if (deadCount()) {
+      e.classList.add('tappable');
+      e.setAttribute('role', 'button');
+      e.setAttribute('tabindex', '0');
+      e.setAttribute('aria-label', 'show the writes that were set aside');
+    } else {
+      e.classList.remove('tappable');
+      e.removeAttribute('role');
+      e.removeAttribute('tabindex');
+      e.removeAttribute('aria-label');
+    }
+  }
+
+  function openDead() {
+    if (!deadCount()) return;
+    renderDead();
+    $('sheetDead').classList.remove('hidden');
+  }
+
+  function closeDead() {
+    disarmDead();
+    $('sheetDead').classList.add('hidden');
+    $('deadList').innerHTML = '';
+  }
+
+  /* ── discarding takes two taps ──────────────────────────────────
+   *
+   * A set-aside write is the only record that the write ever happened, and
+   * discarding it cannot be undone, so DISCARD arms on the first tap and acts on
+   * the second — the same two-step the grid already uses for a consequential tap
+   * (arm/disarm above).
+   *
+   * It is also what makes a double tap safe. Discarding a row lets the rows below
+   * slide up, so a second tap in the same place lands on a different row's button.
+   * Both taps of a double tap land on the row the reader is looking at, and the row
+   * that slides into the vacated space is not armed, so it cannot be discarded by a
+   * tap that was never aimed at it. Nothing here depends on how fast the taps are.
+   */
+  var deadArmed = null;                    // { token, btn, timer }
+
+  function disarmDead() {
+    if (!deadArmed) return;
+    if (deadArmed.timer) clearTimeout(deadArmed.timer);
+    if (deadArmed.btn) {
+      deadArmed.btn.classList.remove('arming');
+      deadArmed.btn.textContent = DISCARD_LABEL;
+    }
+    deadArmed = null;
+  }
+
+  var DISCARD_LABEL = 'DISCARD';
+  var DISCARD_ARMED = 'TAP AGAIN TO DISCARD';
+
+  function armDead(token, btn) {
+    if (deadArmed && deadArmed.token === token) {
+      disarmDead();
+      discardDead(token);
+      return;
+    }
+    disarmDead();
+    btn.classList.add('arming');
+    btn.textContent = DISCARD_ARMED;
+    deadArmed = { token: token, btn: btn,
+                  timer: setTimeout(function () { disarmDead(); }, CFG.confirmTimeoutMs) };
+  }
+
+  /** One row per set-aside write, newest first. */
+  function renderDead() {
+    var host = $('deadList');
+    disarmDead();
+    host.innerHTML = '';
+    deadRows().forEach(function (r) {
+      var row = document.createElement('div');
+      row.className = 'deadrow';
+      row.dataset.token = r.token;
+
+      var when = document.createElement('div');
+      when.className = 'dwhen';
+      when.textContent = r.when + ' · ' + r.key;
+
+      var what = document.createElement('div');
+      what.className = 'dwhat';
+      what.textContent = 'tried to ' + r.what + ', block started ' + r.started;
+
+      var why = document.createElement('div');
+      why.className = 'dwhy';
+      why.textContent = r.why;
+
+      var drop = document.createElement('button');
+      drop.className = 'danger';
+      drop.textContent = DISCARD_LABEL;
+      drop.setAttribute('aria-label', 'discard this set-aside write');
+      drop.addEventListener('click', function () { armDead(r.token, drop); });
+
+      row.appendChild(when); row.appendChild(what); row.appendChild(why);
+      row.appendChild(drop);
+      host.appendChild(row);
+    });
+  }
+
+  /**
+   * Once a write has been repaired by hand there is nothing left to look at, so
+   * the row goes. This touches the dead list and nothing else: a write still
+   * waiting in the queue is pending, not lost, and discarding must never reach
+   * it. A tap on a row that has already gone finds no match and does nothing.
+   *
+   * The discarded row is removed on its own rather than by redrawing the list, so
+   * the other rows keep their armed state and their identity. What it does NOT do
+   * is hold the layout still: removing one row from a flex column slides every row
+   * below it up by exactly the amount redrawing did, so a second tap in the same
+   * place does land on a different row's button.
+   *
+   * That is safe, and arm/confirm is why. The row that slides under the finger
+   * arrives unarmed, so the tap that lands on it can only arm it — destroying it
+   * would need a further, deliberate tap against a button already reading
+   * TAP AGAIN TO DISCARD. Contract assertion 24 and amendment A4; pinned by the
+   * tap-count phase in test/headless.js, which counts what a real browser destroys
+   * at 2, 3, 4 and 6 taps on one fixed point.
+   */
+  function discardDead(token) {
+    var d = ls(K_DEAD, []);
+    if (!Array.isArray(d)) return;
+    var hit = -1;
+    for (var i = 0; i < d.length; i++) if (deadToken(d[i]) === token) { hit = i; break; }
+    if (hit < 0) return;
+    d.splice(hit, 1);
+    lsSet(K_DEAD, d);
+    dropRow(token);
+    if (d.length) showErr(deadMsg());
+    else { closeDead(); hideErr(); }
+  }
+
+  /** Take one row out of the drawer, leaving every other row's state untouched.
+      The rows below it do slide up — see discardDead above for why that is safe. */
+  function dropRow(token) {
+    var host = $('deadList'), kids = host.children;
+    for (var i = 0; i < kids.length; i++) {
+      if (kids[i].dataset && kids[i].dataset.token === token) {
+        host.removeChild(kids[i]);
+        return;
+      }
+    }
+  }
 
   /* ── logging ───────────────────────────────────────────────── */
 
@@ -961,10 +1277,7 @@
     }
     buildGrid();
     render();
-    if (deadCount()) {
-      showErr(deadCount() + ' write' + (deadCount() > 1 ? 's' : '') +
-              ' were set aside after repeated failures');
-    }
+    if (deadCount()) showErr(deadMsg());
 
     if (!hasRun) { showErr('google.script.run unavailable'); return; }
 
@@ -1025,6 +1338,12 @@
 
   $('postureBtn').addEventListener('click', toggleSit);
   $('sitEdit').addEventListener('click', openSitEdit);
+
+  $('err').addEventListener('click', function () { openDead(); });
+  $('err').addEventListener('keydown', function (e) {
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openDead(); }
+  });
+  $('dgClose').addEventListener('click', closeDead);
 
   $('spClose').addEventListener('click', function () { $('sheetSplit').classList.add('hidden'); });
   $('spRange').addEventListener('input', renderSplit);
