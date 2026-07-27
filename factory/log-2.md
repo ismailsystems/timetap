@@ -399,3 +399,92 @@ word before it. Routed around each time by rewording rather than by touching the
 rule — it is not this round's to widen, and it does catch the thing it was built
 for. Named here because three hits in one round is a pattern, and the next
 person writing prose near the word "scope" should know.
+
+## [2026-07-27 14:0x] A5 | Waking hours stop counting time nobody logged — STAGE A COMPLETE
+
+One early return in `dayStats_`, placed after the hours accumulation and the
+switches count and before the span computation:
+
+```js
+if (p && (p.key === 'UNLOGGED' || p.mark === '?')) return;
+```
+
+`UNLOGGED` lands on the ACTUAL calendar, so the nightly one dragged every day's
+span back to 00:00 and both `waking h` and `sitting %` measured nothing. A `?`
+block's end is the app's guess. Neither may bound the span; both keep their own
+hours columns, because they are real time and the rollup still says so.
+
+**Tests: 44 through 44h. 616 → 636 assertions.** Four contracted timezones green
+at the stage boundary; skips by name in others. Lint clear, headless ok at 20
+checks per viewport. `test/fixtures/rollup-golden.json` **unchanged**, as the
+handoff requires outside B2/B3 and D1.
+
+**Vacuity check** (not mandated for this task, but worth doing): reverting the
+guard turns 4 assertions red — 44, 44b and 44e twice. 44c, 44d, 44f and 44g stay
+green by design; 44c guards against *over*-correcting into subtracting guessed
+hours, which the absence of the fix does not do.
+
+**CHECKER — could not break it. All seven criteria met.** Its differential was
+better than mine: worktrees at `a256bdf` and at HEAD, 16 scenarios across 6
+timezones, comparing daily *and* weekly rows — single blocks, gaps, both
+midnight directions, zero-length, one-minute, overlapping, window edges, 24-hour
+blocks, second-precision. **Identical in every zone.** The common case did not
+move. It also ran the mutation table I should have written myself, including the
+one that matters most — moving the guard *above* the hours accumulation, so
+`UNLOGGED` and `?` hours would vanish from their own columns — and confirmed
+five independent assertions catch it.
+
+**Two real consequences it found, neither a criterion breach, both parked.**
+
+**Q9 — a row can now contradict itself.** `DW` 09-16 closed, `DW` 16-24 phantom
+`?`: `waking h` 7, `DW` 15, `sitting %` 1.14. The sheet reports 15 hours of deep
+work inside a 7-hour waking day. Worse, a day whose only block is the overnight
+phantom reads `waking h` 0 while `DW` reads 2.
+
+The root of it is that a `?` block's **start** is a fact the user reported —
+they tapped the category at 22:00 — and only its **end** was guessed. The guard
+throws away both. Letting the start extend `first` while the end does not extend
+`last` removes the contradiction and *still satisfies A5's criteria 2 and 5* — I
+checked that specifically. It was not taken because **contract 22** says a `?`
+block does not extend the waking span with no qualification, and under that fix
+a `?` block that is the day's first event extends it backwards. Overriding a
+contract assertion is the human's call. Pinned by test 44h so the behaviour is
+deliberate rather than accidental, and 44h is the test to change if Q9 is ruled
+the other way.
+
+**Q10 — a user-added category can take the key `UNLOGGED`.** `keyFor_` has no
+reserved-key check, so "Unlogged" and "un-logged" both derive `UNLOGGED`, and
+that user's genuinely logged blocks then stop counting toward waking. Both
+halves predate this round; A5 is what makes the first bite. Not fixed —
+reserving a key is a product decision and contract 7 leaves category add alone.
+
+Q5 extended with the consequence the checker attached to it: a title hand-edited
+in Google Calendar to end in ` ?` now also loses its hours from `waking h`.
+
+**One informational finding, recorded and not acted on:** the `last > first`
+half of `if (first !== null && last > first)` is unreachable — both are set only
+inside `if (t > s)`. Dropping it leaves 636/0, so no test can distinguish it.
+Dead defensive code, left alone.
+
+---
+
+**STAGE A IS COMPLETE.** What the handoff says the stage should deliver, and what
+it actually delivers now:
+
+- *A day with a real boundary* — STOP ends it, and opens nothing (A3), reachable
+  and unmistakable in the worst case a phone can produce (A4).
+- *Guessed blocks visible as guesses* — `staleGuard_` writes `?` (A2), on a title
+  format proved to carry it (A1), and no user action produces one.
+- *`waking h` and `sitting %` mean something* — they no longer measure a span
+  that always began at 00:00 (A5).
+
+Confirmed end-to-end by the checker in the offline harness: after STOP, the next
+morning's reload writes no `UNLOGGED` and no `?`, and the day reports
+`waking h` 8, `DW` 8, `sitting %` 1.
+
+Guessed hours are not yet separable in the sheet — that is Stage B, which starts
+at B1.
+
+Suite 636 / 0, twice in a row, in all four contracted zones. `appsscript.json`
+and `test/fixtures/rollup-golden.json` byte-identical to `a256bdf`. Exactly one
+test line removed all round, and it is A2's.

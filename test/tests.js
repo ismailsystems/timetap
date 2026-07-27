@@ -2434,6 +2434,141 @@ chk('and the end time the user chose is untouched', A()[0].e === endedAt,
 H.setCallLag('getState', null);
 reset();
 
+/* ── A5: waking hours stop counting time nobody logged ─────────────
+ *
+ * UNLOGGED lands on the ACTUAL calendar, so before this the nightly one dragged
+ * every day's span back to 00:00 and both `waking h` and `sitting %` measured
+ * nothing. A '?' block's end is the app's guess, not a time anyone reported
+ * stopping. Neither may stretch the span; both keep their own hours. */
+
+const AC = (t, day, h1, m1, h2, m2) => H.CALS.actual.createEvent(t,
+  new Date(D(2026, 7, day, h1, m1)), new Date(D(2026, 7, day, h2, m2)), {});
+const SI = (day, h1, m1, h2, m2) => H.CALS.sit.createEvent('SIT',
+  new Date(D(2026, 7, day, h1, m1)), new Date(D(2026, 7, day, h2, m2)), {});
+const dRows = () => H.SHEETS.book.getSheetByName('daily').rows;
+const dCol = n => dRows()[0].indexOf(n);
+const dRow = ymd => dRows().find(r => r[0] === ymd);
+const dayCell = (ymd, n) => { const r = dRow(ymd); return r ? r[dCol(n)] : undefined; };
+
+console.log('\n44. UNLOGGED time does not count as waking time');
+reset(D(2026, 7, 24, 15, 0)); goodSheet();
+AC('UNLOGGED -', 20, 0, 0, 7, 0);
+AC('DW: shipping', 20, 9, 0, 17, 0);
+dailyRollup();
+chk('waking h is 8, not 17', dayCell('2026-07-20', 'waking h') === 8,
+  String(dayCell('2026-07-20', 'waking h')));
+chk('and UNLOGGED still reports its own 7 hours',
+  dayCell('2026-07-20', 'UNLOGGED') === 7, String(dayCell('2026-07-20', 'UNLOGGED')));
+chk('and DW still reports its 8', dayCell('2026-07-20', 'DW') === 8,
+  String(dayCell('2026-07-20', 'DW')));
+
+console.log('\n44b. a guessed block does not count as waking time either');
+reset(D(2026, 7, 24, 15, 0)); goodSheet();
+AC('DW: shipping', 20, 9, 0, 17, 0);
+AC('MTG: ?', 20, 22, 0, 23, 59);
+dailyRollup();
+chk('waking h counts 09:00-17:00 only', dayCell('2026-07-20', 'waking h') === 8,
+  String(dayCell('2026-07-20', 'waking h')));
+chk('and the guessed block still reports its own hours',
+  near(dayCell('2026-07-20', 'MTG') * 3600000, 1.98 * 3600000),
+  String(dayCell('2026-07-20', 'MTG')));
+
+console.log('\n44c. the span is a span, not a sum');
+/* A guessed block sitting between two logged ones must not punch a hole in the
+ * day: the ends are what is measured. */
+reset(D(2026, 7, 24, 15, 0)); goodSheet();
+AC('DW: morning', 20, 9, 0, 12, 0);
+AC('ADM: ?', 20, 12, 0, 14, 0);
+AC('MTG: afternoon', 20, 14, 0, 17, 0);
+dailyRollup();
+chk('waking h is the whole 8-hour span', dayCell('2026-07-20', 'waking h') === 8,
+  String(dayCell('2026-07-20', 'waking h')));
+chk('the guessed two hours are not subtracted from it',
+  dayCell('2026-07-20', 'waking h') === 8 && dayCell('2026-07-20', 'ADM') === 2,
+  'waking ' + dayCell('2026-07-20', 'waking h') + ' ADM ' + dayCell('2026-07-20', 'ADM'));
+
+console.log('\n44d. the common case does not move');
+/* The load-bearing one. A day with nothing unlogged and nothing guessed must
+ * report exactly what it reported before this round — and section 39d already
+ * compares both whole grids against test/fixtures/rollup-golden.json, which is
+ * unchanged by this task. This asserts the specific column directly. */
+reset(D(2026, 7, 24, 15, 0)); goodSheet();
+AC('DW: shipping', 20, 9, 0, 12, 0);
+AC('MTG: standup', 20, 13, 30, 17, 15);
+dailyRollup();
+chk('waking h spans first start to last end, unchanged',
+  near(dayCell('2026-07-20', 'waking h') * 3600000, 8.25 * 3600000),
+  String(dayCell('2026-07-20', 'waking h')));
+
+console.log('\n44e. a day of nothing but UNLOGGED divides by nothing');
+reset(D(2026, 7, 24, 15, 0)); goodSheet();
+AC('UNLOGGED -', 20, 0, 0, 23, 59);
+SI(20, 9, 0, 11, 0);
+dailyRollup();
+chk('waking h is 0', dayCell('2026-07-20', 'waking h') === 0,
+  String(dayCell('2026-07-20', 'waking h')));
+chk('sitting % is blank, not Infinity and not an error',
+  dayCell('2026-07-20', 'sitting %') === '',
+  JSON.stringify(dayCell('2026-07-20', 'sitting %')));
+chk('and the sitting hours are still reported',
+  dayCell('2026-07-20', 'sitting h') === 2, String(dayCell('2026-07-20', 'sitting h')));
+chk('while UNLOGGED keeps its own hours',
+  near(dayCell('2026-07-20', 'UNLOGGED') * 3600000, 23.98 * 3600000),
+  String(dayCell('2026-07-20', 'UNLOGGED')));
+
+console.log('\n44f. a day with no events at all still reports');
+reset(D(2026, 7, 24, 15, 0)); goodSheet();
+AC('DW: elsewhere', 22, 9, 0, 10, 0);        // a different day, so the window has rows
+let e44 = null;
+try { dailyRollup(); } catch (e) { e44 = String((e && e.message) || e); }
+chk('the rollup does not throw', e44 === null, String(e44));
+chk('the empty day reports 0 waking', dayCell('2026-07-20', 'waking h') === 0,
+  String(dayCell('2026-07-20', 'waking h')));
+chk('and blank sitting %', dayCell('2026-07-20', 'sitting %') === '',
+  JSON.stringify(dayCell('2026-07-20', 'sitting %')));
+
+console.log('\n44h. a day made only of guessed time reports no waking hours');
+/* This pins a CONSEQUENCE, not a desired behaviour, and it is the shape of
+ * parked question Q9.
+ *
+ * A '?' block's START is a fact the user reported — they tapped the category at
+ * 22:00 — and only its END was guessed. The guard discards both, so the evening
+ * a user starts work at 22:00 and never closes the day reports `waking h` 0
+ * while `DW` reads 2: a row that contradicts itself.
+ *
+ * Letting a '?' block's start extend `first` while its end does not extend
+ * `last` would fix it and still satisfy A5's criteria 2 and 5 — but contract 22
+ * says a '?' block does "not extend the waking span", full stop, and a block
+ * that is the day's earliest event would then extend it backwards. Choosing
+ * that is overriding a contract assertion, which is the human's call and not
+ * the loop's.
+ *
+ * So the behaviour is pinned here rather than left accidental. If Q9 is ruled
+ * the other way, THIS is the test to change. */
+reset(D(2026, 7, 24, 15, 0)); goodSheet();
+AC('DW: evening ?', 20, 22, 0, 23, 59);
+dailyRollup();
+chk('waking h is 0 for a day of nothing but guessed time',
+  dayCell('2026-07-20', 'waking h') === 0, String(dayCell('2026-07-20', 'waking h')));
+chk('while the block still reports its own hours',
+  near(dayCell('2026-07-20', 'DW') * 3600000, 1.98 * 3600000),
+  String(dayCell('2026-07-20', 'DW')));
+chk('and sitting % stays blank rather than dividing by it',
+  dayCell('2026-07-20', 'sitting %') === '',
+  JSON.stringify(dayCell('2026-07-20', 'sitting %')));
+
+console.log('\n44g. an UNLOGGED block is still only excluded from the span');
+/* Guards the over-correction: excluding it from the span must not quietly
+ * exclude it from switches or from the key set. */
+reset(D(2026, 7, 24, 15, 0)); goodSheet();
+AC('UNLOGGED -', 20, 0, 0, 7, 0);
+AC('DW: shipping', 20, 9, 0, 17, 0);
+dailyRollup();
+chk('UNLOGGED still has a column', dCol('UNLOGGED') >= 0, JSON.stringify(dRows()[0]));
+chk('and both blocks still counted as switches',
+  dayCell('2026-07-20', 'switches') === 2, String(dayCell('2026-07-20', 'switches')));
+reset();
+
 console.log('\n────────────────────────────────────────');
 console.log(H.pass + ' passed, ' + H.fail + ' failed' +
             (H.skipped.length ? ', ' + H.skipped.length + ' skipped' : ''));

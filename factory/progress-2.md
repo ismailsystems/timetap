@@ -7,9 +7,9 @@ Round 1's progress record is `factory/progress.md` and is **read-only**.
 
 ## Status
 
-In progress. **4 of 16 tasks complete.** Stage A, task A5 next.
+In progress. **5 of 16 tasks complete. Stage A is finished.** Stage B, task B1 next.
 
-Suite: **616 passed / 0 failed** (baseline was 492), green in all four
+Suite: **636 passed / 0 failed** (baseline was 492), green in all four
 contracted timezones. Lint all clear. Headless ok, 19 checks per viewport.
 
 ## Tasks
@@ -20,7 +20,7 @@ contracted timezones. Lint all clear. Headless ok, 19 checks per viewport.
 | A2 | A | **done** | 1 | vacuity check done, separation held. Checker found 2 defects, both fixed |
 | A3 | A | **done** | 1 | checker found 2 real bugs (stuck armed STOP, stale-read race) + 3 weak tests, all fixed |
 | A4 | A | **done** | 1 | checker found 4 mutations my phase missed; all now caught |
-| A5 | A | pending | 0 | |
+| A5 | A | **done** | 1 | criteria all met; checker's 16-scenario x 6-zone differential moved nothing. Q9/Q10 parked |
 | B1 | B | pending | 0 | |
 | B2 | B | pending | 0 | golden fixture changes here |
 | B3 | B | pending | 0 | golden fixture changes here |
@@ -159,6 +159,12 @@ the mark slot. The read side is unclosable by design. A user who types
 "DW: a ?"  ->  {key:'DW', text:'a', mark:'?'}
 ```
 
+One consequence worth stating outright, found at A5: such a block also stops
+counting toward the waking span, so a user who hand-edits a title to end in
+` ?` silently loses those hours from `waking h` while keeping them in their
+category column. Narrowly reachable — `MARK_TAIL_RE_` needs whitespace before
+the `?`, so `DW: ship it?` is safe and only `DW: ship it ?` is not.
+
 `parseTitle_` cannot tell a `?` the app wrote from one a user typed, because the
 handoff's design puts both in the same single trailing character. Making parse
 ignore `?` would break A2 outright — `getState` has to read back what
@@ -167,6 +173,66 @@ ignore `?` would break A2 outright — `getState` has to read back what
 **Not fixable inside this design.** It is a consequence of encoding the guess as
 a trailing mark, which contracts 13 and 18 mandate. Flagged so the reviewer sees
 it as a known limit rather than an oversight.
+
+### Q9 (A5) — a row can now contradict itself, and a guessed block's start is a fact
+
+A5 stops `UNLOGGED` and `?` blocks from extending the waking span. Both keep
+their own hours, as criterion 3 requires. The consequence, found by the checker:
+
+```
+                                                    A5            pre-round
+DW 09-16 closed "=", DW 16-24 phantom "?", SIT 09-17
+  waking h                                          7             15
+  DW                                               15             15
+  sitting %                                      1.14           0.53
+
+a day whose only block is the overnight phantom
+  waking h                                          0             2
+  DW                                                2             2
+```
+
+The sheet now reports 15 hours of deep work inside a 7-hour waking day, and an
+evening-start day reads `waking h` 0 while its category column reads 2.
+
+**The root of it:** a `?` block's **start** is a fact the user reported — they
+tapped the category at 22:00 — and only its **end** was guessed. The guard
+discards both ends.
+
+**The fix that suggests itself, and why it was not taken.** Letting a `?`
+block's start extend `first` while its end does not extend `last` removes the
+contradiction *and still satisfies A5's criteria 2 and 5* — I checked. But
+**contract 22** says a `?` block's hours "do not extend the waking span", with
+no qualification, and under that fix a `?` block that is the day's earliest
+event extends the span backwards. Taking it means overriding a contract
+assertion, which the guardrails reserve for the human.
+
+Behaviour is pinned by test 44h rather than left accidental. **If this is ruled
+the other way, 44h is the test to change.**
+
+Worth noting `sitting %` above 100% was already reachable before this round —
+SIT 06:00-20:00 against DW 09:00-17:00 gives 1.75 in both trees — so this is a
+widening of an existing oddity, not a new class of one. A5's own risk note
+anticipates the comparability problem and parks it; this is the same family.
+
+### Q10 (A5) — a user-added category can take the key `UNLOGGED`
+
+`keyFor_` has no reserved-key check, so a category the user names "Unlogged",
+"un-logged" or "UNLOGGED time" all derive the key `UNLOGGED`:
+
+```
+keyFor_("Unlogged", [])      = UNLOGGED
+"unlogged: real work"  ->  {key:'UNLOGGED', text:'real work', mark:null}
+that user's real 06:00-18:00 block  ->  waking h = 0, UNLOGGED = 12
+```
+
+Their genuinely logged time then stops counting toward the waking span, and
+`rollupKeys_` also pushes `UNLOGGED` unconditionally so the key gets a duplicate
+column. Both halves predate this round; A5 is what makes the first one bite.
+
+**Not fixed.** Reserving a key is a product decision — reject the name, rename
+the key, or silently suffix it — and contract 7 puts category add and remove
+among the things this round leaves alone. Contrived to reach, and named here so
+it is a known hole rather than a surprise.
 
 ### Q8 (A4) — the mark strip's own controls are 42px tall
 

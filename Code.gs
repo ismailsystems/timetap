@@ -1046,6 +1046,25 @@ function dayStats_(lo, hi, plan, actual, sit, keys) {
     var p = parseTitle_(e.title);
     if (p && (p.key in d.actual)) d.actual[p.key] += clipHours_(e, lo, hi);
     if (e.start >= lo && e.start < hi) d.switches++;
+
+    /*
+     * The waking span is the part of the day the user actually accounted for,
+     * so two kinds of block on this calendar must not stretch it.
+     *
+     * UNLOGGED is written by staleGuard_ to cover a gap nobody logged, and it
+     * lands on the ACTUAL calendar — so before this, the nightly one dragged
+     * every day's span back to 00:00 and both `waking h` and `sitting %`
+     * measured nothing at all. A '?' block is one whose end the app guessed;
+     * its end is not a time the user reported stopping.
+     *
+     * Both keep their own hours columns. They are real time and the rollup
+     * still says so — this changes only what bounds the span, not what is
+     * counted. And the span stays a span: a guessed block sitting between two
+     * logged ones does not punch a hole in it, because the ends are what is
+     * measured, not the sum.
+     */
+    if (p && (p.key === 'UNLOGGED' || p.mark === '?')) return;
+
     var s = Math.max(e.start, lo), t = Math.min(e.end, hi);
     if (t > s) {
       if (first === null || s < first) first = s;
