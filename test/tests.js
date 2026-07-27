@@ -1310,6 +1310,74 @@ chk('its close button exists', !!el('dgClose'));
 chk('its list exists', !!el('deadList'));
 reset();
 
+/* ── B3: an entry can be discarded once it has been dealt with ────── */
+
+const dropBtn = r => r.children.find(c => c.tag === 'button');
+
+console.log('\n37. discarding one of two leaves the other and the drawer open');
+seedTwoDead();
+$('err').click(); settle();
+chk('two rows to start', uiRows().length === 2, String(uiRows().length));
+const keptText = rowText(uiRows()[1]);
+dropBtn(uiRows()[0]).click(); settle();
+chk('one row remains', uiRows().length === 1, String(uiRows().length));
+chk('and it is the one not discarded', rowText(uiRows()[0]) === keptText, rowText(uiRows()[0]));
+chk('the dead list in storage holds one', DEAD().length === 1, JSON.stringify(DEAD()));
+chk('the drawer stays open', !$('sheetDead').hidden);
+chk('and the banner now counts one', $('err').textContent === '1 write was set aside after repeated failures',
+  $('err').textContent);
+
+console.log('\n37b. discarding the last one closes the drawer and clears the banner');
+dropBtn(uiRows()[0]).click(); settle();
+chk('the dead list is empty', DEAD().length === 0, JSON.stringify(DEAD()));
+chk('the drawer closed itself', $('sheetDead').hidden);
+chk('the banner is hidden', $('err').hidden, $('err').textContent);
+chk('and it is no longer a door', $('err').getAttribute('role') === null,
+  String($('err').getAttribute('role')));
+
+console.log('\n37c. and it stays gone across a reload');
+reboot();
+chk('no set-aside message on the next load', $('err').hidden, $('err').textContent);
+chk('the dead list is still empty', DEAD().length === 0, JSON.stringify(DEAD()));
+reset();
+
+console.log('\n37d. discarding never touches pending work');
+reset();
+H.STORE['tt.dead.v1'] = JSON.stringify([
+  { at: D(2026, 7, 20, 11, 0), why: 'server said no', key: 'DW',
+    startMs: D(2026, 7, 20, 10, 30), op: { type: 'setMark', ref: 'refdddd4', id: 'dead1' } }
+]);
+H.STORE['tt.queue.v1'] = JSON.stringify([
+  { id: 'pending1', type: 'openActual', ref: 'refeeee5', key: 'MTG', startMs: D(2026, 7, 20, 11, 30) }
+]);
+H.setOnline(false);                            // so the pending write cannot drain
+reboot();
+const qBefore = H.STORE['tt.queue.v1'];
+chk('there is a pending write', Q().length === 1, JSON.stringify(Q()));
+$('err').click(); settle();
+dropBtn(uiRows()[0]).click(); settle();
+chk('the set-aside entry is gone', DEAD().length === 0, JSON.stringify(DEAD()));
+chk('the queue is byte-for-byte unchanged', H.STORE['tt.queue.v1'] === qBefore,
+  H.STORE['tt.queue.v1'] + ' vs ' + qBefore);
+H.setOnline(true);
+reset();
+
+console.log('\n37e. discarding the same row twice is a no-op');
+seedTwoDead();
+$('err').click(); settle();
+const staleRow = dropBtn(uiRows()[0]);
+const survivor = rowText(uiRows()[1]);
+staleRow.click(); settle();
+chk('the first tap discarded one', DEAD().length === 1, JSON.stringify(DEAD()));
+let b3Threw = null;
+try { staleRow.click(); settle(); } catch (e) { b3Threw = String(e && e.message || e); }
+chk('the second tap throws nothing', b3Threw === null, String(b3Threw));
+chk('and takes nothing with it', DEAD().length === 1, JSON.stringify(DEAD()));
+chk('the surviving row is the one that should have survived',
+  uiRows().length === 1 && rowText(uiRows()[0]) === survivor,
+  uiRows().length ? rowText(uiRows()[0]) : '(none)');
+reset();
+
 console.log('\n────────────────────────────────────────');
 console.log(H.pass + ' passed, ' + H.fail + ' failed');
 process.exit(H.fail ? 1 : 0);

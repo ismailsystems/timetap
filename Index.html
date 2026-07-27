@@ -253,6 +253,7 @@
     font-size: 12px; color: #ffb4ad; margin-top: 7px;
     word-break: break-word; user-select: text; -webkit-user-select: text;
   }
+  .deadrow .danger { width: 100%; height: 40px; margin-top: 11px; }
   #deadList { display: flex; flex-direction: column; gap: 9px; }
 
   /* ── overlays ────────────────────────────────────────────── */
@@ -635,6 +636,16 @@
    * say something says so rather than rendering blank — a row with an empty
    * cell reads like there was nothing there, which is a different claim.
    */
+  /**
+   * A row's position is not its identity: discarding one renumbers every entry
+   * after it, so a second tap on a row that has already gone would land on
+   * whatever slid into its place. The token survives that.
+   */
+  function deadToken(e) {
+    var op = (e && e.op) || {};
+    return [(e && e.at) || '', op.id || '', op.type || '', op.ref || ''].join('|');
+  }
+
   function deadRows() {
     var d = ls(K_DEAD, []);
     if (!Array.isArray(d)) return [];
@@ -642,7 +653,7 @@
     for (var i = 0; i < d.length; i++) {
       var e = d[i] || {}, op = e.op || {};
       rows.push({
-        i: i,
+        token: deadToken(e),
         when:    isFinite(e.at) ? clock(e.at) : 'unknown time',
         key:     e.key || op.key || 'unknown category',
         started: isFinite(e.startMs) ? clock(e.startMs) : 'unknown start',
@@ -729,9 +740,34 @@
       why.className = 'dwhy';
       why.textContent = r.why;
 
+      var drop = document.createElement('button');
+      drop.className = 'danger';
+      drop.textContent = 'DISCARD';
+      drop.setAttribute('aria-label', 'discard this set-aside write');
+      drop.addEventListener('click', function () { discardDead(r.token); });
+
       row.appendChild(when); row.appendChild(what); row.appendChild(why);
+      row.appendChild(drop);
       host.appendChild(row);
     });
+  }
+
+  /**
+   * Once a write has been repaired by hand there is nothing left to look at, so
+   * the row goes. This touches the dead list and nothing else: a write still
+   * waiting in the queue is pending, not lost, and discarding must never reach
+   * it. A tap on a row that has already gone finds no match and does nothing.
+   */
+  function discardDead(token) {
+    var d = ls(K_DEAD, []);
+    if (!Array.isArray(d)) return;
+    var hit = -1;
+    for (var i = 0; i < d.length; i++) if (deadToken(d[i]) === token) { hit = i; break; }
+    if (hit < 0) return;
+    d.splice(hit, 1);
+    lsSet(K_DEAD, d);
+    if (d.length) { renderDead(); showErr(deadMsg()); }
+    else { closeDead(); hideErr(); }
   }
 
   /* ── logging ───────────────────────────────────────────────── */
