@@ -1709,42 +1709,91 @@ chk('and the grid still holds exactly one stamp',
 reset();
 
 console.log('\n39d. the stamp shifts no row and no column that was there before');
-const GOLD = require('./fixtures/rollup-golden.json');
-const gz = GOLD.byZone[Session.getScriptTimeZone()];
-chk('there is a golden for this timezone', !!gz, Session.getScriptTimeZone());
-reset(D(2026, 7, 20, 9, 0)); reboot();
-goodSheet();
-tap('DW');  wait(40);
-tap('MTG'); wait(50);
-tap('ADM'); wait(30);
-tap('DW');  wait(20);
-tap('FRAG');
-const now39 = dailyRollup();
-chk('the same run still reports the same shape',
-  now39.days === gz.days && now39.categories === gz.categories,
-  JSON.stringify(now39) + ' vs ' + JSON.stringify({ days: gz.days, categories: gz.categories }));
-['daily', 'weekly'].forEach(tab => {
-  const gold = gz.grids[tab], live = tabRows(tab);
-  const gw = gold[0].length;
-  chk(tab + ': same number of rows', live.length === gold.length,
-    live.length + ' vs ' + gold.length);
-  let firstDiff = null;
-  for (let i = 0; i < gold.length && firstDiff === null; i++) {
-    for (let j = 0; j < gw; j++) {
-      if (String(live[i][j]) !== String(gold[i][j])) {
-        firstDiff = 'row ' + i + ' col ' + j + ': ' + JSON.stringify(live[i][j]) +
-                    ' vs golden ' + JSON.stringify(gold[i][j]);
-        break;
+
+/*
+ * The golden is the grid this rollup produced before the stamp existed, captured
+ * per timezone because every day boundary in this app is timezone-dependent.
+ *
+ * Two things can go wrong before a single assertion runs, and they are different
+ * problems that deserve different answers. The fixture being unreadable is a
+ * broken checkout: the suite cannot do its job, so it says why and stops. The
+ * fixture simply having no entry for the current zone is a developer working in a
+ * fifth zone — contract item 2 names four — so the section is skipped by name and
+ * the rest of the run continues. Neither is a stack trace, and neither is a pass:
+ * this section used to report "FAIL there is a golden for this timezone" and then
+ * dereference the missing golden on the next line, aborting the run.
+ */
+function loadGolden() {
+  let g;
+  try {
+    g = require('./fixtures/rollup-golden.json');
+  } catch (e) {
+    /* First line only: a MODULE_NOT_FOUND message carries the whole require stack
+       after it, which buries the one sentence that says what to do. */
+    console.log('\n  test/fixtures/rollup-golden.json could not be read: ' +
+                String((e && e.message) || e).split('\n')[0]);
+    console.log('  It is the record of the grid this rollup produced before the stamp');
+    console.log('  existed, and section 39d cannot mean anything without it.');
+    console.log('  Restore it with:  git checkout -- test/fixtures/rollup-golden.json\n');
+    process.exit(1);
+  }
+  if (!g || !g.byZone || typeof g.byZone !== 'object' || !Object.keys(g.byZone).length) {
+    console.log('\n  test/fixtures/rollup-golden.json parsed but holds no byZone map of');
+    console.log('  golden grids, so section 39d has nothing to compare against.');
+    console.log('  Restore it with:  git checkout -- test/fixtures/rollup-golden.json\n');
+    process.exit(1);
+  }
+  return g;
+}
+
+const GOLD = loadGolden();
+const ZONE = Session.getScriptTimeZone();
+const gz = GOLD.byZone[ZONE];
+
+if (!gz) {
+  H.skip('39d. the stamp shifts no row and no column that was there before',
+    'no golden grid captured for ' + ZONE + '. The fixture holds ' +
+    Object.keys(GOLD.byZone).sort().join(', ') + ' — the four zones contract item 2 ' +
+    'names. Run the suite in one of those to exercise this section.');
+} else {
+  chk('the golden for this timezone holds a grid for both tabs',
+    !!(gz.grids && gz.grids.daily && gz.grids.daily.length &&
+       gz.grids.weekly && gz.grids.weekly.length),
+    ZONE + ': ' + JSON.stringify(Object.keys(gz.grids || {})));
+  reset(D(2026, 7, 20, 9, 0)); reboot();
+  goodSheet();
+  tap('DW');  wait(40);
+  tap('MTG'); wait(50);
+  tap('ADM'); wait(30);
+  tap('DW');  wait(20);
+  tap('FRAG');
+  const now39 = dailyRollup();
+  chk('the same run still reports the same shape',
+    now39.days === gz.days && now39.categories === gz.categories,
+    JSON.stringify(now39) + ' vs ' + JSON.stringify({ days: gz.days, categories: gz.categories }));
+  ['daily', 'weekly'].forEach(tab => {
+    const gold = gz.grids[tab], live = tabRows(tab);
+    const gw = gold[0].length;
+    chk(tab + ': same number of rows', live.length === gold.length,
+      live.length + ' vs ' + gold.length);
+    let firstDiff = null;
+    for (let i = 0; i < gold.length && firstDiff === null; i++) {
+      for (let j = 0; j < gw; j++) {
+        if (String(live[i][j]) !== String(gold[i][j])) {
+          firstDiff = 'row ' + i + ' col ' + j + ': ' + JSON.stringify(live[i][j]) +
+                      ' vs golden ' + JSON.stringify(gold[i][j]);
+          break;
+        }
       }
     }
-  }
-  chk(tab + ': every pre-existing cell is byte-identical', firstDiff === null, String(firstDiff));
-  chk(tab + ': exactly one new column', live[0].length === gw + 1,
-    live[0].length + ' vs ' + (gw + 1));
-  chk(tab + ': and the only thing in it is the stamp',
-    /^last rebuilt /.test(live[0][gw]) && live.slice(1).every(r => r[gw] === ''),
-    JSON.stringify(live.slice(0, 3).map(r => r[gw])));
-});
+    chk(tab + ': every pre-existing cell is byte-identical', firstDiff === null, String(firstDiff));
+    chk(tab + ': exactly one new column', live[0].length === gw + 1,
+      live[0].length + ' vs ' + (gw + 1));
+    chk(tab + ': and the only thing in it is the stamp',
+      /^last rebuilt /.test(live[0][gw]) && live.slice(1).every(r => r[gw] === ''),
+      JSON.stringify(live.slice(0, 3).map(r => r[gw])));
+  });
+}
 reset();
 
 /* ── C3: the last outcome, readable when the sheet is not ─────────── */
@@ -1814,5 +1863,10 @@ chk('and the report reads it', /Last run: succeeded/.test(rollupStatus()), rollu
 reset();
 
 console.log('\n────────────────────────────────────────');
-console.log(H.pass + ' passed, ' + H.fail + ' failed');
+console.log(H.pass + ' passed, ' + H.fail + ' failed' +
+            (H.skipped.length ? ', ' + H.skipped.length + ' skipped' : ''));
+/* A skip is never folded into `passed`. A run that could not reach a section has
+   to be visibly different from one that ran everything, or the count says the
+   suite did more than it did. */
+H.skipped.forEach(s => console.log('  skipped: ' + s.label + '\n    ' + s.why));
 process.exit(H.fail ? 1 : 0);

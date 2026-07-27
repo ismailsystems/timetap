@@ -24,6 +24,14 @@ for z in America/New_York Europe/London Australia/Sydney UTC; do
 done
 ```
 
+Those four are the contracted zones, and section 39d compares both rollup grids
+against a golden captured per zone in `test/fixtures/rollup-golden.json`. In a
+fifth zone there is no golden to compare against, so 39d reports as **skipped**
+with the zone named and the run continues — 482 passed, 1 skipped. A skip is never
+counted in `passed`: a run that could not reach a section has to look different
+from one that ran everything. If the fixture itself is missing or unreadable the
+suite says so and stops, rather than throwing partway through.
+
 The shim deliberately mirrors two things the real parser does, both of which hid
 a real bug before it did: an id that the markup never declares resolves to
 `null`, and interactive content written into a `<button>` is dropped.

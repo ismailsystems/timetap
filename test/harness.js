@@ -383,9 +383,21 @@ const show = e => `"${e.t}" ${hhmm(e.s)}-${hhmm(e.e)}${/#open/.test(e.d) ? ' OPE
 // seconds. The tolerance is for that bookkeeping and nothing else.
 const near = (a, b, tol) => Math.abs(a - b) <= (tol === undefined ? 750 : tol);
 let pass = 0, fail = 0;
+const skipped = [];
 function chk(label, cond, detail) {
   if (cond) { pass++; console.log('  ok   ' + label); }
   else { fail++; console.log('  FAIL ' + label + (detail ? '\n         ' + detail : '')); }
+}
+/**
+ * A check this run could not reach, reported the way smoke.js reports one: named,
+ * with the reason, and counted nowhere near `pass`. A skip that quietly passed
+ * would be the counted-assertion-that-cannot-fail class again — see
+ * test/README.md:63 — and a run with a skip has to look different from a run
+ * without one.
+ */
+function skip(label, why) {
+  skipped.push({ label: label, why: why });
+  console.log('  skip ' + label + '\n         ' + why);
 }
 function reset(atMs) {
   CALS.plan.events = []; CALS.actual.events = []; CALS.sit.events = []; CALS.alt.events = [];
@@ -406,11 +418,11 @@ function reboot() {
   settle();
 }
 
-module.exports = { LOGGED, fireVisible: () => VIS.forEach(f => f()), chk, near, reset, reboot, META_ALLOWED, SCRIPT_PROPS, SHEETS, TRIGGERS,
+module.exports = { LOGGED, fireVisible: () => VIS.forEach(f => f()), chk, skip, near, reset, reboot, META_ALLOWED, SCRIPT_PROPS, SHEETS, TRIGGERS,
   posture, activeKey, litPosture, noteBox, elapsedBox, addCell,
   clearPropCache: () => { global.PROPS_ = null; }, tap, tapSit, tapMark, wait, advance, settle, A, S, show, hhmm, $,
   CALS, NODES, STORE, desc,
-  get pass() { return pass; }, get fail() { return fail; },
+  get pass() { return pass; }, get fail() { return fail; }, get skipped() { return skipped; },
   setOnline: v => { ONLINE = v; },
   // Pass a message to make every server call reject with it; pass null to stop.
   setServerReject: m => { REJECT = (m === null || m === undefined || m === false) ? null : String(m); },
