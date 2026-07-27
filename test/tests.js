@@ -2868,6 +2868,124 @@ chk('including the guessed hours', dayCell('2026-07-20', markCol_(added48.key, '
   String(dayCell('2026-07-20', markCol_(added48.key, '?'))));
 reset(); H.clearPropCache();
 
+/* ── B4: the rollup says how much of PLAN it could actually read ───
+ *
+ * A plan written as "Deep work — memo" contributes exactly zero and every ratio
+ * column reads blank forever, with nothing anywhere saying why. This counts and
+ * stops; it never guesses what an unparsed title meant. */
+
+const REC4 = () => JSON.parse(H.SCRIPT_PROPS.ROLLUP_LAST || '{}');
+
+console.log('\n49. the record says how many PLAN events there were and how many counted');
+reset(D(2026, 7, 24, 15, 0)); goodSheet();
+// 3 that reach a configured category...
+PL('DW: ship it', 20, 9, 12);
+PL('MTG: standup', 20, 13, 14);
+PL('ADM: inbox', 21, 9, 10);
+// ...and 9 that do not.
+PL('Deep work — memo', 20, 15, 17);
+PL('9:00 standup', 21, 11, 12);
+PL('Re: the thing', 21, 14, 15);
+PL('Dinner: with Ada', 21, 19, 21);
+PL('gym', 22, 7, 8);
+PL('Lunch with Ada', 22, 12, 13);
+PL('review the deck', 22, 15, 16);
+PL('CALL: mum', 23, 18, 19);
+PL('gardening', 23, 9, 10);
+dailyRollup();
+chk('12 PLAN events found', REC4().planFound === 12, String(REC4().planFound));
+chk('3 of them named a configured category', REC4().planParsed === 3,
+  String(REC4().planParsed));
+
+console.log('\n49b. and says it in words a person would read');
+const st49 = rollupStatus();
+chk('the status names both numbers', /12/.test(st49) && /3/.test(st49), st49);
+chk('in a sentence, not as a bare pair of integers',
+  /found 12, of which 3 named a configured category/.test(st49), st49);
+chk('and says what the other nine cost',
+  /other 9 counted toward nothing/.test(st49), st49);
+chk('and says what would have made them count',
+  /category key and a colon/.test(st49), st49);
+chk('with neither undefined nor NaN anywhere in it',
+  !/undefined|NaN/.test(st49), st49);
+
+console.log('\n49c. "9:00 standup" is found but not parsed');
+/* The point of the task: the count is of events that reached a category, not
+ * of events the regex matched. "9:00 standup" parses to key 9, which is
+ * nobody's category. */
+chk('parseTitle_ does match it', parseTitle_('9:00 standup') !== null,
+  JSON.stringify(parseTitle_('9:00 standup')));
+chk('to a key nobody configured', rollupKeys_().indexOf('9') < 0,
+  JSON.stringify(rollupKeys_()));
+reset(D(2026, 7, 24, 15, 0)); goodSheet();
+PL('9:00 standup', 20, 9, 10);
+dailyRollup();
+chk('so it counts as found', REC4().planFound === 1, String(REC4().planFound));
+chk('and not as parsed', REC4().planParsed === 0, String(REC4().planParsed));
+
+console.log('\n49d. setupRollup reports it too');
+reset(D(2026, 7, 24, 15, 0)); goodSheet();
+PL('DW: ship it', 20, 9, 12);
+PL('gardening', 20, 15, 16);
+const rep49 = setupRollup();
+chk('the setup report names both numbers',
+  /found 2, of which 1 named a configured category/.test(rep49), rep49);
+chk('and prints neither undefined nor NaN', !/undefined|NaN/.test(rep49), rep49);
+
+console.log('\n49e. the grids stay pure numbers');
+chk('no daily header mentions the counts',
+  !dRows()[0].some(h => /plan events|found|parsed/i.test(String(h))),
+  JSON.stringify(dRows()[0]));
+chk('no weekly header does either',
+  !wRows()[0].some(h => /plan events|found|parsed/i.test(String(h))),
+  JSON.stringify(wRows()[0]));
+chk('and no cell in either grid does',
+  !dRows().slice(1).concat(wRows().slice(1))
+    .some(r => r.some(c => /plan events|counted toward nothing/i.test(String(c)))),
+  'a count leaked into a data row');
+
+console.log('\n49f. a PLAN calendar that cannot be read at all is 0 and 0');
+reset(D(2026, 7, 24, 15, 0)); goodSheet();
+H.SCRIPT_PROPS.CAL_PLAN = 'nosuchcalendar'; H.clearPropCache();
+let e49 = null;
+try { dailyRollup(); } catch (e) { e49 = String((e && e.message) || e); }
+chk('nothing throws', e49 === null, String(e49));
+chk('found is 0', REC4().planFound === 0, String(REC4().planFound));
+chk('parsed is 0', REC4().planParsed === 0, String(REC4().planParsed));
+delete H.SCRIPT_PROPS.CAL_PLAN; H.clearPropCache();
+
+console.log('\n49g. zero PLAN events says so plainly');
+reset(D(2026, 7, 24, 15, 0)); goodSheet();
+dailyRollup();
+const st49g = rollupStatus();
+chk('found is 0', REC4().planFound === 0, String(REC4().planFound));
+chk('and the report says none were found',
+  /none found in the window/.test(st49g), st49g);
+chk('and explains what that means for the ratios',
+  /every ratio column is blank/.test(st49g), st49g);
+chk('with neither undefined nor NaN', !/undefined|NaN/.test(st49g), st49g);
+
+console.log('\n49h. a failure never overwrites the counts with zeroes');
+/* Same rule round 1 set for lastSuccessMs: a run that failed before it read
+ * PLAN knows nothing about PLAN, and writing 0 would be a false claim rather
+ * than a missing one. */
+reset(D(2026, 7, 24, 15, 0)); goodSheet();
+PL('DW: ship it', 20, 9, 12);
+PL('gardening', 20, 15, 16);
+dailyRollup();
+chk('a good run recorded 2 and 1',
+  REC4().planFound === 2 && REC4().planParsed === 1, JSON.stringify(REC4()));
+H.SCRIPT_PROPS.SHEET_ID = 'no-such-book'; H.clearPropCache();
+let e49h = null;
+try { dailyRollup(); } catch (e) { e49h = String((e && e.message) || e); }
+chk('the next run fails', e49h !== null, String(e49h));
+chk('and it is recorded as a failure', REC4().outcome === 'failed', JSON.stringify(REC4()));
+chk('but the counts from the last good run survive',
+  REC4().planFound === 2 && REC4().planParsed === 1, JSON.stringify(REC4()));
+chk('and the report still states them',
+  /found 2, of which 1 named a configured category/.test(rollupStatus()), rollupStatus());
+reset(); H.clearPropCache();
+
 console.log('\n────────────────────────────────────────');
 console.log(H.pass + ' passed, ' + H.fail + ' failed' +
             (H.skipped.length ? ', ' + H.skipped.length + ' skipped' : ''));

@@ -587,3 +587,35 @@ would not reveal it, because they would still add up.
 
 `test/fixtures/rollup-golden.json` and `appsscript.json`: still byte-identical
 to `a256bdf`.
+
+## [2026-07-27 15:3x] B4 | The rollup says how much of PLAN it could actually read
+
+`planCoverage_` counts the PLAN events in the window and how many of them
+reached a **configured** category. Both numbers go into the existing rollup
+script property, and `planLine_` says them in a sentence that `rollupStatus`
+and `setupRollup` both print.
+
+The distinction the task exists for: **"parsed" means the title reached a
+category, not that the regex matched.** `9:00 standup` parses to key `9`, which
+is nobody's category — it counts as found and not as parsed. A count of regex
+matches would have reported that plan as usable and left the ratio blank
+anyway.
+
+It reports and stops. It never guesses what an unparsed title meant; round 1
+rejected that and the reasons are still written where `rollupKeys_` explains why
+keys are not discovered from titles.
+
+A run that fails before reading PLAN leaves the previous counts alone. Zeroes
+written by a failure would read as "no plan events", which is a different and
+false claim — the same rule round 1 set for `lastSuccessMs`.
+
+**Tests: 49 through 49h. 688 → 716 assertions.** Four contracted zones green,
+lint clear, headless ok.
+
+**Mutation-tested:**
+
+| Mutation | Caught by |
+|---|---|
+| "parsed" counts regex matches rather than configured keys | 5 assertions, including 49c |
+| a failed run overwrites the counts with zeroes | 49h, both halves |
+| reported as a bare pair of integers | 5 assertions across 49b and 49d |

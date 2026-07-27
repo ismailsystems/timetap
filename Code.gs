@@ -927,7 +927,7 @@ function readRollupRecord_() {
  * numbers went stale eleven days ago is the whole point; a record that forgot
  * the last good run would only be able to say that something is wrong now.
  */
-function recordRollup_(ok, why) {
+function recordRollup_(ok, why, plan) {
   var rec = readRollupRecord_();
   if (!rec) rec = {};
   var now = Date.now();
@@ -935,6 +935,15 @@ function recordRollup_(ok, why) {
   rec.atMs = now;
   if (ok) {
     rec.lastSuccessMs = now;
+    /* Only ever written by a run that got as far as reading PLAN. A run that
+       failed before then leaves the previous counts alone — the same rule
+       round 1 set for lastSuccessMs, and for the same reason: zeroes written
+       by a failure would read as "no plan events", which is a different and
+       false claim. */
+    if (plan) {
+      rec.planFound = plan.found;
+      rec.planParsed = plan.parsed;
+    }
   } else {
     rec.lastFailureMs = now;
     rec.lastFailureWhy = why;
@@ -943,6 +952,56 @@ function recordRollup_(ok, why) {
   try {
     PropertiesService.getScriptProperties().setProperty(ROLLUP_PROP, JSON.stringify(rec));
   } catch (e) {}
+}
+
+/**
+ * How many PLAN events the window held, and how many of them reached a
+ * configured category.
+ *
+ * dayStats_ only counts a PLAN event whose title parses to a key already in the
+ * configured set, so a plan written as "Deep work — memo" contributes exactly
+ * zero and every ratio column reads blank forever with nothing saying why. This
+ * counts and stops. It never guesses what an unparsed title meant — round 1
+ * rejected that for reasons that still hold, and they are written down where
+ * rollupKeys_ explains why keys are not discovered from titles.
+ *
+ * "Parsed" means the title reached a configured category, not that the regex
+ * matched: "9:00 standup" parses to key 9, which is nobody's category, and it
+ * counts as found and not as parsed.
+ */
+function planCoverage_(plan, keys) {
+  var known = {};
+  keys.forEach(function (k) { known[k] = 1; });
+  var parsed = 0;
+  plan.forEach(function (e) {
+    var p = parseTitle_(e.title);
+    if (p && (p.key in known)) parsed++;
+  });
+  return { found: plan.length, parsed: parsed };
+}
+
+/**
+ * One sentence about how much of PLAN the last run could read.
+ *
+ * A bare pair of integers is not a report — "12 / 3" needs the reader to know
+ * which is which and what either means. This says it in words, and says what
+ * the unread ones cost.
+ */
+function planLine_(rec) {
+  if (!rec || typeof rec.planFound !== 'number') {
+    return 'PLAN events: nothing on record yet.';
+  }
+  if (rec.planFound === 0) {
+    return 'PLAN events: none found in the window, so every ratio column is blank.';
+  }
+  if (rec.planParsed === rec.planFound) {
+    return 'PLAN events: found ' + rec.planFound + ', and all ' + rec.planFound +
+           ' named a configured category.';
+  }
+  return 'PLAN events: found ' + rec.planFound + ', of which ' + rec.planParsed +
+         ' named a configured category. The other ' + (rec.planFound - rec.planParsed) +
+         ' counted toward nothing: a plan event only counts if its title begins ' +
+         'with a category key and a colon, like "DW: ship the thing".';
 }
 
 /**
@@ -955,7 +1014,7 @@ function recordRollup_(ok, why) {
 function dailyRollup() {
   try {
     var out = rollupOnce_();
-    recordRollup_(true, null);
+    recordRollup_(true, null, out.plan);
     return out;
   } catch (e) {
     recordRollup_(false, String((e && e.message) || e));
@@ -994,6 +1053,7 @@ function rollupStatus() {
                ? stampTime_(rec.lastFailureMs) + ', ' +
                  (rec.lastFailureWhy || 'no reason recorded')
                : 'none on record'));
+  lines.push(planLine_(rec));
   return say_(lines.join('\n'));
 }
 
@@ -1008,6 +1068,7 @@ function rollupOnce_() {
   var sit    = readCal_(calId_('CAL_SITTING'), firstDay, endMs);
 
   var keys = rollupKeys_();
+  var planRead = planCoverage_(plan, keys);
   var days = [];
   for (var i = 0; i < ROLLUP_DAYS; i++) {
     var s = addLocalDaysMs_(firstDay, i);
@@ -1022,7 +1083,8 @@ function rollupOnce_() {
   writeGrid_(ss, WEEKLY_TAB, weekly);
   say_('rolled up ' + days.length + ' days across ' + allCategories_().length +
        ' categories into ' + ss.getUrl());
-  return { days: days.length, categories: keys.length, sheet: ss.getUrl() };
+  return { days: days.length, categories: keys.length, sheet: ss.getUrl(),
+           plan: planRead };
 }
 
 /**
@@ -1361,7 +1423,13 @@ function setupRollup() {
     'events found in the last ' + ROLLUP_DAYS + ' days:',
     '  PLAN      ' + seen.PLAN,
     '  ACTUAL    ' + seen.ACTUAL,
-    '  SITTING   ' + seen.SITTING
+    '  SITTING   ' + seen.SITTING,
+    '',
+    /* The count above says how many PLAN events exist; this says how many the
+       rollup could actually use. They are different numbers and the gap between
+       them is the whole reason every ratio column can read blank while the PLAN
+       calendar is visibly full. */
+    planLine_({ planFound: res.plan.found, planParsed: res.plan.parsed })
   ];
   if (others.length) {
     lines.push('',

@@ -7,9 +7,9 @@ Round 1's progress record is `factory/progress.md` and is **read-only**.
 
 ## Status
 
-In progress. **8 of 16 tasks complete.** Stage B, task B4 next.
+In progress. **9 of 16 tasks complete.** Stage B, task B5 next.
 
-Suite: **688 passed / 0 failed** (baseline was 492), green in all four
+Suite: **716 passed / 0 failed** (baseline was 492), green in all four
 contracted timezones. Lint all clear. Headless ok, 19 checks per viewport.
 
 ## Tasks
@@ -24,7 +24,7 @@ contracted timezones. Lint all clear. Headless ok, 19 checks per viewport.
 | B1 | B | **done** | 1 | four mutations tried, all caught; golden untouched |
 | B2 | B | **done** | 1 | golden deliberately NOT regenerated — see Q11 |
 | B3 | B | **done** | 1 | done in the same pass as B2; reason in log-2.md |
-| B4 | B | pending | 0 | |
+| B4 | B | **done** | 1 | three mutations tried, all caught |
 | B5 | B | pending | 0 | vacuity check required |
 | C1 | C | pending | 0 | the sweep is the load-bearing criterion |
 | C2 | C | pending | 0 | |
