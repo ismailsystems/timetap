@@ -15,7 +15,7 @@ A task is `done` only after the CHECKER step has independently re-verified it.
 | B3 | Discard an entry; banner clears with the last | done | 1 | 19 assertions (372 → 391, 4 zones, lint clear). CHECKER: 3 mutations, all caught — position-based identity, discard reaching into the queue, drawer not closing on the last entry. |
 | C1 | A failed rollup records why | done | 1 | 19 assertions (391 → 410, 4 zones, lint clear). Record-then-rethrow into script property `ROLLUP_LAST`. CHECKER: 3 mutations, all caught. |
 | C2 | Both tabs carry a last-rebuilt stamp | done | 1 | 30 assertions (410 → 440, 4 zones, lint clear). Golden fixture `test/fixtures/rollup-golden.json` captured from d048ca3, before the stamp existed. CHECKER: 5 mutations, all caught. One existing test amended (see log). |
-| C3 | Last outcome readable by hand | pending | 0 | |
+| C3 | Last outcome readable by hand | done | 1 | 19 assertions (440 → 459, 4 zones, lint clear). `rollupStatus()`, runnable from the editor. CHECKER: 4 mutations, all caught. **Stage C complete.** |
 | D1 | A real browser opens Index.html | pending | 0 | |
 | D2 | Harness serves the page as Apps Script does | pending | 0 | |
 | D3 | Desktop viewport too, reported separately | pending | 0 | |

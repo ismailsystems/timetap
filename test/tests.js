@@ -1595,6 +1595,72 @@ chk('the same run still reports the same shape',
 });
 reset();
 
+/* ── C3: the last outcome, readable when the sheet is not ─────────── */
+
+console.log('\n40. the report names the last success and the last failure');
+reset(); goodSheet();
+tap('DW'); wait(30); tap('MTG');
+dailyRollup();
+wait(120);
+brokenSheet();
+try { dailyRollup(); } catch (e) {}
+H.LOGGED.length = 0;
+const rep = rollupStatus();
+chk('it says the last run failed', /Last run: failed/.test(rep), rep);
+chk('it names when the last success was',
+  rep.indexOf(stampTime_(REC().lastSuccessMs)) > 0, rep);
+chk('it names when the last failure was',
+  rep.indexOf(stampTime_(REC().lastFailureMs)) > 0, rep);
+chk('and what the failure was', /no-such-book/.test(rep), rep);
+chk('nothing reads as undefined', !/undefined/.test(rep), rep);
+chk('the same string reaches the log', H.LOGGED.indexOf(rep) >= 0,
+  JSON.stringify(H.LOGGED));
+chk('it reports and does not advise',
+  !/should|must|you need|recommend|⚠|warning/i.test(rep), rep);
+reset();
+
+console.log('\n40b. nothing on record says so in plain words');
+reset();
+H.LOGGED.length = 0;
+let rep40b = null, e40b = null;
+try { rep40b = rollupStatus(); } catch (e) { e40b = String(e && e.message || e); }
+chk('it does not throw', e40b === null, String(e40b));
+chk('it says no rollup has run', /No rollup has run yet/.test(rep40b || ''), String(rep40b));
+chk('nothing reads as undefined', !/undefined/.test(rep40b || ''), String(rep40b));
+chk('and it still reaches the log', H.LOGGED.indexOf(rep40b) >= 0, JSON.stringify(H.LOGGED));
+reset();
+
+console.log('\n40c. a record that cannot be read says that, rather than throwing');
+reset();
+H.SCRIPT_PROPS.ROLLUP_LAST = 'this is not json {{{';
+H.LOGGED.length = 0;
+let rep40c = null, e40c = null;
+try { rep40c = rollupStatus(); } catch (e) { e40c = String(e && e.message || e); }
+chk('it does not throw', e40c === null, String(e40c));
+chk('it says the record cannot be read',
+  /cannot be read/.test(rep40c || ''), String(rep40c));
+chk('and names the property to clear', /ROLLUP_LAST/.test(rep40c || ''), String(rep40c));
+chk('nothing reads as undefined', !/undefined/.test(rep40c || ''), String(rep40c));
+reset();
+
+console.log('\n40d. a record holding the wrong shape entirely is still not a crash');
+reset();
+H.SCRIPT_PROPS.ROLLUP_LAST = '["an","array","not","an","object"]';
+let rep40d = null, e40d = null;
+try { rep40d = rollupStatus(); } catch (e) { e40d = String(e && e.message || e); }
+chk('it does not throw', e40d === null, String(e40d));
+chk('and it says it cannot read the record', /cannot be read/.test(rep40d || ''), String(rep40d));
+reset();
+
+console.log('\n40e. a run after an unreadable record starts a clean one');
+reset(); goodSheet();
+H.SCRIPT_PROPS.ROLLUP_LAST = 'not json at all';
+tap('DW'); wait(20); tap('MTG');
+dailyRollup();
+chk('the record is readable again', REC() && REC().outcome === 'ok', JSON.stringify(REC()));
+chk('and the report reads it', /Last run: succeeded/.test(rollupStatus()), rollupStatus());
+reset();
+
 console.log('\n────────────────────────────────────────');
 console.log(H.pass + ' passed, ' + H.fail + ' failed');
 process.exit(H.fail ? 1 : 0);

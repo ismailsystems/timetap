@@ -876,6 +876,40 @@ function dailyRollup() {
   }
 }
 
+/**
+ * Run this from the editor when the stamp in a tab looks old and the next
+ * question is why. It answers from the script property, so it still works in
+ * the case that produces most stale stamps: the spreadsheet cannot be opened
+ * at all.
+ *
+ * It reports what is on record and stops. Whether eleven days is a problem is
+ * not something this can know.
+ */
+function rollupStatus() {
+  var rec = readRollupRecord_();
+  if (rec === null) {
+    return say_('No rollup has run yet, so there is nothing on record. ' +
+                'Run setupRollup to install the nightly trigger, or dailyRollup ' +
+                'to build the tabs now.');
+  }
+  if (rec === false) {
+    return say_('There is a rollup record but it cannot be read. Delete the ' +
+                'script property ' + ROLLUP_PROP + ' and run dailyRollup to ' +
+                'start a fresh one.');
+  }
+  var lines = [];
+  lines.push('Last run: ' + (rec.outcome === 'ok' ? 'succeeded' : 'failed') +
+             (rec.atMs ? ' at ' + stampTime_(rec.atMs) : ''));
+  lines.push('Last success: ' +
+             (rec.lastSuccessMs ? stampTime_(rec.lastSuccessMs) : 'none on record'));
+  lines.push('Last failure: ' +
+             (rec.lastFailureMs
+               ? stampTime_(rec.lastFailureMs) + ', ' +
+                 (rec.lastFailureWhy || 'no reason recorded')
+               : 'none on record'));
+  return say_(lines.join('\n'));
+}
+
 function rollupOnce_() {
   var ss = openSheet_();
   var todayStart = localMidnightMs_(Date.now());
@@ -1056,13 +1090,17 @@ function openSheet_() {
  */
 function stampGrid_(rows) {
   if (!rows.length) return rows;
-  var tz = Session.getScriptTimeZone();
   var width = 0;
   rows.forEach(function (r) { if (r.length > width) width = r.length; });
   rows.forEach(function (r) { while (r.length < width) r.push(''); });
-  rows[0][width] = 'last rebuilt ' +
-    Utilities.formatDate(new Date(Date.now()), tz, 'yyyy-MM-dd HH:mm') + ' ' + tz;
+  rows[0][width] = 'last rebuilt ' + stampTime_(Date.now());
   return rows;
+}
+
+/** A moment, in the script's own timezone, said the same way everywhere. */
+function stampTime_(ms) {
+  var tz = Session.getScriptTimeZone();
+  return Utilities.formatDate(new Date(ms), tz, 'yyyy-MM-dd HH:mm') + ' ' + tz;
 }
 
 /** Replace the tab's contents wholesale. Values only: no formatting opinions. */
