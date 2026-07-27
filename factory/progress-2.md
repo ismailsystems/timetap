@@ -7,9 +7,9 @@ Round 1's progress record is `factory/progress.md` and is **read-only**.
 
 ## Status
 
-In progress. **6 of 16 tasks complete.** Stage B, task B2 next.
+In progress. **8 of 16 tasks complete.** Stage B, task B4 next.
 
-Suite: **656 passed / 0 failed** (baseline was 492), green in all four
+Suite: **688 passed / 0 failed** (baseline was 492), green in all four
 contracted timezones. Lint all clear. Headless ok, 19 checks per viewport.
 
 ## Tasks
@@ -22,8 +22,8 @@ contracted timezones. Lint all clear. Headless ok, 19 checks per viewport.
 | A4 | A | **done** | 1 | checker found 4 mutations my phase missed; all now caught |
 | A5 | A | **done** | 1 | criteria all met; checker's 16-scenario x 6-zone differential moved nothing. Q9/Q10 parked |
 | B1 | B | **done** | 1 | four mutations tried, all caught; golden untouched |
-| B2 | B | pending | 0 | golden fixture changes here |
-| B3 | B | pending | 0 | golden fixture changes here |
+| B2 | B | **done** | 1 | golden deliberately NOT regenerated — see Q11 |
+| B3 | B | **done** | 1 | done in the same pass as B2; reason in log-2.md |
 | B4 | B | pending | 0 | |
 | B5 | B | pending | 0 | vacuity check required |
 | C1 | C | pending | 0 | the sweep is the load-bearing criterion |
@@ -213,6 +213,45 @@ Worth noting `sitting %` above 100% was already reachable before this round —
 SIT 06:00-20:00 against DW 09:00-17:00 gives 1.75 in both trees — so this is a
 widening of an existing oddity, not a new class of one. A5's own risk note
 anticipates the comparability problem and parks it; this is the same family.
+
+### Q11 (B2/B3) — the golden fixture was NOT regenerated, and that is deliberate
+
+The handoff's guardrails say `test/fixtures/rollup-golden.json` "changes exactly
+twice this round — in B2/B3 and again in D1", and B2's **test notes** say its
+header row "must be updated as part of this task". It has not been. **Zero
+lines changed.**
+
+The fixture carries its own instruction, written in round 1:
+
+```
+"_note": "Grids produced by the code BEFORE the last-rebuilt stamp existed.
+          Regenerating this file defeats the test that uses it."
+```
+
+It is a frozen pre-change record, and its whole value is that it was captured by
+code that predates what it is used to check. Regenerating it from the new code
+would make section 39d — and B2's own position assertion — agree with whatever
+the new code happened to do.
+
+**B2's acceptance criterion is met either way, and better this way:** *"every
+header that existed before this round is at the same zero-based index as before,
+asserted against the header row recorded in `test/fixtures/rollup-golden.json`."*
+A frozen header is exactly what that sentence wants to be asserted against.
+
+So the assertions were updated instead of the fixture. Section 39d no longer
+says "exactly one new column"; it derives the expected mark columns **from the
+golden's own header** and asserts they appear in order, followed by exactly one
+stamp. New section 46 asserts every pre-round header sits at its pre-round
+index, on both tabs.
+
+**This is a deviation from a test note, not from a criterion**, and it preserves
+a guard round 1 put there on purpose. Flagged rather than done quietly. If the
+human prefers the fixture regenerated, section 39d and section 46 are where that
+decision lands — but the `_note` should be deleted at the same time, because it
+would no longer be true.
+
+The same reasoning will apply at D1, where the handoff again expects a fixture
+update for the new key's columns.
 
 ### Q10 (A5) — a user-added category can take the key `UNLOGGED`
 

@@ -1119,6 +1119,17 @@ function dayStats_(lo, hi, plan, actual, sit, keys) {
 
 var DOW_ = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
+/**
+ * The column name for one key's one bucket.
+ *
+ * Unmarked gets a word rather than a glyph, because there is no character that
+ * means "the user did not say" — a blank or a dot in a header reads as a
+ * missing column rather than as a real bucket, and it is a real bucket.
+ */
+function markCol_(key, mark) {
+  return key + ' ' + (mark === '' ? 'unmarked' : mark);
+}
+
 /** One row per day. The rawest thing the calendars can say. */
 function dailyGrid_(days, keys) {
   var head = ['date', 'day'];
@@ -1126,6 +1137,21 @@ function dailyGrid_(days, keys) {
   keys.forEach(function (k) { head.push('plan ' + k); });
   head = head.concat(['switches', 'waking h', 'sitting h', 'sitting %',
                       'longest sit min', 'sits over 90']);
+  /*
+   * The mark columns are APPENDED, after every column that existed before, and
+   * never interleaved next to the key they belong to.
+   *
+   * That is the whole contract with the world outside this repo: README tells
+   * the reader to point formulas from their own tabs at these columns by
+   * position, and those formulas cannot be tested from in here. Interleaving
+   * would read better and would silently break every one of them.
+   *
+   * Grouped by key rather than by mark, so one category's five buckets sit
+   * together once you are past the boundary.
+   */
+  keys.forEach(function (k) {
+    MARK_BUCKETS.forEach(function (m) { head.push(markCol_(k, m)); });
+  });
 
   var rows = [head];
   days.forEach(function (d) {
@@ -1135,6 +1161,9 @@ function dailyGrid_(days, keys) {
     r.push(d.switches, round2_(d.waking), round2_(d.sitting),
            d.waking > 0 ? round2_(d.sitting / d.waking) : '',
            Math.round(d.longestSit / MS_MIN), d.sitsOver90);
+    keys.forEach(function (k) {
+      MARK_BUCKETS.forEach(function (m) { r.push(round2_(d.marks[k][m])); });
+    });
     rows.push(r);
   });
   return rows;
@@ -1147,19 +1176,36 @@ function weeklyGrid_(days, keys) {
   keys.forEach(function (k) { head.push('plan ' + k, k, k + ' ratio'); });
   head = head.concat(['switches', 'waking h', 'sitting h', 'sitting %',
                       'longest sit min', 'sits over 90']);
+  /* Same rule as the daily tab: appended after every column that existed
+     before, never interleaved. This tab already carries three columns per key
+     — plan, actual, ratio — so it is the wider of the two and the one where
+     interleaving would be most expensive to unpick. */
+  keys.forEach(function (k) {
+    MARK_BUCKETS.forEach(function (m) { head.push(markCol_(k, m)); });
+  });
 
   var weeks = [], index = {};
   days.forEach(function (d) {
     var wk = ymd_(mondayStartMs_(d.ms, 0));
     if (!(wk in index)) {
       index[wk] = weeks.length;
-      var blank = { wk: wk, plan: {}, actual: {}, switches: 0, waking: 0,
+      var blank = { wk: wk, plan: {}, actual: {}, marks: {}, switches: 0, waking: 0,
                     sitting: 0, longestSit: 0, sitsOver90: 0 };
-      keys.forEach(function (k) { blank.plan[k] = 0; blank.actual[k] = 0; });
+      keys.forEach(function (k) {
+        blank.plan[k] = 0;
+        blank.actual[k] = 0;
+        blank.marks[k] = {};
+        MARK_BUCKETS.forEach(function (m) { blank.marks[k][m] = 0; });
+      });
       weeks.push(blank);
     }
     var w = weeks[index[wk]];
-    keys.forEach(function (k) { w.plan[k] += d.plan[k]; w.actual[k] += d.actual[k]; });
+    keys.forEach(function (k) {
+      w.plan[k] += d.plan[k];
+      w.actual[k] += d.actual[k];
+      // A week's bucket is the sum of its days' same bucket, and nothing else.
+      MARK_BUCKETS.forEach(function (m) { w.marks[k][m] += d.marks[k][m]; });
+    });
     w.switches += d.switches;
     w.waking += d.waking;
     w.sitting += d.sitting;
@@ -1177,6 +1223,11 @@ function weeklyGrid_(days, keys) {
     r.push(w.switches, round2_(w.waking), round2_(w.sitting),
            w.waking > 0 ? round2_(w.sitting / w.waking) : '',
            Math.round(w.longestSit / MS_MIN), w.sitsOver90);
+    /* Zero, not blank. A week in which every hour was guessed has 0 in its '='
+       column — that is a number and it is true. Blank is a different claim. */
+    keys.forEach(function (k) {
+      MARK_BUCKETS.forEach(function (m) { r.push(round2_(w.marks[k][m])); });
+    });
     rows.push(r);
   });
   return rows;

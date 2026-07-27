@@ -740,8 +740,15 @@ const fixed = ['date', 'day', 'switches', 'waking h', 'sitting h', 'sitting %',
 // The last-rebuilt stamp (C2) also lives in row 1, past the last data column.
 // It is excluded by name rather than by loosening the filter, and pinned below,
 // so a column genuinely invented from a title still fails this.
+// B2 appended one column per key per mark bucket. They are derived from the
+// configured keys, so they are the opposite of invented — but they still have
+// to be named here, or this rule cannot tell them from a column conjured out
+// of a subject line.
+const markCols29 = [];
+known.forEach(k => MARK_BUCKETS.forEach(m => markCols29.push(markCol_(k, m))));
 const invented = hdr.filter(h => !fixed.includes(h) && !h.startsWith('plan ') &&
-                                 !known.includes(h) && !/^last rebuilt /.test(h));
+                                 !known.includes(h) && !markCols29.includes(h) &&
+                                 !/^last rebuilt /.test(h));
 chk('no column invented from a clock time or a subject line',
   invented.length === 0, invented.join(' '));
 chk('and the only non-column cell in the header is the one stamp',
@@ -1789,11 +1796,35 @@ if (!gz) {
       }
     }
     chk(tab + ': every pre-existing cell is byte-identical', firstDiff === null, String(firstDiff));
-    chk(tab + ': exactly one new column', live[0].length === gw + 1,
-      live[0].length + ' vs ' + (gw + 1));
-    chk(tab + ': and the only thing in it is the stamp',
-      /^last rebuilt /.test(live[0][gw]) && live.slice(1).every(r => r[gw] === ''),
-      JSON.stringify(live.slice(0, 3).map(r => r[gw])));
+    /* B2 and B3 append one column per key per mark bucket, after every column
+     * that existed before. The golden is deliberately NOT regenerated — it is
+     * the pre-round record, and its own _note says regenerating it defeats the
+     * test that uses it. So the assertion is not "one new column" any more; it
+     * is "exactly these new columns, in this order, and then the stamp".
+     *
+     * The keys come out of the golden's own header rather than out of the live
+     * code, so this cannot agree with a mistake by construction. */
+    const goldKeys = gold[0].filter(h => /^plan /.test(h)).map(h => h.slice(5));
+    /* Which tabs carry the mark columns, stated rather than sniffed. Deriving
+       it from the live header would make this agree with whatever the code did.
+       B2 does the daily tab; B3 adds the weekly one to this list. */
+    const TABS_WITH_MARKS = ['daily', 'weekly'];
+    const expectNew = [];
+    if (TABS_WITH_MARKS.includes(tab)) {
+      goldKeys.forEach(k => MARK_BUCKETS.forEach(m => expectNew.push(markCol_(k, m))));
+    }
+    chk(tab + ': the golden header really did yield the keys', goldKeys.length > 0,
+      JSON.stringify(goldKeys));
+    chk(tab + ': the new columns are the mark columns, appended in order',
+      JSON.stringify(live[0].slice(gw, gw + expectNew.length)) === JSON.stringify(expectNew),
+      JSON.stringify(live[0].slice(gw, gw + expectNew.length)) + ' vs ' + JSON.stringify(expectNew));
+    const stampAt = gw + expectNew.length;
+    chk(tab + ': then exactly one more column, and it is the stamp',
+      live[0].length === stampAt + 1 && /^last rebuilt /.test(live[0][stampAt]),
+      live[0].length + ' wide, col ' + stampAt + ' = ' + JSON.stringify(live[0][stampAt]));
+    chk(tab + ': and no data row puts anything in the stamp column',
+      live.slice(1).every(r => r[stampAt] === '' || r[stampAt] === undefined),
+      JSON.stringify(live.slice(1, 4).map(r => r[stampAt])));
   });
 }
 reset();
@@ -2682,6 +2713,160 @@ chk('MTG total unchanged', near(s45f.actual.MTG * 3600000, 1.5 * 3600000),
 chk('UNLOGGED is bucketed too, under the mark it carries',
   near(s45f.marks.UNLOGGED['-'] * 3600000, 3 * 3600000), JSON.stringify(s45f.marks.UNLOGGED));
 reset();
+
+/* ── B2 and B3: both tabs carry a column per category per mark ─────
+ *
+ * Appended, never interleaved. Existing column positions are a contract with
+ * formulas that live outside this repo and cannot be tested from inside it, so
+ * these assert POSITIONS and not merely presence.
+ *
+ * The positions are read from test/fixtures/rollup-golden.json, which is the
+ * pre-round record and is deliberately NOT regenerated — see the note in
+ * factory/progress-2.md. A fixture rewritten from the new code would agree with
+ * whatever the new code did. */
+
+const wRows = () => H.SHEETS.book.getSheetByName('weekly').rows;
+
+console.log('\n46. no column that existed before this round has moved');
+const GOLD46 = require('./fixtures/rollup-golden.json');
+const gz46 = GOLD46.byZone[ZONE];
+if (!gz46) {
+  H.skip('46. no column that existed before this round has moved',
+    'no golden captured for this zone; the four contracted zones are ' +
+    Object.keys(GOLD46.byZone).sort().join(', '));
+} else {
+  reset(D(2026, 7, 24, 15, 0)); goodSheet();
+  AC('DW: a =', 20, 9, 0, 11, 0);
+  dailyRollup();
+  [['daily', dRows()], ['weekly', wRows()]].forEach(([tab, live]) => {
+    const goldHead = gz46.grids[tab][0];
+    const moved = goldHead
+      .map((h, i) => (live[0][i] === h ? null : i + ': expected ' + h + ', found ' + live[0][i]))
+      .filter(Boolean);
+    chk(tab + ': every pre-round header is at the index it was at before',
+      moved.length === 0, moved.join(' | '));
+    chk(tab + ': and the grid only got wider, never shorter',
+      live[0].length > goldHead.length,
+      live[0].length + ' vs ' + goldHead.length);
+  });
+}
+
+console.log('\n47. a day\'s marks show up as columns, beside the total that contains them');
+reset(D(2026, 7, 24, 15, 0)); goodSheet();
+AC('DW: settled =', 20, 9, 0, 11, 0);
+AC('DW: guessed ?', 20, 13, 0, 14, 0);
+dailyRollup();
+chk('DW = shows 2', dayCell('2026-07-20', 'DW =') === 2, String(dayCell('2026-07-20', 'DW =')));
+chk('DW ? shows 1', dayCell('2026-07-20', 'DW ?') === 1, String(dayCell('2026-07-20', 'DW ?')));
+chk('and the existing DW column still shows 3',
+  dayCell('2026-07-20', 'DW') === 3, String(dayCell('2026-07-20', 'DW')));
+chk('the buckets that saw nothing show 0, not blank',
+  dayCell('2026-07-20', 'DW +') === 0 && dayCell('2026-07-20', 'DW -') === 0 &&
+  dayCell('2026-07-20', 'DW unmarked') === 0,
+  JSON.stringify([dayCell('2026-07-20', 'DW +'), dayCell('2026-07-20', 'DW -'),
+                  dayCell('2026-07-20', 'DW unmarked')]));
+
+console.log('\n47b. every row is the width of the header');
+/* A short row is how a column silently shifts. */
+const ragged47 = dRows().filter(r => r.length !== dRows()[0].length)
+  .map((r, i) => 'row ' + i + ' is ' + r.length + ' wide');
+chk('daily: no ragged rows', ragged47.length === 0, ragged47.slice(0, 4).join(' | '));
+const raggedW47 = wRows().filter(r => r.length !== wRows()[0].length)
+  .map((r, i) => 'row ' + i + ' is ' + r.length + ' wide');
+chk('weekly: no ragged rows', raggedW47.length === 0, raggedW47.slice(0, 4).join(' | '));
+
+console.log('\n47c. exactly one stamp, after the last data column');
+const stamps47 = dRows()[0].filter(h => /^last rebuilt /.test(h));
+chk('daily: exactly one stamp', stamps47.length === 1, JSON.stringify(stamps47));
+chk('daily: and it is the last column',
+  /^last rebuilt /.test(dRows()[0][dRows()[0].length - 1]),
+  JSON.stringify(dRows()[0].slice(-2)));
+const stampsW47 = wRows()[0].filter(h => /^last rebuilt /.test(h));
+chk('weekly: exactly one stamp', stampsW47.length === 1, JSON.stringify(stampsW47));
+chk('weekly: and it is the last column',
+  /^last rebuilt /.test(wRows()[0][wRows()[0].length - 1]),
+  JSON.stringify(wRows()[0].slice(-2)));
+
+console.log('\n47d. two runs against a fixed clock produce the same grid');
+reset(D(2026, 7, 24, 15, 0)); goodSheet();
+AC('DW: a =', 20, 9, 0, 11, 0);
+AC('MTG: b ?', 20, 13, 0, 14, 0);
+dailyRollup();
+const first47 = JSON.stringify(dRows());
+const firstW47 = JSON.stringify(wRows());
+dailyRollup();
+chk('daily is byte-identical the second time', JSON.stringify(dRows()) === first47);
+chk('weekly is byte-identical the second time', JSON.stringify(wRows()) === firstW47);
+
+console.log('\n48. a week\'s bucket is the sum of its days\' same bucket');
+reset(D(2026, 7, 24, 15, 0)); goodSheet();
+AC('DW: mon =', 20, 9, 0, 11, 0);
+AC('DW: tue =', 21, 9, 0, 12, 0);
+AC('DW: wed ?', 22, 9, 0, 10, 0);
+AC('MTG: thu -', 23, 9, 0, 9, 30);
+dailyRollup();
+const wHead = wRows()[0];
+const wRow = wRows().find(r => r[0] === '2026-07-20');
+const wCell = n => wRow[wHead.indexOf(n)];
+chk('the week\'s DW = is 2 + 3', wCell('DW =') === 5, String(wCell('DW =')));
+chk('the week\'s DW ? is 1', wCell('DW ?') === 1, String(wCell('DW ?')));
+chk('the week\'s MTG - is 0.5', wCell('MTG -') === 0.5, String(wCell('MTG -')));
+/* Checked against the daily tab rather than against numbers typed in here, so
+ * a bucket summed into the wrong key is caught — per-key totals would not
+ * reveal it, because they would still add up. */
+const drift48 = [];
+rollupKeys_().forEach(k => MARK_BUCKETS.forEach(m => {
+  const col = markCol_(k, m);
+  const daySum = ['2026-07-20', '2026-07-21', '2026-07-22', '2026-07-23',
+                  '2026-07-24', '2026-07-25', '2026-07-26']
+    .reduce((a, ymd) => a + (dayCell(ymd, col) || 0), 0);
+  if (Math.abs(round2_(daySum) - wCell(col)) > 0.005) {
+    drift48.push(col + ': days ' + round2_(daySum) + ' vs week ' + wCell(col));
+  }
+}));
+chk('every weekly mark cell equals the sum of its days', drift48.length === 0,
+  drift48.join(' | '));
+
+console.log('\n48b. a week of nothing but guesses says 0, not blank');
+reset(D(2026, 7, 24, 15, 0)); goodSheet();
+AC('DW: all guessed ?', 20, 9, 0, 12, 0);
+AC('DW: also guessed ?', 21, 9, 0, 11, 0);
+dailyRollup();
+const wRow48 = wRows().find(r => r[0] === '2026-07-20');
+const wCell48 = n => wRow48[wRows()[0].indexOf(n)];
+chk('the ? column carries all its hours', wCell48('DW ?') === 5, String(wCell48('DW ?')));
+chk('the = column says 0', wCell48('DW =') === 0, JSON.stringify(wCell48('DW =')));
+chk('and 0 is a number, not an empty cell', typeof wCell48('DW =') === 'number',
+  typeof wCell48('DW ='));
+chk('while the ratio cell for an unplanned key is still blank',
+  wCell48('DW ratio') === '', JSON.stringify(wCell48('DW ratio')));
+
+console.log('\n48c. a retired category keeps its full set of mark columns');
+/* removeCategory only retires a category that was added at runtime — one in the
+ * CATEGORIES array has to leave Code.gs — so the fixture adds one, logs history
+ * under it, and then retires it. Its history stays in the rollup, and the
+ * handoff requires it keep every mark column while it does. */
+reset(D(2026, 7, 24, 15, 0)); goodSheet();
+const added48 = addCategory('Sketching').categories.find(c => c.label === 'Sketching');
+H.clearPropCache();
+AC(added48.key + ': history =', 20, 9, 0, 11, 0);
+AC(added48.key + ': guessed ?', 20, 13, 0, 14, 0);
+dailyRollup();
+chk('while it is live it has its mark columns',
+  MARK_BUCKETS.every(m => dRows()[0].indexOf(markCol_(added48.key, m)) >= 0),
+  JSON.stringify(dRows()[0].filter(h => h.indexOf(added48.key) === 0)));
+removeCategory(added48.key);
+H.clearPropCache();
+dailyRollup();
+const missing48 = MARK_BUCKETS.filter(m => dRows()[0].indexOf(markCol_(added48.key, m)) < 0);
+chk('and once retired it still has every one of them',
+  missing48.length === 0, JSON.stringify(missing48.map(m => markCol_(added48.key, m))));
+chk('its logged history is still in them',
+  dayCell('2026-07-20', markCol_(added48.key, '=')) === 2,
+  String(dayCell('2026-07-20', markCol_(added48.key, '='))));
+chk('including the guessed hours', dayCell('2026-07-20', markCol_(added48.key, '?')) === 1,
+  String(dayCell('2026-07-20', markCol_(added48.key, '?'))));
+reset(); H.clearPropCache();
 
 console.log('\n────────────────────────────────────────');
 console.log(H.pass + ' passed, ' + H.fail + ' failed' +

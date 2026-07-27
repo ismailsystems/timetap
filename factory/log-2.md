@@ -524,3 +524,66 @@ The per-key sum is the load-bearing one and it is a loop over `rollupKeys_()`
 rather than hand-picked cases — it is what catches hours counted into the wrong
 key's bucket, which the totals alone cannot reveal because they would still add
 up.
+
+## [2026-07-27 15:0x] B2+B3 | Both tabs carry a column per category per mark
+
+`dailyGrid_` and `weeklyGrid_` gain one column per key per mark bucket,
+**appended after every column that existed before**, grouped by key. A
+`markCol_` helper names them: `DW +`, `DW =`, `DW -`, `DW ?`, and `DW unmarked`
+— a word rather than a glyph for the last, because no character means "the user
+did not say", and a blank or a dot in a header reads as a missing column rather
+than a real bucket.
+
+Appending rather than interleaving is the whole contract with the world outside
+this repo: `README.md` tells the reader to point formulas from their own tabs at
+these columns by position, and those formulas cannot be tested from in here.
+
+**Tests: 46, 47, 47b, 47c, 47d, 48, 48b, 48c. 656 → 688 assertions.** Four
+contracted timezones green, lint clear, headless ok.
+
+**Done in one pass rather than two, which is a deviation from the operating
+loop.** Section 39d's width assertion spans both tabs; leaving the weekly tab
+out required an explicit exemption list that B3 would delete an hour later, and
+an assertion carrying a temporary exemption is a worse record than one commit
+covering both. B2 alone was green before B3 was started — I checked — so the
+dependency order was respected even though the commits were not split.
+
+**The golden fixture was NOT regenerated. Zero lines changed.** The handoff
+expects it to change here; the fixture's own `_note`, written in round 1, says
+regenerating it defeats the test that uses it. It is a frozen pre-change record,
+and B2's criterion — "asserted against the header row recorded in
+`test/fixtures/rollup-golden.json`" — is served better by a frozen header than
+by one rewritten from the code under test. Assertions were updated instead:
+39d now derives the expected mark columns *from the golden's own header* rather
+than being told them, and section 46 pins every pre-round header to its
+pre-round index on both tabs. Parked as **Q11** with the reasoning and the
+consequence for D1.
+
+**Three existing assertions moved, all because they pinned the old width**, and
+each was made at least as strict:
+
+- test 29's "no column invented from a clock time or a subject line" now names
+  the mark columns as legitimate. They are derived from configured keys, so they
+  are the opposite of invented — but without naming them the rule could not tell
+  them from a column conjured out of a subject line.
+- 39d's "exactly one new column" became "exactly these new columns, in this
+  order, and then the stamp".
+- 39d's "the only thing in it is the stamp" split into a stamp-position
+  assertion and a no-data-row-writes-there assertion.
+
+**Mutation-tested before claiming it works:**
+
+| Mutation | Caught by |
+|---|---|
+| mark columns interleaved beside their key — the forbidden layout | **27 assertions**, including the golden comparison |
+| weekly buckets summed into the wrong key | 48's day-to-week check, plus 48 itself |
+| unmarked bucket written blank instead of 0 | 48b, both halves |
+| stamp written before the mark columns | 10 assertions |
+
+The day-to-week check compares every weekly mark cell against the sum of that
+column across its seven daily rows, rather than against numbers typed into the
+test. That is what catches a bucket summed into the wrong key — per-key totals
+would not reveal it, because they would still add up.
+
+`test/fixtures/rollup-golden.json` and `appsscript.json`: still byte-identical
+to `a256bdf`.
