@@ -1014,6 +1014,96 @@ const dedicated = setupRollup();
 chk('a dedicated sheet gets no such warning', !/other tabs/.test(dedicated));
 reset();
 
+/* ── A1: a server rejection is a different failure from a dropped connection ──
+ * Everything downstream of here (the drawer, what a dead entry knows about
+ * itself) is only honestly testable if a failure can be forced on demand. These
+ * assert what today's unmodified client already does. */
+
+const Q = () => JSON.parse(H.STORE['tt.queue.v1'] || '[]');
+const DEAD = () => JSON.parse(H.STORE['tt.dead.v1'] || '[]');
+const headTries = () => { const q = Q(); return q.length ? (q[0].tries || 0) : null; };
+// The backoff starts at 4s and doubles to a 60s ceiling (Index.html:522), so the
+// step has to be smaller than the gap being counted or one advance swallows the
+// whole early ladder — 4+8+16+32s inside a single 61s jump, five attempts where
+// the test meant to observe one. Small steps to count attempts exactly; big
+// steps only once the delay has pinned at its ceiling.
+function pump(cond, cap, stepMs) {
+  const step = stepMs === undefined ? 1000 : stepMs;
+  for (let i = 0; i < (cap === undefined ? 200 : cap) && !cond(); i++) { advance(step); settle(); }
+  return cond();
+}
+
+console.log('\n34. a server rejection travels the server path, not the offline one');
+reset();
+H.setServerReject('server said no');
+const rej = applyOps([{ id: 'srv1', type: 'openActual', ref: 'aaaabbbbccccdddd',
+                        key: 'DW', startMs: Date.now() }]);
+chk('the rejection comes back through errors, not as a thrown call',
+  rej.errors.length === 1, JSON.stringify(rej.errors));
+chk('the error names the op that caused it',
+  rej.errors.length === 1 && rej.errors[0].id === 'srv1', JSON.stringify(rej.errors));
+chk('and carries the thrown message',
+  rej.errors.length === 1 && /server said no/.test(rej.errors[0].message),
+  JSON.stringify(rej.errors));
+chk('nothing was applied', rej.applied.length === 0, JSON.stringify(rej.applied));
+chk('and nothing reached the calendar', A().length === 0, A().map(show).join(' | '));
+reset();
+
+console.log('\n34b. five rejections set the write aside — and four do not');
+reset(); reboot();
+H.setServerReject('calendar is not having it');
+tap('DW');
+chk('the write is queued', Q().length === 1, JSON.stringify(Q().map(o => o.type)));
+pump(() => (headTries() || 0) >= 4 || DEAD().length > 0);
+chk('after four attempts it is still queued', Q().length === 1, JSON.stringify(Q()));
+chk('and nothing has been set aside yet', DEAD().length === 0, JSON.stringify(DEAD()));
+chk('four is really four', headTries() === 4, String(headTries()));
+// Stop at the fifth attempt whether or not it set anything aside. Pumping until
+// a dead entry appears would pass just as happily on a client that gave up on
+// the sixth — the threshold has to be observed, not waited for.
+pump(() => DEAD().length > 0 || (headTries() || 0) >= 5);
+chk('the fifth attempt sets it aside, and not one later',
+  DEAD().length === 1, 'dead=' + DEAD().length + ' tries=' + headTries());
+chk('and it leaves the queue', Q().length === 0, JSON.stringify(Q()));
+chk('the reason kept is the server\'s own message',
+  DEAD().length === 1 && /calendar is not having it/.test(DEAD()[0].why),
+  DEAD().length ? DEAD()[0].why : '(none)');
+chk('the op it set aside is the one that failed',
+  DEAD().length === 1 && DEAD()[0].op.type === 'openActual',
+  DEAD().length ? DEAD()[0].op.type : '(none)');
+chk('and the user was told', !$('err').hidden, $('err').textContent);
+reset();
+
+console.log('\n34c. a network failure is never counted against an op');
+reset(); reboot();
+H.setOnline(false);
+tap('DW');
+chk('the write is queued', Q().length === 1, JSON.stringify(Q().map(o => o.type)));
+for (let i = 0; i < 8; i++) { advance(61000); settle(); }
+chk('after eight retries it is still queued', Q().length === 1, JSON.stringify(Q()));
+chk('nothing was set aside', DEAD().length === 0, JSON.stringify(DEAD()));
+chk('and no try was counted against it', !Q()[0].tries, String(Q()[0] && Q()[0].tries));
+H.setOnline(true);
+reset();
+
+console.log('\n34d. the dead list is capped at fifty, keeping the newest');
+reset();
+const many = [];
+for (let i = 0; i < 60; i++) {
+  many.push({ id: 'op' + i, type: 'openActual', ref: 'ref' + String(i).padStart(5, '0'),
+              key: 'DW', startMs: Date.now() + i * 60000 });
+}
+H.STORE['tt.queue.v1'] = JSON.stringify(many);
+H.setServerReject('still no');
+reboot();
+pump(() => Q().length === 0, 2000, 61000);
+chk('every one of the sixty left the queue', Q().length === 0, String(Q().length));
+chk('the dead list holds exactly fifty', DEAD().length === 50, String(DEAD().length));
+chk('the oldest ten were dropped, not the newest',
+  DEAD().length === 50 && DEAD()[0].op.ref === 'ref00010' && DEAD()[49].op.ref === 'ref00059',
+  DEAD().length ? DEAD()[0].op.ref + '..' + DEAD()[DEAD().length - 1].op.ref : '(empty)');
+reset();
+
 console.log('\n────────────────────────────────────────');
 console.log(H.pass + ' passed, ' + H.fail + ' failed');
 process.exit(H.fail ? 1 : 0);

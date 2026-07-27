@@ -158,6 +158,22 @@ let code = fs.readFileSync(SRC + 'Code.gs', 'utf8')
   .replace("var CAL_SITTING = '';", "var CAL_SITTING = 'sit';");
 vm.runInThisContext(code, { filename: 'Code.gs' });
 
+/* A server rejection and a dropped connection are different failures, and the
+ * client is deliberately built to tell them apart. A rejection comes back
+ * through the *success* handler as a non-empty errors array (Code.gs:629) and
+ * counts against the op's try count; setOnline(false) fires the failure handler
+ * and does not count, because retrying is exactly what a network failure wants
+ * (Index.html:497). Only the first path can ever set a write aside, and nothing
+ * in the shim could reach it, so it gets a switch of its own. Wrapping applyOp_
+ * rather than applyOps keeps the real errors/applied/dropped bookkeeping and the
+ * real stop-at-first-failure ordering in play. */
+const realApplyOp_ = global.applyOp_;
+let REJECT = null;
+global.applyOp_ = function () {
+  if (REJECT !== null) throw new Error(REJECT);
+  return realApplyOp_.apply(this, arguments);
+};
+
 /* ── DOM shim ──────────────────────────────────────────────────── */
 class El {
   constructor(tag) {
@@ -323,6 +339,7 @@ function reset(atMs) {
   Object.keys(STORE).forEach(k => delete STORE[k]);
   NOW = atMs !== undefined ? atMs : new Date(2026, 6, 20, 9, 0, 0, 0).getTime();
   ONLINE = true;
+  REJECT = null;
   LOGGED.length = 0;
   global.PROPS_ = null;
   SHEETS.book.sheets = [];
@@ -341,5 +358,8 @@ module.exports = { LOGGED, fireVisible: () => VIS.forEach(f => f()), chk, near, 
   clearPropCache: () => { global.PROPS_ = null; }, tap, tapSit, tapMark, wait, advance, settle, A, S, show, hhmm, $,
   CALS, NODES, STORE, desc,
   get pass() { return pass; }, get fail() { return fail; },
-  setOnline: v => { ONLINE = v; }, nowMs: () => NOW,
+  setOnline: v => { ONLINE = v; },
+  // Pass a message to make every server call reject with it; pass null to stop.
+  setServerReject: m => { REJECT = (m === null || m === undefined || m === false) ? null : String(m); },
+  nowMs: () => NOW,
   setNow: v => { NOW = v; } };
