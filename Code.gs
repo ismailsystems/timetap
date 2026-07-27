@@ -813,8 +813,70 @@ function say_(msg) {
   return msg;
 }
 
-/** Entry point for the daily time-driven trigger. Safe to run by hand. */
+/* ── what the last rollup did ───────────────────────────────────────
+ *
+ * The record lives in a script property and not in the spreadsheet, because
+ * the likeliest way the rollup fails is openSheet_ refusing a bad or revoked
+ * SHEET_ID — and a record kept inside the sheet would be unreachable in exactly
+ * the case it exists for. Script properties stay writable when the sheet does
+ * not.
+ */
+var ROLLUP_PROP = 'ROLLUP_LAST';
+
+/** null: nothing recorded. false: something recorded, but unreadable. */
+function readRollupRecord_() {
+  var raw;
+  try { raw = PropertiesService.getScriptProperties().getProperty(ROLLUP_PROP); }
+  catch (e) { return false; }
+  if (raw === null || raw === undefined || raw === '') return null;
+  try {
+    var v = JSON.parse(raw);
+    return (v && typeof v === 'object' && !Array.isArray(v)) ? v : false;
+  } catch (e) { return false; }
+}
+
+/**
+ * A failure records itself without erasing the last success. Knowing the
+ * numbers went stale eleven days ago is the whole point; a record that forgot
+ * the last good run would only be able to say that something is wrong now.
+ */
+function recordRollup_(ok, why) {
+  var rec = readRollupRecord_();
+  if (!rec) rec = {};
+  var now = Date.now();
+  rec.outcome = ok ? 'ok' : 'failed';
+  rec.atMs = now;
+  if (ok) {
+    rec.lastSuccessMs = now;
+  } else {
+    rec.lastFailureMs = now;
+    rec.lastFailureWhy = why;
+  }
+  // Recording must never become the thing that breaks the rollup.
+  try {
+    PropertiesService.getScriptProperties().setProperty(ROLLUP_PROP, JSON.stringify(rec));
+  } catch (e) {}
+}
+
+/**
+ * Entry point for the daily time-driven trigger. Safe to run by hand.
+ *
+ * Record, then rethrow. The recording is what makes a failure findable later;
+ * it is not a reason to swallow the error, so the platform's own execution list
+ * still shows the run as failed.
+ */
 function dailyRollup() {
+  try {
+    var out = rollupOnce_();
+    recordRollup_(true, null);
+    return out;
+  } catch (e) {
+    recordRollup_(false, String((e && e.message) || e));
+    throw e;
+  }
+}
+
+function rollupOnce_() {
   var ss = openSheet_();
   var todayStart = localMidnightMs_(Date.now());
   var firstDay = addLocalDaysMs_(todayStart, -(ROLLUP_DAYS - 1));

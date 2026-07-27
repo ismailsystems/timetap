@@ -13,7 +13,7 @@ A task is `done` only after the CHECKER step has independently re-verified it.
 | B1 | A set-aside write identifies its block | done | 1 | All 5 criteria verified. 1-4 in section 35-35d; criterion 5 verified in section 36f once B2 gave it a surface to render on. Found F1 and F2 on the way. |
 | B2 | Banner opens a drawer of set-aside writes | done | 1 | 35 assertions (337 → 372, 4 zones, lint clear). Fixes F1 and F2. CHECKER: 7 mutations, all caught — one of them (singular verb) only after I noticed my tests covered the plural case alone. |
 | B3 | Discard an entry; banner clears with the last | done | 1 | 19 assertions (372 → 391, 4 zones, lint clear). CHECKER: 3 mutations, all caught — position-based identity, discard reaching into the queue, drawer not closing on the last entry. |
-| C1 | A failed rollup records why | pending | 0 | |
+| C1 | A failed rollup records why | done | 1 | 19 assertions (391 → 410, 4 zones, lint clear). Record-then-rethrow into script property `ROLLUP_LAST`. CHECKER: 3 mutations, all caught. |
 | C2 | Both tabs carry a last-rebuilt stamp | pending | 0 | |
 | C3 | Last outcome readable by hand | pending | 0 | |
 | D1 | A real browser opens Index.html | pending | 0 | |

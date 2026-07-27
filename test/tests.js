@@ -1378,6 +1378,88 @@ chk('the surviving row is the one that should have survived',
   uiRows().length ? rowText(uiRows()[0]) : '(none)');
 reset();
 
+/* ── C1: a failed rollup records why, where the failure cannot erase it ── */
+
+const REC = () => {
+  const raw = H.SCRIPT_PROPS.ROLLUP_LAST;
+  return raw === undefined ? null : JSON.parse(raw);
+};
+const goodSheet = () => { H.SCRIPT_PROPS.SHEET_ID = 'book'; H.clearPropCache(); };
+const brokenSheet = () => { H.SCRIPT_PROPS.SHEET_ID = 'no-such-book'; H.clearPropCache(); };
+
+console.log('\n38. a working rollup returns what it always did, and says so');
+reset(); goodSheet();
+tap('DW'); wait(40); tap('MTG'); wait(20); tap('DW');
+const r38 = dailyRollup();
+chk('it still returns days, categories and sheet',
+  r38 && typeof r38.days === 'number' && typeof r38.categories === 'number' &&
+  typeof r38.sheet === 'string', JSON.stringify(r38));
+chk('the record says the run succeeded', REC() && REC().outcome === 'ok', JSON.stringify(REC()));
+chk('with a timestamp', REC() && near(REC().lastSuccessMs, H.nowMs(), 2000),
+  REC() ? String(REC().lastSuccessMs) : '(none)');
+chk('and no failure is claimed', REC() && !REC().lastFailureMs, JSON.stringify(REC()));
+reset();
+
+console.log('\n38b. a sheet that cannot be opened records the failure and rethrows');
+reset(); brokenSheet();
+let e38 = null;
+try { dailyRollup(); } catch (e) { e38 = String(e && e.message || e); }
+chk('the error is rethrown so the platform marks the run failed', e38 !== null, String(e38));
+chk('and it names the sheet it could not open', /no-such-book/.test(e38 || ''), String(e38));
+chk('the record says it failed', REC() && REC().outcome === 'failed', JSON.stringify(REC()));
+chk('with the reason kept', REC() && /no-such-book/.test(REC().lastFailureWhy || ''),
+  REC() ? String(REC().lastFailureWhy) : '(none)');
+chk('and a timestamp', REC() && near(REC().lastFailureMs, H.nowMs(), 2000),
+  REC() ? String(REC().lastFailureMs) : '(none)');
+reset();
+
+console.log('\n38c. a failure never erases the last good run');
+reset(); goodSheet();
+tap('DW'); wait(30); tap('MTG');
+dailyRollup();
+const okAt = REC().lastSuccessMs;
+chk('a success is on record', REC().outcome === 'ok' && okAt > 0, JSON.stringify(REC()));
+wait(60);
+brokenSheet();
+try { dailyRollup(); } catch (e) {}
+chk('the newer failure is recorded', REC().outcome === 'failed', JSON.stringify(REC()));
+chk('and the last success is still there, to the millisecond',
+  REC().lastSuccessMs === okAt, REC().lastSuccessMs + ' vs ' + okAt);
+chk('the two are distinguishable', REC().lastFailureMs > REC().lastSuccessMs,
+  REC().lastFailureMs + ' vs ' + REC().lastSuccessMs);
+reset();
+
+console.log('\n38d. a failure partway through the write is recorded too');
+reset(); goodSheet();
+tap('DW'); wait(30); tap('MTG');
+const realWriteGrid = global.writeGrid_;
+global.writeGrid_ = function () { throw new Error('the sheet went away mid-write'); };
+let e38d = null;
+try { dailyRollup(); } catch (e) { e38d = String(e && e.message || e); }
+global.writeGrid_ = realWriteGrid;
+chk('it rethrew', /mid-write/.test(e38d || ''), String(e38d));
+chk('the failure is on record with its reason',
+  REC() && REC().outcome === 'failed' && /mid-write/.test(REC().lastFailureWhy || ''),
+  JSON.stringify(REC()));
+reset();
+
+console.log('\n38e. a success after a failure reads as current');
+reset(); brokenSheet();
+try { dailyRollup(); } catch (e) {}
+const failAt = REC().lastFailureMs;
+chk('the failure is on record', REC().outcome === 'failed', JSON.stringify(REC()));
+wait(60);
+goodSheet();
+tap('DW'); wait(20); tap('MTG');
+dailyRollup();
+chk('the run now reads as ok', REC().outcome === 'ok', JSON.stringify(REC()));
+chk('the success is the newer of the two', REC().lastSuccessMs > failAt,
+  REC().lastSuccessMs + ' vs ' + failAt);
+chk('and the old failure is still on record, not erased',
+  REC().lastFailureMs === failAt && /no-such-book/.test(REC().lastFailureWhy || ''),
+  JSON.stringify(REC()));
+reset();
+
 console.log('\n────────────────────────────────────────');
 console.log(H.pass + ' passed, ' + H.fail + ' failed');
 process.exit(H.fail ? 1 : 0);
