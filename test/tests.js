@@ -735,9 +735,16 @@ const hdr = H.SHEETS.book.getSheetByName('daily').rows[0];
 const known = clientConfig_().categories.map(c => c.key).concat(['UNLOGGED']);
 const fixed = ['date', 'day', 'switches', 'waking h', 'sitting h', 'sitting %',
                'longest sit min', 'sits over 90'];
-const invented = hdr.filter(h => !fixed.includes(h) && !h.startsWith('plan ') && !known.includes(h));
+// The last-rebuilt stamp (C2) also lives in row 1, past the last data column.
+// It is excluded by name rather than by loosening the filter, and pinned below,
+// so a column genuinely invented from a title still fails this.
+const invented = hdr.filter(h => !fixed.includes(h) && !h.startsWith('plan ') &&
+                                 !known.includes(h) && !/^last rebuilt /.test(h));
 chk('no column invented from a clock time or a subject line',
   invented.length === 0, invented.join(' '));
+chk('and the only non-column cell in the header is the one stamp',
+  hdr.filter(h => /^last rebuilt /.test(h)).length === 1,
+  JSON.stringify(hdr.filter(h => /^last rebuilt /.test(h))));
 chk('UNLOGGED is still reported', hdr.includes('UNLOGGED'));
 chk('a real category prefix is still counted',
   H.SHEETS.book.getSheetByName('weekly').rows[1][hdr.indexOf('plan DW') >= 0 ? 1 : 1] !== undefined);
@@ -1458,6 +1465,134 @@ chk('the success is the newer of the two', REC().lastSuccessMs > failAt,
 chk('and the old failure is still on record, not erased',
   REC().lastFailureMs === failAt && /no-such-book/.test(REC().lastFailureWhy || ''),
   JSON.stringify(REC()));
+reset();
+
+/* ── C2: both tabs say when they were last rebuilt ────────────────── */
+
+const tabRows = name => {
+  const sh = H.SHEETS.book.getSheetByName(name);
+  return sh ? sh.rows : null;
+};
+const stampsIn = rows => {
+  const found = [];
+  (rows || []).forEach((r, i) => r.forEach((c, j) => {
+    if (typeof c === 'string' && /^last rebuilt /.test(c)) found.push({ i, j, c });
+  }));
+  return found;
+};
+
+console.log('\n39. both tabs carry a last-rebuilt stamp');
+reset(); goodSheet();
+tap('DW'); wait(40); tap('MTG'); wait(20); tap('DW');
+dailyRollup();
+const dStamps = stampsIn(tabRows('daily'));
+const wStamps = stampsIn(tabRows('weekly'));
+chk('the daily tab has exactly one stamp', dStamps.length === 1, JSON.stringify(dStamps));
+chk('the weekly tab has exactly one stamp', wStamps.length === 1, JSON.stringify(wStamps));
+chk('the daily stamp is in row 1', dStamps.length === 1 && dStamps[0].i === 0,
+  dStamps.length ? String(dStamps[0].i) : '(none)');
+chk('past the last data column',
+  dStamps.length === 1 && dStamps[0].j === tabRows('daily')[1].length - 1,
+  dStamps.length ? dStamps[0].j + ' vs ' + (tabRows('daily')[1].length - 1) : '(none)');
+chk('nothing else sits in that column',
+  tabRows('daily').slice(1).every(r => r[dStamps[0].j] === ''),
+  JSON.stringify(tabRows('daily').slice(1, 3).map(r => r[dStamps[0].j])));
+chk('it reads as a date and a time',
+  /^last rebuilt \d{4}-\d\d-\d\d \d\d:\d\d /.test(dStamps[0].c), dStamps[0].c);
+chk('and it names the script timezone',
+  dStamps[0].c.slice(-Session.getScriptTimeZone().length) === Session.getScriptTimeZone(),
+  dStamps[0].c + ' / ' + Session.getScriptTimeZone());
+chk('the clock in it is local, not UTC',
+  dStamps[0].c.indexOf(' ' + String(new Date(H.nowMs()).getHours()).padStart(2, '0') + ':') > 0,
+  dStamps[0].c + ' / local hour ' + new Date(H.nowMs()).getHours());
+chk('the stamp states a fact and stops',
+  !/stale|out of date|should|check|warning|⚠/i.test(dStamps[0].c), dStamps[0].c);
+
+console.log('\n39b. running twice rewrites the stamp, it does not accumulate');
+const firstStamp = dStamps[0].c;
+wait(120);
+dailyRollup();
+chk('still exactly one stamp in daily', stampsIn(tabRows('daily')).length === 1,
+  JSON.stringify(stampsIn(tabRows('daily'))));
+chk('still exactly one in weekly', stampsIn(tabRows('weekly')).length === 1,
+  JSON.stringify(stampsIn(tabRows('weekly'))));
+chk('and it moved on', stampsIn(tabRows('daily'))[0].c !== firstStamp,
+  stampsIn(tabRows('daily'))[0].c + ' vs ' + firstStamp);
+
+console.log('\n39c. a failed run never refreshes the stamp');
+const beforeFail = stampsIn(tabRows('daily'))[0].c;
+const rowsBefore = JSON.stringify(tabRows('daily'));
+wait(120);
+brokenSheet();
+let e39 = null;
+try { dailyRollup(); } catch (e) { e39 = String(e && e.message || e); }
+chk('the run failed', e39 !== null, String(e39));
+chk('the stamp in the sheet is untouched', stampsIn(tabRows('daily'))[0].c === beforeFail,
+  stampsIn(tabRows('daily'))[0].c + ' vs ' + beforeFail);
+chk('and so is every other cell', JSON.stringify(tabRows('daily')) === rowsBefore);
+reset();
+
+console.log('\n39e. a tab\'s stamp is never newer than that tab\'s own numbers');
+reset(); goodSheet();
+tap('DW'); wait(40); tap('MTG');
+dailyRollup();
+const weeklyBefore = JSON.stringify(tabRows('weekly'));
+const dailyStampBefore = stampsIn(tabRows('daily'))[0].c;
+wait(180);
+const realWG = global.writeGrid_;
+global.writeGrid_ = function (ss, tab, rows) {
+  if (tab === WEEKLY_TAB) throw new Error('weekly tab is protected');
+  return realWG(ss, tab, rows);
+};
+let e39e = null;
+try { dailyRollup(); } catch (e) { e39e = String(e && e.message || e); }
+global.writeGrid_ = realWG;
+chk('the run failed partway', /weekly tab is protected/.test(e39e || ''), String(e39e));
+chk('the weekly tab is untouched — old numbers, old stamp, together',
+  JSON.stringify(tabRows('weekly')) === weeklyBefore);
+chk('the daily tab got new numbers and a new stamp, also together',
+  stampsIn(tabRows('daily'))[0].c !== dailyStampBefore,
+  stampsIn(tabRows('daily'))[0].c + ' vs ' + dailyStampBefore);
+chk('and the failure is on record', REC() && REC().outcome === 'failed', JSON.stringify(REC()));
+reset();
+
+console.log('\n39d. the stamp shifts no row and no column that was there before');
+const GOLD = require('./fixtures/rollup-golden.json');
+const gz = GOLD.byZone[Session.getScriptTimeZone()];
+chk('there is a golden for this timezone', !!gz, Session.getScriptTimeZone());
+reset(D(2026, 7, 20, 9, 0)); reboot();
+goodSheet();
+tap('DW');  wait(40);
+tap('MTG'); wait(50);
+tap('ADM'); wait(30);
+tap('DW');  wait(20);
+tap('FRAG');
+const now39 = dailyRollup();
+chk('the same run still reports the same shape',
+  now39.days === gz.days && now39.categories === gz.categories,
+  JSON.stringify(now39) + ' vs ' + JSON.stringify({ days: gz.days, categories: gz.categories }));
+['daily', 'weekly'].forEach(tab => {
+  const gold = gz.grids[tab], live = tabRows(tab);
+  const gw = gold[0].length;
+  chk(tab + ': same number of rows', live.length === gold.length,
+    live.length + ' vs ' + gold.length);
+  let firstDiff = null;
+  for (let i = 0; i < gold.length && firstDiff === null; i++) {
+    for (let j = 0; j < gw; j++) {
+      if (String(live[i][j]) !== String(gold[i][j])) {
+        firstDiff = 'row ' + i + ' col ' + j + ': ' + JSON.stringify(live[i][j]) +
+                    ' vs golden ' + JSON.stringify(gold[i][j]);
+        break;
+      }
+    }
+  }
+  chk(tab + ': every pre-existing cell is byte-identical', firstDiff === null, String(firstDiff));
+  chk(tab + ': exactly one new column', live[0].length === gw + 1,
+    live[0].length + ' vs ' + (gw + 1));
+  chk(tab + ': and the only thing in it is the stamp',
+    /^last rebuilt /.test(live[0][gw]) && live.slice(1).every(r => r[gw] === ''),
+    JSON.stringify(live.slice(0, 3).map(r => r[gw])));
+});
 reset();
 
 console.log('\n────────────────────────────────────────');

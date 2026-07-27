@@ -78,6 +78,12 @@ global.Utilities = {
   formatDate: (d, tz, fmt) => {
     const p = n => String(n).padStart(2, '0');
     if (fmt === 'yyyy-MM-dd') return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate());
+    // node's local getters follow TZ, which is what Session.getScriptTimeZone()
+    // reports here, so the two agree the way they do on Apps Script.
+    if (fmt === 'yyyy-MM-dd HH:mm') {
+      return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()) +
+             ' ' + p(d.getHours()) + ':' + p(d.getMinutes());
+    }
     throw new Error('unsupported format ' + fmt);
   }
 };

@@ -893,8 +893,8 @@ function rollupOnce_() {
     days.push(dayStats_(s, addLocalDaysMs_(s, 1), plan, actual, sit, keys));
   }
 
-  writeGrid_(ss, DAILY_TAB, dailyGrid_(days, keys));
-  writeGrid_(ss, WEEKLY_TAB, weeklyGrid_(days, keys));
+  writeGrid_(ss, DAILY_TAB, stampGrid_(dailyGrid_(days, keys)));
+  writeGrid_(ss, WEEKLY_TAB, stampGrid_(weeklyGrid_(days, keys)));
   say_('rolled up ' + days.length + ' days across ' + allCategories_().length +
        ' categories into ' + ss.getUrl());
   return { days: days.length, categories: keys.length, sheet: ss.getUrl() };
@@ -1041,6 +1041,28 @@ function openSheet_() {
   var ss = SpreadsheetApp.openById(id);
   if (!ss) throw new Error('SHEET_ID does not resolve to a spreadsheet you can open: ' + id);
   return ss;
+}
+
+/**
+ * When the tab was last rebuilt, stated and nothing more. A date is a fact; how
+ * old is too old is the reader's call.
+ *
+ * It goes in row 1, in the first column after the last data column. README
+ * tells you to point formulas from your own tabs at these ones, and a stamp row
+ * above the data would silently shift every row reference already written
+ * against it. The grid is rebuilt wholesale every run, so the stamp is part of
+ * the grid rather than something patched in afterwards — which is also why
+ * there is exactly one of them however many times the rollup runs.
+ */
+function stampGrid_(rows) {
+  if (!rows.length) return rows;
+  var tz = Session.getScriptTimeZone();
+  var width = 0;
+  rows.forEach(function (r) { if (r.length > width) width = r.length; });
+  rows.forEach(function (r) { while (r.length < width) r.push(''); });
+  rows[0][width] = 'last rebuilt ' +
+    Utilities.formatDate(new Date(Date.now()), tz, 'yyyy-MM-dd HH:mm') + ' ' + tz;
+  return rows;
 }
 
 /** Replace the tab's contents wholesale. Values only: no formatting opinions. */
