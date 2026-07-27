@@ -1,8 +1,41 @@
 # Progress — timetap error paths round
 
+## FIX PASS SUMMARY (2026-07-27, after the independent review)
+
+**Outcome: the five findings in `factory/REVIEW.md` are fixed, and the human's three
+decisions are recorded in the contract.** 459 → **492 assertions**, green under all four
+timezones; `node test/lint.js` all clear with two new rules; `node test/headless.js` green
+at both viewports and now also drives the drawer at real coordinates.
+
+| Finding | Fix | Pinned by |
+|---|---|---|
+| 1. double-tap on DISCARD destroyed two writes | DISCARD arms on the first tap and acts on the second — the app's existing arm/confirm idiom. A row sliding into the vacated space is never armed. | tier-1 §37f/37g/37i, and a real-browser double-tap in `test/headless.js` |
+| 2. a failed rollup stamped the daily tab as current | both grids built before either is written; `writeGrid_` writes then trims instead of clearing first, so a failed write leaves a tab's old numbers and old stamp together | §39e (stub now breaks `getRange`, so `clear()` is reachable), §39f, §39g |
+| 3. NUL byte made `test/headless.js` binary to git | raw byte → `'\0'` escape | new lint rule over every text file |
+| 4. summary said "none parked" with D2 unmet | D2's criterion 6 formally retired by human decision (amendment A1); status below is accurate | — |
+| 5. README claimed one OAuth scope | corrected to three | new lint rule comparing the docs to the manifest |
+
+Every fix was checked for vacuity by reverting it in a fixture copy and confirming the
+new test fails. **D2 criterion 6 is retired, not met** — see amendment A1 in HANDOFF.md.
+
+**The three decisions, as ruled by the human on 2026-07-27** (recorded in full under
+"Contract amendments" in `factory/HANDOFF.md`):
+
+1. **D2 criterion 6 retired**, replaced by the layout-width control the build produced.
+   No check in `smoke.js` is viewport-sensitive, verified twice independently.
+2. **Contract item 6 corrected** to three OAuth scopes. The manifest is untouched and
+   still byte-identical to `main`.
+3. **The rollup's invariant is per-tab honesty**, plus: a failed write must never blank
+   a tab. Item 16 rewritten; assertions 24–27 added.
+
+**Original run summary follows, with its status line corrected.**
+
+---
+
 ## RUN SUMMARY
 
-**Outcome: complete.** All 13 tasks done, none parked. 298 → **459 assertions**, green under
+**Outcome: 12 of 13 tasks done; D2 parked on one criterion** (since retired by human
+decision — see the fix pass above). 298 → **459 assertions**, green under
 America/New_York, Europe/London, Australia/Sydney and UTC, twice in a row; `node test/lint.js`
 all clear; `node test/headless.js` green at both viewports. 13 commits on `factory/error-paths`,
 nothing pushed, `main` untouched.
@@ -56,7 +89,7 @@ A task is `done` only after the CHECKER step has independently re-verified it.
 | C2 | Both tabs carry a last-rebuilt stamp | done | 1 | 30 assertions (410 → 440, 4 zones, lint clear). Golden fixture `test/fixtures/rollup-golden.json` captured from d048ca3, before the stamp existed. CHECKER: 5 mutations, all caught. One existing test amended (see log). |
 | C3 | Last outcome readable by hand | done | 1 | 19 assertions (440 → 459, 4 zones, lint clear). `rollupStatus()`, runnable from the editor. CHECKER: 4 mutations, all caught. **Stage C complete.** |
 | D1 | A real browser opens Index.html | done | 1 | `test/headless.js` + `test/serve.js`, Playwright pinned 1.62.0 (exact). 3 new lint rules. CHECKER: 4 lint mutations + both missing-browser paths, all exit non-zero. Tier-4 canary: chromium-1234 launches on this machine. |
-| D2 | Harness serves the page as Apps Script does | done | 1 | 5 of 6 criteria met and verified. **Criterion 6 is PARKED — see F4**, with evidence and a question; not weakened, not declared met. Found and fixed F3. |
+| D2 | Harness serves the page as Apps Script does | PARKED → resolved | 1 | 5 of 6 criteria met and verified. **Criterion 6 was PARKED — see F4**; not weakened, not declared met. **Retired 2026-07-27 by human decision** (HANDOFF amendment A1), replaced by the layout-width control. Found and fixed F3. |
 | D3 | Desktop viewport too, reported separately | done | 1 | Both viewports labelled with their dimensions and reported separately. CHECKER: a phone-only CSS break fails phone / passes desktop / exits 1 naming phone; zero checks at one viewport exits 1 even though the other passed. |
 | D4 | Drift lint on the meta tags (HIGH RISK) | done | 1 | All 6 criteria verified against fixture copies, plus 2 extra vacuity guards. **META-TEST PERFORMED**: neutering the rule makes exactly criteria 2, 3 and 4 stop detecting — three, as required. See log for the full transcript. |
 | D5 | deploy.sh gains a third gate | done | 1 | All 5 criteria exercised with a stub `clasp` prepended to PATH and a dummy `.clasp.json` in a fixture copy — the real `.clasp.json` was never read and no real deployment happened. **Stage D complete.** |

@@ -927,8 +927,12 @@ function rollupOnce_() {
     days.push(dayStats_(s, addLocalDaysMs_(s, 1), plan, actual, sit, keys));
   }
 
-  writeGrid_(ss, DAILY_TAB, stampGrid_(dailyGrid_(days, keys)));
-  writeGrid_(ss, WEEKLY_TAB, stampGrid_(weeklyGrid_(days, keys)));
+  // Both grids are built before either is written, so a failure while building
+  // one leaves both tabs exactly as they were rather than half-rebuilt.
+  var daily  = stampGrid_(dailyGrid_(days, keys));
+  var weekly = stampGrid_(weeklyGrid_(days, keys));
+  writeGrid_(ss, DAILY_TAB, daily);
+  writeGrid_(ss, WEEKLY_TAB, weekly);
   say_('rolled up ' + days.length + ' days across ' + allCategories_().length +
        ' categories into ' + ss.getUrl());
   return { days: days.length, categories: keys.length, sheet: ss.getUrl() };
@@ -1103,15 +1107,27 @@ function stampTime_(ms) {
   return Utilities.formatDate(new Date(ms), tz, 'yyyy-MM-dd HH:mm') + ' ' + tz;
 }
 
-/** Replace the tab's contents wholesale. Values only: no formatting opinions. */
+/**
+ * Replace the tab's contents wholesale. Values only: no formatting opinions.
+ *
+ * Write first, then trim what the previous grid left behind. It used to clear
+ * first, which meant a write that failed after the clear left the tab **empty** —
+ * so a rollup that broke partway through its second tab wiped that tab's numbers
+ * and its stamp together, and nothing in the spreadsheet said why. Old numbers
+ * next to their own old stamp are honest; a blank tab is not. setValues is one
+ * call: it either lands or throws, and if it throws nothing here has run yet.
+ */
 function writeGrid_(ss, tabName, rows) {
   var sh = ss.getSheetByName(tabName) || ss.insertSheet(tabName);
-  sh.clear();
-  if (!rows.length) return;
+  if (!rows.length) { sh.clear(); return; }
   var width = 0;
   rows.forEach(function (r) { if (r.length > width) width = r.length; });
   rows.forEach(function (r) { while (r.length < width) r.push(''); });
   sh.getRange(1, 1, rows.length, width).setValues(rows);
+  // Anything beyond the new grid is last run's leftovers, not data.
+  var maxRow = sh.getMaxRows(), maxCol = sh.getMaxColumns();
+  if (maxRow > rows.length) sh.getRange(rows.length + 1, 1, maxRow - rows.length, maxCol).clearContent();
+  if (maxCol > width) sh.getRange(1, width + 1, rows.length, maxCol - width).clearContent();
   sh.setFrozenRows(1);
 }
 

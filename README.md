@@ -21,7 +21,7 @@ does not participate in beyond emitting raw numbers.
 
 | File | What it is |
 |---|---|
-| [`appsscript.json`](appsscript.json) | Manifest. One OAuth scope. Set your timezone here. |
+| [`appsscript.json`](appsscript.json) | Manifest. Three OAuth scopes, all load-bearing. Set your timezone here. |
 | [`Code.gs`](Code.gs) | Server. CONFIG block, calendar reads/writes, week aggregation. |
 | [`Index.html`](Index.html) | Client. All HTML/CSS/JS inlined. No CDN, no build step. |
 | [`SETUP.md`](SETUP.md) | Deployment steps and the required Google Calendar settings. |

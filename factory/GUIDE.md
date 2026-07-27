@@ -179,3 +179,227 @@ someone technical:
 3. "The headless smoke test renders locally, which is only honest because a lint
    rule fails the moment the harness's injected meta tags drift from the ones
    `doGet` actually serves."
+
+---
+
+# Part 2 — What got built, explained
+
+## How the error paths actually work now
+*2026-07-27 — after the build and after the independent review*
+
+Same post office. Same letters. Three of the boxes from Part 1 were sketches;
+they're now real rooms you can walk into, and I've been inside all three.
+
+### The whole thing in one picture
+
+```mermaid
+flowchart TD
+    A["You tap a category"] --> B["The outgoing tray"]
+    B --> C["Google Calendar<br/>(the real record)"]
+    B -->|"gave up after 5 tries"| D["The shelf, with a door<br/>BUILT — you can read it"]
+    C --> E["The nightly van"]
+    E --> F["Your spreadsheet<br/>+ a 'last rebuilt' date"]
+    E -->|"van broke down"| G["The logbook<br/>BUILT — survives a lost ledger"]
+    H["The window inspector<br/>BUILT — a machine that looks"] -.->|"blocks the deploy"| A
+```
+
+Everything in Part 1's picture got built. One number changed: a letter is tried
+**five** times, not three — I'd guessed three from reading, and the code says five
+([Index.html:490](../Index.html:490)). Nobody changed it; the plan's sketch was
+just slightly wrong about a detail that was already there.
+
+### The cast, now that they're real
+
+**The shelf got a door.** The sign on the counter ("2 writes were set aside") is
+now something you can press. Pressing it opens a full-screen list, newest at the
+top, one card per undeliverable letter. Each card says four things in ordinary
+words:
+
+```
+9:53 AM · ADM
+tried to save the mark, block started 9:00 AM
+API call to calendar.events.patch failed with error: Not Found
+[ DISCARD ]
+```
+
+That middle line is the part that took real work. A letter in the tray doesn't
+naturally know which block it belonged to — a letter saying *"save the mark"*
+carries only a reference code, which is useless to you standing in front of Google
+Calendar. So the app now keeps a small **address book** on the side
+([Index.html:451](../Index.html:451)): every time a letter is posted, if it knows
+its category or its block's start time, it writes that down under the reference
+code. Later, when a letter lands on the shelf, the shelf looks the code up in the
+address book and can tell you *"the ADM block that started at 9:00"* instead of
+*"reference 4f3a91"*.
+
+Two bugs were caught during the build, both real, both fixed:
+
+- **The sign used to erase itself.** It appeared at startup, then the app finished
+  loading normally and wiped it on the way past — so the one message you needed
+  was visible only when the load *also* failed. Now "hide the sign" checks whether
+  anything is still on the shelf first, and refuses if there is
+  ([Index.html:688](../Index.html:688)).
+- **It said "1 write were set aside."** Now it says *was*.
+
+**The van writes the date on the ledger.** Every successful nightly run stamps
+`last rebuilt 2026-07-27 03:00 America/Chicago` into both spreadsheet tabs. The
+placement is the interesting bit: the stamp goes in **row 1, in the first empty
+column after your data** — deliberately not a new row at the top. If it were a new
+row, every formula you've ever pointed at those tabs would silently shift by one.
+A stamp that breaks your spreadsheet to tell you the spreadsheet is fresh would be
+a poor trade.
+
+**The van keeps a private logbook.** If the van can't reach the ledger at all — a
+revoked spreadsheet, a wrong ID — it can't write a note *in* the ledger. So the
+note goes somewhere else entirely: a Google-side scratchpad called a script
+property, which stays writable even when the spreadsheet doesn't
+([Code.gs:840](../Code.gs:840)). It records the last success and the last failure
+**separately**, so a breakdown never erases the evidence of the last good run —
+knowing the numbers went stale eleven days ago is the whole point. And there's a
+button you can press in the editor, `rollupStatus()`, that reads it out in
+sentences.
+
+Critically: the van **writes the note and then still crashes** on purpose. If it
+swallowed the error to look tidy, Google's own list of runs would show a success.
+
+**The inspector was hired, and turned out to be half-blind — which is the most
+useful thing we learned.** More on that below.
+
+### Follow one failed letter, all the way through
+
+```mermaid
+sequenceDiagram
+    participant You
+    participant Tray as "The outgoing tray"
+    participant Book as "The address book"
+    participant Google
+    participant Shelf as "The shelf"
+
+    You->>Tray: "tap the + mark on ADM"
+    Tray->>Book: "note: this code = ADM, 9:00"
+    Tray->>Google: "attempt 1 … attempt 5"
+    Google-->>Tray: "refused, five times"
+    Note over Tray: "stop — it blocks the letters behind it"
+    Tray->>Shelf: "set it aside, with the reason"
+    Shelf->>Book: "what was code 4f3a91?"
+    Book-->>Shelf: "ADM, started 9:00"
+    Shelf-->>You: "press the sign to read it"
+    You->>Shelf: "press DISCARD once I have fixed it by hand"
+```
+
+I ran exactly this by hand, in a real browser, with the server forced to refuse.
+It works. The card reads the way it should, the reason is Google's own words rather
+than a code, and a letter written by an older version of the app — one with no
+address book entry — renders as *"unknown category"* instead of a blank line or a
+crash.
+
+### The one thing that is broken, in plain words
+
+The review found a real bug and it is the reason the build isn't finished.
+
+```mermaid
+flowchart LR
+    A["Three cards on the shelf"] --> B["You tap DISCARD on the top one"]
+    B --> C["The list is rebuilt<br/>the next card slides UP"]
+    C --> D["Its DISCARD button<br/>is now under your finger"]
+    D --> E["A second tap<br/>throws away a DIFFERENT letter"]
+```
+
+That's it. That's the whole bug. Tap DISCARD twice quickly — the way anyone taps a
+button on a phone — and you destroy two letters instead of one, and the second one
+is a letter you never looked at. There's no undo, and the shelf is the *only*
+record that letter ever existed.
+
+**Why the tests said this was fine.** There is a test named "discard invoked twice
+on the same row is a no-op", and it passes. Here's the gap. Most of the tests run
+in a pretend browser — fast, no windows, good enough for logic. In the pretend
+browser, "tap the same button twice" means literally the same button object, and
+the app *does* correctly refuse the second tap: each card carries a little
+fingerprint, and once a card is gone its fingerprint matches nothing. That guard is
+real and it works.
+
+But in a **real** browser the whole list is thrown away and redrawn after a
+discard. The button you tap the second time isn't the same button — it's the next
+card's button, sitting in the same place on the glass, carrying a *valid*
+fingerprint. So the app does exactly what it was asked: it discards that card.
+
+The pretend browser cannot express "a different control moved under your finger."
+That's a category of bug it is structurally blind to — and it is precisely the
+category the new inspector was hired to catch, except the inspector only runs the
+old shopfront checklist, which has nothing about the shelf on it.
+
+The fix is small: when a card is discarded, remove just that one card instead of
+redrawing the list. Then nothing moves under your finger.
+
+### The inspector's honest limits
+
+```mermaid
+flowchart TD
+    A["Inspector opens the page"] --> B["Rebuilds the shopfront<br/>signs added first"]
+    B --> C["Runs the old checklist<br/>17 checks, both screen sizes"]
+    C --> D["Measures the page width<br/>390 with signs, 980 without"]
+    E["The drift rule<br/>fails if the sign lists differ"] -.-> B
+```
+
+The inspector works, and the drift rule works — I changed a sign on one side only,
+in four different ways, and it failed every time and named the sign. I also
+replaced the rule with one that always says "fine" and confirmed that three of its
+own tests immediately stopped catching anything. So it isn't decorative.
+
+But here's what the build discovered, and this is genuinely valuable: **the old
+checklist cannot see screen width at all.** Every check on it is *relative* — is
+the page as tall as the window, are the cells equal width, is the last row full —
+and all of those are just as true on a 980-pixel-wide page as a 390-pixel one. I
+verified this myself: strip out the width instruction entirely, so the page lays
+out completely wrong, and all 17 checks still pass, cheerfully.
+
+So the plan asked for a proof it couldn't have: *"remove the signs and watch the
+checks fail."* They don't fail. Instead of quietly rewriting that requirement to
+match what it had, the loop left it **unmet and flagged it** — and built a
+different proof that does work: measure the page's actual width, 390 with the signs
+and 980 without. That's a real fact from the live page.
+
+This is the strongest evidence yet for something Part 1 promised and this round
+kept: **the machine does not replace you with your phone.** A desktop browser
+genuinely cannot see two of the three bug classes that checklist exists for. Your
+paste-into-the-phone step is still in the instructions, and the README now says
+plainly why.
+
+### The parts most likely to confuse you
+
+**1. A passing test is not the same as a working feature.** This round produced the
+cleanest possible demonstration: 459 checks, green under four different world
+clocks, three runs in a row — and a feature that throws away your data on a
+double-tap. The test wasn't fake or lazy. It tested the right idea in an
+environment where that idea can't go wrong. Whenever a test runs somewhere simpler
+than reality, ask what reality does that the simpler place can't.
+
+**2. "Recorded the failure" and "hid the failure" look identical from outside.** The
+van writes its note and then crashes anyway. That deliberate second step is what
+keeps Google's own run history honest. A version that recorded the problem and then
+returned quietly would look better and tell you less — the exact bargain this
+codebase's rule ("automate capture, never automate judgment") exists to refuse.
+
+**3. One rollup problem is still open, and it's a judgment call, not a bug hunt.**
+The van rebuilds two tabs, daily then weekly. If the second one fails halfway, the
+daily tab already carries today's date while the weekly tab sits empty. Is that a
+lie? Arguably not — the daily tab genuinely *was* rebuilt today, and its stamp is
+telling the truth about itself. But the plan's sentence said a failed run must
+never refresh the stamp, full stop. The build chose the per-tab reading, wrote a
+test for *that*, and moved on without asking you — which is the one move it wasn't
+allowed to make. Not because its answer is wrong; because it's yours to give.
+
+### What you can now say
+
+1. "The drawer identifies each set-aside write by a fingerprint rather than its
+   position, which correctly blocks re-discarding a stale entry — but the list
+   re-renders on discard, so in a real browser the next row's button lands under
+   the finger and a double-tap destroys a second, different entry."
+2. "The rollup records its outcome in a script property rather than in the
+   spreadsheet, because the likeliest failure is the spreadsheet being unopenable,
+   and it keeps the last success separately from the last failure so a breakdown
+   can't erase the evidence of the last good run."
+3. "The headless layer proves the meta tags are load-bearing by measuring layout
+   width from the live DOM — 390 with them, 980 without — because no check in
+   `smoke.js` is viewport-sensitive, which is also the clearest proof that the
+   phone paste hasn't been superseded."

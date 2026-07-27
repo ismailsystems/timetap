@@ -11,7 +11,7 @@ some of these bugs have ever appeared.
 
 ## `node test/tests.js`
 
-459 assertions against the real `Code.gs` and the real script out of
+492 assertions against the real `Code.gs` and the real script out of
 `Index.html`, run in node behind a shim for `CalendarApp`, `SpreadsheetApp`,
 `PropertiesService`, `ScriptApp`, `HtmlService`, `LockService` and a small DOM.
 A virtual clock lets a test wait ninety minutes in a millisecond.
@@ -49,11 +49,21 @@ properties of the file.
 | neither list declares a tag twice | a duplicate name hides a difference behind whichever copy is read last |
 | `doGet` and `test/headless.js` inject the same meta tags | the headless run would render a document the phone never loads, and pass while doing it |
 | every meta tag name is one Apps Script permits | `addMetaTag` throws at request time for any other name — a crash you only see on the deployed URL |
+| no source file contains a NUL byte | git calls the file binary, so `git diff` shows nothing and the file stops being reviewable |
+| the docs agree with the manifest about scope counts | README claimed one OAuth scope while the manifest asked for three, for long enough that a build contract quoted the claim as fact |
 
 ## `node test/headless.js`
 
 Runs `test/smoke.js` inside a real browser engine, at a phone viewport and a
 desktop viewport, and reports pass/fail counts for each.
+
+It also drives the drawer of set-aside writes at real coordinates — open it, then
+double-tap DISCARD at one fixed point and check that exactly one entry left and it
+was the one aimed at. That check is here rather than in the suite above because the
+suite's DOM shim has no layout, so it cannot express a control moving into the place
+a finger has already committed to. That is precisely how a single-tap DISCARD used to
+destroy a second write the reader had never looked at, while a test named "discarding
+the same row twice is a no-op" passed.
 
 ```bash
 npm install          # once; installs the pinned headless browser

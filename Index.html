@@ -254,6 +254,7 @@
     word-break: break-word; user-select: text; -webkit-user-select: text;
   }
   .deadrow .danger { width: 100%; height: 40px; margin-top: 11px; }
+  .deadrow .danger.arming { box-shadow: 0 0 0 3px var(--flag); }
   #deadList { display: flex; flex-direction: column; gap: 9px; }
 
   /* ── overlays ────────────────────────────────────────────── */
@@ -605,6 +606,9 @@
     q.splice(i, 1);
     setQueue(q);
     showErr('gave up on one write and set it aside: ' + err.message);
+    // If the reader is standing at the shelf when a new one lands, put it on the
+    // shelf rather than making them close the drawer and open it again.
+    if (!$('sheetDead').classList.contains('hidden')) renderDead();
   }
 
   function deadCount() {
@@ -718,15 +722,62 @@
     $('sheetDead').classList.remove('hidden');
   }
 
-  function closeDead() { $('sheetDead').classList.add('hidden'); }
+  function closeDead() {
+    disarmDead();
+    $('sheetDead').classList.add('hidden');
+    $('deadList').innerHTML = '';
+  }
+
+  /* ── discarding takes two taps ──────────────────────────────────
+   *
+   * A set-aside write is the only record that the write ever happened, and
+   * discarding it cannot be undone, so DISCARD arms on the first tap and acts on
+   * the second — the same two-step the grid already uses for a consequential tap
+   * (arm/disarm above).
+   *
+   * It is also what makes a double tap safe. Discarding a row lets the rows below
+   * slide up, so a second tap in the same place lands on a different row's button.
+   * Both taps of a double tap land on the row the reader is looking at, and the row
+   * that slides into the vacated space is not armed, so it cannot be discarded by a
+   * tap that was never aimed at it. Nothing here depends on how fast the taps are.
+   */
+  var deadArmed = null;                    // { token, btn, timer }
+
+  function disarmDead() {
+    if (!deadArmed) return;
+    if (deadArmed.timer) clearTimeout(deadArmed.timer);
+    if (deadArmed.btn) {
+      deadArmed.btn.classList.remove('arming');
+      deadArmed.btn.textContent = DISCARD_LABEL;
+    }
+    deadArmed = null;
+  }
+
+  var DISCARD_LABEL = 'DISCARD';
+  var DISCARD_ARMED = 'TAP AGAIN TO DISCARD';
+
+  function armDead(token, btn) {
+    if (deadArmed && deadArmed.token === token) {
+      disarmDead();
+      discardDead(token);
+      return;
+    }
+    disarmDead();
+    btn.classList.add('arming');
+    btn.textContent = DISCARD_ARMED;
+    deadArmed = { token: token, btn: btn,
+                  timer: setTimeout(function () { disarmDead(); }, CFG.confirmTimeoutMs) };
+  }
 
   /** One row per set-aside write, newest first. */
   function renderDead() {
     var host = $('deadList');
+    disarmDead();
     host.innerHTML = '';
     deadRows().forEach(function (r) {
       var row = document.createElement('div');
       row.className = 'deadrow';
+      row.dataset.token = r.token;
 
       var when = document.createElement('div');
       when.className = 'dwhen';
@@ -742,9 +793,9 @@
 
       var drop = document.createElement('button');
       drop.className = 'danger';
-      drop.textContent = 'DISCARD';
+      drop.textContent = DISCARD_LABEL;
       drop.setAttribute('aria-label', 'discard this set-aside write');
-      drop.addEventListener('click', function () { discardDead(r.token); });
+      drop.addEventListener('click', function () { armDead(r.token, drop); });
 
       row.appendChild(when); row.appendChild(what); row.appendChild(why);
       row.appendChild(drop);
@@ -757,6 +808,13 @@
    * the row goes. This touches the dead list and nothing else: a write still
    * waiting in the queue is pending, not lost, and discarding must never reach
    * it. A tap on a row that has already gone finds no match and does nothing.
+   *
+   * The discarded row is removed on its own, and the list is NOT redrawn. Redrawing
+   * rebuilt every row, which slid the next one up into the space the finger had
+   * just left and put its DISCARD button under that finger — so a double tap threw
+   * away a second write the reader had never looked at. The token guard below
+   * cannot catch that, because the second tap lands on a genuinely different row
+   * holding a genuinely valid token. Nothing may move while a finger is down.
    */
   function discardDead(token) {
     var d = ls(K_DEAD, []);
@@ -766,8 +824,20 @@
     if (hit < 0) return;
     d.splice(hit, 1);
     lsSet(K_DEAD, d);
-    if (d.length) { renderDead(); showErr(deadMsg()); }
+    dropRow(token);
+    if (d.length) showErr(deadMsg());
     else { closeDead(); hideErr(); }
+  }
+
+  /** Take one row out of the drawer, leaving every other row where it was. */
+  function dropRow(token) {
+    var host = $('deadList'), kids = host.children;
+    for (var i = 0; i < kids.length; i++) {
+      if (kids[i].dataset && kids[i].dataset.token === token) {
+        host.removeChild(kids[i]);
+        return;
+      }
+    }
   }
 
   /* ── logging ───────────────────────────────────────────────── */

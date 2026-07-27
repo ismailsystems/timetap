@@ -239,7 +239,10 @@ you're about to make would add interpretation, take the plainer option.
    posture, split and sit-edit all behave exactly as their existing tests assert.
 5. The four source files (`Code.gs`, `Index.html`, `appsscript.json`, `SETUP.md`)
    import nothing and require no build step. Anything added is dev-only tooling.
-6. `appsscript.json` still asks for exactly one OAuth scope.
+6. `appsscript.json` still asks for exactly **three** OAuth scopes — `calendar`,
+   `spreadsheets` and `script.scriptapp`, all load-bearing.
+   *(Amended 2026-07-27 by human decision — see Contract amendments. The original
+   said "exactly one OAuth scope", which was never true of this repo.)*
 
 **Lost writes are findable**
 
@@ -268,8 +271,14 @@ you're about to make would add interpretation, take the plainer option.
 15. Given a spreadsheet id that cannot be opened, when `dailyRollup` runs, then the
     failure and its reason are recorded in the script property, and the record of the
     last *successful* run is preserved.
-16. Given a run fails, then the last-rebuilt stamp in the sheet is **not** refreshed —
-    a failed run must never make the numbers look current.
+16. Given a run fails, then **no tab ever holds a stamp newer than its own numbers**:
+    a tab that was rebuilt carries the time it was rebuilt, and a tab that was not
+    keeps both its old numbers and its old stamp, together. A failed run must never
+    leave a tab blank, and must never leave a stamp claiming numbers that are not
+    there.
+    *(Amended 2026-07-27 by human decision — see Contract amendments. The original
+    said the stamp "is not refreshed" full stop, which is unsatisfiable when the run
+    rebuilds two tabs and fails between them.)*
 17. Given the rollup runs twice, then exactly one stamp exists per tab, and the day
     rows and category columns are byte-identical to what the same run produced before
     this round (the stamp shifts no existing row or column).
@@ -291,6 +300,73 @@ you're about to make would add interpretation, take the plainer option.
     exits non-zero. A skipped run is never reported as a pass.
 23. Given any test layer fails, when `./deploy.sh` runs, then it exits non-zero and
     pushes nothing.
+
+**New assertions from the review (2026-07-27).** These join the contract; final
+sign-off runs them too.
+
+24. Given several set-aside writes and the drawer open, when DISCARD is tapped twice
+    in quick succession at one fixed screen position, then exactly one entry leaves
+    the dead list, and it is the entry whose row was under the finger. Discarding a
+    row must not move another row's controls into the space it vacated.
+25. Given a tab whose write fails after the tab has been opened, then that tab still
+    holds its previous numbers and its previous stamp. `writeGrid_` must never leave
+    a tab emptied by a failure.
+26. Given any file in the repo, then it contains no NUL byte — a source file git
+    classifies as binary is a source file nobody can review.
+27. Given the docs, then no sentence anywhere states a scope count that disagrees
+    with `appsscript.json`.
+
+---
+
+## Contract amendments (human decisions — 2026-07-27)
+
+Three rulings from the human after the independent review (`factory/REVIEW.md`).
+These are the only sanctioned changes to the Contract; nothing else in this file
+changed except the Orientation Q&A block.
+
+**A1 — D2's sixth criterion is retired, with its reason on the record.**
+The criterion asked that injecting the meta tags *after* render make "the
+viewport-dependent checks in `smoke.js` fail". There are no viewport-dependent
+checks in `smoke.js`: every check in it is relative (app height against
+`window.innerHeight`, cells of equal width, rows full), and all of them hold at any
+layout width. Verified twice, independently: with no meta tags at all the page lays
+out at 980px — definitively the wrong document — and all 17 checks still pass.
+
+The criterion is therefore **not met, not weakened, and not carried forward**. It is
+replaced by the control the build produced, which proves the same thing by a fact
+read from the live DOM: layout width is 390px with the tags and 980px without. D2 is
+**complete** on this basis. This is also the round's clearest evidence that the
+headless layer does not supersede the phone paste, and `test/README.md` says so.
+
+**A2 — Contract item 6 was wrong about the baseline; the sentence is corrected, the
+manifest is not.**
+`appsscript.json` asks for three OAuth scopes and asked for three at the branch
+point. All three are load-bearing: the rollup writes a spreadsheet and the nightly
+trigger is installed through `ScriptApp`. Deleting two to satisfy a sentence would
+break the app. Item 6 now says three; `README.md` is corrected to match, and a lint
+rule keeps the docs and the manifest from drifting apart again (assertion 27).
+
+**A3 — The rollup's invariant is per-tab honesty, and a failed write must not blank a
+tab.**
+Item 16 originally read "given a run fails, the stamp in the sheet is not refreshed",
+full stop. The rollup rebuilds two tabs; if the second fails, the first has genuinely
+been rebuilt and its stamp is telling the truth about itself. The invariant the human
+wants is the per-tab one, now stated in item 16.
+
+Two things follow, and both are required:
+- Both grids are built **before either is written**, so a failure while building
+  leaves both tabs untouched.
+- `writeGrid_` writes **before** it trims, rather than clearing first, so a failed
+  write leaves the tab's old numbers and old stamp in place instead of blanking it
+  (assertion 25). Clear-then-write was pre-existing, and it is what turned a partial
+  failure into an empty tab.
+
+`test/tests.js` §39e already asserted the per-tab invariant. It was written before
+this ruling and without escalating the change — that was the loop overstepping, not
+the invariant being wrong. It stands, and its stub is replaced by one that fails
+*inside* `writeGrid_` so the blanking path is actually reachable.
+
+---
 
 **Tiers used this round.** Tier 1 (offline) and tier 3 (end-to-end smoke) only. There
 is no tier 2 — nothing in this round touches a live external service, since testing
@@ -317,7 +393,7 @@ Read these before your first task; they will save you a wrong turn.
 |---|---|
 | `Code.gs` (1104 lines) | Server. CONFIG block at the top, calendar reads/writes, day aggregation, the rollup. |
 | `Index.html` (1063 lines) | Client. All HTML/CSS/JS inlined. No CDN, no build step. |
-| `appsscript.json` | Manifest. One OAuth scope. |
+| `appsscript.json` | Manifest. Three OAuth scopes, all load-bearing. |
 | `SETUP.md` | Deployment steps and required Google Calendar settings. |
 
 **How the app works.** The calendar is the source of truth, not localStorage. Tapping

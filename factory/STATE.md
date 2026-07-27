@@ -1,47 +1,57 @@
 # Factory State
 project: timetap
-stage: 5
-stage_name: The loop builds it
-last_updated: 2026-07-26 19:20
-next_action: Human launches the overnight loop from factory/HANDOFF.md (orientation prompt first, then "begin"). When it finishes, run /factory for the fresh-eyes review.
+stage: 6
+stage_name: Fresh-eyes review (of the fix pass)
+last_updated: 2026-07-27 07:00
+next_action: Run /factory-review once more, in a NEW context, on the fix diff only (the last commit). The fixes were written by the same agent that found the findings, so they have not been independently checked — that is the one gap left. If that review comes back SHIP, stage 7 is the proof video with auto-loom-proof.
 notes: |
-  HANDOFF.md is compiled and self-contained. progress.md and log.md are seeded so
-  the loop's first GATHER finds them. The factory does NOT launch the loop — the
-  human presses the button.
+  Round complete and fixed. Two documents carry the history: factory/REVIEW.md is the
+  independent review as written (left unedited — it is the record of what was true
+  before the fix), and the FIX PASS SUMMARY at the top of factory/progress.md is what
+  changed afterwards.
 
-  Branch factory/error-paths created off main and checked out. factory/ is
-  untracked at launch; the loop's first commit will sweep it in.
+  THE HUMAN'S THREE DECISIONS, ruled 2026-07-27, recorded as amendments A1-A3 under
+  "Contract amendments" in factory/HANDOFF.md:
+    A1. D2's criterion 6 is RETIRED, not met — no check in smoke.js is
+        viewport-sensitive (verified twice: no metas at all still passes all 17 at a
+        980px layout). Replaced by the layout-width control, 390 vs 980.
+    A2. Contract item 6 corrected from one OAuth scope to three. The manifest was
+        never wrong and is still byte-identical to main; the sentence was.
+    A3. The rollup's invariant is per-tab honesty, AND a failed write must never blank
+        a tab. Item 16 rewritten; assertions 24-27 added to the contract.
 
-  Baseline verified green immediately before handoff: 298 assertions under
-  America/New_York, Europe/London, Australia/Sydney, UTC; lint all clear.
+  HANDOFF.md has now been edited twice, both sanctioned: the Orientation Q&A block
+  during the run, and these amendments by human decision. Nothing else in it changed.
 
-  Caps set in HANDOFF.md: 25 passes or 8 hours; 3 failures parks a task; 3 parked
-  tasks ends the run.
+  FIXES APPLIED (all five findings, plus the two cosmetic ones):
+    F-1 the blocking data-loss bug. DISCARD arms then acts, reusing the app's own
+        arm/confirm idiom rather than a timing guard — structural, so it holds however
+        fast the taps are. Pinned by tier-1 37f/37g/37h/37i AND a real-browser
+        double-tap at fixed coordinates in test/headless.js.
+    F-2 both grids built before either is written; writeGrid_ writes then trims
+        instead of clearing first. §39e's stub now breaks getRange rather than
+        writeGrid_, which is why the loop's version could not see the blanking.
+    F-3 NUL byte gone, plus a lint rule over every text file.
+    F-4 progress.md's status line now matches its own table.
+    F-5 README corrected, plus a lint rule comparing doc scope counts to the manifest.
+    F-6 drawer refreshes while open; closing it leaves no rows behind.
 
-  Round scope: three error-path features — (1) drawer for set-aside writes,
-  (2) rollup that records its own failure, (3) headless smoke test. Ordered cheap
-  first (B, C) so a partial night still delivers; D is where a stall is expected.
+  Every fix was vacuity-checked by reverting it in a fixture copy and confirming the
+  new test fails. Details per finding in factory/log.md.
 
-  Highest-risk task is D4 (drift lint between the meta tags doGet injects and the
-  ones the headless harness injects), carrying a mandatory meta-test: replacing the
-  rule with one that always returns true must break at least three of its own
-  criteria.
+  VERIFIED AFTER THE FIX: 492 assertions (was 459), green twice in a row under all
+  four timezones. lint all clear, 17 rules. headless green at both viewports plus the
+  new drawer phase. deploy.sh re-exercised with a stub clasp first on PATH — nothing
+  pushed, real binary never invoked. Golden rollup fixture untouched and still
+  byte-identical in all four zones.
 
-  A1 carries a standing instruction: if its assertions about EXISTING behaviour fail
-  against unmodified code, that is a finding to record and PARK — not a reason to
-  edit Index.html until green.
+  WHAT IS STILL UNCHECKED: the fixes themselves, by anyone other than their author.
+  That is why next_action is another review rather than the video.
 
-  Corrections made during stages 3-4, both already applied to BRIEF/PLAN/GUIDE:
-    - doGet adds THREE meta tags (Code.gs:180-182), not four. Four is the allowlist
-      of names Apps Script permits.
-    - The real assertion count is 298, not the 253 test/README.md claims. Contract
-      assertion 1 pins 298; fixing the doc is a criterion in E1.
+  Plan explained to user 2026-07-26 (GUIDE.md Part 1, post-office scene).
+  Build explained 2026-07-27 (GUIDE.md Part 2, same scene). Part 2 predates this fix
+  pass — it describes the double-tap bug as open. Worth a short Part 3, or an edit to
+  Part 2, once the fix has been independently reviewed.
 
-  Plan explained to user 2026-07-26 (factory/GUIDE.md Part 1, post-office scene).
-  Part 2 gets written after the review.
-
-  When the loop is done: /factory → stage 6 → factory-review. The review must read
-  ONLY the contract and the diff, never the loop's reasoning.
-
-  Product law that must survive any build: automate capture, never automate
-  judgment. Non-goals in README.md are binding.
+  Product law still intact: nothing built or fixed this round interprets, scores or
+  advises. "TAP AGAIN TO DISCARD" states what the next tap will do and stops.

@@ -103,14 +103,58 @@ class FHtmlOutput {
   setXFrameOptionsMode(m) { this.xframe = m; return this; }
   getContent() { return this.content; }
 }
+/* A real sheet is allocated larger than its data (1000x26 for a new one), and
+   writing a smaller grid over a bigger one leaves the old cells behind until
+   something clears them. writeGrid_ depends on that: it writes first and trims
+   afterwards, so that a write which throws cannot leave the tab empty. A shim
+   whose setValues just replaced the whole array could not tell the two orders
+   apart. `rows` stays the tight rectangle of meaningful data, which is what the
+   assertions and the golden fixture read. */
+const ALLOC_ROWS = 1000, ALLOC_COLS = 26;
 class FSheet {
   constructor(name) { this.name = name; this.rows = []; this.frozen = 0; }
   getName() { return this.name; }
   clear() { this.rows = []; return this; }
   setFrozenRows(n) { this.frozen = n; return this; }
+  getMaxRows() { return Math.max(ALLOC_ROWS, this.rows.length); }
+  getMaxColumns() {
+    return Math.max(ALLOC_COLS, this.rows.reduce((w, r) => Math.max(w, r.length), 0));
+  }
+  _trim() {
+    const blank = v => v === '' || v === null || v === undefined;
+    while (this.rows.length && this.rows[this.rows.length - 1].every(blank)) this.rows.pop();
+    let w = this.rows.reduce((m, r) => Math.max(m, r.length), 0);
+    while (w > 0 && this.rows.every(r => blank(r[w - 1]))) {
+      this.rows.forEach(r => { if (r.length >= w) r.length = w - 1; });
+      w--;
+    }
+  }
   getRange(r, c, nr, nc) {
     const sh = this;
-    return { setValues(v) { sh.rows = v.map(x => x.slice()); return this; } };
+    const touch = (row, col, val) => {
+      while (sh.rows.length < row) sh.rows.push([]);
+      const line = sh.rows[row - 1];
+      while (line.length < col) line.push('');
+      line[col - 1] = val;
+    };
+    return {
+      setValues(v) {
+        v.forEach((line, i) => line.forEach((val, j) => touch(r + i, c + j, val)));
+        sh._trim();
+        return this;
+      },
+      // Only cells that exist are blanked; a real clear of unallocated space is
+      // a no-op you cannot observe.
+      clearContent() {
+        for (let i = r; i < r + nr; i++) {
+          const line = sh.rows[i - 1];
+          if (!line) continue;
+          for (let j = c; j < c + nc; j++) if (j - 1 < line.length) line[j - 1] = '';
+        }
+        sh._trim();
+        return this;
+      }
+    };
   }
 }
 class FSpreadsheet {
@@ -224,6 +268,7 @@ class El {
     return this._stubs[sel] || (this._stubs[sel] = new El('span'));
   }
   appendChild(c) { this.children.push(c); return c; }
+  removeChild(c) { const i = this.children.indexOf(c); if (i >= 0) this.children.splice(i, 1); return c; }
   get hidden() { return this._cls.has('hidden'); }
 }
 const NODES = {};

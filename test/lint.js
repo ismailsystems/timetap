@@ -221,5 +221,38 @@ check('every meta tag name is one Apps Script permits',
       .map(n => 'test/headless.js: ' + n)),
   'addMetaTag throws "not allowed in this context" at request time for any other name');
 
+/* A stray NUL byte makes git classify the file as binary: `git diff` prints
+   "Binary files differ" and shows nothing, and `git grep` skips it. test/headless.js
+   shipped with one — a separator written as the byte itself rather than as '\0' —
+   so the whole headless runner was unreviewable for a round. Contract 26. */
+const TEXT_FILES = ['Code.gs', 'Index.html', 'appsscript.json', 'SETUP.md', 'README.md',
+                    'deploy.sh', 'package.json']
+  .map(f => path.join(ROOT, f))
+  .concat(fs.readdirSync(__dirname).filter(f => /\.(js|md)$/.test(f)).map(f => path.join(__dirname, f)));
+check('no source file contains a NUL byte',
+  TEXT_FILES.filter(f => fs.existsSync(f) && fs.readFileSync(f).includes(0))
+    .map(f => path.relative(ROOT, f)),
+  'git treats a file with a NUL as binary, so its diffs become invisible to review');
+
+/* The manifest asked for three OAuth scopes while README claimed one, for long
+   enough that the claim was copied into a build contract as fact. A count in prose
+   drifts silently; this makes it drift loudly. Contract 27. */
+const SCOPE_COUNT = (JSON.parse(manifest).oauthScopes || []).length;
+const NUMBER_WORDS = ['zero', 'one', 'two', 'three', 'four', 'five', 'six'];
+check('the docs agree with the manifest about how many scopes it asks for',
+  ['README.md', 'SETUP.md'].filter(f => fs.existsSync(path.join(ROOT, f))).reduce((bad, f) => {
+    const text = fs.readFileSync(path.join(ROOT, f), 'utf8');
+    const re = /\b(zero|one|two|three|four|five|six|\d+)\s+(?:OAuth\s+)?scopes?\b/gi;
+    let m;
+    while ((m = re.exec(text))) {
+      const said = /^\d+$/.test(m[1]) ? Number(m[1]) : NUMBER_WORDS.indexOf(m[1].toLowerCase());
+      if (said !== SCOPE_COUNT) {
+        bad.push(f + ': "' + m[0] + '" but appsscript.json asks for ' + SCOPE_COUNT);
+      }
+    }
+    return bad;
+  }, []),
+  'a scope count stated in prose goes stale silently, and then gets quoted as fact');
+
 console.log(fails ? '\n' + fails + ' failed\n' : '\nall clear\n');
 process.exit(fails ? 1 : 0);

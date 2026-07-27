@@ -1320,13 +1320,22 @@ reset();
 /* ── B3: an entry can be discarded once it has been dealt with ────── */
 
 const dropBtn = r => r.children.find(c => c.tag === 'button');
+// DISCARD arms on the first tap and acts on the second — the same two-step the
+// grid uses for a consequential tap. See section 37f for why: a single-tap
+// discard let the next row slide under the finger, so a double tap destroyed a
+// second write the reader had never seen. Every assertion below is unchanged;
+// only the gesture that reaches it is.
+const discard = r => { const b = dropBtn(r); b.click(); settle(); b.click(); settle(); };
+// The same window the grid's arm/confirm uses, read from the real config rather
+// than written down here.
+const CFG_CONFIRM_TIMEOUT = clientConfig_().confirmTimeoutMs;
 
 console.log('\n37. discarding one of two leaves the other and the drawer open');
 seedTwoDead();
 $('err').click(); settle();
 chk('two rows to start', uiRows().length === 2, String(uiRows().length));
 const keptText = rowText(uiRows()[1]);
-dropBtn(uiRows()[0]).click(); settle();
+discard(uiRows()[0]);
 chk('one row remains', uiRows().length === 1, String(uiRows().length));
 chk('and it is the one not discarded', rowText(uiRows()[0]) === keptText, rowText(uiRows()[0]));
 chk('the dead list in storage holds one', DEAD().length === 1, JSON.stringify(DEAD()));
@@ -1335,7 +1344,7 @@ chk('and the banner now counts one', $('err').textContent === '1 write was set a
   $('err').textContent);
 
 console.log('\n37b. discarding the last one closes the drawer and clears the banner');
-dropBtn(uiRows()[0]).click(); settle();
+discard(uiRows()[0]);
 chk('the dead list is empty', DEAD().length === 0, JSON.stringify(DEAD()));
 chk('the drawer closed itself', $('sheetDead').hidden);
 chk('the banner is hidden', $('err').hidden, $('err').textContent);
@@ -1362,27 +1371,119 @@ reboot();
 const qBefore = H.STORE['tt.queue.v1'];
 chk('there is a pending write', Q().length === 1, JSON.stringify(Q()));
 $('err').click(); settle();
-dropBtn(uiRows()[0]).click(); settle();
+discard(uiRows()[0]);
 chk('the set-aside entry is gone', DEAD().length === 0, JSON.stringify(DEAD()));
 chk('the queue is byte-for-byte unchanged', H.STORE['tt.queue.v1'] === qBefore,
   H.STORE['tt.queue.v1'] + ' vs ' + qBefore);
 H.setOnline(true);
 reset();
 
-console.log('\n37e. discarding the same row twice is a no-op');
+console.log('\n37e. a button whose row has already gone discards nothing');
 seedTwoDead();
 $('err').click(); settle();
 const staleRow = dropBtn(uiRows()[0]);
 const survivor = rowText(uiRows()[1]);
-staleRow.click(); settle();
-chk('the first tap discarded one', DEAD().length === 1, JSON.stringify(DEAD()));
+discard(uiRows()[0]);
+chk('the row was discarded', DEAD().length === 1, JSON.stringify(DEAD()));
 let b3Threw = null;
-try { staleRow.click(); settle(); } catch (e) { b3Threw = String(e && e.message || e); }
-chk('the second tap throws nothing', b3Threw === null, String(b3Threw));
+try { staleRow.click(); settle(); staleRow.click(); settle(); }
+catch (e) { b3Threw = String(e && e.message || e); }
+chk('tapping its detached button throws nothing', b3Threw === null, String(b3Threw));
 chk('and takes nothing with it', DEAD().length === 1, JSON.stringify(DEAD()));
 chk('the surviving row is the one that should have survived',
   uiRows().length === 1 && rowText(uiRows()[0]) === survivor,
   uiRows().length ? rowText(uiRows()[0]) : '(none)');
+reset();
+
+/* Contract assertion 24. A single-tap discard let the rows below slide up into
+   the space the finger had just left, so a double tap destroyed a second write
+   the reader had never looked at. The token guard cannot catch that: the second
+   tap lands on a genuinely different row holding a genuinely valid token. Both
+   taps of a double tap must therefore resolve to the row that was aimed at.
+   The tier-3 twin of this, in a real browser at real coordinates, is in
+   test/headless.js — the shim cannot express a control moving under a finger. */
+console.log('\n37f. a double tap discards the row it was aimed at, and only that row');
+seedTwoDead();
+$('err').click(); settle();
+chk('two rows to start', uiRows().length === 2, String(uiRows().length));
+const aimedAt = rowText(uiRows()[0]);
+const bystander = rowText(uiRows()[1]);
+const aimedBtn = dropBtn(uiRows()[0]);
+chk('the button reads DISCARD before anything is tapped',
+  aimedBtn.textContent === 'DISCARD', aimedBtn.textContent);
+aimedBtn.click(); settle();
+chk('one tap discards nothing at all', DEAD().length === 2, JSON.stringify(DEAD().length));
+chk('it arms instead, and says so', aimedBtn.textContent === 'TAP AGAIN TO DISCARD',
+  aimedBtn.textContent);
+chk('and the row is still on screen', uiRows().length === 2, String(uiRows().length));
+aimedBtn.click(); settle();
+chk('the second tap discards exactly one', DEAD().length === 1, JSON.stringify(DEAD()));
+chk('and it is the row that was aimed at — the bystander survives',
+  uiRows().length === 1 && rowText(uiRows()[0]) === bystander,
+  'aimed at: ' + aimedAt + '  ||  left: ' + (uiRows().length ? rowText(uiRows()[0]) : '(none)'));
+
+console.log('\n37g. the row that slides up into the gap is not armed');
+chk('the survivor is not carrying an armed button',
+  dropBtn(uiRows()[0]).textContent === 'DISCARD', dropBtn(uiRows()[0]).textContent);
+// A third tap in the same place lands on the survivor. It must arm it, never
+// discard it — that is the whole mechanism of the bug this section pins.
+dropBtn(uiRows()[0]).click(); settle();
+chk('a stray tap on it arms rather than discards', DEAD().length === 1, JSON.stringify(DEAD()));
+chk('the drawer is still open with its one row',
+  !$('sheetDead').hidden && uiRows().length === 1, String(uiRows().length));
+reset();
+
+console.log('\n37h. an armed row forgets, so a stale confirmation cannot land later');
+seedTwoDead();
+$('err').click(); settle();
+const forgetful = dropBtn(uiRows()[0]);
+forgetful.click(); settle();
+chk('it is armed', forgetful.textContent === 'TAP AGAIN TO DISCARD', forgetful.textContent);
+advance(CFG_CONFIRM_TIMEOUT + 1000); settle();
+chk('after the timeout it has disarmed itself', forgetful.textContent === 'DISCARD',
+  forgetful.textContent);
+forgetful.click(); settle();
+chk('so the next tap arms again rather than discarding', DEAD().length === 2,
+  JSON.stringify(DEAD().length));
+reset();
+
+console.log('\n37i. arming one row disarms any other');
+seedTwoDead();
+$('err').click(); settle();
+const rowA = dropBtn(uiRows()[0]), rowB = dropBtn(uiRows()[1]);
+rowA.click(); settle();
+rowB.click(); settle();
+chk('the first row went back to DISCARD', rowA.textContent === 'DISCARD', rowA.textContent);
+chk('the second is the armed one', rowB.textContent === 'TAP AGAIN TO DISCARD', rowB.textContent);
+rowA.click(); settle();
+chk('tapping the first again only re-arms it', DEAD().length === 2, JSON.stringify(DEAD().length));
+chk('and the second disarmed', rowB.textContent === 'DISCARD', rowB.textContent);
+reset();
+
+console.log('\n37j. a write set aside while the drawer is open appears in it');
+reset(); reboot();
+tap('ADM'); wait(52); tap('DW');
+H.setServerReject('the calendar refused');
+tapMark('+');
+pump(() => DEAD().length > 0);
+$('err').click(); settle();
+chk('one row on screen', uiRows().length === 1, String(uiRows().length));
+tap('FRAG'); wait(30); tap('DW'); tapMark('+');
+pump(() => DEAD().length > 1);
+chk('the new one is on the shelf too, without reopening the drawer',
+  uiRows().length === 2, 'rows=' + uiRows().length + ' dead=' + DEAD().length);
+H.setServerReject(null);
+reset();
+
+console.log('\n37k. closing the drawer leaves nothing behind in it');
+seedTwoDead();
+$('err').click(); settle();
+chk('two rows while open', uiRows().length === 2, String(uiRows().length));
+$('dgClose').click(); settle();
+chk('the drawer is closed', $('sheetDead').hidden);
+chk('and holds no rows at all', uiRows().length === 0, String(uiRows().length));
+$('err').click(); settle();
+chk('reopening rebuilds both rows', uiRows().length === 2, String(uiRows().length));
 reset();
 
 /* ── C1: a failed rollup records why, where the failure cannot erase it ── */
@@ -1539,21 +1640,72 @@ dailyRollup();
 const weeklyBefore = JSON.stringify(tabRows('weekly'));
 const dailyStampBefore = stampsIn(tabRows('daily'))[0].c;
 wait(180);
-const realWG = global.writeGrid_;
-global.writeGrid_ = function (ss, tab, rows) {
-  if (tab === WEEKLY_TAB) throw new Error('weekly tab is protected');
-  return realWG(ss, tab, rows);
-};
+// Break the tab itself, not writeGrid_. Stubbing the function meant its own
+// clear() never ran, so the case that actually blanked a tab was unreachable
+// from here — the review found it by breaking getRange instead. Contract 25.
+const weeklySheet = H.SHEETS.book.getSheetByName(WEEKLY_TAB);
+const realGetRange = weeklySheet.getRange;
+weeklySheet.getRange = function () { throw new Error('weekly tab is protected'); };
 let e39e = null;
 try { dailyRollup(); } catch (e) { e39e = String(e && e.message || e); }
-global.writeGrid_ = realWG;
+weeklySheet.getRange = realGetRange;
 chk('the run failed partway', /weekly tab is protected/.test(e39e || ''), String(e39e));
 chk('the weekly tab is untouched — old numbers, old stamp, together',
   JSON.stringify(tabRows('weekly')) === weeklyBefore);
+// Contract 25. writeGrid_ used to clear before it wrote, so a write that threw
+// left the tab with no numbers AND no stamp — worse than stale, because nothing
+// in the spreadsheet said anything had gone wrong.
+chk('and it is not empty — a failed write never blanks a tab',
+  tabRows('weekly').length > 0, 'weekly rows=' + tabRows('weekly').length);
+chk('it still carries exactly its own old stamp',
+  stampsIn(tabRows('weekly')).length === 1, JSON.stringify(stampsIn(tabRows('weekly'))));
 chk('the daily tab got new numbers and a new stamp, also together',
   stampsIn(tabRows('daily'))[0].c !== dailyStampBefore,
   stampsIn(tabRows('daily'))[0].c + ' vs ' + dailyStampBefore);
 chk('and the failure is on record', REC() && REC().outcome === 'failed', JSON.stringify(REC()));
+reset();
+
+/* Contract 16 as amended, and 25. A failure while BUILDING a grid must leave both
+   tabs alone — which is why both grids are now built before either is written. */
+console.log('\n39f. a failure before any write leaves both tabs exactly as they were');
+reset(); goodSheet();
+tap('DW'); wait(40); tap('MTG');
+dailyRollup();
+const bothBefore = JSON.stringify([tabRows('daily'), tabRows('weekly')]);
+wait(180);
+const realWeeklyGrid = global.weeklyGrid_;
+global.weeklyGrid_ = function () { throw new Error('could not build the weekly grid'); };
+let e39f = null;
+try { dailyRollup(); } catch (e) { e39f = String(e && e.message || e); }
+global.weeklyGrid_ = realWeeklyGrid;
+chk('the run failed', /could not build the weekly grid/.test(e39f || ''), String(e39f));
+chk('neither tab was touched — not even the one that would have been written first',
+  JSON.stringify([tabRows('daily'), tabRows('weekly')]) === bothBefore);
+chk('each tab still holds exactly one stamp',
+  stampsIn(tabRows('daily')).length === 1 && stampsIn(tabRows('weekly')).length === 1,
+  JSON.stringify(stampsIn(tabRows('daily'))) + ' / ' + JSON.stringify(stampsIn(tabRows('weekly'))));
+chk('and the failure is on record with its reason',
+  REC() && REC().outcome === 'failed' && /weekly grid/.test(REC().lastFailureWhy || ''),
+  JSON.stringify(REC()));
+chk('while the last success is still on record',
+  REC() && !!REC().lastSuccessMs, JSON.stringify(REC()));
+reset();
+
+/* A smaller grid must not leave the bigger one's cells behind now that the write
+   happens before the trim rather than after a clear. */
+console.log('\n39g. a later, smaller grid leaves none of the bigger one behind');
+reset(); goodSheet();
+dailyRollup();
+const wideDaily = tabRows('daily')[0].length;
+H.SHEETS.book.getSheetByName('daily').getRange(1, wideDaily + 4, 1, 1).setValues([['LEFTOVER']]);
+chk('a stray cell is sitting past the grid',
+  tabRows('daily')[0].indexOf('LEFTOVER') >= 0, JSON.stringify(tabRows('daily')[0].slice(-3)));
+wait(120);
+dailyRollup();
+chk('the next run cleared it away',
+  tabRows('daily')[0].indexOf('LEFTOVER') < 0, JSON.stringify(tabRows('daily')[0].slice(-3)));
+chk('and the grid still holds exactly one stamp',
+  stampsIn(tabRows('daily')).length === 1, JSON.stringify(stampsIn(tabRows('daily'))));
 reset();
 
 console.log('\n39d. the stamp shifts no row and no column that was there before');
