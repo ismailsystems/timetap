@@ -30,7 +30,9 @@ Everything below must be true at the end. **23 assertions.**
    posture, split and sit-edit all behave exactly as their existing tests assert.
 5. The four source files (`Code.gs`, `Index.html`, `appsscript.json`, `SETUP.md`)
    import nothing and require no build step. Anything added is dev-only tooling.
-6. `appsscript.json` still asks for exactly one OAuth scope.
+6. `appsscript.json` still asks for exactly three OAuth scopes — `calendar`,
+   `spreadsheets` and `script.scriptapp`, all load-bearing. (Corrected 2026-07-27,
+   HANDOFF amendment A2: this line said "one", which was never true of this repo.)
 
 **Lost writes are findable**
 

@@ -68,7 +68,7 @@ The morning it works, in concrete behaviour:
 |---|---|
 | `Code.gs` (1104 lines) | Server. CONFIG block, calendar reads/writes, week aggregation, rollup. |
 | `Index.html` (1063 lines) | Client. All CSS/JS inlined. |
-| `appsscript.json` | Manifest, one OAuth scope. |
+| `appsscript.json` | Manifest, three OAuth scopes, all load-bearing. |
 | `SETUP.md` | Deploy steps. |
 
 **Tests.** Three layers, documented in `test/README.md`:

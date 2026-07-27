@@ -50,7 +50,7 @@ properties of the file.
 | `doGet` and `test/headless.js` inject the same meta tags | the headless run would render a document the phone never loads, and pass while doing it |
 | every meta tag name is one Apps Script permits | `addMetaTag` throws at request time for any other name — a crash you only see on the deployed URL |
 | no file in the repo contains a NUL byte | git calls the file binary, so `git diff` shows nothing and the file stops being reviewable |
-| the docs agree with the manifest about scope counts | README claimed one OAuth scope while the manifest asked for three, for long enough that a build contract quoted the claim as fact |
+| every `.md` in the repo agrees with the manifest about scope counts | `README.md`'s manifest row disagreed with `appsscript.json` for long enough that a build contract quoted the wrong number as fact, and then two more docs quoted it from there |
 
 ## `node test/headless.js`
 

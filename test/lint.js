@@ -234,11 +234,19 @@ check('every meta tag name is one Apps Script permits',
    edited when a directory is added is a list that goes stale the first time nobody
    remembers to edit it. */
 
-/** Every file the repo tracks, and how we worked that out. */
-function trackedFiles() {
+/**
+ * Every file in the repo, and how we worked that out.
+ *
+ * `--others --exclude-standard` puts untracked-but-not-ignored files in too, so a
+ * doc dropped in and not yet `git add`ed is still covered. A rule that only saw
+ * committed files would give a new file a free pass for exactly as long as it took
+ * someone to notice — which is the same hole the hand-written list had.
+ */
+function repoFiles() {
   if (fs.existsSync(path.join(ROOT, '.git'))) {
     try {
-      const out = execFileSync('git', ['ls-files', '-z'], { cwd: ROOT, encoding: 'utf8' });
+      const out = execFileSync('git', ['ls-files', '-z', '--cached', '--others', '--exclude-standard'],
+                               { cwd: ROOT, encoding: 'utf8' });
       return { how: 'git ls-files', files: out.split('\0').filter(Boolean) };
     } catch (e) { /* fall through to the walk */ }
   }
@@ -266,13 +274,22 @@ function trackedFiles() {
    the next Code.gs that grew a NUL. */
 const BINARY_EXEMPT = [];
 
-const census = trackedFiles();
+const census = repoFiles();
 const nulBad = [], nulSkipped = [];
 for (const rel of census.files) {
   const full = path.join(ROOT, rel);
   let buf;
   try {
     if (!fs.existsSync(full)) continue;          // tracked but deleted in the worktree
+    /* Not everything git lists is a file to read. `.gitignore` says `node_modules/`,
+       which matches a directory and not a symlink pointing at one, so a checkout
+       that symlinks its node_modules gets the whole tree offered here. Nothing that
+       is not a regular file can hold a NUL of its own — git stores a symlink as its
+       target path — so these are skipped, out loud. */
+    if (!fs.statSync(full).isFile()) {
+      nulSkipped.push(rel + ' — not a regular file, so there is no text to read');
+      continue;
+    }
     buf = fs.readFileSync(full);
   } catch (e) {
     nulBad.push(rel + ' — could not be read at all: ' + ((e && e.message) || e));
@@ -294,23 +311,61 @@ nulSkipped.forEach(function (s) { console.log('         skipped ' + s); });
 
 /* The manifest asked for three OAuth scopes while README claimed one, for long
    enough that the claim was copied into a build contract as fact. A count in prose
-   drifts silently; this makes it drift loudly. Contract 27. */
+   drifts silently; this makes it drift loudly. Contract 27.
+
+   Assertion 27 says "no sentence anywhere", so the rule reads every .md in the
+   repo, not the two it used to. Reading only README.md and SETUP.md left
+   factory/BRIEF.md and factory/PLAN.md still saying "one OAuth scope" and passing —
+   and BRIEF's orientation table stated it as a current fact about the repo, which
+   is precisely how the wrong number got quoted into a build contract in the first
+   place. */
 const SCOPE_COUNT = (JSON.parse(manifest).oauthScopes || []).length;
 const NUMBER_WORDS = ['zero', 'one', 'two', 'three', 'four', 'five', 'six'];
-check('the docs agree with the manifest about how many scopes it asks for',
-  ['README.md', 'SETUP.md'].filter(f => fs.existsSync(path.join(ROOT, f))).reduce((bad, f) => {
-    const text = fs.readFileSync(path.join(ROOT, f), 'utf8');
-    const re = /\b(zero|one|two|three|four|five|six|\d+)\s+(?:OAuth\s+)?scopes?\b/gi;
-    let m;
-    while ((m = re.exec(text))) {
-      const said = /^\d+$/.test(m[1]) ? Number(m[1]) : NUMBER_WORDS.indexOf(m[1].toLowerCase());
-      if (said !== SCOPE_COUNT) {
-        bad.push(f + ': "' + m[0] + '" but appsscript.json asks for ' + SCOPE_COUNT);
-      }
+
+/* Files that quote the old, wrong sentence deliberately: they are the record of
+   what was wrong and when, and correcting them would destroy the evidence. Named
+   one at a time with the reason, never a pattern — a pattern over `factory/` or
+   over "anything mentioning REVIEW" would quietly swallow a doc that is genuinely
+   stating a current fact, which is the failure mode this rule exists to catch.
+
+   HANDOFF.md is here for a second reason as well: amendment A2 quotes the original
+   contract sentence verbatim, and the file is under a never-edit guardrail. That
+   makes this entry the weakest one in the list — a wrong count introduced anywhere
+   else in HANDOFF.md would not be caught. It is named here so the next reviewer
+   sees the gap rather than discovering it. */
+const SCOPE_QUOTE_EXEMPT = {
+  'factory/REVIEW.md':    'review 1 — quotes README\'s wrong sentence as the finding',
+  'factory/REVIEW-2.md':  'review 2 — quotes BRIEF\'s and PLAN\'s wrong sentences as the finding',
+  'factory/FIXES.md':     'fix list 1 — quotes the wrong sentence in the task that fixed it',
+  'factory/FIXES-2.md':   'fix list 2 — quotes the wrong sentences in the task that fixed them',
+  'factory/log.md':       'append-only build log — records the finding in its own words',
+  'factory/progress.md':  'append-only progress record — records the finding in its own words',
+  'factory/STATE.md':     'factory state — summarises the finding for the next stage',
+  'factory/HANDOFF.md':   'contract amendment A2 quotes the original wrong sentence; also never-edit'
+};
+
+const scopeDocs = census.files.filter(f => /\.md$/i.test(f)).sort();
+const scopeBad = [];
+for (const rel of scopeDocs) {
+  if (SCOPE_QUOTE_EXEMPT[rel]) continue;
+  const full = path.join(ROOT, rel);
+  if (!fs.existsSync(full)) continue;
+  const text = fs.readFileSync(full, 'utf8');
+  const re = /\b(zero|one|two|three|four|five|six|\d+)\s+(?:OAuth\s+)?scopes?\b/gi;
+  let m;
+  while ((m = re.exec(text))) {
+    const said = /^\d+$/.test(m[1]) ? Number(m[1]) : NUMBER_WORDS.indexOf(m[1].toLowerCase());
+    if (said !== SCOPE_COUNT) {
+      const line = text.slice(0, m.index).split('\n').length;
+      scopeBad.push(rel + ':' + line + ' — "' + m[0] + '" but appsscript.json asks for ' + SCOPE_COUNT);
     }
-    return bad;
-  }, []),
+  }
+}
+check('the docs agree with the manifest about how many scopes it asks for', scopeBad,
   'a scope count stated in prose goes stale silently, and then gets quoted as fact');
+console.log('         ' + (scopeDocs.length - Object.keys(SCOPE_QUOTE_EXEMPT).length) +
+            ' of ' + scopeDocs.length + ' .md files checked; ' +
+            Object.keys(SCOPE_QUOTE_EXEMPT).length + ' exempt as the record of the mistake');
 
 console.log(fails ? '\n' + fails + ' failed\n' : '\nall clear\n');
 process.exit(fails ? 1 : 0);
