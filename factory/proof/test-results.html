@@ -1,0 +1,108 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>timetap — error paths round — test results</title>
+<style>
+  :root { --ink:#12151a; --dim:#5b6472; --line:#dde2e9; --ok:#0d8a4f; --skip:#8a6d0d; --bg:#fff; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink);
+         font:16px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif; }
+  .wrap { max-width:1120px; margin:0 auto; padding:48px 56px 64px; }
+  header { display:flex; align-items:baseline; gap:24px; flex-wrap:wrap;
+           border-bottom:3px solid var(--ink); padding-bottom:20px; }
+  h1 { font-size:34px; margin:0; letter-spacing:-.02em; }
+  .when { color:var(--dim); font-size:17px; }
+  .hero { display:flex; gap:56px; align-items:center; margin:36px 0 44px; flex-wrap:wrap; }
+  .big { font-size:104px; line-height:.9; font-weight:700; color:var(--ok); letter-spacing:-.04em; }
+  .big small { display:block; font-size:19px; font-weight:600; color:var(--ink);
+               letter-spacing:0; margin-top:10px; }
+  .zero { color:var(--ink); }
+  h2 { font-size:15px; text-transform:uppercase; letter-spacing:.09em; color:var(--dim);
+       margin:40px 0 12px; }
+  table { width:100%; border-collapse:collapse; font-size:17px; }
+  td, th { text-align:left; padding:9px 12px 9px 0; border-bottom:1px solid var(--line);
+           vertical-align:top; }
+  th { font-size:13px; text-transform:uppercase; letter-spacing:.07em; color:var(--dim);
+       border-bottom:2px solid var(--ink); }
+  .tick { color:var(--ok); font-weight:700; width:34px; }
+  .tick.s { color:var(--skip); }
+  .num { font-variant-numeric:tabular-nums; white-space:nowrap; color:var(--dim); }
+  code { font:14px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace; background:#f2f4f7;
+         padding:2px 6px; border-radius:4px; }
+  .cmds { background:#12151a; color:#e8ecf1; border-radius:10px; padding:20px 24px; margin-top:14px;
+          font:15px/1.85 ui-monospace,SFMono-Regular,Menlo,monospace; overflow-x:auto; }
+  .cmds .c { color:#7fd1a3; }
+  footer { margin-top:44px; padding-top:18px; border-top:1px solid var(--line);
+           color:var(--dim); font-size:15px; }
+</style>
+<div class="wrap">
+  <header>
+    <h1>timetap — error paths</h1>
+    <span class="when">verified 27 July 2026 · branch <code>factory/error-paths</code>, merged to <code>main</code></span>
+  </header>
+
+  <div class="hero">
+    <div class="big">492<small>assertions passed</small></div>
+    <div class="big zero">0<small>failed</small></div>
+    <div class="big zero">17<small>lint rules, all clear</small></div>
+    <div class="big zero">19<small>rendered-page checks, per viewport</small></div>
+  </div>
+
+  <h2>The offline suite, under every contracted timezone</h2>
+  <table>
+    <tr><th class="tick"></th><th>Timezone</th><th>Result</th></tr>
+    <tr><td class="tick">✓</td><td>America/New_York</td><td class="num">492 passed, 0 failed</td></tr>
+    <tr><td class="tick">✓</td><td>Europe/London</td><td class="num">492 passed, 0 failed</td></tr>
+    <tr><td class="tick">✓</td><td>Australia/Sydney</td><td class="num">492 passed, 0 failed</td></tr>
+    <tr><td class="tick">✓</td><td>UTC</td><td class="num">492 passed, 0 failed</td></tr>
+    <tr><td class="tick s">→</td><td>Asia/Kolkata <span class="when">— an uncontracted zone</span></td>
+        <td class="num">482 passed, 0 failed, 1 skipped by name</td></tr>
+  </table>
+
+  <h2>The contract, group by group</h2>
+  <table>
+    <tr><th class="tick"></th><th>What was promised</th><th>Where it is proved</th></tr>
+    <tr><td class="tick">✓</td><td><b>The existing app is unharmed</b> — items 1–6.
+        Normal use is untouched: taps, the mark strip, posture, split and sit-edit all behave
+        exactly as their existing tests assert.</td>
+        <td class="num">suite §1–§33 · lint</td></tr>
+    <tr><td class="tick">✓</td><td><b>Lost writes are findable</b> — items 7–13. A write the app
+        gave up on lands on a list you can open and read, and discarding one never touches
+        pending work.</td>
+        <td class="num">suite §34–§37k</td></tr>
+    <tr><td class="tick">✓</td><td><b>The rollup admits it failed</b> — items 14–18. Each tab
+        carries a stamp describing that tab alone; a failed write leaves old numbers and old
+        stamp together rather than blanking the tab.</td>
+        <td class="num">suite §38–§40e</td></tr>
+    <tr><td class="tick">✓</td><td><b>The machine can see the screen</b> — items 19–23. The real
+        page is rendered in a real browser at two viewports, and a skipped run is never
+        reported as a pass.</td>
+        <td class="num">headless · lint drift rule · deploy.sh</td></tr>
+    <tr><td class="tick">✓</td><td><b>Added by review</b> — items 24–27. Arm-and-confirm on
+        DISCARD, no tab blanked by a failed write, no NUL byte in any file, no document
+        disagreeing with the manifest.</td>
+        <td class="num">headless tap count · suite §39e–§39g · lint</td></tr>
+  </table>
+
+  <h2>The drawer, driven at real coordinates in a real browser</h2>
+  <table>
+    <tr><th class="tick"></th><th>Taps on one fixed point</th><th>Entries destroyed</th><th>Every destruction armed first</th></tr>
+    <tr><td class="tick">✓</td><td class="num">2</td><td class="num">1</td><td>yes — button read TAP AGAIN TO DISCARD</td></tr>
+    <tr><td class="tick">✓</td><td class="num">3</td><td class="num">1</td><td>yes</td></tr>
+    <tr><td class="tick">✓</td><td class="num">4</td><td class="num">2</td><td>yes</td></tr>
+    <tr><td class="tick">✓</td><td class="num">6</td><td class="num">3</td><td>yes</td></tr>
+  </table>
+
+  <h2>Run it yourself</h2>
+  <div class="cmds">
+<span class="c">for</span> z <span class="c">in</span> America/New_York Europe/London Australia/Sydney UTC; <span class="c">do</span> TZ=$z node test/tests.js | tail -1; <span class="c">done</span><br>
+node test/lint.js<br>
+npm install &amp;&amp; node test/headless.js
+  </div>
+
+  <footer>
+    Two independent reviews ran on this build; both returned <b>FIX FIRST</b>, and both fix lists
+    were completed in full. The second fix pass was verified by its author against every criterion,
+    with each check deliberately broken in a copy to confirm it could fail — it was not
+    independently reviewed.
+  </footer>
+</div>
