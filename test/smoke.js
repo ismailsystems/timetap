@@ -73,6 +73,21 @@
     (vis('icSit') ? 1 : 0) + (vis('icStand') ? 1 : 0) === 1,
     'sit=' + vis('icSit') + ' stand=' + vis('icStand'));
 
+  /* STOP is the only control that ends the day. A day that cannot be ended is
+     a phantom block every night, so "it rendered" is worth checking on its own
+     — reachable, hittable, and named for a screen reader. */
+  var stopBtn = document.getElementById('stopBtn');
+  var stopRect = stopBtn ? stopBtn.getBoundingClientRect() : null;
+  ok('the STOP control exists, is reachable and carries a label',
+    !!stopBtn && stopBtn.tagName === 'BUTTON' &&
+    getComputedStyle(stopBtn).display !== 'none' &&
+    stopRect.width >= 44 && stopRect.height >= 44 &&
+    !!(stopBtn.getAttribute('aria-label') || stopBtn.textContent.trim()),
+    stopBtn ? (stopBtn.tagName + ' ' + Math.round(stopRect.width) + 'x' +
+               Math.round(stopRect.height) + ' label="' +
+               (stopBtn.getAttribute('aria-label') || stopBtn.textContent.trim()) + '"')
+            : 'no #stopBtn in the document');
+
   var pageBg = getComputedStyle(document.body).backgroundColor;
   var lit = cats.filter(function (c) { return c.classList.contains('active'); })[0];
   if (lit) {

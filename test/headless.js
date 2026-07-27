@@ -363,6 +363,409 @@ async function checkTapCount(browser, view, page) {
 }
 
 /** Same list, same content strings, order not meaningful. */
+/*
+ * A4 — the posture row in the worst case it ever has to survive.
+ *
+ * In the common case that row holds one thing: #sync is hidden when everything
+ * is synced and #sitEdit is hidden when nothing is sitting. The case worth
+ * pinning is the other one — pending writes AND sitting AND the sit clock AND
+ * STOP, four things in a fixed 72px row on a 390px phone. That is the state a
+ * day actually ends in, and STOP is the control that ends it.
+ *
+ * The failure this exists to catch is not a logic failure. It is a control that
+ * passes every assertion in tests.js and is still too small, too cramped or too
+ * ambiguous to use at 23:00. An unnoticed armed STOP is a stop that does not
+ * happen.
+ *
+ * The states are driven rather than faked: the block and the SIT come from
+ * seeded state the way a reload gets them, and the mark strip is reached by
+ * actually ending a 40-minute block with STOP.
+ */
+const POSTURE_ORIGIN = 'http://timetap-posture.invalid/';
+const TOUCH_TARGET = 44;
+
+/* A server that accepts the call and never answers, so the row stays in its
+   pending state for the length of the check. A stub that succeeded would empty
+   the queue and hide #sync, which is the easy case, not the worst one. */
+function stallingServerStub() {
+  const mk = () => {
+    const b = {
+      withSuccessHandler: () => b,
+      withFailureHandler: () => b,
+      applyOps: () => {},
+      getState: () => {},
+      addCategory: () => {}
+    };
+    return b;
+  };
+  window.google = { script: { run: new Proxy({}, { get: (_, k) => (...a) => mk()[k](...a) }) } };
+}
+
+async function checkPostureRow(browser, view, page) {
+  const problems = [];
+  const label = view.name + ' ' + view.width + 'px';
+  const ctx = await browser.newContext({
+    viewport: { width: view.width, height: view.height },
+    isMobile: !!view.isMobile, hasTouch: !!view.isMobile,
+    deviceScaleFactor: view.isMobile ? 3 : 1
+  });
+  const pg = await ctx.newPage();
+  const errors = [];
+  pg.on('pageerror', e => errors.push(String((e && e.message) || e)));
+  try {
+    await pg.route(POSTURE_ORIGIN, r =>
+      r.fulfill({ status: 200, contentType: 'text/html; charset=utf-8', body: documentFor(page, true) }));
+    await pg.addInitScript(stallingServerStub);
+    await pg.addInitScript(() => {
+      const now = Date.now();
+      // A block running 40 minutes, so ending it is over MIN_MARK_MINUTES and
+      // brings up the mark strip, and a SIT that has been open for an hour.
+      localStorage.setItem('tt.state.v1', JSON.stringify({
+        open: { ref: 'aaaabbbbccccdddd', key: 'DW', text: '', startMs: now - 40 * 60000 },
+        sit: { ref: 'eeeeffff11112222', startMs: now - 60 * 60000 },
+        lastTapMs: 0
+      }));
+      // Pending writes, so #sync is visible rather than hidden.
+      localStorage.setItem('tt.queue.v1', JSON.stringify([
+        { id: 'q1', type: 'setMark', ref: 'aaaabbbbccccdddd', mark: '-', ts: now },
+        { id: 'q2', type: 'setText', ref: 'aaaabbbbccccdddd', text: 'x', ts: now }
+      ]));
+    });
+    await pg.goto(POSTURE_ORIGIN, { waitUntil: 'load' });
+    await pg.waitForTimeout(120);
+
+    const geom = () => pg.evaluate(({ TOUCH_TARGET }) => {
+      const vis = el => {
+        if (!el) return false;
+        const s = getComputedStyle(el);
+        if (s.display === 'none' || s.visibility === 'hidden') return false;
+        const r = el.getBoundingClientRect();
+        return r.width > 0 && r.height > 0;
+      };
+      const posture = document.getElementById('posture');
+      const row = document.getElementById('postureRow');
+      const kids = posture ? [].slice.call(posture.children).filter(vis) : [];
+      const rect = el => { const r = el.getBoundingClientRect();
+                           return { x: r.left, y: r.top, w: r.width, h: r.height, r: r.right, b: r.bottom }; };
+      const controls = kids.filter(el => el.matches('button, a, input, [role="button"]'));
+      const stop = document.getElementById('stopBtn');
+      /* The strip is the other thing that occupies this row, and its controls
+         are two levels deep so no direct-children filter reaches them.
+         Measured and reported rather than asserted: criterion 1 is about the
+         resting posture row, and the strip is hidden then. See Q8. */
+      const stripCtl = [].slice.call(document.querySelectorAll(
+        '#strip .strip-marks button, #stripHead')).map(el => {
+          const r = el.getBoundingClientRect();
+          return { id: el.id || ('mark ' + el.textContent.trim()),
+                   w: +r.width.toFixed(1), h: +r.height.toFixed(1) };
+        });
+      const lab = document.getElementById('postureLabel');
+      const labStyle = lab ? getComputedStyle(lab) : null;
+      const stopStyle = stop ? getComputedStyle(stop) : null;
+      let hitStop = null;
+      if (stop && vis(stop)) {
+        const r = stop.getBoundingClientRect();
+        const el = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+        hitStop = el ? (el.id || (el.closest('button') && el.closest('button').id) || el.tagName) : null;
+      }
+      return {
+        rowRect: row ? rect(row) : null,
+        postureRect: posture ? rect(posture) : null,
+        postureHidden: posture ? posture.classList.contains('hidden') : null,
+        stripHidden: (() => { const s = document.getElementById('strip');
+                              return s ? s.classList.contains('hidden') : null; })(),
+        kids: kids.map(el => ({ id: el.id || el.className || el.tagName,
+                                covers: getComputedStyle(el).position === 'absolute',
+                                ...rect(el) })),
+        controls: controls.map(el => ({ id: el.id || el.tagName, ...rect(el) })),
+        stripCtl,
+        stopVisible: vis(stop),
+        stopText: stop ? stop.textContent.trim() : null,
+        stopHitTarget: hitStop,
+        stopStyle: stopStyle ? {
+          position: stopStyle.position, fontWeight: stopStyle.fontWeight,
+          boxShadow: stopStyle.boxShadow, padding: stopStyle.padding,
+          borderRadius: stopStyle.borderRadius, opacity: stopStyle.opacity,
+          outline: stopStyle.outlineStyle,
+          color: stopStyle.color, background: stopStyle.backgroundColor
+        } : null,
+        stopRect: stop && vis(stop) ? rect(stop) : null,
+        label: lab ? (() => {
+          /* scrollWidth > clientWidth is the wrong axis for this element.
+             #postureLabel is display:block with white-space:normal, so it
+             WRAPS rather than overflowing and scrollWidth is identically
+             clientWidth — the check could never fire. The ways this label
+             actually breaks are vertical: it wraps to more lines than it has
+             words, or it is clipped by an ancestor, or a word is sliced.
+             smoke.js already had the right technique; this is that technique.
+
+             A label may use as many lines as it has words, and no more. */
+          const cs = getComputedStyle(lab);
+          let lh = parseFloat(cs.lineHeight);
+          if (!lh || isNaN(lh)) lh = parseFloat(cs.fontSize) * 1.2;
+          const box = lab.getBoundingClientRect();
+          const content = box.height - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom);
+          const lines = Math.max(1, Math.round(content / lh));
+          const words = lab.textContent.trim().split(/\s+/).filter(Boolean);
+
+          // Could every word have fitted on a line of its own?
+          const probe = document.createElement('span');
+          probe.style.cssText = 'position:absolute;visibility:hidden;white-space:pre;font:' + cs.font;
+          document.body.appendChild(probe);
+          const room = box.width - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+          const wordsFit = words.every(w => {
+            probe.textContent = w;
+            return probe.getBoundingClientRect().width <= room + 1;
+          });
+          probe.remove();
+
+          // Clipped by the label itself, or by anything it sits inside.
+          let clippedBy = null;
+          for (let el = lab; el && el.id !== 'app'; el = el.parentElement) {
+            const es = getComputedStyle(el);
+            const r = el.getBoundingClientRect();
+            if ((es.overflow === 'hidden' || es.overflowY === 'hidden') &&
+                el.scrollHeight > el.clientHeight + 1) { clippedBy = el.id || el.className; break; }
+            if (el !== lab && box.bottom > r.bottom + 1 &&
+                (es.overflow === 'hidden' || es.overflowY === 'hidden')) {
+              clippedBy = el.id || el.className; break;
+            }
+          }
+          /* A word split across two line boxes has more than one client rect.
+             This is the direct measurement of "never a partial word" — the
+             lines-vs-words heuristic misses word-break:break-all, which slices
+             words while producing FEWER lines than the label has words. */
+            const sliced = [];
+          const tn = lab.firstChild;
+          if (tn && tn.nodeType === 3) {
+            const re = /\S+/g;
+            let m;
+            while ((m = re.exec(tn.textContent))) {
+              const rg = document.createRange();
+              rg.setStart(tn, m.index);
+              rg.setEnd(tn, m.index + m[0].length);
+              const rects = [].slice.call(rg.getClientRects())
+                .filter(q => q.width > 0.5 && q.height > 0.5);
+              if (rects.length > 1) sliced.push(m[0]);
+            }
+          }
+
+          // The label's own box outgrowing the control that holds it.
+          const holder = lab.parentElement;
+          return {
+            text: lab.textContent.trim(),
+            lines, words: words.length, wordsFit, sliced,
+            clippedBy,
+            overflow: cs.textOverflow,
+            widthClipped: lab.scrollWidth > lab.clientWidth + 1,
+            holderOverflows: holder
+              ? holder.scrollHeight > holder.clientHeight + 1 : false,
+            holderId: holder ? (holder.id || holder.className) : null,
+            heightOverflows: box.bottom > document.getElementById('posture')
+              .getBoundingClientRect().bottom + 1
+          };
+        })() : null,
+        docScrollsX: document.documentElement.scrollWidth > document.documentElement.clientWidth + 1,
+        TOUCH_TARGET
+      };
+    }, { TOUCH_TARGET });
+
+    const g = await geom();
+
+    console.log('\nposture row, worst case (' + label + ')');
+    console.log('  in the row:      ' + g.kids.map(k => k.id + ' ' +
+                Math.round(k.w) + 'x' + Math.round(k.h)).join(', '));
+    console.log('  posture label:   "' + (g.label && g.label.text) + '"' +
+                (g.label && g.label.clipped ? ' CLIPPED' : ' fits'));
+
+    // The worst case is only worth measuring if it actually assembled.
+    const ids = g.kids.map(k => k.id);
+    const wanted = ['sync', 'postureBtn', 'sitEdit', 'stopBtn'];
+    const missing = wanted.filter(w => !ids.includes(w));
+    if (missing.length) {
+      problems.push(label + ': the worst case did not assemble — ' + missing.join(', ') +
+                    ' not visible in the posture row. Present: ' + JSON.stringify(ids) +
+                    '. Every check below would have passed vacuously.');
+      return problems;                       // measuring the easy case proves nothing
+    }
+
+    // 1. Hit boxes.
+    const small = g.controls.filter(c => c.w < TOUCH_TARGET || c.h < TOUCH_TARGET);
+    if (small.length) {
+      problems.push(label + ': ' + small.length + ' control(s) in the posture row are under ' +
+                    TOUCH_TARGET + 'x' + TOUCH_TARGET + ' CSS px: ' +
+                    small.map(c => c.id + ' ' + Math.round(c.w) + 'x' + Math.round(c.h)).join(', '));
+    }
+
+    /* 2. Overlap, pairwise, and containment in the row.
+     *
+     * Run against a given state rather than only the resting one. The armed
+     * state is the one A4's own description worries about — "TAP AGAIN TO STOP
+     * will not render in a narrow slot" — so measuring only at rest would miss
+     * exactly the failure this task exists to prevent. */
+    const geometryProblems = (state, when) => {
+      const found = [];
+      for (let i = 0; i < state.kids.length; i++) {
+        for (let j = i + 1; j < state.kids.length; j++) {
+          const a = state.kids[i], b = state.kids[j];
+          // Two controls stacked on purpose is how the armed state works, so an
+          // element that deliberately covers the row is not an overlap defect.
+          if (a.covers || b.covers) continue;
+          const over = a.x < b.r - 0.5 && b.x < a.r - 0.5 && a.y < b.b - 0.5 && b.y < a.b - 0.5;
+          if (over) {
+            found.push(label + ' (' + when + '): ' + a.id + ' overlaps ' + b.id +
+                       ' in the posture row (' + JSON.stringify(a) + ' vs ' + JSON.stringify(b) + ')');
+          }
+        }
+      }
+      const spilling = state.kids.filter(k => k.x < state.postureRect.x - 0.5 ||
+                                              k.r > state.postureRect.r + 0.5);
+      if (spilling.length) {
+        found.push(label + ' (' + when + '): ' + spilling.map(k => k.id).join(', ') +
+                   ' extend past the posture row horizontally');
+      }
+      if (state.docScrollsX) {
+        found.push(label + ' (' + when + '): the document scrolls horizontally');
+      }
+      return found;
+    };
+    problems.push(...geometryProblems(g, 'resting'));
+    /* Hit-tested at rest, not only after the strip. Without this, something
+       covering the row is caught only by Playwright's 30s actionability
+       timeout, which reports a stack trace and no criterion name. */
+    if (g.stopHitTarget !== 'stopBtn') {
+      problems.push(label + ': STOP is not hittable in the resting worst case — the element at ' +
+                    'its centre is ' + g.stopHitTarget);
+    }
+
+    // 3. The posture label is legible or explicitly truncated, never a part-word.
+    if (!g.label || !g.label.text) {
+      problems.push(label + ': the posture label rendered no text at all');
+    } else {
+      const L = g.label;
+      if (L.widthClipped && L.overflow !== 'ellipsis') {
+        problems.push(label + ': the posture label "' + L.text + '" is cut off sideways with ' +
+                      'no ellipsis, so it renders a partial word');
+      }
+      // Measured directly: a word occupying two line boxes has been cut in half.
+      if (L.sliced.length && L.wordsFit) {
+        problems.push(label + ': the posture label "' + L.text + '" renders ' +
+                      L.sliced.length + ' word(s) split across lines (' + L.sliced.join(', ') +
+                      ') and every word had room to fit — so a word is being cut in half');
+      }
+      // More lines than words is the same fault seen from the other side.
+      if (L.lines > L.words && L.wordsFit) {
+        problems.push(label + ': the posture label "' + L.text + '" is broken across ' + L.lines +
+                      ' lines for ' + L.words + ' word(s), and every word had room to fit');
+      }
+      if (L.holderOverflows) {
+        problems.push(label + ': the posture label "' + L.text + '" is taller than the ' +
+                      L.holderId + ' that holds it, so it renders outside its own control');
+      }
+      if (L.clippedBy) {
+        problems.push(label + ': the posture label "' + L.text + '" is clipped by ' + L.clippedBy +
+                      ', so whole lines of it are not on screen');
+      }
+      if (L.heightOverflows) {
+        problems.push(label + ': the posture label "' + L.text + '" renders past the bottom of ' +
+                      'the posture row');
+      }
+    }
+
+    // 4. Armed differs from resting in text AND in more than colour.
+    const resting = { text: g.stopText, style: g.stopStyle, rect: g.stopRect };
+    /* Short timeout, and a failure to click is reported as a finding rather
+       than thrown. Something covering the row makes Playwright wait 30s and
+       then raise a stack trace with no criterion name in it — the hit test
+       above has already said what is wrong, and that is the message worth
+       showing. */
+    const tapStop = async () => {
+      try { await pg.click('#stopBtn', { timeout: 2000 }); return true; }
+      catch (e) {
+        problems.push(label + ': STOP could not be clicked — ' +
+                      String((e && e.message) || e).split('\n')[0]);
+        return false;
+      }
+    };
+    if (!await tapStop()) return problems;
+    await pg.waitForTimeout(30);
+    const g2 = await geom();
+    const armed = { text: g2.stopText, style: g2.stopStyle, rect: g2.stopRect };
+    console.log('  STOP resting:    "' + resting.text + '" ' +
+                Math.round(resting.rect.w) + 'x' + Math.round(resting.rect.h) +
+                ' ' + resting.style.position);
+    console.log('  STOP armed:      "' + armed.text + '" ' +
+                Math.round(armed.rect.w) + 'x' + Math.round(armed.rect.h) +
+                ' ' + armed.style.position);
+    if (armed.text === resting.text) {
+      problems.push(label + ': armed STOP reads the same as resting STOP ("' + armed.text + '")');
+    }
+    /* Compared on properties the text cannot move on its own. Width and height
+       are deliberately NOT in here: a longer label makes an auto-width button
+       wider all by itself, so measuring the box would just re-detect the text
+       change and call it styling. This check is only worth having if it can
+       fail while the text still changes. */
+    const styleKeys = ['position', 'fontWeight', 'boxShadow', 'padding',
+                       'borderRadius', 'opacity', 'outline'];
+    const shapeChanged = styleKeys.some(k => armed.style[k] !== resting.style[k]);
+    if (!shapeChanged) {
+      problems.push(label + ': armed STOP differs from resting only in colour — ' +
+                    JSON.stringify(resting.style) + ' vs ' + JSON.stringify(armed.style) +
+                    '. Colour alone is one channel, and it is the one some people do not have.');
+    }
+    if (armed.rect && (armed.rect.w < TOUCH_TARGET || armed.rect.h < TOUCH_TARGET)) {
+      problems.push(label + ': armed STOP is under the touch target at ' +
+                    Math.round(armed.rect.w) + 'x' + Math.round(armed.rect.h));
+    }
+    // The armed label is the one that might not fit. Measure it, do not assume.
+    problems.push(...geometryProblems(g2, 'armed'));
+    if (g2.stopHitTarget !== 'stopBtn') {
+      problems.push(label + ': armed STOP is not hittable — the element at its centre is ' +
+                    g2.stopHitTarget);
+    }
+
+    // 5. Confirm, which ends the day and raises the strip over the row; then a
+    //    tap that is not a mark must give the row — and STOP — back.
+    if (!await tapStop()) return problems;
+    await pg.waitForTimeout(30);
+    const g3 = await geom();
+    if (g3.stripHidden !== false) {
+      problems.push(label + ': ending a 40-minute block with STOP did not raise the mark strip ' +
+                    '(strip hidden=' + g3.stripHidden + '), so criterion 5 could not be tested');
+    } else {
+      await pg.evaluate(() => {
+        // Anywhere on the strip that is not one of the three mark buttons.
+        document.getElementById('stripHead').click();
+      });
+      await pg.waitForTimeout(30);
+      const g4 = await geom();
+      console.log('  strip controls:  ' + (g3.stripCtl.length
+        ? g3.stripCtl.map(c => c.id + ' ' + Math.round(c.w) + 'x' + Math.round(c.h)).join(', ')
+        : 'none measured'));
+      const stripSmall = g3.stripCtl.filter(c => c.w < TOUCH_TARGET || c.h < TOUCH_TARGET);
+      if (stripSmall.length) {
+        console.log('  NOTE:            ' + stripSmall.map(c => c.id).join(', ') +
+                    ' are under ' + TOUCH_TARGET + 'x' + TOUCH_TARGET +
+                    '. Pre-existing, outside criterion 1\'s scope, parked as Q8.');
+      }
+      if (g4.stripHidden !== true) {
+        problems.push(label + ': tapping the strip away from a mark did not dismiss it');
+      }
+      if (!g4.stopVisible) {
+        problems.push(label + ': STOP is not visible after the strip is dismissed');
+      } else if (g4.stopHitTarget !== 'stopBtn') {
+        problems.push(label + ': STOP is visible but not hittable after the strip is dismissed — ' +
+                      'the element at its centre is ' + g4.stopHitTarget);
+      }
+    }
+
+    if (errors.length) problems.push(label + ': page errors — ' + errors.join(' | '));
+  } finally {
+    await ctx.close();
+  }
+  return problems;
+}
+
 function sameMetas(a, b) {
   const norm = list => list.map(m => m[0] + '\0' + m[1]).sort();
   const x = norm(a), y = norm(b);
@@ -485,6 +888,12 @@ async function main() {
     problems = problems.concat(await checkInjectionMatters(browser, VIEWS[0], page));
     problems = problems.concat(await checkDrawer(browser, VIEWS[0], page));
     problems = problems.concat(await checkTapCount(browser, VIEWS[0], page));
+    /* A4: the worst-case posture row, on a phone and on a desktop. 980px is
+       named in the contract specifically so STOP cannot become a phone-only
+       control that nobody checked anywhere else. */
+    for (const view of [VIEWS[0], { name: 'desktop', width: 980, height: 800, isMobile: false }]) {
+      problems = problems.concat(await checkPostureRow(browser, view, page));
+    }
   } finally {
     await browser.close();
   }

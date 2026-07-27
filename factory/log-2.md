@@ -320,3 +320,82 @@ longer looks like it is about to do something.
 phantom block plus `UNLOGGED` the next morning. Judged honest — the user is told
 in a persistent banner and the write is in the drawer — but it reads against
 contract 16 as literally worded, so it wants a human decision.
+
+## [2026-07-27 13:0x] A4 | STOP is reachable and unmistakable on a phone, in the worst case
+
+A `checkPostureRow` phase in `test/headless.js`, run at 390px and 980px, plus one
+new check in `test/smoke.js` and a rewritten section of `test/README.md`.
+`Index.html` is unchanged by this task — A3 built the control, A4 proves it is
+usable. **20 smoke checks per viewport, up from 19.**
+
+The worst case is driven rather than described: a running block and an open SIT
+come from seeded state the way a reload gets them, pending writes come from a
+seeded queue, and the server stub accepts calls and never answers — because a
+stub that *succeeded* would drain the queue and hide `#sync`, which is the easy
+case rather than the worst one. All four of `#sync`, `#postureBtn`, `#sitEdit`
+and `#stopBtn` are then in one fixed 72px row, and the phase refuses to measure
+anything if they are not, rather than passing vacuously.
+
+**CHECKER — and this task is almost entirely test code, so the only question
+worth asking was "can any of this fail?" It ran 15 mutations. Four survived.**
+
+| Mutation | Was | Now |
+|---|---|---|
+| Long label wrapping to 4 lines, overflowing its button | passed green | caught |
+| `word-break: break-all` slicing words mid-word | passed green | caught |
+| Ancestor `overflow:hidden` losing whole lines | passed green | caught |
+| Armed STOP staying inline and spilling out of the row | passed green | caught |
+
+**The label check was the bad one, and it was near-vacuous.** I had written
+`scrollWidth > clientWidth`, which for `#postureLabel` can never fire:
+`display:block` with `white-space:normal` means it *wraps* rather than
+overflowing, so `scrollWidth` is identically `clientWidth` — 145 == 145 even
+with a 39-character label. It measured the one axis that element cannot fail on.
+The checker demonstrated two mutations that put literal half-words on screen
+(`CURRENTLY SIT / TING AT THE DE / SK RIGHT NOW`) while the check printed
+"fits". `test/smoke.js` already contained the right technique, twelve lines
+away, and I had not looked.
+
+Replaced with three direct measurements: whether any word occupies more than one
+line box (a `Range` per word — this is what catches `break-all`, which slices
+words while producing *fewer* lines than the label has words, so the
+lines-vs-words heuristic misses it), whether the label outgrows the control
+holding it (`holder.scrollHeight > holder.clientHeight`), and whether any
+ancestor clips it.
+
+**Geometry is now measured twice, resting and armed.** Overflow and overlap ran
+only against the resting state, so an armed STOP that stayed inline and spilled
+to x=490 in a row ending at 382 — with the document scrolling horizontally —
+exited 0. That is precisely the failure A4's own description names: "TAP AGAIN
+TO STOP will not render in a narrow slot".
+
+**Two more from the checker, both taken.** The styling comparison originally
+included width and height, which meant it was re-detecting the *text* change and
+calling it styling — a colour-only armed state passed because the longer label
+made the button wider by itself. It now compares only properties text cannot
+move: position, padding, box-shadow, border-radius, opacity, outline, weight.
+And the resting-state hit test was computed but never read, so something
+covering the row surfaced as a 30-second Playwright stack trace with no
+criterion name; it is now asserted, and the click carries a 2-second timeout and
+reports failure as a finding. That case now names itself in two seconds.
+
+Also: the 44px floor was written as `< 44 - 0.5`, which passed a 43.5px control.
+44 now means 44.
+
+**Q8 parked:** the strip's own controls measure 74x42 and `stripHead` 112x17 —
+under the floor the rest of the row is held to. Outside criterion 1's scope (the
+strip is hidden in the resting worst case), pre-existing from round 1, and
+reaching 44px means finding 2px in a fixed 72px row. Measured and printed on
+every headless run so it cannot be quietly forgotten.
+
+`test/README.md`'s assertion counts were stale — 492 and 482, from before this
+round. Now 616 and 606, measured rather than assumed.
+
+**Third false positive from the scope-count rule this round.** It matched
+`criterion 1 scopes the check` as a claim that the manifest asks for one scope,
+having previously matched `round-1 scope claim`. The regex is
+`(number) (OAuth )?scopes?`, which cannot see that the number belongs to the
+word before it. Routed around each time by rewording rather than by touching the
+rule — it is not this round's to widen, and it does catch the thing it was built
+for. Named here because three hits in one round is a pattern, and the next
+person writing prose near the word "scope" should know.

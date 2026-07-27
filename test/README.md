@@ -11,7 +11,7 @@ some of these bugs have ever appeared.
 
 ## `node test/tests.js`
 
-492 assertions against the real `Code.gs` and the real script out of
+616 assertions against the real `Code.gs` and the real script out of
 `Index.html`, run in node behind a shim for `CalendarApp`, `SpreadsheetApp`,
 `PropertiesService`, `ScriptApp`, `HtmlService`, `LockService` and a small DOM.
 A virtual clock lets a test wait ninety minutes in a millisecond.
@@ -27,7 +27,7 @@ done
 Those four are the contracted zones, and section 39d compares both rollup grids
 against a golden captured per zone in `test/fixtures/rollup-golden.json`. In a
 fifth zone there is no golden to compare against, so 39d reports as **skipped**
-with the zone named and the run continues — 482 passed, 1 skipped. A skip is never
+with the zone named and the run continues — 606 passed, 1 skipped. A skip is never
 counted in `passed`: a run that could not reach a section has to look different
 from one that ran everything. If the fixture itself is missing or unreadable the
 suite says so and stops, rather than throwing partway through.
@@ -72,6 +72,37 @@ suite's DOM shim has no layout, so it cannot express a control moving into the p
 a finger has already committed to. That is precisely how a single-tap DISCARD used to
 destroy a second write the reader had never looked at, while a test named "discarding
 the same row twice is a no-op" passed.
+
+A further phase measures the posture row in the worst case it ever has to survive:
+pending writes **and** an open SIT **and** a running block, so all four of `#sync`,
+`#postureBtn`, `#sitEdit` and `#stopBtn` are in one fixed 72px row at once. It runs at
+390px and at 980px, and checks hit boxes against 44x44, pairwise overlap, horizontal
+overflow, whether STOP is hittable at its own centre, whether the posture label is
+legible, and that an armed STOP differs from a resting one in **both** text and
+styling. Geometry is measured twice — resting and armed — because the armed label is
+the one that might not fit. It then ends a 40-minute block with STOP for real, so the
+mark strip comes up over the row, and checks that dismissing the strip gives STOP back.
+
+Four notes on why it is shaped the way it is, each of them a mutation that survived an
+earlier version of the check:
+
+- The server stub accepts calls and never answers. A stub that succeeded would drain
+  the queue and hide `#sync`, which is the easy case rather than the worst one.
+- The styling comparison excludes width and height. A longer armed label makes an
+  auto-width button wider by itself, so measuring the box would just re-detect the
+  text change and report it as styling.
+- The label is judged on the axis it can actually fail on. `scrollWidth >
+  clientWidth` can never fire for `#postureLabel`, which is `display:block` with
+  `white-space:normal` and therefore wraps rather than overflowing. What is measured
+  instead: whether any word occupies more than one line box (a word cut in half),
+  whether the label outgrows the control holding it, and whether an ancestor clips it.
+- The click has a short timeout and reports failure as a finding. Something covering
+  the row otherwise surfaces as a 30-second Playwright stack trace with no criterion
+  name in it.
+
+It also measures the strip's own controls and prints them. They are not asserted: the
+strip is hidden in the resting worst case, so they fall outside the criterion. They are
+currently 42px tall, which is under the 44px floor the rest of the row is held to.
 
 A second drawer phase counts rather than watches: it taps one fixed point 2, 3, 4 and
 6 times and checks that 1, 1, 2 and 3 entries left, and — the part that actually

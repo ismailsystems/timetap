@@ -7,7 +7,7 @@ Round 1's progress record is `factory/progress.md` and is **read-only**.
 
 ## Status
 
-In progress. **3 of 16 tasks complete.** Stage A, task A4 next.
+In progress. **4 of 16 tasks complete.** Stage A, task A5 next.
 
 Suite: **616 passed / 0 failed** (baseline was 492), green in all four
 contracted timezones. Lint all clear. Headless ok, 19 checks per viewport.
@@ -19,7 +19,7 @@ contracted timezones. Lint all clear. Headless ok, 19 checks per viewport.
 | A1 | A | **done** | 1 | vacuity check done. Checker found a contract-17 defect, fixed. Criterion 6 parked as Q1 — self-contradictory |
 | A2 | A | **done** | 1 | vacuity check done, separation held. Checker found 2 defects, both fixed |
 | A3 | A | **done** | 1 | checker found 2 real bugs (stuck armed STOP, stale-read race) + 3 weak tests, all fixed |
-| A4 | A | pending | 0 | |
+| A4 | A | **done** | 1 | checker found 4 mutations my phase missed; all now caught |
 | A5 | A | pending | 0 | |
 | B1 | B | pending | 0 | |
 | B2 | B | pending | 0 | golden fixture changes here |
@@ -167,6 +167,25 @@ ignore `?` would break A2 outright — `getState` has to read back what
 **Not fixable inside this design.** It is a consequence of encoding the guess as
 a trailing mark, which contracts 13 and 18 mandate. Flagged so the reviewer sees
 it as a known limit rather than an oversight.
+
+### Q8 (A4) — the mark strip's own controls are 42px tall
+
+Measured during A4 and printed by the headless phase on every run:
+
+```
+strip controls:  stripHead 112x17, mark + 74x42, mark = 74x42, mark - 74x42
+```
+
+The three mark buttons and the strip head are interactive, live inside
+`#postureRow`, and are under the 44x44 floor the rest of that row is now held
+to. They are **not** asserted, because the first criterion limits the check to
+the resting posture row and the strip is hidden then — so failing on them would
+be inventing a criterion rather than meeting one.
+
+Pre-existing from round 1, and reaching 44px means finding 2px inside a fixed
+72px row that also holds a 17px head. **Should the strip be brought up to the
+same floor?** Human's call; it is a visual change to round 1's work, not this
+round's. Printed on every headless run so it cannot be quietly forgotten.
 
 ### Q7 (A3) — a STOP whose closes never reach the server still becomes a phantom
 
