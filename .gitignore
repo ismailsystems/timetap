@@ -2,5 +2,10 @@ node_modules/
 .DS_Store
 _site/
 
+# generated media for the proof video — several MB of mp4, webm, mp3 and png
+# that git would keep forever. The recipe is committed instead: beats.json,
+# serve-proof.mjs and test-results.html regenerate it from scratch.
+factory/proof/out/
+
 # holds your script id and is machine-specific; see SETUP.md section 10
 .clasp.json

@@ -1,9 +1,9 @@
 # Factory State
 project: timetap
-stage: 7
-stage_name: Proof video (stage 6 skipped by human decision)
-last_updated: 2026-07-27 (fix pass 2 complete; third review declined)
-next_action: "Stage 6 SKIPPED — the human declined the third fresh-eyes review on 2026-07-27, satisfied with fix pass 2. Fix pass 2 therefore stands self-checked only; its author is the only thing that has verified it. Before or instead of stage 7: factory/GUIDE.md Part 2 is now WRONG, not merely stale — its section \"The one thing that is broken, in plain words\" describes the double-tap data loss as a live bug and proposes a fix (remove one card instead of redrawing) that is not the fix that shipped and would not have been sufficient alone. The build uses arm/confirm. Fix that before anyone reads it. Also outstanding: branch factory/error-paths is 19 commits ahead of main, nothing pushed, main untouched at 0ad0214 — the round is not merged."
+stage: done
+stage_name: Line complete — plan, build, review, fixes, explanation, proof video
+last_updated: 2026-07-27 (proof video recorded)
+next_action: "Nothing outstanding in the factory. Proof video at factory/proof/out/timetap-error-paths-proof-demo.mp4 — 97.7s, 8 beats, 6 contract criteria shown on camera, engine verify PASSED (duration match, audio -24.8dB, QA frames). Every frame spot-checked against its narration by hand. The video is gitignored as build output; beats.json + serve-proof.mjs + test-results.html are committed and regenerate it. THE ONE THING LEFT, and it is the human's call: main is 26 commits ahead of origin/main and nothing has been pushed. Stage 6 SKIPPED — the human declined the third fresh-eyes review on 2026-07-27, satisfied with fix pass 2. Fix pass 2 therefore stands self-checked only; its author is the only thing that has verified it. Before or instead of stage 7: factory/GUIDE.md Part 2 is now WRONG, not merely stale — its section \"The one thing that is broken, in plain words\" describes the double-tap data loss as a live bug and proposes a fix (remove one card instead of redrawing) that is not the fix that shipped and would not have been sufficient alone. The build uses arm/confirm. Fix that before anyone reads it. Also outstanding: branch factory/error-paths is 19 commits ahead of main, nothing pushed, main untouched at 0ad0214 — the round is not merged."
 notes: |
   FIX PASS 2 COMPLETE (2026-07-27). All five items in factory/FIXES-2.md done,
   five commits, nothing parked, nothing escalated, no questions for the human.

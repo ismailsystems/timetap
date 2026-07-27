@@ -1,0 +1,220 @@
+{
+  "meta": {
+    "title": "timetap — error paths, proved",
+    "slug": "timetap-error-paths-proof",
+    "persona": "the owner of timetap, who paid for the overnight run and wants to see it work",
+    "cta": "The build is on main. Read factory/GUIDE.md Part 3 for how it works in plain words.",
+    "targetLengthSec": 115
+  },
+  "baseUrl": "http://localhost:4173",
+  "viewport": {
+    "width": 390,
+    "height": 844
+  },
+  "voice": {
+    "model": "eleven_multilingual_v2",
+    "settings": {
+      "stability": 0.8,
+      "similarity_boost": 0.8,
+      "style": 0.1
+    }
+  },
+  "beats": [
+    {
+      "id": 1,
+      "page": "/app",
+      "text": "This is timetap. You tap a category and your time goes to your calendar. This round changed none of that. It changed what happens when a save fails.",
+      "actions": [
+        {
+          "fn": "waitFor",
+          "sel": "#grid"
+        },
+        {
+          "fn": "hl",
+          "sel": "#grid"
+        },
+        {
+          "fn": "wait",
+          "ms": 600
+        },
+        {
+          "fn": "unhl",
+          "sel": "#grid"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "page": "/drawer",
+      "text": "The contract says a write the app gave up on has to be findable. Watch. There they are. Each one names the time. The category. What it tried to do. And the reason it failed.",
+      "actions": [
+        {
+          "fn": "waitFor",
+          "sel": "#err"
+        },
+        {
+          "fn": "hl",
+          "sel": "#err"
+        },
+        {
+          "fn": "clickEl",
+          "sel": "#err"
+        },
+        {
+          "fn": "waitFor",
+          "sel": "#sheetDead"
+        },
+        {
+          "fn": "unhl",
+          "sel": "#err"
+        },
+        {
+          "fn": "hl",
+          "sel": "#sheetDead"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "page": "/drawer-open",
+      "text": "Throwing one away can't be undone. So it asks first. One tap arms it. The button now reads, tap again to discard. Nothing is gone yet. And if you walk away it forgets after four seconds.",
+      "actions": [
+        {
+          "fn": "waitFor",
+          "sel": "#deadList .deadrow:nth-child(1) button.danger"
+        },
+        {
+          "fn": "hl",
+          "sel": "#deadList .deadrow:nth-child(1) button.danger"
+        },
+        {
+          "fn": "wait",
+          "ms": 400
+        },
+        {
+          "fn": "clickEl",
+          "sel": "#deadList .deadrow:nth-child(1) button.danger"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "page": "/drawer2",
+      "text": "Two reviews caught a bug right here. One tap used to destroy an entry. So two taps destroyed two of them. Now watch. Two taps at the same spot. One entry gone. And it's the one that was aimed at.",
+      "actions": [
+        {
+          "fn": "waitFor",
+          "sel": "#deadList .deadrow:nth-child(1) button.danger"
+        },
+        {
+          "fn": "hl",
+          "sel": "#deadList"
+        },
+        {
+          "fn": "unhl",
+          "sel": "#deadList"
+        },
+        {
+          "fn": "clickEl",
+          "sel": "#deadList .deadrow:nth-child(1) button.danger"
+        },
+        {
+          "fn": "clickEl",
+          "sel": "#deadList .deadrow:nth-child(1) button.danger"
+        },
+        {
+          "fn": "hl",
+          "sel": "#deadList"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "page": "/legacy",
+      "text": "Here's the error path. This entry was written by an older version of the app. No category was saved. No start time either. It doesn't crash and it isn't blank. It says unknown and shows you the rest.",
+      "actions": [
+        {
+          "fn": "waitFor",
+          "sel": "#deadList .deadrow:nth-child(3)"
+        },
+        {
+          "fn": "wait",
+          "ms": 400
+        },
+        {
+          "fn": "hl",
+          "sel": "#deadList .deadrow:nth-child(3)"
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "page": "/last",
+      "text": "One entry left. Discard it. The drawer closes on its own and the warning goes with it. That's the shelf empty. Nothing left to tell you about.",
+      "actions": [
+        {
+          "fn": "waitFor",
+          "sel": "#deadList .deadrow:nth-child(1) button.danger"
+        },
+        {
+          "fn": "hl",
+          "sel": "#deadList .deadrow:nth-child(1) button.danger"
+        },
+        {
+          "fn": "clickEl",
+          "sel": "#deadList .deadrow:nth-child(1) button.danger"
+        },
+        {
+          "fn": "clickEl",
+          "sel": "#deadList .deadrow:nth-child(1) button.danger"
+        },
+        {
+          "fn": "waitFor",
+          "sel": "#grid"
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "page": "/results",
+      "text": "Beyond what you just watched. Four hundred and ninety two automated checks run behind this build. Green under four time zones. Seventeen static rules on top. This is today's run.",
+      "actions": [
+        {
+          "fn": "waitFor",
+          "sel": ".hero"
+        },
+        {
+          "fn": "hl",
+          "sel": ".hero"
+        },
+        {
+          "fn": "wait",
+          "ms": 800
+        },
+        {
+          "fn": "unhl",
+          "sel": ".hero"
+        },
+        {
+          "fn": "scrollToEl",
+          "sel": "table:nth-of-type(3)"
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "page": "/app",
+      "text": "Twenty seven promises in the contract. Six shown here on camera. The rest are covered by the suite. One honest note before you go. The last round of fixes was verified by the agent that wrote them. It was never independently reviewed.",
+      "actions": [
+        {
+          "fn": "waitFor",
+          "sel": "#grid"
+        },
+        {
+          "fn": "wait",
+          "ms": 800
+        }
+      ]
+    }
+  ]
+}
