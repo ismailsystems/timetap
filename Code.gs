@@ -140,6 +140,21 @@ var ROLLUP_HOUR = 3;
 var OPEN_TOKEN  = '#open';
 var REF_PREFIX  = '#ref:';
 var UNLOGGED_TITLE = 'UNLOGGED -';
+/**
+ * Where an ACTUAL event goes when the app cannot tell what it is: either its
+ * title does not parse at all ("Lunch with Ada") or it parses to a key nobody
+ * configured ("Re: the thing" -> RE, "9:00 standup" -> 9).
+ *
+ * Both used to be claimed as Admin on the write and display paths, and to
+ * vanish entirely from the rollup — hours filed under a category the user never
+ * chose, or hours that simply were not there. A key named for what it is says
+ * neither more nor less than the app knows.
+ *
+ * "UNFILED" rather than "UNPARSED": it sits in a spreadsheet a person reads,
+ * next to UNLOGGED, and parsing is this app's problem rather than theirs. It
+ * also keeps the word "parsed" for B4's PLAN counts, which mean something else.
+ */
+var UNFILED_KEY = 'UNFILED';
 var SIT_TITLE   = 'SIT';
 var MS_HOUR     = 3600000;
 var MS_MIN      = 60000;
@@ -627,7 +642,11 @@ function getState() {
   var evA = findOpen_(ca);
   evA = staleGuard_(ca, evA, true, out.notes);
   if (evA) {
-    var p = parseTitle_(evA.getTitle()) || { key: 'ADM', text: '', mark: null };
+    // A title hand-edited in Google Calendar into something this cannot read is
+    // not Admin. Telling the client it is would light the wrong button and file
+    // the close under a category the user never chose.
+    var p = parseTitle_(evA.getTitle()) ||
+            { key: UNFILED_KEY, text: evA.getTitle(), mark: null };
     out.open = {
       ref: refOf_(evA),
       key: p.key,
@@ -665,7 +684,15 @@ function staleGuard_(cal, ev, isActual, notes) {
   if (!(boundEnd > startMs)) boundEnd = startMs + MS_MIN;
 
   if (isActual) {
-    var p = parseTitle_(ev.getTitle()) || { key: 'ADM', text: '', mark: null };
+    /*
+     * The fallback carries the whole existing title as the text rather than
+     * dropping it. This is the one site that WRITES the fallback back to the
+     * calendar, so claiming ADM here did two things at once: it filed the block
+     * under a category the user never chose, and the empty text destroyed
+     * whatever they had actually typed. "Lunch with Ada" became "ADM: ?".
+     */
+    var p = parseTitle_(ev.getTitle()) ||
+            { key: UNFILED_KEY, text: ev.getTitle(), mark: null };
     /*
      * '?' — this block's end time is the app's guess, and the title says so.
      *
@@ -807,7 +834,10 @@ function opCloseActual_(op) {
   var cal = calActual_();
   var ev = findByRef_(cal, op.ref, op.endMs);
   if (!ev) return;                                       // nothing to close: no-op
-  var p = parseTitle_(ev.getTitle()) || { key: op.key || 'ADM', text: '', mark: null };
+  // op.key is what the client believed this block was, which is better evidence
+  // than anything here; UNFILED_KEY only when even that is missing.
+  var p = parseTitle_(ev.getTitle()) ||
+          { key: op.key || UNFILED_KEY, text: ev.getTitle(), mark: null };
   var text = (typeof op.text === 'string') ? op.text : p.text;
   ev.setTitle(buildTitle_(p.key, text, op.mark || null));
   endEventAt_(ev, op.endMs);
@@ -846,7 +876,8 @@ function opSplitActual_(op) {
   var cal = calActual_();
   var ev = findByRef_(cal, op.ref, op.atMs);
   if (ev) {
-    var p = parseTitle_(ev.getTitle()) || { key: 'ADM', text: '', mark: null };
+    var p = parseTitle_(ev.getTitle()) ||
+            { key: UNFILED_KEY, text: ev.getTitle(), mark: null };
     var text = (typeof op.text === 'string') ? op.text : p.text;
     ev.setTitle(buildTitle_(p.key, text, op.mark || null));
     endEventAt_(ev, op.atMs);
@@ -1119,6 +1150,18 @@ function rollupKeys_() {
   var keys = allCategories_().map(function (c) { return c.key; });
   retiredKeys_().forEach(function (r) { if (keys.indexOf(r.key) < 0) keys.push(r.key); });
   keys.push('UNLOGGED');
+  /*
+   * Guarded, unlike UNLOGGED above, because a category the user names "Unfiled"
+   * derives this same key and one key must not get two columns.
+   *
+   * The guard stops the duplicate COLUMN. It does not stop the collision:
+   * keyFor_ reserves neither this key nor UNLOGGED, so such a category still
+   * shares a name with a key the rollup writes to, and the client would then
+   * light that button for a block it could not read. Reserving a key is a
+   * product decision — reject the name, rename the key, or suffix it silently
+   * — and it is parked in factory/progress-2.md rather than decided here.
+   */
+  if (keys.indexOf(UNFILED_KEY) < 0) keys.push(UNFILED_KEY);
   return keys;
 }
 
@@ -1145,21 +1188,31 @@ function dayStats_(lo, hi, plan, actual, sit, keys) {
   var first = null, last = null;
   actual.forEach(function (e) {
     var p = parseTitle_(e.title);
-    if (p && (p.key in d.actual)) {
-      /*
-       * The mark was already being parsed here and then dropped on the floor —
-       * discarded at the exact point it would have become a number. The same
-       * hours now land in the key's total and in the bucket for how the user
-       * marked them, from one measurement, so a key's five buckets sum to its
-       * total by construction rather than by agreement.
-       *
-       * An unrecognised trailing character parses as no mark at all, so it
-       * lands in the unmarked bucket. There is no sixth bucket to land in.
-       */
-      var h = clipHours_(e, lo, hi);
-      d.actual[p.key] += h;
-      d.marks[p.key][isMark_(p.mark) ? p.mark : ''] += h;
-    }
+    /*
+     * An ACTUAL event the app cannot place is time that happened. It used to
+     * contribute nothing at all — not misfiled, just gone — because a title
+     * that fails to parse, and one that parses to a key nobody configured, both
+     * fell through this test. Its hours go to UNFILED_KEY, which is in the key
+     * set, so they are in the grid and nameable rather than silently absent.
+     *
+     * Deliberately not applied to PLAN above: B4 counts what PLAN could not be
+     * read and reports it, and filing unreadable plans under a key would be the
+     * guess this app does not make.
+     */
+    var key = (p && (p.key in d.actual)) ? p.key : UNFILED_KEY;
+    /*
+     * The mark was already being parsed here and then dropped on the floor —
+     * discarded at the exact point it would have become a number. The same
+     * hours now land in the key's total and in the bucket for how the user
+     * marked them, from one measurement, so a key's five buckets sum to its
+     * total by construction rather than by agreement.
+     *
+     * An unrecognised trailing character parses as no mark at all, so it lands
+     * in the unmarked bucket. There is no sixth bucket to land in.
+     */
+    var h = clipHours_(e, lo, hi);
+    d.actual[key] += h;
+    d.marks[key][isMark_(p && p.mark) ? p.mark : ''] += h;
     if (e.start >= lo && e.start < hi) d.switches++;
 
     /*

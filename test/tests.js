@@ -738,7 +738,12 @@ PL('DW: ship it', 21, 10, 14);
 reboot();
 dailyRollup();
 const hdr = H.SHEETS.book.getSheetByName('daily').rows[0];
-const known = clientConfig_().categories.map(c => c.key).concat(['UNLOGGED']);
+/* UNFILED joins UNLOGGED here for the same reason UNLOGGED is here: it is a
+   fixed key the rollup always reports, not a column conjured out of a title.
+   None of the four PLAN events below can reach it — D1 files ACTUAL events
+   only, and deliberately leaves an unreadable plan uncounted rather than
+   guessing where it belonged. */
+const known = clientConfig_().categories.map(c => c.key).concat(['UNLOGGED', UNFILED_KEY]);
 const fixed = ['date', 'day', 'switches', 'waking h', 'sitting h', 'sitting %',
                'longest sit min', 'sits over 90'];
 // The last-rebuilt stamp (C2) also lives in row 1, past the last data column.
@@ -1794,20 +1799,92 @@ if (!gz) {
   tap('DW');  wait(20);
   tap('FRAG');
   const now39 = dailyRollup();
-  chk('the same run still reports the same shape',
-    now39.days === gz.days && now39.categories === gz.categories,
+  /* One more key than the golden records, and it is the one D1 added. Asserted
+     as "+1" rather than relaxed to ">=", so a second key appearing from
+     somewhere still fails. */
+  chk('the same run reports one more key than before, and no other change',
+    now39.days === gz.days && now39.categories === gz.categories + 1,
     JSON.stringify(now39) + ' vs ' + JSON.stringify({ days: gz.days, categories: gz.categories }));
   ['daily', 'weekly'].forEach(tab => {
     const gold = gz.grids[tab], live = tabRows(tab);
     const gw = gold[0].length;
+    /*
+     * D1 adds one key to rollupKeys_, and a key is not one column: it is a
+     * column in each group the grid is built from. So a pre-round column cannot
+     * still be at its pre-round *index*, and asserting that it is would now be
+     * asserting that D1 did not happen.
+     *
+     * What replaces it is not weaker, because it says exactly what moved and
+     * what did not: every pre-round column is still present, in the same
+     * relative order, carrying the same values row for row — matched by NAME so
+     * the insertion cannot hide a changed number — and the only columns
+     * inserted among them are the ones that one new key contributes. A mark
+     * column interleaved beside the key it belongs to, which is the thing
+     * contract 20 exists to prevent, still fails here: it would insert a column
+     * that is not the new key's.
+     *
+     * The golden itself is still NOT regenerated. See Q11 and Q14 in
+     * factory/progress-2.md.
+     */
+    const NEW_COLS = tab === 'daily'
+      ? [UNFILED_KEY, 'plan ' + UNFILED_KEY]
+      : ['plan ' + UNFILED_KEY, UNFILED_KEY, UNFILED_KEY + ' ratio'];
     chk(tab + ': same number of rows', live.length === gold.length,
       live.length + ' vs ' + gold.length);
+    const surviving = live[0].filter(h => gold[0].includes(h));
+    chk(tab + ': every pre-round column is still there, in the same order',
+      JSON.stringify(surviving) === JSON.stringify(gold[0]),
+      JSON.stringify(surviving.filter((h, i) => h !== gold[0][i]).slice(0, 4)));
+    const lastGoldAt = live[0].lastIndexOf(gold[0][gw - 1]);
+    const inserted = live[0].slice(0, lastGoldAt + 1).filter(h => !gold[0].includes(h));
+    chk(tab + ': and the only columns inserted among them are the new key\'s',
+      JSON.stringify(inserted) === JSON.stringify(NEW_COLS),
+      JSON.stringify(inserted) + ' vs ' + JSON.stringify(NEW_COLS));
+    /*
+     * WHERE they were inserted, which the three assertions above do not pin.
+     * Without this, moving the new key to the front of its group shifts every
+     * pre-round column in that group and still passes: the columns are all
+     * present, in order, with their values, and the only extra ones are the new
+     * key's. Each inserted column must sit immediately after the last pre-round
+     * column of the group it belongs to — appended within its group, which is
+     * the least disturbance a new key can cause.
+     */
+    const preKeys = gold[0].filter(h => /^plan /.test(h)).map(h => h.slice(5));
+    const lastKey = preKeys[preKeys.length - 1];
+    const AFTER = tab === 'daily'
+      ? [[UNFILED_KEY, lastKey], ['plan ' + UNFILED_KEY, 'plan ' + lastKey]]
+      : [['plan ' + UNFILED_KEY, lastKey + ' ratio'],   // the weekly triple, in order
+         [UNFILED_KEY, 'plan ' + UNFILED_KEY],
+         [UNFILED_KEY + ' ratio', UNFILED_KEY]];
+    const misplaced = AFTER
+      .filter(([col, prev]) => live[0].indexOf(col) !== live[0].indexOf(prev) + 1)
+      .map(([col, prev]) => col + ' is at ' + live[0].indexOf(col) +
+                            ', not straight after ' + prev + ' at ' + live[0].indexOf(prev));
+    chk(tab + ': each of them sits at the end of the group it belongs to',
+      misplaced.length === 0, misplaced.join(' | '));
+    /*
+     * And the exact arithmetic of the shift: a pre-round column moves by the
+     * number of inserted columns that precede it, and by nothing else. This is
+     * contract 20 restated for a grid that gained a key — it says the movement
+     * is fully explained rather than merely tolerated.
+     */
+    const unexplained = gold[0].map((h, j) => {
+      const before = NEW_COLS.filter(c => live[0].indexOf(c) < live[0].indexOf(h)).length;
+      return live[0].indexOf(h) === j + before ? null
+        : h + ': was ' + j + ', now ' + live[0].indexOf(h) + ', with ' + before + ' inserted before it';
+    }).filter(Boolean);
+    chk(tab + ': every pre-round column moved by exactly what was inserted before it',
+      unexplained.length === 0, unexplained.slice(0, 4).join(' | '));
+    const liveAt = {};
+    live[0].forEach((h, i) => { if (!(h in liveAt)) liveAt[h] = i; });
     let firstDiff = null;
     for (let i = 0; i < gold.length && firstDiff === null; i++) {
       for (let j = 0; j < gw; j++) {
-        if (String(live[i][j]) !== String(gold[i][j])) {
-          firstDiff = 'row ' + i + ' col ' + j + ': ' + JSON.stringify(live[i][j]) +
-                      ' vs golden ' + JSON.stringify(gold[i][j]);
+        const name = gold[0][j], lj = liveAt[name];
+        if (lj === undefined) { firstDiff = 'column ' + JSON.stringify(name) + ' is gone'; break; }
+        if (String(live[i][lj]) !== String(gold[i][j])) {
+          firstDiff = 'row ' + i + ' col ' + JSON.stringify(name) + ': ' +
+                      JSON.stringify(live[i][lj]) + ' vs golden ' + JSON.stringify(gold[i][j]);
           break;
         }
       }
@@ -1821,7 +1898,8 @@ if (!gz) {
      *
      * The keys come out of the golden's own header rather than out of the live
      * code, so this cannot agree with a mistake by construction. */
-    const goldKeys = gold[0].filter(h => /^plan /.test(h)).map(h => h.slice(5));
+    const goldKeys = gold[0].filter(h => /^plan /.test(h)).map(h => h.slice(5))
+      .concat([UNFILED_KEY]);        // D1's key gets its full set, like every other
     /* Which tabs carry the mark columns, stated rather than sniffed. Deriving
        it from the live header would make this agree with whatever the code did.
        B2 does the daily tab; B3 adds the weekly one to this list. */
@@ -1832,10 +1910,14 @@ if (!gz) {
     }
     chk(tab + ': the golden header really did yield the keys', goldKeys.length > 0,
       JSON.stringify(goldKeys));
+    // The appended block starts after the pre-round columns plus the ones D1
+    // inserted among them — computed, not assumed, so a stray insertion moves
+    // the expectation rather than being absorbed by it.
+    const appendAt = gw + inserted.length;
     chk(tab + ': the new columns are the mark columns, appended in order',
-      JSON.stringify(live[0].slice(gw, gw + expectNew.length)) === JSON.stringify(expectNew),
-      JSON.stringify(live[0].slice(gw, gw + expectNew.length)) + ' vs ' + JSON.stringify(expectNew));
-    const stampAt = gw + expectNew.length;
+      JSON.stringify(live[0].slice(appendAt, appendAt + expectNew.length)) === JSON.stringify(expectNew),
+      JSON.stringify(live[0].slice(appendAt, appendAt + expectNew.length)) + ' vs ' + JSON.stringify(expectNew));
+    const stampAt = appendAt + expectNew.length;
     chk(tab + ': then exactly one more column, and it is the stamp',
       live[0].length === stampAt + 1 && /^last rebuilt /.test(live[0][stampAt]),
       live[0].length + ' wide, col ' + stampAt + ' = ' + JSON.stringify(live[0][stampAt]));
@@ -2762,11 +2844,28 @@ if (!gz46) {
   dailyRollup();
   [['daily', dRows()], ['weekly', wRows()]].forEach(([tab, live]) => {
     const goldHead = gz46.grids[tab][0];
-    const moved = goldHead
-      .map((h, i) => (live[0][i] === h ? null : i + ': expected ' + h + ', found ' + live[0][i]))
+    /* Same reasoning as 39d: D1 adds a key, and a key inserts a column into
+     * every group the grid is built from, so pre-round indexes necessarily
+     * shift. What is asserted is that they shift TOGETHER and only for that
+     * reason — same columns, same order, and the only things between them are
+     * the new key's own columns. Contract 20's purpose was never "the numbers
+     * must never move"; it was "the mark columns must be appended rather than
+     * interleaved", and that is what this still catches. Q14. */
+    const NEW_COLS = tab === 'daily'
+      ? [UNFILED_KEY, 'plan ' + UNFILED_KEY]
+      : ['plan ' + UNFILED_KEY, UNFILED_KEY, UNFILED_KEY + ' ratio'];
+    const surviving = live[0].filter(h => goldHead.includes(h));
+    const misordered = surviving
+      .map((h, i) => (h === goldHead[i] ? null : i + ': expected ' + goldHead[i] + ', found ' + h))
       .filter(Boolean);
-    chk(tab + ': every pre-round header is at the index it was at before',
-      moved.length === 0, moved.join(' | '));
+    chk(tab + ': every pre-round header is still present, in the same order',
+      surviving.length === goldHead.length && misordered.length === 0,
+      misordered.slice(0, 4).join(' | ') || (surviving.length + ' of ' + goldHead.length));
+    const lastGoldAt = live[0].lastIndexOf(goldHead[goldHead.length - 1]);
+    const inserted = live[0].slice(0, lastGoldAt + 1).filter(h => !goldHead.includes(h));
+    chk(tab + ': and nothing was interleaved among them but the one key D1 adds',
+      JSON.stringify(inserted) === JSON.stringify(NEW_COLS),
+      JSON.stringify(inserted) + ' vs ' + JSON.stringify(NEW_COLS));
     chk(tab + ': and the grid only got wider, never shorter',
       live[0].length > goldHead.length,
       live[0].length + ' vs ' + goldHead.length);
@@ -3469,6 +3568,145 @@ chk('firing the grid with no open block writes nothing', A().length === 0,
 chk('and queues nothing', JSON.parse(H.STORE['tt.queue.v1'] || '[]').length === 0,
   H.STORE['tt.queue.v1'] || '[]');
 chk('and leaves the sheet shut', !splitOpen());
+reset();
+
+console.log('\n53. an unreadable title stops being filed as Admin');
+/* Two holes of the same shape. Four sites did parseTitle_(...) || { key: 'ADM' },
+ * so a title the app cannot read was CLAIMED to be Admin on the write and
+ * display paths; and in dayStats_ an ACTUAL event that failed to parse, or
+ * parsed to a key nobody configured, contributed nothing at all — its hours
+ * vanished rather than being misfiled. Both now go to a key named for what
+ * they are. */
+reset(D(2026, 7, 24, 15, 0)); goodSheet();
+AC('Lunch with Ada', 20, 12, 0, 13, 0);
+dailyRollup();
+chk('the unreadable block reports its hours under UNFILED',
+  dayCell('2026-07-20', UNFILED_KEY) === 1, String(dayCell('2026-07-20', UNFILED_KEY)));
+chk('and ADM is 0 — nothing was claimed as Admin',
+  dayCell('2026-07-20', 'ADM') === 0, String(dayCell('2026-07-20', 'ADM')));
+
+console.log('\n53b. parsed-but-unknown gets the same home as unparseable');
+reset(D(2026, 7, 24, 15, 0)); goodSheet();
+AC('Re: the thing', 20, 14, 0, 15, 0);          // parses to key RE, not configured
+AC('9:00 standup', 20, 16, 0, 17, 0);           // parses to key 9, not configured
+dailyRollup();
+chk('both land under UNFILED', dayCell('2026-07-20', UNFILED_KEY) === 2,
+  String(dayCell('2026-07-20', UNFILED_KEY)));
+chk('and no column was invented for RE or 9',
+  !dRows()[0].includes('RE') && !dRows()[0].includes('9'), JSON.stringify(dRows()[0].slice(0, 12)));
+
+console.log('\n53c. a category that really is Admin is untouched');
+reset(D(2026, 7, 24, 15, 0)); goodSheet();
+AC('ADM: real admin =', 20, 9, 0, 11, 0);
+AC('Lunch with Ada', 20, 12, 0, 13, 0);
+dailyRollup();
+chk('ADM reports its own two hours', dayCell('2026-07-20', 'ADM') === 2,
+  String(dayCell('2026-07-20', 'ADM')));
+chk('in the right mark bucket', dayCell('2026-07-20', 'ADM =') === 2,
+  String(dayCell('2026-07-20', 'ADM =')));
+chk('and UNFILED holds only the unreadable one',
+  dayCell('2026-07-20', UNFILED_KEY) === 1, String(dayCell('2026-07-20', UNFILED_KEY)));
+
+console.log('\n53d. the key is in the rollup\'s set exactly once');
+reset();
+const keys53 = rollupKeys_();
+chk('UNFILED appears exactly once',
+  keys53.filter(k => k === UNFILED_KEY).length === 1, JSON.stringify(keys53));
+chk('alongside UNLOGGED', keys53.indexOf('UNLOGGED') >= 0, JSON.stringify(keys53));
+/* Q10's hazard, closed for this key: a category the user names "Unfiled"
+   derives the same key, and one key must not get two columns. */
+H.SCRIPT_PROPS.EXTRA_CATEGORIES = JSON.stringify(
+  [{ key: UNFILED_KEY, label: 'Unfiled', color: '8', autoMark: null }]);
+H.clearPropCache();
+const keys53b = rollupKeys_();
+chk('and still only once when a user category derives the same key',
+  keys53b.filter(k => k === UNFILED_KEY).length === 1, JSON.stringify(keys53b));
+delete H.SCRIPT_PROPS.EXTRA_CATEGORIES; H.clearPropCache();
+
+console.log('\n53e. it gets the full set of mark columns, like every other key');
+reset(D(2026, 7, 24, 15, 0)); goodSheet();
+AC('Lunch with Ada', 20, 12, 0, 13, 0);         // unreadable: no mark to read
+AC('Re: the thing =', 20, 14, 0, 15, 0);        // unknown key, but the mark parsed
+dailyRollup();
+chk('every bucket has a column',
+  MARK_BUCKETS.every(m => dCol(markCol_(UNFILED_KEY, m)) >= 0),
+  JSON.stringify(MARK_BUCKETS.map(m => markCol_(UNFILED_KEY, m) + '=' + dCol(markCol_(UNFILED_KEY, m)))));
+chk('the unreadable one is unmarked, not dropped',
+  dayCell('2026-07-20', markCol_(UNFILED_KEY, '')) === 1,
+  String(dayCell('2026-07-20', markCol_(UNFILED_KEY, ''))));
+chk('the one whose mark survived parsing keeps it',
+  dayCell('2026-07-20', markCol_(UNFILED_KEY, '=')) === 1,
+  String(dayCell('2026-07-20', markCol_(UNFILED_KEY, '='))));
+chk('and the key total is the sum of its buckets',
+  dayCell('2026-07-20', UNFILED_KEY) ===
+    MARK_BUCKETS.reduce((s, m) => s + dayCell('2026-07-20', markCol_(UNFILED_KEY, m)), 0),
+  String(dayCell('2026-07-20', UNFILED_KEY)));
+chk('the weekly tab carries them too',
+  MARK_BUCKETS.every(m => wRows()[0].indexOf(markCol_(UNFILED_KEY, m)) >= 0),
+  JSON.stringify(wRows()[0].slice(-8)));
+
+console.log('\n53f. getState does not tell the client an unreadable block is Admin');
+/* Site 1 of 4. */
+reset(); reboot();
+tap('DW'); settle(); wait(30);
+A()[0].t = 'Lunch with Ada';                    // hand-edited in Google Calendar
+reboot();
+chk('the client is not told it is ADM', activeKey() !== 'ADM', String(activeKey()));
+chk('and nothing is lit, because the app does not know what it is',
+  activeKey() === null, String(activeKey()));
+chk('the block is still open on the calendar, untouched',
+  A().length === 1 && A()[0].t === 'Lunch with Ada' && /#open/.test(A()[0].d), show(A()[0]));
+tap('MTG'); settle();
+chk('and tapping a category closes it without throwing',
+  A().length === 2 && /#open/.test(A()[1].d) && A()[1].t === 'MTG:',
+  A().map(show).join(' | '));
+chk('the closed one is still not Admin', !/^ADM:/.test(A()[0].t), A()[0].t);
+
+console.log('\n53g. bounding an unreadable block keeps what the user wrote');
+/* Site 2 of 4 — the only one that WRITES the fallback back to the calendar.
+ * It used to turn "Lunch with Ada" into "ADM: ?": a category nobody chose, and
+ * the text gone with it. */
+reset(D(2026, 7, 20, 22, 0)); reboot();
+tap('DW'); settle();
+A()[0].t = 'Lunch with Ada';
+H.setNow(D(2026, 7, 21, 7, 0));
+reboot();
+const b53 = A()[0];
+chk('it is not claimed as Admin', !/^ADM:/.test(b53.t), b53.t);
+chk('the words the user typed survive', /Lunch with Ada/.test(b53.t), b53.t);
+chk('it still says the end was the app\'s guess', /\?$/.test(b53.t), b53.t);
+chk('and the boundary arithmetic is what it always was — the day border',
+  b53.e === D(2026, 7, 21, 0, 0), show(b53));
+chk('with UNLOGGED covering the rest', A().length === 2 && /^UNLOGGED/.test(A()[1].t),
+  A().map(show).join(' | '));
+chk('and it round-trips: what was written parses back to what it says',
+  JSON.stringify(parseTitle_(b53.t)) ===
+    JSON.stringify({ key: UNFILED_KEY, text: 'Lunch with Ada', mark: '?' }),
+  JSON.stringify(parseTitle_(b53.t)));
+
+console.log('\n53h. closing and splitting an unreadable block, at the server');
+/* Sites 3 and 4 of 4. The client always sends a key, so these fallbacks are
+ * reached by an op that does not — a queue entry from an older build, or one
+ * hand-edited in localStorage. Driven through the real applyOps. */
+reset(); reboot();
+tap('DW'); settle(); wait(30);
+A()[0].t = 'Lunch with Ada';
+const ref53 = /#ref:([A-Za-z0-9]+)/.exec(A()[0].d)[1];
+applyOps([{ id: 'd1close', type: 'closeActual', ref: ref53, endMs: H.nowMs() }]);
+chk('closeActual does not claim it as Admin', !/^ADM:/.test(A()[0].t), A()[0].t);
+chk('and keeps the text', /Lunch with Ada/.test(A()[0].t), A()[0].t);
+
+reset(); reboot();
+tap('DW'); settle(); wait(60);
+A()[0].t = 'Lunch with Ada';
+const ref53b = /#ref:([A-Za-z0-9]+)/.exec(A()[0].d)[1];
+applyOps([{ id: 'd1split', type: 'splitActual', ref: ref53b, atMs: H.nowMs() - 30 * 60000,
+            newRef: 'd1splitnewref00', newKey: 'MTG', nowMs: H.nowMs() }]);
+chk('splitActual does not claim the first half as Admin',
+  !/^ADM:/.test(A()[0].t), A()[0].t);
+chk('and keeps its text', /Lunch with Ada/.test(A()[0].t), A()[0].t);
+chk('while the remainder is the category that was asked for',
+  A().length === 2 && A()[1].t === 'MTG:', A().map(show).join(' | '));
 reset();
 
 console.log('\n────────────────────────────────────────');

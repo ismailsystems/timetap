@@ -58,6 +58,9 @@ properties of the file.
 | `doGet` and `test/headless.js` inject the same meta tags | the headless run would render a document the phone never loads, and pass while doing it |
 | every meta tag name is one Apps Script permits | `addMetaTag` throws at request time for any other name — a crash you only see on the deployed URL |
 | no file in the repo contains a NUL byte | git calls the file binary, so `git diff` shows nothing and the file stops being reviewable |
+| the correction window nests inside the confirm window | inverted, there is a band where one unconfirmed tap silently retitles the block you are in. Reads both numbers out of `Code.gs`, so it pins the relationship rather than today's two values |
+| the docs say how a PLAN event has to be titled, and show a real key | a plan written any other way counts toward nothing and the sheet cannot say why. The example key is checked against `CATEGORIES`, so the docs cannot drift into showing a key the app does not have |
+| every constant `SETUP.md` quotes has that value in `Code.gs` | C1 changed `MISTAP_SECONDS` from 90 to 20 and left the setup guide saying 90. Every documented constant is checked, and documenting one that `Code.gs` does not declare fails too |
 | every `.md` in the repo agrees with the manifest about scope counts | `README.md`'s manifest row disagreed with `appsscript.json` for long enough that a build contract quoted the wrong number as fact, and then two more docs quoted it from there |
 
 ## `node test/headless.js`

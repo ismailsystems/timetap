@@ -422,6 +422,50 @@ PLAN_DOCS.forEach(rel => {
 check('the docs say how a PLAN event has to be titled, and show a real key', planBad,
   'a plan written any other way counts toward nothing, and the sheet cannot say why');
 
+/*
+ * SETUP.md documents the tunable constants as "`NAME` (value) — what it does",
+ * and a value quoted in prose goes stale the moment someone tunes the code.
+ * C1 changed MISTAP_SECONDS from 90 to 20 — the entire point of that task — and
+ * left SETUP.md telling the reader 90. C1's own rule pins the RELATIONSHIP
+ * between the two windows in Code.gs, so nothing looked at the prose.
+ *
+ * Every constant documented that way is checked, not just the one that was
+ * wrong: a rule that only knows about today's mistake does not catch tomorrow's.
+ * The names come out of SETUP.md, so documenting a new constant enrols it here
+ * automatically and documenting one that does not exist is itself a failure.
+ */
+const setupPath = path.join(ROOT, 'SETUP.md');
+const constBad = [];
+let constChecked = 0;
+if (!fs.existsSync(setupPath)) {
+  constBad.push('SETUP.md is missing');
+} else {
+  const setupText = fs.readFileSync(setupPath, 'utf8');
+  const quoted = [...setupText.matchAll(/`([A-Z][A-Z0-9_]{2,})`\s*\((\d+)\)/g)];
+  if (!quoted.length) {
+    constBad.push('SETUP.md quotes no constant values at all, so this rule would ' +
+                  'have passed while checking nothing');
+  }
+  quoted.forEach(m => {
+    const name = m[1], said = Number(m[2]);
+    const decl = codeNoComments.match(new RegExp('var\\s+' + name + '\\s*=\\s*(\\d+)\\s*;'));
+    const line = setupText.slice(0, m.index).split('\n').length;
+    if (!decl) {
+      constBad.push('SETUP.md:' + line + ' — documents ' + name + ' (' + said +
+                    '), which Code.gs does not declare as a number');
+      return;
+    }
+    constChecked++;
+    if (Number(decl[1]) !== said) {
+      constBad.push('SETUP.md:' + line + ' — says ' + name + ' is ' + said +
+                    ', but Code.gs sets it to ' + decl[1]);
+    }
+  });
+}
+check('every constant SETUP.md quotes has that value in Code.gs', constBad,
+  'a setup guide that states a wrong number is read as fact and then configured from');
+console.log('         ' + constChecked + ' documented constants checked against Code.gs');
+
 const SCOPE_QUOTE_EXEMPT = {
   'factory/REVIEW.md':    'review 1 — quotes README\'s wrong sentence as the finding',
   'factory/REVIEW-2.md':  'review 2 — quotes BRIEF\'s and PLAN\'s wrong sentences as the finding',

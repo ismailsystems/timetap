@@ -151,9 +151,11 @@ surface of the app. There is no settings screen and there will never be one.
   never shows the mark strip; the mark is applied silently. `null` means the
   strip may appear.
 - `MIN_MARK_MINUTES` (15) — shorter blocks get no mark and no strip.
-- `MISTAP_SECONDS` (90) — a tap this soon after the last one is a correction:
+- `MISTAP_SECONDS` (20) — a tap this soon after the last one is a correction:
   it retitles the open block rather than starting a new one, keeping the
-  original start time.
+  original start time. It must stay **smaller** than `CONFIRM_WITHIN_SECONDS`
+  below, so that every correction is confirmed before it happens; a lint rule
+  fails if the two are ever swapped.
 - `CONFIRM_WITHIN_SECONDS` (60) — a tap this soon after the last one arms the
   button instead of acting, and waits for a second tap on the same button.
   Nothing is written or queued until that second tap.

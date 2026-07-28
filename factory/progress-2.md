@@ -7,12 +7,15 @@ Round 1's progress record is `factory/progress.md` and is **read-only**.
 
 ## Status
 
-In progress. **13 of 16 tasks complete. Stage C is complete.** Stage D, task D1
-next.
+In progress. **14 of 16 tasks complete.** Stage D, task D2 next.
 
-Suite: **807 passed / 0 failed** (baseline was 492), green in all four
-contracted timezones. Lint all clear, 19 rules. Headless ok, 20 checks per
-viewport plus the new split-scope phase.
+**One thing needs a human ruling before this round can be called finished:
+Q14.** D1 and contract 20 cannot both be true, D1's checker returned FAIL on it,
+and the resolution taken is written up in full below.
+
+Suite: **848 passed / 0 failed** (baseline was 492), green in all four
+contracted timezones. Lint all clear, 20 rules. Headless ok, 20 checks per
+viewport plus the split-scope phase.
 
 ## Resume here (context cleared 2026-07-28, after C2; C3 done 2026-07-28)
 
@@ -21,14 +24,14 @@ circuit breaker, and restarted at C3. Nothing is half-finished: every completed
 task is committed.
 
 To continue, run `/loop work through factory/HANDOFF-2.md exactly as written`.
-The next unfinished, unblocked task is **D1**. Read this file and
+The next unfinished, unblocked task is **D2**. Read this file and
 `factory/log-2.md` first — between them they are the whole memory of the run.
 
-State after C3:
+State after D1:
 
 ```
-node test/tests.js      807 passed, 0 failed   (baseline 492)
-node test/lint.js       all clear — 19 rules
+node test/tests.js      848 passed, 0 failed   (baseline 492)
+node test/lint.js       all clear — 20 rules
 node test/headless.js   ok — 20 checks per viewport
 ```
 
@@ -37,10 +40,12 @@ Green in all four contracted timezones. `appsscript.json` and
 pre-existing test assertion has been removed all round, and it is A2's — the one
 pinning the `=` that A2 exists to replace.
 
-**Eleven questions are parked below and none has been answered.** Q1, Q4, Q9 and
-Q11 are the ones where the handoff contradicts itself or where a contract
-assertion is doing something the human may not have intended. They are the first
-thing to read.
+**Fourteen questions are parked below and none has been answered.** **Q14 is
+the one that blocks sign-off** — a contract assertion and a task that cannot
+both be satisfied, which D1's checker returned FAIL on. After that, Q1, Q4, Q9
+and Q11 are where the handoff contradicts itself or where a contract assertion
+is doing something the human may not have intended. They are the first thing to
+read.
 
 ## Tasks
 
@@ -59,7 +64,7 @@ thing to read.
 | C1 | C | **done** | 1 | the sweep found a planted gap at exactly seconds 5-19 |
 | C2 | C | **done** | 1 | label and action share one predicate; boundary repaint closes the stale-label gap |
 | C3 | C | **done** | 1 | checker ran 8 criteria + 10 mutations; found a pre-existing silent data loss (addition 4) and two untested branches, all fixed. Q12/Q13 parked |
-| D1 | D | pending | 0 | golden fixture changes here, second and last time |
+| D1 | D | **done, with Q14 escalated** | 1 | checker returned FAIL: it found a real gap in the rewritten column tests (closed) and was right that the contract-20 conflict was under-escalated (Q14 now does it properly). Golden fixture deliberately NOT regenerated |
 | D2 | D | pending | 0 | |
 | D3 | D | pending | 0 | |
 
@@ -97,7 +102,10 @@ park it here rather than ask.
 **Two naming choices made rather than parked** — both cheap to change at review,
 neither worth stalling the run over:
 
-- D1's "a key named for what it is" does not name the key. Using `UNPARSED`.
+- D1's "a key named for what it is" does not name the key. Settled at D1 as
+  `UNFILED`, not the `UNPARSED` written here at orientation: the column sits in
+  a spreadsheet a person reads, and "parsed" is B4's word for something else —
+  test 49e matches `/parsed/i` against every header, and `UNPARSED` tripped it.
 - D2's partial-week marker does not name the column. Will be decided at D2 and
   recorded here.
 
@@ -303,6 +311,25 @@ the key, or silently suffix it — and contract 7 puts category add and remove
 among the things this round leaves alone. Contrived to reach, and named here so
 it is a known hole rather than a surprise.
 
+**Extended at D1, and demonstrated by that task's checker.** D1 adds a second
+reserved key, `UNFILED`, with the same hole: `keyFor_` builds its taken-list
+from configured and retired categories only, so a category named "Unfiled"
+derives `UNFILED` too. `rollupKeys_` is guarded so the key still gets exactly
+one column, but the collision itself remains, and in that configuration the
+client lights that button for a block it cannot read — a narrower version of
+the very lie D1 removes:
+
+```
+addCategory('Unfiled') -> key UNFILED
+an ACTUAL title the app cannot read -> the grid lights UNFILED
+(test 53f asserts nothing lights, and does so in the default config)
+```
+
+Strictly better than before D1, which lit `ADM` with no user action at all.
+**One decision closes both halves:** reserve `UNLOGGED` and `UNFILED` in
+`keyFor_`. The code comment at `rollupKeys_` now says exactly what the guard
+does and does not do, rather than implying this was closed.
+
 ### Q8 (A4) — the mark strip's own controls are 42px tall
 
 Measured during A4 and printed by the headless phase on every run:
@@ -397,6 +424,75 @@ Not fixed: `disarm()` inside `openSplit` would do it, but arming is C2's
 territory, C2's tests pin behaviour around it, and a four-second stale label on
 a cell hidden behind a sheet is not worth a second unscoped change in this
 commit. Named so it is a known gap rather than a surprise.
+
+### Q14 (D1) — contract 20 and D1 cannot both be true, and this is the one thing needing a human ruling
+
+**Read this one first.** D1's checker returned **FAIL** on it, and it is the
+only unresolved conflict in the round.
+
+Contract 20: *"every column that existed before this round is at the same index
+it was at before, on both tabs."* D1's criterion 3: the new key joins
+`rollupKeys_`. Those cannot both hold. `keys` drives three column groups, so
+adding one key inserts a column into each and everything after it shifts —
+measured, not argued:
+
+```
+daily   13 of 22 pre-round columns move   "plan DW" 9 -> 10 ... "sits over 90" 21 -> 23
+weekly   6 of 28 pre-round columns move   "switches" 22 -> 25 ... "sits over 90" 27 -> 30
+```
+
+The handoff offers two ways out and **both destroy something**:
+
+1. *Regenerate the golden*, as D1's criterion 7 says ("the golden fixture's
+   header row is updated to match") and as the guardrail budgets. But 39d
+   compares the live grid to the golden cell by cell across all 91 rows, and A5
+   uses it for "the common case must not move". Regenerating makes both compare
+   the new code against itself. The fixture's own `_note`, written in round 1,
+   says so: *"Regenerating this file defeats the test that uses it."*
+2. *Park D1*, per the guardrail. That leaves the actual dishonesty — hours
+   claimed as Admin, and hours vanishing from the rollup entirely — unfixed,
+   for a conflict that is about a test fixture rather than about the fix.
+
+**Taken, and stated plainly rather than quietly:** the golden stays frozen, D1's
+substance ships, and 39d and 46 were rewritten to say exactly what changed
+instead of asserting something D1 makes impossible. They now assert, against
+the frozen golden:
+
+- every pre-round column is still present, in the same relative order;
+- carrying the same value in every row, matched by **name** so an insertion
+  cannot hide a changed number;
+- the only columns inserted among them are the new key's;
+- each inserted column sits at the **end** of the group it belongs to;
+- and every pre-round column moved by **exactly** the number of inserted
+  columns before it, and by nothing else.
+
+That last pair is contract 20 restated for a grid that gained a key: the
+movement is fully explained rather than merely tolerated. The checker's own
+mutation table confirms interleaved mark columns, reordered columns, changed
+numbers and stray new columns all still go red. It also found a real hole in the
+first version of this — the new key could be moved to the front of its group and
+nothing failed — which is why the placement and exact-shift assertions above
+exist. **That hole is closed and the closure is proved:** moving the key to the
+front now fails 4 assertions across both tabs.
+
+**What the human decides:** whether contract 20 should be restated as "no
+pre-round column moves except by keys legitimately added, and only ever
+appended" — which is what the code and tests now do — or whether the fixture
+should be regenerated and the pre-round record given up. **This deviation is not
+hidden in a test comment: it is here, in the run summary, and in `log-2.md` with
+the checker's FAIL verdict quoted.**
+
+### Q15 (D1) — an unreadable block can no longer be split or recategorised
+
+Also from D1's checker. Before D1 a block whose title the app could not read
+rendered as `ADM`, which was the lie D1 removes — but it did light a button, and
+a lit button is what SPLIT and recategorise-whole are reached through. Now
+nothing lights, so those two are unreachable for that block. The exits that
+remain are STOP and tapping any category, both of which close it correctly.
+
+Judged the right trade and left alone: the app not claiming to know what a block
+is costs an affordance that only existed because it was claiming. Named because
+it is a capability the round removes without a criterion saying so.
 
 ## Contract additions
 
@@ -499,6 +595,31 @@ correction unless it is closed here.
 **Fixed in C3**, in `mutatePendingOpen`: it refuses to coalesce while a flush is
 in flight and returns false, so the caller queues a real `recategorize` behind
 the op already on the wire. Tests 52j, 52k, 52f.
+
+### Addition 5 (found at D1, in passing) — C1 changed a constant and left the docs saying the old value
+
+`SETUP.md` documents the tunable constants with their values. C1 changed
+`MISTAP_SECONDS` from 90 to 20 — the whole point of the task, so the correction
+window nests inside the confirm window — and `SETUP.md` still said 90:
+
+```
+MISTAP_SECONDS           doc=90     code=20     <-- MISMATCH
+(the other six documented constants all agreed)
+```
+
+A setup guide that states a wrong number is the same class of defect as the
+scope-count drift round 1 found, and the same one B5 exists to prevent for
+PLAN. C1's own lint rule pins the *ordering* of the two constants in `Code.gs`,
+which is why nothing caught this.
+
+- [tier 1] `SETUP.md` states the value each documented constant actually has in
+  `Code.gs`.
+- [tier 1] A lint rule reads both and fails, naming the constant, if any
+  documented value drifts from the source — for **every** constant documented
+  that way, not just the one that was wrong.
+
+**Fixed in D1.** `SETUP.md` corrected, and `test/lint.js` gains
+"every constant SETUP.md quotes has that value in Code.gs" — 7 checked.
 
 ## Parked tasks
 

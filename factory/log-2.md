@@ -890,3 +890,86 @@ does. A missing label is a failure, not an abort.
 
 Green twice in a row and in all four contracted timezones: 807 / 0, lint all
 clear at 19 rules, headless ok at 20 checks per viewport. **Stage C complete.**
+
+## [2026-07-28 08:40] D1 | An unreadable title stops being filed as Admin
+
+**Two holes of the same shape.** Four sites did `parseTitle_(...) || { key: 'ADM' }`,
+so a title the app could not read was *claimed* to be Admin on the write and
+display paths. And in `dayStats_`, an ACTUAL event that failed to parse — or
+parsed to a key nobody configured — contributed nothing at all: its hours did
+not get misfiled, they disappeared. Both now go to `UNFILED`, a key in
+`rollupKeys_` beside `UNLOGGED`.
+
+**The key is named UNFILED, not UNPARSED.** It sits in a spreadsheet a person
+reads; parsing is this app's problem, not theirs. It also keeps the word
+"parsed" for B4's PLAN counts, which mean something else entirely — test 49e
+matches `/parsed/i` against every header, and `UNPARSED` tripped it.
+
+**The one site that writes back to the calendar mattered most.** `staleGuard_`'s
+fallback carried `text: ''`, so bounding a block titled "Lunch with Ada" wrote
+`ADM: ?` — a category nobody chose, and the user's own words deleted. It now
+carries the whole existing title as the text: `UNFILED: Lunch with Ada ?`,
+which round-trips.
+
+**Tests: 53 through 53h. 807 → 848 assertions.** The four call sites each got
+their own assertion, as the task's test note demanded — proved by reverting each
+one alone and watching a different assertion fail each time.
+
+**Mutation table — eight on the implementation, all caught:**
+
+| Mutation | Caught by |
+|---|---|
+| `dayStats_` back to counting only known keys | 5 assertions |
+| UNFILED dropped from `rollupKeys_` | crashes 39d/53e outright |
+| the dedup guard removed | 53d |
+| `getState` back to ADM | 53f, 3 assertions |
+| `staleGuard_` back to ADM with empty text | 53g, 3 assertions |
+| `staleGuard_` keeps the key but drops the text | 53g, 2 assertions |
+| `opCloseActual_` back to ADM | 53h |
+| `opSplitActual_` back to ADM | 53h |
+
+**Found in passing, and fixed: addition 5.** `SETUP.md` documented
+`MISTAP_SECONDS (90)`. C1 changed it to 20 — the entire point of that task — and
+the docs were left saying 90. Six other documented constants agreed; only that
+one had drifted. `test/lint.js` gains a rule that reads every constant `SETUP.md`
+quotes and compares it to `Code.gs`: 7 checked, and it fails both when a value
+drifts and when the docs quote a constant that does not exist. `test/README.md`
+gained rows for it and for B5's and C1's rules, which were never added.
+
+**The checker returned FAIL, and it was right about one of the two grounds.**
+
+Its verdict, verbatim: *"contract 20 and D1 cannot both hold — adding a key to
+`rollupKeys_` necessarily moves 13 of 22 daily and 6 of 28 weekly pre-round
+columns. The builder resolved that by rewriting the two tests that pinned
+contract 20 and skipping criterion 7's 'the golden fixture's header row is
+updated to match', taking neither the sanctioned path (regenerate the golden)
+nor the guardrail's path (PARK and escalate)."*
+
+**On the ground it was right about:** its mutation G8 moved the new key to the
+front of its column group. Every pre-round column in that group shifted and the
+suite stayed green — the rewritten assertions pinned presence, order, values and
+what was inserted, but never **where**. Two assertions per tab now close it:
+each inserted column must sit at the end of its own group, and every pre-round
+column must move by exactly the number of inserted columns before it. Verified
+by reproducing G8: 4 assertions red across both tabs where there were 0.
+
+**On the ground it was wrong about:** it read the diff without
+`factory/progress-2.md`, by design, so it could not see that the deviation was
+recorded. The record is what was thin, not the decision. Regenerating the golden
+makes 39d compare the new code against itself and gives up A5's "the common case
+must not move" — the fixture's own `_note`, written in round 1, says exactly
+that. Parking D1 leaves hours being claimed as Admin and hours vanishing from
+the rollup, over a conflict about a test fixture. So the substance ships and
+**Q14 now escalates the conflict properly**: in the parked questions, in the run
+summary, and here with the verdict quoted. The human rules on contract 20's
+wording; nothing is hidden in a test comment.
+
+Its other findings: the `UNFILED` key can collide with a category a user names
+"Unfiled" — folded into Q10, which already parks the same hole for `UNLOGGED`,
+and the code comment that overstated the guard is corrected. An unreadable block
+can no longer be split or recategorised, because nothing lights for it — Q15,
+judged the right trade.
+
+848 / 0, green twice and in all four contracted timezones. Lint all clear at 20
+rules. Headless ok at 20 checks per viewport. `appsscript.json` and
+`test/fixtures/rollup-golden.json` byte-identical to `a256bdf`.
