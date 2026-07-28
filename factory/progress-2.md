@@ -25,7 +25,9 @@ section is the instruction; the work is a fix pass.
 | 15 | **Q7** — a STOP whose writes never land still makes a phantom | **Accept it.** The calendar is the record, and the banner says so | none |
 | 16 | **Q11** — the golden fixture | Same ruling as Q14: **stays frozen** | none |
 
-**Eight code changes, five rewordings, three accepted as they are.** Two of the
+**Nine code changes, six rewordings, three accepted as they are.** (An
+earlier version of this line said eight and five; both counts were wrong, and
+`factory/FIXES-3.md` carries the exact list.) Two of the
 rewordings — contract 20 and D2's criterion 4 — are the ones that were blocking
 sign-off, and both are now settled in favour of the code that shipped.
 
@@ -40,6 +42,23 @@ Two rulings ask for work that is bigger than the line it changes: Q12/Q18 wants
 one sheet-lifecycle rule that closes three separate findings, and Q9 changes a
 number the sheet has already been reporting — days logged before it and after it
 are not comparable, which is A5's own warning and now applies twice.
+
+
+### The review's five decisions — answered 2026-07-28
+
+`factory/REVIEW-3.md` surfaced five decisions the contract does not answer. All
+five are ruled on:
+
+| # | Finding | Ruling |
+|---|---|---|
+| 1 | `sitting %` reaches 500 on a forgotten-STOP day | **Count only the sitting time inside the waking span.** `sitting h` keeps the true total |
+| 2 | a note ending in a mark character loses it, silently | **Keep the deletion, and document it** |
+| 3 | an armed STOP covers the posture button, so a tap there ends the day | **Do not cover the posture button.** A tap there cancels the arm |
+| 4 | a block the app cannot read is open, and nothing shows it | **Say it in the banner that already exists** |
+| 5 | a stale tab can stretch a day that STOP already ended | **Keep the first end time.** A close may still replace an end the app guessed |
+
+The work for these, and for the sixteen earlier rulings, is planned in
+`factory/FIXES-3.md`.
 
 ---
 
