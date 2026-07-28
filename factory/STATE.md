@@ -1,10 +1,60 @@
 # Factory State
 project: timetap
-stage: 5
-stage_name: The loop builds it — waiting for the human to press the button
-last_updated: 2026-07-27 (handed off)
-next_action: "THE HUMAN LAUNCHES THE LOOP. Launch instructions are at the top of factory/HANDOFF-2.md. In Claude Code: /loop work through factory/HANDOFF-2.md exactly as written. Answer the agent's orientation questions first, let it append them to HANDOFF-2's Orientation Q&A section, then tell it to begin. Machine must stay awake (caffeinate -dims). In the morning: read the RUN SUMMARY at the top of factory/progress-2.md, then run /factory for the independent review. NEVER launch the loop on the human's behalf."
+stage: 7
+stage_name: Built, reviewed, fixed and verified — waiting on the human to accept and deploy
+last_updated: 2026-07-28 (round 2 complete)
+next_action: "THE HUMAN ACCEPTS AND DEPLOYS. The work is 25 commits on factory/honest-record; main is untouched at a256bdf and nothing has been pushed. Read factory/REVIEW-3.md, above all its 'Decisions for you' — all five are answered and the answers are in progress-2.md. Then merge, deploy, and CHECK YOUR OWN SPREADSHEET FORMULAS: D1 added a rollup key, which moved 13 of the 22 columns the daily tab had. SETUP.md says which, and shows a formula that survives the next change. Optional and offered, not done: the proof video (auto-loom-proof) and the plain-language explainer (factory-explain, which also owes GUIDE.md Part 2 a correction carried over from round 1)."
 notes: |
+  ROUND 2 IS COMPLETE. 16 of 16 tasks, then a three-reviewer review, then a
+  26-item fix pass, then an independent verification of that fix pass.
+
+  WHERE IT ENDED: 994 assertions / 0 failed, green twice and under all four
+  contracted timezones; lint all clear on 21 rules; headless ok at 20 checks per
+  viewport across 7 phases. appsscript.json and test/fixtures/rollup-golden.json
+  byte-identical to a256bdf. Baseline at the start of the round was 492.
+
+  THE REVIEW (factory/REVIEW-3.md) returned FIX FIRST. Three reviewers, none
+  given factory/log-2.md, one on a different model. 28 of 31 contract assertions
+  independently re-derived and holding; guardrails exact; 14 planted faults all
+  caught. Two findings blocked: a forgotten-STOP day reported sitting % of 500,
+  and SETUP.md claimed the columns had not moved when 19 of them had.
+
+  THE FIX PASS (factory/FIXES-3.md) closed all 26 items and both blocking
+  findings. An independent verifier reverted ten of the changes and watched each
+  go red, and reconstructed both findings from scratch rather than running the
+  suite. It returned INCOMPLETE — on the RECORD, not the code: a duplicate of a
+  corrected false claim was still standing, and two numbers in a commit message
+  were wrong. Corrected in 05f1d83 rather than amended, so the mistakes stay
+  visible.
+
+  WHAT THE HUMAN RULED, and where it lives: all 16 parked questions and the
+  review's 5 decisions are answered, in progress-2.md under
+  '## ANSWERS FROM THE HUMAN' and the review's own section. Six contract
+  amendments are recorded under '## CONTRACT AMENDMENTS'; HANDOFF-2.md itself is
+  untouched, as its guardrails require.
+
+  KNOWN AND ACCEPTED, not defects to re-report:
+    - 'week of' holds text, not a date value. It always did (Q16).
+    - A day of nothing but guessed time reads waking h 0 beside a category
+      column that is not 0. A span needs two known ends and that day has one.
+      Test 56b pins it as a stated limit (Q9).
+    - A '?' typed by hand into Google Calendar still reads as the app's guess.
+      It follows from encoding the guess as a trailing mark (Q5).
+    - A day whose STOP writes never reach the server still becomes a night
+      block. The banner and the drawer say so (Q7).
+    - A double tap on SITTING writes a 12-millisecond event, and an UNLOGGED
+      block can span 25 hours. Both predate round 2.
+
+  ONE ROUND-1 DEBT STILL OPEN: factory/GUIDE.md Part 2 describes the round-1
+  double-tap bug as live and proposes a fix that is not what shipped. Part 3
+  corrects it. The explain stage still owes that a proper repair.
+
+  ---
+  WHAT FOLLOWS IS THE ROUND-2 HANDOFF RECORD, written 2026-07-27, kept as the
+  record of what was agreed before the work started. One paragraph pair that
+  appeared twice ('HOW THIS ROUND WAS CHOSEN' / 'THE FINDING THAT DROVE IT') was
+  duplicated in this file; the second copy is removed.
+  ---
   ROUND 2 — "the honest record round". Brief: factory/BRIEF-2.md.
   Plan: factory/PLAN-2.md, 16 tasks in four stages, all criteria written.
 
@@ -57,19 +107,6 @@ notes: |
   THE GOLDEN FIXTURE CHANGES TWICE this round, in B2/B3 and again in D1. Both
   are expected and both are reviewable as diffs. Any other change to
   test/fixtures/rollup-golden.json is a finding.
-
-  HOW THIS ROUND WAS CHOSEN. The user did not pick a feature; they asked to
-  stress test the app's conceptual model first, to settle whether it is
-  trustworthy and usable enough to adopt religiously. That stress test was run
-  against Code.gs and Index.html directly on 2026-07-27 and found six things.
-  The round is the fix list, not a feature.
-
-  THE FINDING THAT DROVE IT: the app can transition but never end. closeActual
-  is enqueued in exactly one place (Index.html:912) and is always paired with a
-  new openActual. So every night the last block is extended to midnight by
-  staleGuard_, marked "=", and is indistinguishable from a real block — and
-  because UNLOGGED lands on the ACTUAL calendar, every day's waking span starts
-  at 00:00, which makes both waking h and sitting % measure nothing.
 
   HOW THIS ROUND WAS CHOSEN. The user did not pick a feature; they asked to
   stress test the app's conceptual model first, to settle whether it is
