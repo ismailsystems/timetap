@@ -488,17 +488,33 @@ async function checkPostureRow(browser, view, page) {
       };
       const posture = document.getElementById('posture');
       const row = document.getElementById('postureRow');
-      const kids = posture ? [].slice.call(posture.children).filter(vis) : [];
+      /* Leaves, not direct children: the sit-clock and STOP now sit in a box of
+         their own, so that an armed STOP can take that box and leave the
+         posture toggle tappable. A direct-children scan stopped seeing them and
+         said so rather than passing vacuously — this is the fix it asked for. */
+      const CTL = 'button, a, input, [role="button"]';
+      const leaves = el => {
+        const out = [];
+        [].slice.call(el.children).forEach(c => {
+          // A control is a leaf. So is anything with no control inside it —
+          // #sync holds a count in a span and is one thing, not two. Only a box
+          // that exists to group controls is descended into.
+          if (c.matches(CTL) || !c.querySelector(CTL)) out.push(c);
+          else out.push.apply(out, leaves(c));
+        });
+        return out;
+      };
+      const kids = posture ? leaves(posture).filter(vis) : [];
       const rect = el => { const r = el.getBoundingClientRect();
                            return { x: r.left, y: r.top, w: r.width, h: r.height, r: r.right, b: r.bottom }; };
-      const controls = kids.filter(el => el.matches('button, a, input, [role="button"]'));
+      const controls = kids.filter(el => el.matches(CTL));
       const stop = document.getElementById('stopBtn');
       /* The strip is the other thing that occupies this row, and its controls
          are two levels deep so no direct-children filter reaches them.
          Measured and reported rather than asserted: criterion 1 is about the
          resting posture row, and the strip is hidden then. See Q8. */
       const stripCtl = [].slice.call(document.querySelectorAll(
-        '#strip .strip-marks button, #stripHead')).map(el => {
+        '#strip .strip-marks button')).map(el => {
           const r = el.getBoundingClientRect();
           return { id: el.id || ('mark ' + el.textContent.trim()),
                    w: +r.width.toFixed(1), h: +r.height.toFixed(1) };
@@ -506,12 +522,22 @@ async function checkPostureRow(browser, view, page) {
       const lab = document.getElementById('postureLabel');
       const labStyle = lab ? getComputedStyle(lab) : null;
       const stopStyle = stop ? getComputedStyle(stop) : null;
-      let hitStop = null;
-      if (stop && vis(stop)) {
-        const r = stop.getBoundingClientRect();
-        const el = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
-        hitStop = el ? (el.id || (el.closest('button') && el.closest('button').id) || el.tagName) : null;
-      }
+      const hitAt = el => {
+        if (!el || !vis(el)) return null;
+        const r = el.getBoundingClientRect();
+        const at = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+        if (!at) return null;
+        // The button that would receive the tap, not the span inside it that
+        // happens to be on top: a label with an id of its own is still its
+        // button's label, and the click goes to the button.
+        const btn = at.closest('button, [role="button"]');
+        return btn ? (btn.id || btn.tagName) : (at.id || at.tagName);
+      };
+      const hitStop = hitAt(stop);
+      /* What a reach for SITTING actually lands on. An armed STOP used to take
+         the whole row, so the answer was stopBtn — and the second tap of a
+         reflex "cancel by tapping elsewhere" ended the day. */
+      const hitPosture = hitAt(document.getElementById('postureBtn'));
       return {
         rowRect: row ? rect(row) : null,
         postureRect: posture ? rect(posture) : null,
@@ -524,6 +550,7 @@ async function checkPostureRow(browser, view, page) {
         controls: controls.map(el => ({ id: el.id || el.tagName, ...rect(el) })),
         stripCtl,
         stopVisible: vis(stop),
+        postureHitTarget: hitPosture,
         stopText: stop ? stop.textContent.trim() : null,
         stopHitTarget: hitStop,
         stopStyle: stopStyle ? {
@@ -767,6 +794,16 @@ async function checkPostureRow(browser, view, page) {
       problems.push(label + ': armed STOP is not hittable — the element at its centre is ' +
                     g2.stopHitTarget);
     }
+    /* The posture toggle must survive the armed state. Reaching for SITTING and
+       missing is how an accidental arm happens; tapping elsewhere is how people
+       cancel one. Those were the same tap, and it ended the day. */
+    ['resting', 'armed'].forEach((state, i) => {
+      const got = (i ? g2 : g).postureHitTarget;
+      if (got !== 'postureBtn') {
+        problems.push(label + ': with STOP ' + state + ', a tap at the posture toggle\'s ' +
+                      'centre lands on ' + got + ' rather than the toggle');
+      }
+    });
 
     // 5. Confirm, which ends the day and raises the strip over the row; then a
     //    tap that is not a mark must give the row — and STOP — back.
@@ -786,11 +823,21 @@ async function checkPostureRow(browser, view, page) {
       console.log('  strip controls:  ' + (g3.stripCtl.length
         ? g3.stripCtl.map(c => c.id + ' ' + Math.round(c.w) + 'x' + Math.round(c.h)).join(', ')
         : 'none measured'));
+      /* Asserted now, not printed. They were 42px — two under the floor the rest
+         of this row is held to — and were reported on every run as a known
+         exception because criterion 1 describes the row with the strip hidden.
+         The human ruled that the strip joins the rule (Q8). The strip head is
+         not in this list: it is a dismiss target that spans the row, and its
+         hit box is the strip, not the 17px of text in it. */
+      if (!g3.stripCtl.length) {
+        problems.push(label + ': the strip is showing but none of its mark buttons ' +
+                      'could be measured, so the floor below was not checked');
+      }
       const stripSmall = g3.stripCtl.filter(c => c.w < TOUCH_TARGET || c.h < TOUCH_TARGET);
       if (stripSmall.length) {
-        console.log('  NOTE:            ' + stripSmall.map(c => c.id).join(', ') +
-                    ' are under ' + TOUCH_TARGET + 'x' + TOUCH_TARGET +
-                    '. Pre-existing, outside criterion 1\'s scope, parked as Q8.');
+        problems.push(label + ': ' + stripSmall.map(c => c.id + ' ' + Math.round(c.w) +
+                      'x' + Math.round(c.h)).join(', ') + ' are under the ' +
+                      TOUCH_TARGET + 'x' + TOUCH_TARGET + ' floor the rest of this row keeps');
       }
       if (g4.stripHidden !== true) {
         problems.push(label + ': tapping the strip away from a mark did not dismiss it');

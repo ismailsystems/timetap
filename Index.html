@@ -113,15 +113,30 @@
      vanishes or stops responding teaches you not to trust it, and tapping it
      with nothing running is harmless. */
   #stopBtn.inert { opacity: .45; }
-  /* Armed, it takes the whole row the way #strip does. TAP AGAIN TO STOP does
-     not fit a 90px slot, and an armed STOP nobody notices is a day that never
-     gets closed. Two channels, not one: the text changes and so does the shape,
-     so this reads as armed without relying on colour. */
+  /* Armed, it takes the row from the posture toggle rightwards — not the whole
+     row. TAP AGAIN TO STOP does not fit a 90px slot, and an armed STOP nobody
+     notices is a day that never gets closed; but covering the toggle as well
+     meant that reaching for SITTING while STOP was armed ended the day, and
+     tapping elsewhere is exactly how people cancel something they armed by
+     accident. The toggle stays uncovered and cancels instead.
+
+     Two channels, not one: the text changes and so does the shape, so this
+     reads as armed without relying on colour. */
+  /* The box the armed state may take: the sit-clock and STOP, never the posture
+     toggle. Anchoring to this rather than to the row is what keeps the toggle
+     tappable, and it needs no measurement to do it. */
+  #stopWrap { position: relative; display: flex; gap: 4px; align-items: stretch; }
+  /* In the flow, not on top of it. Taking the button out of the flow collapsed
+     the box around it to the width of the sit-clock, and the label with it. As
+     a flex item it grows instead, and the posture toggle — flex: 1, min-width:
+     0 — gives up the room. The toggle stays visible and stays tappable, which
+     is the whole point of the change. */
   #stopBtn.arming {
-    position: absolute; inset: 4px; z-index: 2;
-    padding: 0; opacity: 1;
+    flex: 1 0 auto; min-width: 118px; opacity: 1;
+    padding: 0 8px; border-radius: 9px;
     color: var(--bg); background: var(--fg);
     box-shadow: inset 0 0 0 2px var(--fg);
+    font-size: 11px; line-height: 1.15;
   }
 
   /* ── grid ────────────────────────────────────────────────── */
@@ -247,8 +262,13 @@
   #stripHead { flex: 1; min-width: 0; font-size: 13px; color: var(--fg); letter-spacing: .02em;
     overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .strip-marks { display: flex; gap: 6px; }
+  /* 44, not 42. Round 2's A4 holds every other control in this row to a 44x44
+     floor, and these three sat 2px under it — measured and printed on every
+     headless run, but not asserted, because the strip is hidden in the resting
+     row the rule looks at. The row is 72px and the head above uses 17, so the
+     space was always there. */
   .strip-marks button {
-    width: 74px; height: 42px; background: var(--panel); border-radius: 8px;
+    width: 74px; height: 44px; background: var(--panel); border-radius: 8px;
     font-size: 22px; font-weight: 600;
   }
   .strip-marks button:active { background: var(--panel3); }
@@ -339,8 +359,10 @@
         </svg>
         <span class="pl" id="postureLabel">NOT SITTING</span>
       </button>
-      <button id="sitEdit" class="off" aria-label="adjust when sitting started"><span id="sitEl"></span></button>
-      <button id="stopBtn" aria-label="end the day">STOP</button>
+      <div id="stopWrap">
+        <button id="sitEdit" class="off" aria-label="adjust when sitting started"><span id="sitEl"></span></button>
+        <button id="stopBtn" aria-label="end the day">STOP</button>
+      </div>
     </div>
 
     <div id="strip" class="hidden">
@@ -450,6 +472,7 @@
    */
   var localGen = 0;
   var noteTimer = null;
+  var unreadableShown = false;
   var split = { atMs: 0, startMs: 0, nowMs: 0, whole: false };
   var sitEdit = { lo: 0, hi: 0, atMs: 0 };
 
@@ -682,17 +705,36 @@
                   : q[i].type === 'splitActual' ? q[i].newRef
                   : null;
     var cleared = !!(openedRef && S.open && S.open.ref === openedRef);
-    if (cleared) S.open = null;
+    if (cleared) {
+      /*
+       * A set-aside split is the one case where something IS still running: the
+       * split never happened, so the block it was cutting is still open on the
+       * calendar with its original ref. Going idle there made STOP inert while
+       * a real block ran, and said less than the app knew. Where the record of
+       * that block survives — noteBlock keeps its key and start by ref — put it
+       * back in hand. Where it does not, idle is the honest answer.
+       */
+      var back = null;
+      if (q[i].type === 'splitActual' && q[i].ref) {
+        var e = blockIdx()[q[i].ref];
+        if (e && e.key && isFinite(e.startMs)) {
+          back = { ref: q[i].ref, key: e.key, text: '', startMs: e.startMs };
+        }
+      }
+      S.open = back;
+    }
     // The same, for the posture half: a SIT that was never created is not one
     // the row should go on claiming.
     if (q[i].type === 'openSit' && S.sit && S.sit.ref === q[i].ref) {
       S.sit = null;
       cleared = true;
     }
-    if (cleared) saveState();
+    if (cleared) { closeBlockSheets(); saveState(); }
     q.splice(i, 1);
     setQueue(q);
-    showErr('gave up on one write and set it aside: ' + err.message);
+    /* What is on the shelf, not what just landed on it. It said "one write"
+       however many were there, and the drawer behind it said otherwise. */
+    showErr(deadMsg() + ' — the last: ' + err.message);
     if (cleared) render();
     // If the reader is standing at the shelf when a new one lands, put it on the
     // shelf rather than making them close the drawer and open it again.
@@ -1101,6 +1143,13 @@
    * calendar like everything else.
    */
   function toggleSit() {
+    /*
+     * A tap here while STOP is armed cancels the arm and does nothing else.
+     * Tapping something else is how people undo a control they armed by
+     * accident, and this is the something else nearest to it — it used to sit
+     * underneath the armed state and confirm it, which ended the day.
+     */
+    if (disarmStop()) { render(); return; }
     var now = Date.now();
     if (S.sit) {
       closeSit(now);
@@ -1348,6 +1397,23 @@
   function render() {
     var now = Date.now();
 
+    /*
+     * A block whose title this app cannot read has no cell to light. The grid
+     * keeps its running look, because a block really is running — but nothing
+     * in it moves, so the screen said nothing at all. The message bar already
+     * exists for standing facts, and this is one: something is open, the app
+     * cannot name it, and the user can end it or repair the title in Google
+     * Calendar. Round 2's review, finding 9.
+     */
+    if (S.open && !CELL[S.open.key]) {
+      showErr('a block is running that this app cannot read: ' +
+              (S.open.text || S.open.key) +
+              '. Tap any category to close it, or fix its title in Google Calendar.');
+    } else if (unreadableShown) {
+      hideErr();
+    }
+    unreadableShown = !!(S.open && !CELL[S.open.key]);
+
     $('postureBtn').classList.toggle('on', !!S.sit);
     $('postureBtn').setAttribute('aria-pressed', S.sit ? 'true' : 'false');
     $('postureLabel').textContent = S.sit ? 'SITTING' : 'NOT SITTING';
@@ -1406,6 +1472,15 @@
 
   function openSplit() {
     if (!S.open) return;
+    /* An armed category must not survive into a sheet. It kept its label —
+       TAP AGAIN TO SWITCH — on a button that, from here, opens this sheet
+       instead. A label that promises the wrong action is the thing C2 exists
+       to prevent, and a sheet over the top does not excuse it. */
+    /* render(), not just disarm(): the branch that calls this returns without
+       repainting, and disarming already cancelled the timer whose repaint would
+       have cleaned the cell up. Round 1 left an armed STOP looking armed the
+       same way. */
+    disarm(); render();
     setSplitScope(false);            // every opening starts on the safer of the two
     split.startMs = S.open.startMs;
     split.nowMs = Date.now();
@@ -1448,6 +1523,11 @@
 
   function doSplit(key) {
     if (!S.open) { $('sheetSplit').classList.add('hidden'); return; }
+    /* A closed sheet acts on nothing. The sheet closes when the block it names
+       stops being the one in hand, and in a browser its buttons go with it —
+       but "unreachable" is not something this should be trusting the CSS for,
+       and the block underneath is a different one by then. */
+    if ($('sheetSplit').classList.contains('hidden')) return;
     if (split.whole) { recatWhole(key); return; }
     var at = split.atMs, now = Date.now();
     var m = markFor(S.open.key, at - S.open.startMs);
@@ -1515,6 +1595,25 @@
 
   /* ── boot ──────────────────────────────────────────────────── */
 
+  /**
+   * A sheet names one block. If that block stops being the one in hand — a
+   * refresh finds a different one, or a set-aside write clears it — the sheet
+   * is now aimed at something that is gone, and the next tap in it acts on
+   * whatever replaced it. That is how the SPLIT sheet relabelled a block the
+   * user never chose.
+   *
+   * Closing is the whole fix. The sheets write nothing on their own, so a
+   * closed one costs the user a re-open and nothing else.
+   */
+  function closeBlockSheets() {
+    var shut = false;
+    ['sheetSplit', 'sheetSit'].forEach(function (id) {
+      var el = $(id);
+      if (el && !el.classList.contains('hidden')) { el.classList.add('hidden'); shut = true; }
+    });
+    return shut;
+  }
+
   function adoptServerState(st, gen) {
     // A read that was already in flight when the user wrote something describes
     // a moment that has passed. The queue-length check below cannot see it: by
@@ -1522,9 +1621,13 @@
     if (gen !== localGen) return;
     // Anything the user did while the round trip was in flight wins.
     if (!queue().length) {
+      var wasRef = S.open && S.open.ref, wasSit = S.sit && S.sit.ref;
       S.open = st.open ? { ref: st.open.ref, key: st.open.key, text: st.open.text || '', startMs: st.open.startMs } : null;
       S.sit = st.sit ? { ref: st.sit.ref, startMs: st.sit.startMs } : null;
       S.lastTapMs = 0;
+      if (wasRef !== (S.open && S.open.ref) || wasSit !== (S.sit && S.sit.ref)) {
+        closeBlockSheets();
+      }
       render();
       saveState();
     }

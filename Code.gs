@@ -155,6 +155,8 @@ var UNLOGGED_TITLE = 'UNLOGGED -';
  * also keeps the word "parsed" for B4's PLAN counts, which mean something else.
  */
 var UNFILED_KEY = 'UNFILED';
+/** Keys the rollup writes to, which a category may not take. See keyFor_. */
+var RESERVED_KEYS_ = ['UNLOGGED', UNFILED_KEY];
 var SIT_TITLE   = 'SIT';
 var MS_HOUR     = 3600000;
 var MS_MIN      = 60000;
@@ -338,6 +340,15 @@ function keyFor_(label, taken) {
   var key = base, n = 2;
   var used = {};
   taken.forEach(function (c) { used[c.key] = 1; });
+  /*
+   * Two keys belong to the report rather than to the user. A category named
+   * "Unlogged" derived UNLOGGED, and then its real hours stopped counting
+   * toward the waking span, the key got two columns, and the client lit that
+   * button for blocks the app could not read. Reserving them here means such a
+   * category becomes UNLOGGE2 — exactly what a second category named the same
+   * as an existing one already does, so the user sees nothing new.
+   */
+  RESERVED_KEYS_.forEach(function (k) { used[k] = 1; });
   while (used[key]) { key = base.slice(0, 7) + n; n++; }
   return key;
 }
@@ -468,26 +479,33 @@ function buildTitle_(key, text, mark) {
   var t = String(key || '').toUpperCase() + ':';
   var s = String(text == null ? '' : text).replace(/[\r\n]+/g, ' ').replace(/\s+/g, ' ').trim();
   /*
-   * Contract 17: only staleGuard_ may produce '?'. Without this, a note ending
-   * in a question mark — "is this right ?" — lands in the trailing slot and is
-   * read straight back as the app's own "I had to guess" mark, which makes a
-   * block the user annotated indistinguishable from a phantom one. The user's
-   * '?' disappeared from the note too.
+   * A note may not end in a mark character, because the trailing slot is where
+   * the mark lives: "DW: is this right ?" is read straight back as the app's
+   * own "I had to guess" mark, and "DW: costs 5 -" as "that went badly". The
+   * user chose neither, and the character disappeared from their note either
+   * way. All four marks, on the human's ruling (Q2) — the round shipped with
+   * only '?' protected, which left the other three as they always were.
    *
    * Only needed when no mark follows the text. When one does it occupies the
-   * trailing slot, the note's '?' is no longer in mark position, and it is left
-   * exactly as typed: "DW: is this right ? =" parses back to text
-   * "is this right ?" and mark "=". That is better than the pre-round
-   * behaviour, not worse.
+   * trailing slot, the note's character is no longer in mark position, and it
+   * is left exactly as typed: "DW: is this right ? =" parses back to text
+   * "is this right ?" and mark "=".
    *
-   * The identical hole exists for + = and -, and predates this round: a note
-   * ending in one has always been read back as that mark. Deliberately NOT
-   * changed here — contract 17 names '?', contract 7 says leave existing
-   * behaviour alone, and widening this is a product decision. Parked as Q2 in
-   * factory/progress-2.md.
+   * The cost is one character of the user's typing, silently. That is the
+   * human's ruling too, with the documentation owed instead of a message.
    */
   if (!isMark_(mark)) {
-    while (/(?:^|\s)\?$/.test(s)) s = s.slice(0, -1).trim();
+    while (MARK_TAIL_RE_.test(s)) s = s.slice(0, -1).trim();
+  }
+  /*
+   * The one title the app writes without a colon. staleGuard_ creates the night
+   * block as "UNLOGGED -", parseTitle_ reads that form, and building it again
+   * used to add a colon — so a title the app itself wrote did not survive being
+   * written a second time, and contract 18 was false as worded. Only when there
+   * is no text: "UNLOGGED: something" keeps its colon, because it needs one.
+   */
+  if (String(key || '').toUpperCase() === 'UNLOGGED' && !s) {
+    return 'UNLOGGED' + (isMark_(mark) ? ' ' + mark : '');
   }
   if (s) t += ' ' + s;
   if (isMark_(mark)) t += ' ' + mark;
@@ -755,7 +773,15 @@ function validOp_(op) {
     var r = op[refs[j]];
     if (r !== undefined && !/^[A-Za-z0-9]{4,64}$/.test(String(r))) return false;
   }
-  if (op.mark !== undefined && op.mark !== null && !isMark_(op.mark)) return false;
+  /*
+   * A mark must be one the user can choose. '?' is the app's own: only
+   * staleGuard_ writes it, straight to the calendar rather than through an op,
+   * so nothing legitimate arrives here carrying one. This is the trust boundary
+   * for writes that came out of localStorage, and contract 17 says no action a
+   * user can take produces that mark. Human's ruling, Q4.
+   */
+  if (op.mark !== undefined && op.mark !== null &&
+      (!isMark_(op.mark) || op.mark === '?')) return false;
   return true;
 }
 
@@ -839,8 +865,21 @@ function opCloseActual_(op) {
   var p = parseTitle_(ev.getTitle()) ||
           { key: op.key || UNFILED_KEY, text: ev.getTitle(), mark: null };
   var text = (typeof op.text === 'string') ? op.text : p.text;
+  /*
+   * A block that is already closed keeps the end time it was closed at.
+   *
+   * Without this, a second device — or a tab left open on a day that another
+   * device ended with STOP — closes it again hours later and stretches it:
+   * "DW: =" 09:00-10:00 became 09:00-12:00, two hours that never happened, on
+   * the calendar and in the rollup, with neither screen saying anything.
+   *
+   * A '?' end is the exception, because that end is the app's own guess rather
+   * than something the user reported, and a real close arriving late should
+   * replace a guess. Round 2's review, finding 10; the human's ruling.
+   */
+  var closed = !isOpenEvent_(ev);
+  if (!closed || p.mark === '?') endEventAt_(ev, op.endMs);
   ev.setTitle(buildTitle_(p.key, text, op.mark || null));
-  endEventAt_(ev, op.endMs);
   writeDesc_(ev, op.ref, false);
 }
 
@@ -1169,7 +1208,7 @@ function rollupKeys_() {
 function dayStats_(lo, hi, plan, actual, sit, keys) {
   var d = { ms: lo, ymd: ymd_(lo), dow: new Date(lo).getDay(),
             plan: {}, actual: {}, marks: {}, switches: 0, waking: 0, sitting: 0,
-            longestSit: 0, sitsOver90: 0 };
+            sittingWaking: 0, longestSit: 0, sitsOver90: 0 };
   keys.forEach(function (k) {
     d.plan[k] = 0;
     d.actual[k] = 0;
@@ -1213,7 +1252,10 @@ function dayStats_(lo, hi, plan, actual, sit, keys) {
     var h = clipHours_(e, lo, hi);
     d.actual[key] += h;
     d.marks[key][isMark_(p && p.mark) ? p.mark : ''] += h;
-    if (e.start >= lo && e.start < hi) d.switches++;
+    /* A switch is a block the user started. UNLOGGED is written by the app to
+       cover a gap nobody logged, so counting it made a day of two taps report
+       three switches. */
+    if (e.start >= lo && e.start < hi && !(p && p.key === 'UNLOGGED')) d.switches++;
 
     /*
      * The waking span is the part of the day the user actually accounted for,
@@ -1231,11 +1273,19 @@ function dayStats_(lo, hi, plan, actual, sit, keys) {
      * logged ones does not punch a hole in it, because the ends are what is
      * measured, not the sum.
      */
-    if (p && (p.key === 'UNLOGGED' || p.mark === '?')) return;
+    if (p && p.key === 'UNLOGGED') return;      // the user reported neither end
 
     var s = Math.max(e.start, lo), t = Math.min(e.end, hi);
     if (t > s) {
       if (first === null || s < first) first = s;
+      /*
+       * A guessed block's START is a fact: the user tapped the category, and
+       * that is when. Only its END was the app's guess, so only the end is
+       * refused here. Throwing away both made a row disagree with itself — a
+       * day whose only block was the overnight phantom read waking 0 beside a
+       * category column of 2.
+       */
+      if (p && p.mark === '?') return;
       if (last === null || t > last) last = t;
     }
   });
@@ -1245,6 +1295,20 @@ function dayStats_(lo, hi, plan, actual, sit, keys) {
     var ms = Math.min(e.end, hi) - Math.max(e.start, lo);
     if (!(ms > 0)) return;
     d.sitting += ms / MS_HOUR;
+    /*
+     * And the same span again, for the ratio only. `sitting h` is the whole
+     * truth about the chair; `sitting %` divides by the waking span, and a span
+     * shortened by a forgotten STOP does not contain all of those hours. It
+     * used to divide anyway and report percentages above 100 — 500% on a day
+     * the user logged six hours and forgot to press STOP, which is not a
+     * debatable number. Clipping the numerator to the same window as the
+     * denominator makes the column mean: of the time you accounted for, how
+     * much of it were you sitting.
+     */
+    if (first !== null && last > first) {
+      var inSpan = Math.min(e.end, last) - Math.max(e.start, first);
+      if (inSpan > 0) d.sittingWaking += inSpan / MS_HOUR;
+    }
     if (ms > d.longestSit) d.longestSit = ms;
     if (ms > 90 * MS_MIN) d.sitsOver90++;
   });
@@ -1293,7 +1357,7 @@ function dailyGrid_(days, keys) {
     keys.forEach(function (k) { r.push(round2_(d.actual[k])); });
     keys.forEach(function (k) { r.push(round2_(d.plan[k])); });
     r.push(d.switches, round2_(d.waking), round2_(d.sitting),
-           d.waking > 0 ? round2_(d.sitting / d.waking) : '',
+           d.waking > 0 ? round2_(d.sittingWaking / d.waking) : '',
            Math.round(d.longestSit / MS_MIN), d.sitsOver90);
     keys.forEach(function (k) {
       MARK_BUCKETS.forEach(function (m) { r.push(round2_(d.marks[k][m])); });
@@ -1345,7 +1409,7 @@ function weeklyGrid_(days, keys) {
     if (!(wk in index)) {
       index[wk] = weeks.length;
       var blank = { wk: wk, plan: {}, actual: {}, marks: {}, switches: 0, waking: 0,
-                    sitting: 0, longestSit: 0, sitsOver90: 0, covered: 0 };
+                    sitting: 0, sittingWaking: 0, longestSit: 0, sitsOver90: 0, covered: 0 };
       keys.forEach(function (k) {
         blank.plan[k] = 0;
         blank.actual[k] = 0;
@@ -1364,6 +1428,7 @@ function weeklyGrid_(days, keys) {
     w.switches += d.switches;
     w.waking += d.waking;
     w.sitting += d.sitting;
+    w.sittingWaking += d.sittingWaking;
     w.sitsOver90 += d.sitsOver90;
     if (d.longestSit > w.longestSit) w.longestSit = d.longestSit;
     // rollupOnce_ builds exactly one entry per day in the window, including the
@@ -1379,7 +1444,7 @@ function weeklyGrid_(days, keys) {
              w.plan[k] > 0 ? round2_(w.actual[k] / w.plan[k]) : '');
     });
     r.push(w.switches, round2_(w.waking), round2_(w.sitting),
-           w.waking > 0 ? round2_(w.sitting / w.waking) : '',
+           w.waking > 0 ? round2_(w.sittingWaking / w.waking) : '',
            Math.round(w.longestSit / MS_MIN), w.sitsOver90);
     /* Zero, not blank. A week in which every hour was guessed has 0 in its '='
        column — that is a number and it is true. Blank is a different claim. */

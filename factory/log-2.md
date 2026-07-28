@@ -1156,3 +1156,64 @@ human as exactly that rather than folded in quietly: A1's criterion 4, contract
 any of it counts as settled.
 
 **None of the work is started.** This entry records the instruction only.
+
+## [2026-07-28 13:30] FIX PASS 3 | The rulings and the review, in one pass
+
+Twenty-five items from `factory/FIXES-3.md`: nine code changes the human ruled
+on, five the review found, five corrections of fact, and six rewordings. All
+done. **963 → 988 assertions**, green twice and in all four contracted
+timezones, lint clear at 22 rules, headless ok.
+
+**The two blocking findings, re-run by hand rather than trusted to the suite:**
+
+```
+before:  waking h 1   sitting h 5   sitting %  5   switches 3     <- 500%
+after:   waking h 1   sitting h 5   sitting %  1   switches 2
+```
+
+and `SETUP.md` no longer says the columns kept working. It now says which ones
+moved, by how many, and how to write a formula that survives the next time.
+
+**Six things worth recording beyond "done".**
+
+**The switch count.** Test 44g existed to guard A5's over-correction — it
+asserted that UNLOGGED still counted as a switch. The review found that guard
+was protecting the wrong thing: a day of two taps reported three switches,
+because the block the *app* wrote was counted as a thing the user switched to.
+The guard is rewritten, not deleted: a real block must still count, so this
+cannot slide into "nothing counts".
+
+**The Q9 ruling delivers less than it sounds like.** Measured after the change:
+it moves `waking h` only where a guessed block starts earlier than any block the
+user closed by hand. Neither example written into Q9 itself moves at all, and a
+day of nothing but guesses still reads waking 0 beside a category column of 2 —
+a span needs two known ends and that day has one. Test 56b pins that as a stated
+limit. The human was told.
+
+**A test I wrote asserted the wrong thing twice**, and both times the code was
+right: `keyFor_('Deep work')` gives `DEEPWORK`, not `DW` — `DW` comes from the
+configuration — and a dropped op's id DOES come back in `applied`, deliberately,
+so the client stops holding a malformed write. Both are now asserted the right
+way round, the second with the reason quoted from `applyOps` itself.
+
+**The armed STOP took two attempts.** Anchoring it to a box of its own left it
+67px wide, because taking the button out of the flow collapsed the box around
+it. In the flow as a flex item it grows to 158px, the posture toggle gives up
+the room, and the toggle stays tappable — which the headless phase now asserts
+directly, at the toggle's own coordinates, in both the resting and armed states.
+
+**The A4 phase caught its own blind spot.** Wrapping the sit-clock and STOP in a
+box stopped its direct-children scan from seeing them, and it refused to pass
+vacuously: *"the worst case did not assemble — every check below would have
+passed vacuously."* That is the check working, and it asked for exactly the fix
+it got.
+
+**A vacuity check earned itself again.** The new documentation rule matched a
+neighbouring sentence, so deleting the rule it was meant to pin left it green.
+It now needs the rule *and* a worked example, and deleting either goes red.
+
+Two of the review's findings are parked rather than fixed, both with the human's
+knowledge: Q17's wider question about what a sheet should do when its block
+changes is answered for SPLIT and the SIT sheet only, and the pre-existing
+oddities the review listed as cosmetic (a 12ms SIT from a double tap, an
+UNLOGGED block spanning 25 hours) are untouched.

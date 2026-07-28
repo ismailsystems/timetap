@@ -2042,7 +2042,14 @@ chk('every mark x text combination round-trips unchanged', rt41.length === 0,
 chk('and the table actually covered all four marks plus unmarked',
   MARKS41.length === 5 && TEXTS41.length === 7);
 
-console.log('\n41c. an op may carry "?", and still may not carry anything else');
+console.log('\n41c. an op may not carry "?", nor anything else the user cannot choose');
+/* AMENDED — A1's criterion 4 originally required this op to be APPLIED, and the
+ * round shipped that way. The human ruled otherwise (Q4, amendment F3): a mark
+ * must be one the user can choose, and '?' is the app's own. Only staleGuard_
+ * writes it, and it writes straight to the calendar rather than through an op,
+ * so nothing legitimate arrives here carrying one. validOp_ is the trust
+ * boundary for writes that came out of localStorage, and contract 17 says no
+ * action a user can take produces that mark. */
 reset();
 const t41 = H.nowMs();
 const r41 = applyOps([
@@ -2050,9 +2057,21 @@ const r41 = applyOps([
   { id: 'b41', type: 'closeActual', ref: 'aaaabbbbccccdddd', key: 'DW',
     endMs: t41 + 3600000, mark: '?', text: 'memo' }
 ]);
-chk('the op carrying "?" was applied', r41.applied.includes('b41'), JSON.stringify(r41.applied));
-chk('and not dropped', r41.dropped.length === 0, JSON.stringify(r41.dropped.map(d => d.id)));
-chk('so the title carries the guess', A()[0].t === 'DW: memo ?', A()[0].t);
+chk('the op carrying "?" is dropped',
+  r41.dropped.length === 1 && r41.dropped[0].id === 'b41',
+  JSON.stringify(r41.dropped.map(d => d.id)));
+chk('so no title carries a guess the app did not make',
+  !/\?/.test(A()[0].t), A()[0].t);
+chk('and the block it aimed at is untouched — still open, still unmarked',
+  A().length === 1 && A()[0].t === 'DW:' && /#open/.test(A()[0].d), show(A()[0]));
+/* Its id comes back in `applied` as well, which is deliberate and predates the
+   round: applyOps says so in as many words — "applied in the sense that the
+   client should stop holding it" — so a malformed write leaves the queue
+   instead of being retried forever. Asserted, so a change to that is visible. */
+chk('the client is told to stop holding it, rather than retry it forever',
+  r41.applied.includes('b41'), JSON.stringify(r41.applied));
+chk('the open beside it really did apply — one bad op does not poison the batch',
+  r41.applied.includes('a41') && A().length === 1, JSON.stringify(r41.applied));
 
 reset();
 const t41b = H.nowMs();
@@ -2695,16 +2714,27 @@ chk('and sitting % stays blank rather than dividing by it',
   dayCell('2026-07-20', 'sitting %') === '',
   JSON.stringify(dayCell('2026-07-20', 'sitting %')));
 
-console.log('\n44g. an UNLOGGED block is still only excluded from the span');
-/* Guards the over-correction: excluding it from the span must not quietly
- * exclude it from switches or from the key set. */
+console.log('\n44g. an UNLOGGED block keeps its hours and its column');
+/* Guards the over-correction: excluding it from the waking span must not
+ * quietly exclude it from the key set or from its own hours.
+ *
+ * The switch count used to be guarded here too, and is no longer. Round 2's
+ * review found what that guard was protecting: a day of two taps reported
+ * three switches, because the block the APP wrote to cover a gap was counted
+ * as a thing the user switched to. Fix list item D. The guard that matters —
+ * that a real block still counts — is asserted below, so this cannot slide
+ * into "nothing counts". */
 reset(D(2026, 7, 24, 15, 0)); goodSheet();
 AC('UNLOGGED -', 20, 0, 0, 7, 0);
 AC('DW: shipping', 20, 9, 0, 17, 0);
 dailyRollup();
 chk('UNLOGGED still has a column', dCol('UNLOGGED') >= 0, JSON.stringify(dRows()[0]));
-chk('and both blocks still counted as switches',
-  dayCell('2026-07-20', 'switches') === 2, String(dayCell('2026-07-20', 'switches')));
+chk('and still reports its own seven hours',
+  dayCell('2026-07-20', 'UNLOGGED') === 7, String(dayCell('2026-07-20', 'UNLOGGED')));
+chk('the tapped block counts as a switch',
+  dayCell('2026-07-20', 'switches') === 1, String(dayCell('2026-07-20', 'switches')));
+chk('and the one the app wrote does not',
+  dayCell('2026-07-20', 'switches') === 1, String(dayCell('2026-07-20', 'switches')));
 reset();
 
 /* ── B1: the day's statistics know how each hour was marked ────────
@@ -3882,7 +3912,7 @@ chk('and now no cell renders as running', activeKey() === null, String(activeKey
 chk('which is the truth: nothing was created on either calendar',
   A().length === 0 && S().length === 0, A().map(show).join(' | '));
 chk('the banner still says a write was set aside — the repaint does not clear it',
-  !$('err').hidden && /set it aside/.test($('err').textContent), $('err').textContent);
+  !$('err').hidden && /set aside/.test($('err').textContent), $('err').textContent);
 chk('and the drawer still holds it, so it is not lost',
   DEAD().length === 1, JSON.stringify(DEAD().map(d => d.op.type)));
 
@@ -3916,8 +3946,15 @@ chk('and is still open on the calendar',
   A().length === 2 && /#open/.test(A()[1].d), A().map(show).join(' | '));
 H.setServerReject(null);
 
-console.log('\n55d. a set-aside split clears it too — its newRef is an open by another name');
+console.log('\n55d. a set-aside split gives the block back, rather than showing a phantom');
+/* AMENDED — D3's criterion 4 said the grid "stops showing it as running" and
+ * the round shipped that as going idle. Round 2's review found what that cost:
+ * the split never happened, so the block it was cutting is STILL open on the
+ * calendar, and an idle grid made STOP inert while something real ran. The
+ * human ruled (Q17, amendment F6): where the client still holds that block's
+ * record, put it back in hand. */
 reset(); reboot();
+const t55d = H.nowMs();
 tap('MTG'); settle(); wait(120);
 H.setServerReject('calendar said no');
 tap('MTG'); settle();                           // re-tap the lit one: SPLIT
@@ -3928,7 +3965,18 @@ pump(() => DEAD().length > 0);
 chk('the split was set aside',
   DEAD().length === 1 && DEAD()[0].op.type === 'splitActual',
   JSON.stringify(DEAD().map(d => d.op.type)));
-chk('and the grid stops showing it running', activeKey() === null, String(activeKey()));
+chk('the phantom remainder is gone from the grid', activeKey() !== 'ADM',
+  String(activeKey()));
+chk('and the block the split was cutting is back in hand',
+  activeKey() === 'MTG', String(activeKey()));
+chk('with its original start time, because it never stopped running',
+  near(JSON.parse(H.STORE['tt.state.v1']).open.startMs, t55d),
+  JSON.stringify(JSON.parse(H.STORE['tt.state.v1']).open));
+chk('which is the truth: that block is still open on the calendar',
+  A().length === 1 && A()[0].t === 'MTG:' && /#open/.test(A()[0].d),
+  A().map(show).join(' | '));
+chk('and STOP can end it, which is the point',
+  !$('stopBtn')._cls.has('inert'), $('stopBtn').className);
 H.setServerReject(null);
 
 console.log('\n55e. discarding the set-aside open from the drawer leaves it idle');
@@ -4046,6 +4094,310 @@ chk('and the posture falls back to standing',
 chk('which is the truth: the SITTING calendar is empty',
   S().length === 0, S().map(show).join(' | '));
 H.setServerReject(null);
+reset();
+
+console.log('\n56. the day the round exists for adds up');
+/* Round 2's review, finding 1, and the worst thing it found: on a day the user
+ * logged six hours and forgot STOP, the sheet reported one waking hour and a
+ * sitting percentage of 500. A percentage above 100 is not a debatable number.
+ *
+ * Driven end to end through the real client and the real overnight guard —
+ * no hand-authored events — because that is how the reviewer reached it. */
+reset(D(2026, 7, 20, 9, 0)); reboot();
+tapSit(); settle();
+tap('DW'); settle();
+wait(60);
+tap('MTG'); settle();
+H.setNow(D(2026, 7, 21, 7, 30));
+reboot();                                        // the next morning
+chk('the guard bounded the forgotten block and wrote UNLOGGED',
+  A().length === 3 && /\?$/.test(A()[1].t) && /^UNLOGGED/.test(A()[2].t),
+  A().map(show).join(' | '));
+goodSheet(); H.setNow(D(2026, 7, 21, 15, 0));
+dailyRollup();
+const c56 = n => dayCell('2026-07-20', n);
+chk('sitting % is never above 100', c56('sitting %') <= 1,
+  String(c56('sitting %')));
+chk('and it is 1, because every accounted hour was spent sitting',
+  c56('sitting %') === 1, String(c56('sitting %')));
+chk('sitting h keeps the whole truth about the chair',
+  c56('sitting h') === 5, String(c56('sitting h')));
+chk('two taps report two switches, not three',
+  c56('switches') === 2, String(c56('switches')));
+chk('and every hour is still reported somewhere',
+  c56('DW') === 1 && c56('MTG') === 5 && c56('UNLOGGED') === 9,
+  [c56('DW'), c56('MTG'), c56('UNLOGGED')].join(' / '));
+
+console.log('\n56b. a guessed block\'s start is a fact, and bounds the span');
+/* The human's ruling on Q9: the start of a guessed block is something the user
+ * reported — they tapped the category — and only the end was the app's guess.
+ *
+ * What that ruling can and cannot do, measured rather than assumed. It moves
+ * the span's EARLY edge, because a start is a point the span can begin at. It
+ * cannot give a day made only of guesses a waking span, because a span needs
+ * two known ends and that day has one. Both are asserted here so that neither
+ * is mistaken for the other later. */
+reset(D(2026, 7, 24, 15, 0)); goodSheet();
+AC('DW: early ?', 20, 6, 0, 9, 0);
+AC('MTG: logged =', 20, 10, 0, 12, 0);
+dailyRollup();
+chk('a guess that starts before the logged work extends the span backwards',
+  dayCell('2026-07-20', 'waking h') === 6, String(dayCell('2026-07-20', 'waking h')));
+
+reset(D(2026, 7, 24, 15, 0)); goodSheet();
+AC('MTG: logged =', 20, 10, 0, 12, 0);
+AC('DW: late ?', 20, 22, 0, 24, 0);
+dailyRollup();
+chk('but a guess that ends after it does not extend it forwards',
+  dayCell('2026-07-20', 'waking h') === 2, String(dayCell('2026-07-20', 'waking h')));
+chk('and the guessed hours are still reported in their own column',
+  dayCell('2026-07-20', 'DW') === 2, String(dayCell('2026-07-20', 'DW')));
+
+reset(D(2026, 7, 24, 15, 0)); goodSheet();
+AC('DW: evening ?', 20, 22, 0, 24, 0);
+dailyRollup();
+chk('a day of nothing but a guess still has no span, because it has one end',
+  dayCell('2026-07-20', 'waking h') === 0, String(dayCell('2026-07-20', 'waking h')));
+chk('and that day still reports its two hours',
+  dayCell('2026-07-20', 'DW') === 2, String(dayCell('2026-07-20', 'DW')));
+
+reset(D(2026, 7, 24, 15, 0)); goodSheet();
+AC('UNLOGGED -', 20, 0, 0, 7, 0);
+AC('DW: shipping', 20, 9, 0, 17, 0);
+dailyRollup();
+chk('UNLOGGED still bounds neither end — waking h is 8, as A5 requires',
+  dayCell('2026-07-20', 'waking h') === 8, String(dayCell('2026-07-20', 'waking h')));
+
+console.log('\n56c. the sitting ratio still says nothing when it cannot say anything');
+reset(D(2026, 7, 24, 15, 0)); goodSheet();
+AC('UNLOGGED -', 20, 0, 0, 7, 0);
+SI(20, 1, 0, 5, 0);
+dailyRollup();
+chk('a day of only unlogged time leaves sitting % blank',
+  dayCell('2026-07-20', 'sitting %') === '',
+  JSON.stringify(dayCell('2026-07-20', 'sitting %')));
+chk('and sitting h still reports the four hours',
+  dayCell('2026-07-20', 'sitting h') === 4, String(dayCell('2026-07-20', 'sitting h')));
+
+console.log('\n56d. a week of forgotten days adds up too');
+reset(D(2026, 7, 24, 15, 0)); goodSheet();
+[20, 21, 22, 23].forEach(day => {
+  AC('DW: a =', day, 9, 0, 10, 0);
+  AC('MTG: b ?', day, 10, 0, 15, 0);
+  AC('UNLOGGED -', day, 15, 0, 24, 0);
+  SI(day, 9, 0, 14, 0);
+});
+dailyRollup();
+const wk56 = wRows().find(r => r[0] === '2026-07-20');
+const wc56 = n => wk56[wRows()[0].indexOf(n)];
+chk('the week\'s sitting % is not above 100 either',
+  wc56('sitting %') <= 1, String(wc56('sitting %')));
+chk('and the week reports eight switches for eight taps',
+  wc56('switches') === 8, String(wc56('switches')));
+reset();
+
+console.log('\n57. a category cannot take a key the report owns');
+/* Q10's ruling. keyFor_ already adds a number when a key is taken — a second
+ * "Deep work" becomes DW2 — so reserving these two costs the user nothing new
+ * to learn. */
+reset();
+['Unlogged', 'un-logged', 'UNLOGGED time', 'Unfiled', 'unfiled'].forEach(name => {
+  const k = keyFor_(name, []);
+  chk('"' + name + '" does not take a reserved key',
+    k !== 'UNLOGGED' && k !== UNFILED_KEY, name + ' -> ' + k);
+});
+chk('and an ordinary name is untouched',
+  keyFor_('Meetings', []) === 'MEETINGS', keyFor_('Meetings', []));
+chk('a repeated name still numbers as it always did',
+  keyFor_('Meetings', [{ key: 'MEETINGS' }]) === 'MEETING2',
+  keyFor_('Meetings', [{ key: 'MEETINGS' }]));
+chk('and a reserved name numbers by the same rule, not by a special case',
+  keyFor_('Unlogged', []) === 'UNLOGGE2', keyFor_('Unlogged', []));
+reset();
+addCategory('Unlogged');
+const added57 = clientConfig_().categories.slice(-1)[0];
+chk('adding one through the real path gives it a key of its own',
+  added57.key !== 'UNLOGGED', added57.key);
+chk('and the rollup still has exactly one UNLOGGED column',
+  rollupKeys_().filter(k => k === 'UNLOGGED').length === 1, JSON.stringify(rollupKeys_()));
+reset();
+
+console.log('\n58. a title the app writes survives being written again');
+/* Q6's ruling: the night block is created as "UNLOGGED -", with no colon, and
+ * building it again used to add one. Contract 18 said any title carrying "?"
+ * round-trips byte-identical, and this was the one that did not. */
+[['UNLOGGED', '', '-'], ['UNLOGGED', '', '?'], ['UNLOGGED', '', null],
+ ['DW', 'memo', '?'], ['DW', '', '?'], ['DW', 'why? ?', '?']].forEach(([k, t, m]) => {
+  const built = buildTitle_(k, t, m);
+  const p = parseTitle_(built);
+  chk(JSON.stringify(built) + ' round-trips byte-identical',
+    buildTitle_(p.key, p.text, p.mark) === built,
+    built + ' -> ' + JSON.stringify(p) + ' -> ' + buildTitle_(p.key, p.text, p.mark));
+});
+chk('the night block the guard actually writes is that form',
+  UNLOGGED_TITLE === buildTitle_('UNLOGGED', '', '-'),
+  UNLOGGED_TITLE + ' vs ' + buildTitle_('UNLOGGED', '', '-'));
+chk('and an UNLOGGED block with text keeps its colon',
+  buildTitle_('UNLOGGED', 'real text', '-') === 'UNLOGGED: real text -',
+  buildTitle_('UNLOGGED', 'real text', '-'));
+
+console.log('\n59. a note may not end in a mark the user did not choose');
+/* Q2's ruling, widening A1's protection from one character to four. */
+[['great +', '+'], ['costs 5 -', '-'], ['item =', '='], ['is this right ?', '?']].forEach(([note, ch]) => {
+  const t = buildTitle_('DW', note, null);
+  const p = parseTitle_(t);
+  chk('a note ending in "' + ch + '" applies no mark', p.mark === null,
+    JSON.stringify(t) + ' -> ' + JSON.stringify(p));
+});
+chk('and when a real mark follows, the note keeps its character',
+  parseTitle_(buildTitle_('DW', 'great +', '=')).text === 'great +',
+  buildTitle_('DW', 'great +', '='));
+chk('a note of nothing but marks does not throw and carries no mark',
+  parseTitle_(buildTitle_('DW', '+ = - ?', null)).mark === null,
+  buildTitle_('DW', '+ = - ?', null));
+chk('and an ordinary note is untouched',
+  parseTitle_(buildTitle_('DW', 'C++ and 5 - 3', null)).text === 'C++ and 5 - 3',
+  buildTitle_('DW', 'C++ and 5 - 3', null));
+
+console.log('\n60. a day that was ended stays ended');
+/* Round 2's review, finding 10: a tab left open on a day another device closed
+ * with STOP could close it again hours later and stretch it. */
+reset(); reboot();
+const t60 = H.nowMs();
+tap('DW'); settle(); wait(60);
+tapStop(); tapStop(); settle();
+const end60 = A()[0].e;
+chk('the day is closed at the moment STOP was confirmed',
+  A().length === 1 && !/#open/.test(A()[0].d) && near(A()[0].e, t60 + 3600000),
+  show(A()[0]));
+const ref60 = /#ref:([A-Za-z0-9]+)/.exec(A()[0].d)[1];
+advance(2 * 3600000);
+applyOps([{ id: 'stale60', type: 'closeActual', ref: ref60, key: 'DW',
+            endMs: H.nowMs(), mark: '=' }]);
+chk('a later close does not stretch it',
+  A()[0].e === end60, show(A()[0]) + ' was ' + new Date(end60).toTimeString().slice(0, 5));
+chk('and its hours are unchanged',
+  near(A()[0].e - A()[0].s, 3600000), String((A()[0].e - A()[0].s) / 60000) + 'm');
+
+console.log('\n60b. but a close still replaces an end the app only guessed');
+/* The exception that keeps the round's own repair path working: a '?' end is
+ * the app's guess, and a real close arriving late is better evidence. */
+reset(D(2026, 7, 20, 22, 0)); reboot();
+tap('DW'); settle();
+H.setNow(D(2026, 7, 21, 7, 0));
+reboot();                                        // the guard bounds it and marks '?'
+chk('the guard closed it with a guess', /\?$/.test(A()[0].t), A()[0].t);
+const ref60b = /#ref:([A-Za-z0-9]+)/.exec(A()[0].d)[1];
+applyOps([{ id: 'late60b', type: 'closeActual', ref: ref60b, key: 'DW',
+            endMs: D(2026, 7, 20, 23, 30), mark: '=' }]);
+chk('a real close replaces the guessed end',
+  A()[0].e === D(2026, 7, 20, 23, 30), show(A()[0]));
+chk('and the title stops claiming to be a guess',
+  A()[0].t === 'DW: =', A()[0].t);
+reset();
+
+console.log('\n61. a sheet closes when the block it names stops being the one in hand');
+/* Q12 and Q18. The SPLIT sheet names one block. If another device closes that
+ * block, or a set-aside write clears it, the sheet was left open and aimed at
+ * whatever replaced it — and the next tap in it relabelled a block the user
+ * never chose. */
+reset(); reboot();
+tap('DW'); settle(); wait(180);
+tap('DW'); settle();
+chk('the sheet is open on DW', splitOpen() && /DW/.test($('spLab').textContent),
+  $('spLab').textContent);
+// another device: close DW, open REL
+const dw61 = H.CALS.actual.events[0];
+dw61.d = dw61.d.replace('#open', '');
+dw61.e = H.nowMs();
+H.CALS.actual.createEvent('REL:', new Date(H.nowMs()), new Date(H.nowMs() + 60000))
+  .setDescription('#ref:other1234567890\n#open');
+advance(20 * 60000); H.fireVisible(); settle(); advance(1000); settle();
+chk('the app noticed the other device', activeKey() === 'REL', String(activeKey()));
+chk('and the sheet closed with it', !splitOpen(), 'sheet open=' + splitOpen());
+const n61 = A().length;
+splitPick('MTG');
+chk('so a tap in the grid behind it cannot relabel the new block',
+  A().length === n61 && A().every(e => e.t !== 'MTG:'), A().map(show).join(' | '));
+
+console.log('\n61b. and a set-aside write closes it too');
+reset(); reboot();
+H.setOnline(false);                              // stack the open, count no tries
+tap('DW'); settle(); wait(180);
+tap('DW'); settle();
+chk('the sheet is open', splitOpen());
+H.setOnline(true); H.setServerReject('calendar said no');
+pump(() => DEAD().length > 0, 800);
+chk('the write was set aside', DEAD().length === 1, JSON.stringify(DEAD().map(d => d.op.type)));
+chk('and the sheet is shut', !splitOpen(), 'sheet open=' + splitOpen());
+H.setServerReject(null);
+
+console.log('\n62. an armed category does not survive into SPLIT');
+/* Q13. It kept its label — TAP AGAIN TO SWITCH — on a button that, from inside
+ * the sheet, opens the sheet again. */
+reset(); reboot();
+tap('DW'); advance(30000); settle();             // past MISTAP, inside CONFIRM
+tap('MTG'); settle();
+chk('MTG is armed', armedKey() === 'MTG', String(armedKey()));
+tap('DW'); settle();                             // re-tap the lit one: SPLIT
+chk('SPLIT opened', splitOpen());
+chk('and nothing is armed behind it', armedKey() === null, String(armedKey()));
+chk('nor is any label left promising an action', armedText() === '',
+  JSON.stringify(armedText()));
+
+console.log('\n63. the posture toggle cancels an armed STOP rather than confirming it');
+/* Round 2's review, finding 8: the armed state used to cover the whole row, so
+ * reaching for SITTING while STOP was armed ended the day. */
+reset(); reboot();
+tap('DW'); settle(); wait(30);
+tapSit(); settle();
+chk('a block is running and the user is sitting',
+  activeKey() === 'DW' && litPosture() === 'sit', activeKey() + '/' + litPosture());
+tapStop();                                       // armed, not confirmed
+chk('STOP is armed', $('stopBtn')._cls.has('arming'), $('stopBtn').className);
+posture('stand');                                // reaching for the posture toggle
+chk('the arm is cancelled', !$('stopBtn')._cls.has('arming'), $('stopBtn').className);
+chk('the day did NOT end — the block is still running',
+  activeKey() === 'DW' && /#open/.test(A()[0].d), A().map(show).join(' | '));
+chk('and the posture did not toggle either — the tap only cancelled',
+  litPosture() === 'sit', String(litPosture()));
+chk('a second tap on the toggle now works normally',
+  (posture('stand'), litPosture() === 'stand'), String(litPosture()));
+
+console.log('\n64. the banner says how many writes are on the shelf');
+/* Round 2's review, cosmetic: it said "one write" however many there were. */
+reset(); reboot();
+H.setServerReject('calendar said no');
+tap('DW');
+pump(() => DEAD().length > 0);
+chk('one write, and it says one',
+  /1 write was set aside/.test($('err').textContent), $('err').textContent);
+tap('MTG');
+pump(() => DEAD().length > 1, 400);
+chk('two writes, and it says two',
+  /2 writes were set aside/.test($('err').textContent), $('err').textContent);
+chk('and it still names the last reason',
+  /calendar said no/.test($('err').textContent), $('err').textContent);
+H.setServerReject(null);
+
+console.log('\n65. a block the app cannot read says so in the banner');
+/* Round 2's review, finding 9. Nothing lights for such a block, so the screen
+ * used to show a bright grid with no clock in it and no explanation. */
+reset(); reboot();
+tap('DW'); settle(); wait(30);
+A()[0].t = 'Lunch with Ada';                     // hand-edited in Google Calendar
+reboot();
+chk('nothing is lit, because no cell belongs to it', activeKey() === null,
+  String(activeKey()));
+chk('the banner says a block is running that it cannot read',
+  !$('err').hidden && /cannot read/.test($('err').textContent), $('err').textContent);
+chk('and it names what the calendar actually says',
+  /Lunch with Ada/.test($('err').textContent), $('err').textContent);
+tap('MTG'); settle();
+chk('closing it clears the message', $('err').hidden || !/cannot read/.test($('err').textContent),
+  $('err').textContent);
+chk('and the block closed correctly', A().length === 2 && /^UNFILED:/.test(A()[0].t),
+  A().map(show).join(' | '));
 reset();
 
 console.log('\n────────────────────────────────────────');

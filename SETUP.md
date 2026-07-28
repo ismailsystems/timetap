@@ -162,7 +162,9 @@ surface of the app. There is no settings screen and there will never be one.
 - `CONFIRM_TIMEOUT_MS` (4000) — how long an armed button waits before
   forgetting. Ignoring it is always the safe outcome.
 - `STALE_OPEN_HOURS` (5) — how far a forgotten open block may run before the
-  app bounds it and writes `UNLOGGED -` for the rest.
+  app bounds it and writes `UNLOGGED -` for the rest. A block bounded this way
+  is marked `?`, which means the app guessed the end time. Nothing you can tap
+  produces that mark, and a note may not end in one — see README's "The mark".
 - `MARK_TIMEOUT_MS` (6000) — how long the strip waits before applying `=`.
 - `BODY_KEY` (`'BODY'`) — the one category whose tap closes an open SIT block
   and drops the posture button back to `NOT SITTING`. Set it to `''` to remove even
@@ -398,8 +400,7 @@ chart it without being asked twice. A ratio against zero planned hours is blank
 rather than an error, and so is a sitting percentage on a day with no waking
 span.
 
-Both tabs then carry, appended after everything above so that formulas pointed
-at the columns already there keep working:
+Both tabs then carry, appended after everything above:
 
 - **one column per category per mark** — `DW +`, `DW =`, `DW -`, `DW ?`,
   `DW unmarked`, and the same five for every other key. A category's five
@@ -424,7 +425,17 @@ and now says so.
 
 **These tabs are generated output.** Every run clears them and writes them
 again. Anything you type into them is gone by morning. Put your own work in
-another tab and point formulas at `daily!A:Z` — that survives.
+another tab and point formulas at whole columns of `daily` — that survives a
+rebuild.
+
+**A column can move when the set of keys changes.** Adding a category, retiring
+one, or a new key that the app itself reports pushes every column after it one
+place to the right. The mark columns are appended at the end so they never do
+this, but a new key does — `UNFILED` did, in this round, and moved thirteen of
+the twenty-two columns the `daily` tab had before it. If you point a formula at
+a column by letter, check it after you add a category. Pointing at the header
+row by name instead — `INDEX(daily!$A:$BZ, 0, MATCH("waking h", daily!$1:$1, 0))`
+— survives the move.
 
 **Rebuilding is the point.** Because each run recomputes the whole window
 rather than appending yesterday, a calendar you correct on Thursday shows up

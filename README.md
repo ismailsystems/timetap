@@ -55,6 +55,31 @@ A closed block shows the `+ = -` strip only if its category has no `autoMark`
 and it ran at least `MIN_MARK_MINUTES`. Ignoring the strip costs zero taps: it
 dismisses itself and `=` stands. You should see it two to four times a day.
 
+There is a fourth mark, and you cannot choose it. `?` means **the app guessed
+when this block ended** — you left it running, and the app bounded it rather
+than let it run forever. It is not a judgment about the work; it is the app
+saying it does not know. Hours marked `?` are counted in their category as
+usual, and they do not extend your waking span, because nobody reported when
+they stopped.
+
+Because the mark is the last character of the title, a note may not end in one.
+Type `is this right ?` and the app stores `is this right` — otherwise the block
+would be indistinguishable from one the app had to guess at. The same is true
+of a note ending in `+`, `=` or `-`. Anywhere else in the note they are left
+alone: `C++ and 5 - 3` is stored exactly as typed.
+
+### Ending the day
+
+`STOP` sits at the right of the posture row. It closes the running block and
+any open sitting block at that instant, and opens nothing — the only control in
+the app that ends without starting something else. It arms on the first tap and
+acts on the second, and says `TAP AGAIN TO STOP` in between; ignore it and it
+forgets after four seconds. With nothing running it is dimmed and harmless.
+
+Ending the day is what stops the app guessing overnight. Without it, the block
+you left running is bounded by the app the next morning, marked `?`, and the
+rest of the night is written down as `UNLOGGED`.
+
 ### Posture
 
 Posture is an overlay, not a seventh category. Categories are a partition —

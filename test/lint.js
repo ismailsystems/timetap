@@ -434,6 +434,41 @@ check('the docs say how a PLAN event has to be titled, and show a real key', pla
  * The names come out of SETUP.md, so documenting a new constant enrols it here
  * automatically and documenting one that does not exist is itself a failure.
  */
+/*
+ * The round shipped a control and a mark that no user-facing prose mentioned.
+ * A reviewer found it, not a test: contract 24 only required the PLAN rule to be
+ * documented, so nothing was checked. This pins the three claims the docs owe,
+ * each against the source it describes, in the family of B5's rule.
+ */
+const docClaims = [];
+const readmePath = path.join(ROOT, 'README.md');
+if (!fs.existsSync(readmePath)) {
+  docClaims.push('README.md is missing');
+} else {
+  const flat = fs.readFileSync(readmePath, 'utf8').replace(/\s+/g, ' ');
+  const stopLabel = (html.match(/var\s+STOP_LABEL\s*=\s*'([^']*)'/) || [])[1];
+  if (!stopLabel) {
+    docClaims.push('could not read STOP_LABEL out of Index.html, so the check below ' +
+                   'would have compared nothing');
+  } else if (flat.indexOf(stopLabel) < 0) {
+    docClaims.push('README.md never mentions the ' + stopLabel + ' control, which ends the day');
+  }
+  if (!/guess(ed)? when this block ended|app guessed/i.test(flat)) {
+    docClaims.push('README.md does not say what the "?" mark means');
+  }
+  /* Two things, not one phrase: the rule, and a worked example of it. The first
+     version of this matched a nearby sentence and survived deleting the rule
+     itself — the vacuity check caught that, which is why the example is here. */
+  if (!/a note may not end in/i.test(flat)) {
+    docClaims.push('README.md does not state the rule that a note may not end in a mark character');
+  }
+  if (!/`is this right \?`/.test(flat) || !/`is this right`/.test(flat)) {
+    docClaims.push('README.md states the note rule but shows no worked example of it');
+  }
+}
+check('the docs describe the controls and marks a user will meet', docClaims,
+  'a control nobody documented is one the user meets for the first time on their own phone');
+
 const setupPath = path.join(ROOT, 'SETUP.md');
 const constBad = [];
 let constChecked = 0;
