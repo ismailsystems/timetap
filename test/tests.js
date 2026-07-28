@@ -3120,6 +3120,110 @@ chk('and the SIT still closed', S().length === 1 && !/#open/.test(S()[0].d),
   S().map(show).join(' | '));
 reset();
 
+/* ── C2: the armed button says which of the two things it will do ──
+ *
+ * "TAP AGAIN" did not disclose whether confirming would retitle the block you
+ * are in or start a new one. Same rule round 1 settled on for
+ * TAP AGAIN TO DISCARD: state what the next tap will do, and stop. */
+
+const armedText = H.armedText;
+
+console.log('\n51. inside the correction window it offers to retitle');
+reset(); reboot();
+tap('DW'); advance(10000); settle();
+tap('MTG'); settle();
+chk('the cell is armed', armedKey() === 'MTG', String(armedKey()));
+chk('and it reads TAP AGAIN TO RETITLE', armedText() === 'TAP AGAIN TO RETITLE',
+  JSON.stringify(armedText()));
+
+console.log('\n51b. outside it, it offers to switch');
+reset(); reboot();
+tap('DW'); advance(45000); settle();
+tap('MTG'); settle();
+chk('the cell is armed', armedKey() === 'MTG', String(armedKey()));
+chk('and it reads TAP AGAIN TO SWITCH', armedText() === 'TAP AGAIN TO SWITCH',
+  JSON.stringify(armedText()));
+
+console.log('\n51c. a forgotten confirmation leaves no text and no styling');
+['10', '45'].forEach(secs => {
+  reset(); reboot();
+  tap('DW'); advance(Number(secs) * 1000); settle();
+  tap('MTG'); settle();
+  chk('armed at ' + secs + 's', armedKey() === 'MTG' && armedText() !== '',
+    armedKey() + ' ' + JSON.stringify(armedText()));
+  advance(CONFIRM_TIMEOUT_MS + 100); settle();
+  chk('at ' + secs + 's the arming style is gone', armedKey() === null, String(armedKey()));
+  chk('at ' + secs + 's the text is empty', armedText() === '', JSON.stringify(armedText()));
+});
+
+console.log('\n51d. the label always names the action that actually happens');
+/* Read the label, then confirm, then check WHICH of the two outcomes occurred.
+ * Asserted for both windows rather than assumed from the wording. */
+[[10, 'TAP AGAIN TO RETITLE', 1], [45, 'TAP AGAIN TO SWITCH', 2]].forEach(([secs, want, blocks]) => {
+  reset(); reboot();
+  const t51 = H.nowMs();
+  tap('DW'); advance(secs * 1000); settle();
+  tap('MTG'); settle();
+  const said = armedText();
+  chk('at ' + secs + 's it said ' + want, said === want, JSON.stringify(said));
+  tap('MTG'); settle();
+  chk('at ' + secs + 's it did what it said — ' + blocks + ' block(s)',
+    A().length === blocks, A().map(show).join(' | '));
+  if (blocks === 1) {
+    chk('at ' + secs + 's the retitle kept the original start',
+      A()[0].t === 'MTG:' && A()[0].s === t51, show(A()[0]));
+  } else {
+    chk('at ' + secs + 's the switch left the first block alone',
+      A()[0].t === 'DW:' && A()[1].t === 'MTG:', A().map(show).join(' | '));
+  }
+});
+
+console.log('\n51e. a label cannot promise an action the tap will not take');
+/* THE criterion this task exists for. Arm just inside the correction window,
+ * let the clock cross it before the second tap, and the old design would have
+ * confirmed a RETITLE it had already stopped being able to do.
+ *
+ * Two things make it hold. The label and the action read one predicate, so they
+ * cannot be kept out of step. And arming schedules a repaint at the exact
+ * moment the window closes, so the label changes when the action does. */
+reset(); reboot();
+tap('DW'); advance((MISTAP_SECONDS - 3) * 1000); settle();
+tap('MTG'); settle();
+chk('armed just inside the window, it offers to retitle',
+  armedText() === 'TAP AGAIN TO RETITLE', JSON.stringify(armedText()));
+advance(3200); settle();                       // cross the correction boundary
+chk('once the window closes the label changes on its own',
+  armedText() === 'TAP AGAIN TO SWITCH', JSON.stringify(armedText()));
+chk('and it is still armed, so the change is visible rather than a dismissal',
+  armedKey() === 'MTG', String(armedKey()));
+tap('MTG'); settle();
+chk('confirming now switches, exactly as the label said',
+  A().length === 2 && A()[0].t === 'DW:' && A()[1].t === 'MTG:',
+  A().map(show).join(' | '));
+
+/* And the sweep's cousin: at every second across the window, whatever the label
+ * says must be what confirming does. */
+const liars51 = [];
+for (let secs = 0; secs <= 40; secs++) {
+  reset(); reboot();
+  tap('DW');
+  if (secs) advance(secs * 1000);
+  settle();
+  tap('MTG'); settle();
+  if (armedKey() !== 'MTG') continue;          // past the confirm window, no label to check
+  const said = armedText();
+  tap('MTG'); settle();
+  const retitled = A().length === 1;
+  const promised = (said === 'TAP AGAIN TO RETITLE');
+  if (promised !== retitled) {
+    liars51.push(secs + 's: said ' + JSON.stringify(said) + ' but ' +
+                 (retitled ? 'retitled' : 'switched'));
+  }
+}
+chk('at every second from 0 to 40, the label matched what confirming did',
+  liars51.length === 0, liars51.slice(0, 6).join(' | '));
+reset();
+
 console.log('\n────────────────────────────────────────');
 console.log(H.pass + ' passed, ' + H.fail + ' failed' +
             (H.skipped.length ? ', ' + H.skipped.length + ' skipped' : ''));

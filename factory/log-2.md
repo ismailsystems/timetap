@@ -753,3 +753,59 @@ One stale label fixed on the way past: A2's test 42d said "inside
 window moved to 20. It still passed — for a different reason, asserted on the
 next line — and a test whose label no longer describes what it does is a test
 that will mislead someone. Now 10 seconds.
+
+## [2026-07-28 09:4x] C2 | The armed button says which of the two things the next tap will do
+
+`TAP AGAIN` did not disclose whether confirming would retitle the block you are
+in or start a new one. It now reads **TAP AGAIN TO RETITLE** inside the
+correction window and **TAP AGAIN TO SWITCH** outside it — round 1's rule for
+`TAP AGAIN TO DISCARD`, applied here: state what the next tap will do, and stop.
+
+**The stale-label criterion is met structurally, not by care.** Two things:
+
+1. `willRetitle()` is the one place the question "retitle or switch?" is
+   answered. The label reads it and the tap that acts reads it, so they cannot
+   promise different things — not because they are kept in step, but because
+   there is only one of them. `tapCategory`'s `mistap` now calls it.
+2. Arming schedules a repaint at the **exact moment** the correction window
+   closes, when that falls inside the confirm timeout. The action changes there,
+   so the label changes there. Without it, arming at 17 seconds shows RETITLE
+   and a tap three seconds later switches instead — a ~4-second reachable
+   window, since `CONFIRM_TIMEOUT_MS` is 4000.
+
+**Tests: 51 through 51e. 738 → 759 assertions**, including a per-second sweep
+from 0 to 40 asserting that whatever the label said is what confirming did.
+
+**Mutation table:**
+
+| Mutation | Caught by |
+|---|---|
+| no repaint at the window boundary — the stale-label bug | 51e |
+| label and action reading different clocks | 51e and the per-second sweep |
+| back to the undisclosing `TAP AGAIN` | 7 assertions |
+
+**The tier-3 check taught me something worth writing down.** The two labels are
+measured in `checkViewport`, and the check **measures a control string as well**
+— one deliberately far too long, which the check must flag. If the control ever
+passes, the measurement is broken and the two real labels were never checked.
+
+That self-validation immediately earned itself: my first control was 67
+characters, and it **fit** the 629px desktop cell. The run said so:
+
+```
+desktop: the armed-label measurement passed a control string that cannot
+         possibly fit, so it was not really checking the two real labels either
+```
+
+The phone was being checked; the desktop was not. The control is now long
+enough that no cell at any viewport can hold it.
+
+Measured, both viewports: `TAP AGAIN TO RETITLE` is 178px in a 184px cell at
+390px, two lines at 11px. It fits.
+
+**One process note, recorded because the record is the point.** Midway through
+this task I ran `git checkout -- Index.html` to reset a stray edit and destroyed
+C2's uncommitted implementation with it. The handoff's restart permission covers
+exactly this: the work was rebuilt from the same edits and the tests — already
+written — confirmed the rebuild was equivalent. No criteria were changed. It
+cost one pass and is logged rather than quietly redone.

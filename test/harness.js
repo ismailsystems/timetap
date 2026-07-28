@@ -385,6 +385,12 @@ const tapSit = () => posture('sit');
 const tapStop = () => { $('stopBtn').fire('click'); settle(); };
 const stopArmedNow = () => $('stopBtn')._cls.has('arming');
 const stopLabel = () => $('stopBtn').textContent;
+// What the armed cell is offering to do, read off the DOM the user is looking at.
+const armedText = () => {
+  const b = NODES['grid'] && NODES['grid'].children.find(c => c._cls.has('arming'));
+  const cf = b && b.querySelector('.cf');
+  return cf ? cf.textContent : '';
+};
 const noteBox = () => {
   const b = $('grid').children.find(c => c._cls.has('active'));
   return b ? b.querySelector('.gn') : null;
@@ -455,7 +461,7 @@ function reboot() {
 
 module.exports = { LOGGED, fireVisible: () => VIS.forEach(f => f()), chk, skip, near, reset, reboot, META_ALLOWED, SCRIPT_PROPS, SHEETS, TRIGGERS,
   posture, activeKey, litPosture, noteBox, elapsedBox, addCell,
-  clearPropCache: () => { global.PROPS_ = null; }, tap, tapSit, tapMark, tapStop, stopArmedNow, stopLabel,
+  clearPropCache: () => { global.PROPS_ = null; }, tap, tapSit, tapMark, tapStop, stopArmedNow, stopLabel, armedText,
   wait, advance, settle, A, S, show, hhmm, $,
   CALS, NODES, STORE, desc,
   get pass() { return pass; }, get fail() { return fail; }, get skipped() { return skipped; },

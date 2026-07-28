@@ -901,17 +901,53 @@
   }
 
   /** Light the button and wait. Nothing is queued until the second tap. */
+  /*
+   * Would a confirmed tap on a different category retitle the block you are in,
+   * or close it and start a new one?
+   *
+   * This is deliberately the ONE place that question is answered. The armed
+   * label reads it and the tap that acts reads it, so the label cannot promise
+   * something the action will not do — not because the two were kept in step,
+   * but because there is only one of them.
+   */
+  function willRetitle() {
+    return !!(S.open && S.lastTapMs &&
+              (Date.now() - S.lastTapMs) < CFG.mistapSeconds * 1000);
+  }
+
+  var CONFIRM_RETITLE = 'TAP AGAIN TO RETITLE';
+  var CONFIRM_SWITCH  = 'TAP AGAIN TO SWITCH';
+
+  /** What the next tap will actually do, named. Round 1's rule, applied here. */
+  function confirmLabel() {
+    return willRetitle() ? CONFIRM_RETITLE : CONFIRM_SWITCH;
+  }
+
   function arm(key) {
     disarm();
+    var timers = [];
     // Repaint when it forgets, or the button keeps offering a confirmation it
     // is no longer holding.
-    armed = { key: key, timer: setTimeout(function () { disarm(); render(); },
-                                          CFG.confirmTimeoutMs) };
+    timers.push(setTimeout(function () { disarm(); render(); }, CFG.confirmTimeoutMs));
+    /*
+     * And repaint at the exact moment the correction window closes, if that
+     * falls while this is still armed. The action changes there, so the label
+     * has to change there too — otherwise arming at 17 seconds shows
+     * TAP AGAIN TO RETITLE, and a tap three seconds later switches instead. A
+     * label that promises the wrong action is worse than no label.
+     */
+    if (S.open && S.lastTapMs) {
+      var untilSwitch = S.lastTapMs + CFG.mistapSeconds * 1000 - Date.now();
+      if (untilSwitch > 0 && untilSwitch < CFG.confirmTimeoutMs) {
+        timers.push(setTimeout(render, untilSwitch));
+      }
+    }
+    armed = { key: key, timers: timers };
     render();
   }
 
   function disarm() {
-    if (armed && armed.timer) clearTimeout(armed.timer);
+    if (armed && armed.timers) armed.timers.forEach(clearTimeout);
     armed = null;
   }
 
@@ -941,7 +977,9 @@
     }
     disarm();
 
-    var mistap = S.open && S.lastTapMs && (now - S.lastTapMs) < CFG.mistapSeconds * 1000;
+    // The same predicate the armed label was rendered from, so the two cannot
+    // disagree about what this tap is.
+    var mistap = willRetitle();
 
     if (mistap) {                                                    // 6.3 correction
       S.open.key = key;
@@ -1299,7 +1337,7 @@
         // Never overwrite what is being typed right now.
         if (cell.note !== document.activeElement) cell.note.value = isOpen ? (S.open.text || '') : '';
         var cf = kids[i].querySelector('.cf');
-        if (cf) cf.textContent = isArmed ? 'TAP AGAIN' : '';
+        if (cf) cf.textContent = isArmed ? confirmLabel() : '';
       }
     }
     paintSync();
