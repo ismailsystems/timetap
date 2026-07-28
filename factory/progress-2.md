@@ -12,6 +12,34 @@ In progress. **12 of 16 tasks complete.** Stage C, task C3 next.
 Suite: **759 passed / 0 failed** (baseline was 492), green in all four
 contracted timezones. Lint all clear. Headless ok, 19 checks per viewport.
 
+## Resume here (context cleared 2026-07-28, after C2)
+
+The loop was stopped deliberately after **C2**, at the human's request, not by a
+circuit breaker. Nothing is half-finished: the working tree is clean and every
+completed task is committed.
+
+To continue, run `/loop work through factory/HANDOFF-2.md exactly as written`.
+The next unfinished, unblocked task is **C3**. Read this file and
+`factory/log-2.md` first — between them they are the whole memory of the run.
+
+State as of stopping:
+
+```
+node test/tests.js      759 passed, 0 failed   (baseline 492)
+node test/lint.js       all clear — 19 rules
+node test/headless.js   ok — 20 checks per viewport
+```
+
+Green in all four contracted timezones. `appsscript.json` and
+`test/fixtures/rollup-golden.json` byte-identical to `a256bdf`. Exactly one
+pre-existing test assertion has been removed all round, and it is A2's — the one
+pinning the `=` that A2 exists to replace.
+
+**Eleven questions are parked below and none has been answered.** Q1, Q4, Q9 and
+Q11 are the ones where the handoff contradicts itself or where a contract
+assertion is doing something the human may not have intended. They are the first
+thing to read.
+
 ## Tasks
 
 | Task | Stage | Status | Attempts | Notes |
