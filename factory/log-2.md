@@ -1217,3 +1217,43 @@ knowledge: Q17's wider question about what a sheet should do when its block
 changes is answered for SPLIT and the SIT sheet only, and the pre-existing
 oddities the review listed as cosmetic (a 12ms SIT from a double tap, an
 UNLOGGED block spanning 25 hours) are untouched.
+
+## [2026-07-28 14:10] CORRECTION | The verifier was right three times, and twice about numbers I had just claimed
+
+An independent verifier checked the fix pass against `factory/FIXES-3.md`. It
+confirmed all 26 items land and are load-bearing — it reverted ten of them and
+watched each go red, reconstructed both blocking findings from scratch rather
+than running my tests, and checked that an ordinary close, a replayed close and
+a close after a reboot all still work. Verdict: **INCOMPLETE**, on the record
+rather than the code.
+
+**All three of its findings were true. Measured:**
+
+```
+the duplicate false claim   progress-2.md:346 still read "no circuit breaker
+                            fired", twenty lines from the correction saying it did
+lint rules                  claimed 22, measured 21
+baseline assertions         claimed 963, measured 908 at the fix pass's own parent
+```
+
+The 963 was a number from the middle of the pass, quoted as though it were the
+starting line. The verifier's own words for it: *"the record about the record
+is, again, not quite honest."* That is the third time this round that the
+paperwork was the thing at fault, and the second time in two commits.
+
+Corrected here rather than by amending the commit, so the mistake stays visible:
+the duplicate claim now carries the correction, the log entry above carries the
+right numbers, and `FIXES-3.md` says 26 items rather than 25 — it had left its
+own item D out of its own total, in a document whose first paragraph boasts
+about counting exactly.
+
+**Also fixed: a coverage gap it found.** A1's criterion names both the SPLIT
+sheet and the SIT time sheet, and the code closes both, but every test I wrote
+drove SPLIT only. Section 61c now drives the sit sheet through both routes — a
+set-aside `openSit`, and another device ending the SIT. **988 → 994
+assertions.**
+
+And one test edit that was not disclosed: section 55's regex moved from
+`/set it aside/` to `/set aside/` when the banner started counting what is on
+the shelf. Same strength, but it now says so in a comment, because "same
+strength" is exactly what a quiet weakening also claims.

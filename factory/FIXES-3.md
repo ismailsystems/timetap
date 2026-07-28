@@ -13,8 +13,12 @@ apply in full — `HANDOFF-2.md` and round 1's files are never edited,
 frozen (the human's ruling on Q14), and nothing points at a real calendar.
 
 **Counts, stated exactly, because the last summary got them wrong:**
-**9 code changes from the rulings, 5 from the review, 5 corrections of fact,
-and 6 rewordings.** 25 items.
+**9 code changes from the rulings (A1-A9), 5 from the review (B1-B5), 5
+corrections of fact (C1-C5), 1 more code change listed on its own (D), and 6
+rewordings (F1-F6). 26 items.**
+
+(This line first said 25, by leaving D out of its own total. Corrected after a
+verifier added it up. Counting exactly is easier to claim than to do.)
 
 ---
 

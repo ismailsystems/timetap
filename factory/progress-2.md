@@ -343,7 +343,13 @@ Round 1's progress record is `factory/progress.md` and is **read-only**.
 
 ## Status
 
-**All 16 tasks complete.** Nothing is parked, and no circuit breaker fired.
+**All 16 tasks complete. No task was parked.** One circuit breaker did fire —
+the handoff says a criterion that fails against today's unmodified code means
+the task is **parked**, and D2 was marked done instead. The RUN SUMMARY above
+carries the full correction; this line used to repeat the false version, and a
+verifier found it still standing after the correction was written twenty lines
+away. A record that is true in one place and false in another is the fault this
+round is named for.
 
 **Every parked question has now been ruled on by the human** — see
 `## ANSWERS FROM THE HUMAN` at the top of this file. The two that were blocking

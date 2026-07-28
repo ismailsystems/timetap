@@ -3911,6 +3911,11 @@ chk('the open was set aside',
 chk('and now no cell renders as running', activeKey() === null, String(activeKey()));
 chk('which is the truth: nothing was created on either calendar',
   A().length === 0 && S().length === 0, A().map(show).join(' | '));
+/* AMENDED: this read /set it aside/ until the banner started counting what is on
+   the shelf rather than announcing one arrival ("2 writes were set aside" no
+   longer contains "set it aside"). Same strength — the banner must still say a
+   write was set aside — but adapted, and named here so it is not mistaken for a
+   quiet weakening. */
 chk('the banner still says a write was set aside — the repaint does not clear it',
   !$('err').hidden && /set aside/.test($('err').textContent), $('err').textContent);
 chk('and the drawer still holds it, so it is not lost',
@@ -4331,6 +4336,37 @@ pump(() => DEAD().length > 0, 800);
 chk('the write was set aside', DEAD().length === 1, JSON.stringify(DEAD().map(d => d.op.type)));
 chk('and the sheet is shut', !splitOpen(), 'sheet open=' + splitOpen());
 H.setServerReject(null);
+
+console.log('\n61c. the SIT time sheet is held to the same rule');
+/* The criterion names both sheets and the code closes both, but 61 and 61b only
+ * ever drove SPLIT — a verifier found that half of A1 was untested rather than
+ * unimplemented. The sit sheet reaches the same trap by the same two routes. */
+const sitSheetOpen = () => { const n = H.NODES['sheetSit']; return !!n && !n.hidden; };
+reset(); reboot();
+H.setOnline(false);
+tapSit(); settle();
+$('sitEdit').fire('click'); settle();
+chk('the sit sheet is open', sitSheetOpen());
+H.setOnline(true); H.setServerReject('calendar said no');
+pump(() => DEAD().length > 0, 800);
+chk('the SIT open was set aside',
+  DEAD().length === 1 && DEAD()[0].op.type === 'openSit',
+  JSON.stringify(DEAD().map(d => d.op.type)));
+chk('and the sit sheet closed with it', !sitSheetOpen(), 'open=' + sitSheetOpen());
+H.setServerReject(null);
+
+reset(); reboot();
+tapSit(); settle();
+$('sitEdit').fire('click'); settle();
+chk('the sit sheet is open again', sitSheetOpen());
+// another device stops the sitting
+const sit61 = H.CALS.sit.events[0];
+sit61.d = sit61.d.replace('#open', '');
+sit61.e = H.nowMs();
+advance(20 * 60000); H.fireVisible(); settle(); advance(1000); settle();
+chk('the app noticed the SIT ended elsewhere', litPosture() === 'stand',
+  String(litPosture()));
+chk('and the sheet aimed at it closed too', !sitSheetOpen(), 'open=' + sitSheetOpen());
 
 console.log('\n62. an armed category does not survive into SPLIT');
 /* Q13. It kept its label — TAP AGAIN TO SWITCH — on a button that, from inside
