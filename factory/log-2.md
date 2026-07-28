@@ -691,3 +691,65 @@ Suite **716 / 0** in all four contracted zones. Lint all clear across 18 rules.
 Headless ok at 20 checks per viewport. `test/fixtures/rollup-golden.json` and
 `appsscript.json` still byte-identical to `a256bdf`. Exactly one test line
 removed all round, and it is still A2's.
+
+## [2026-07-28 09:0x] C1 | The tap windows nest, so nothing destructive happens unconfirmed
+
+`MISTAP_SECONDS` 90 → **20**, against a `CONFIRM_WITHIN_SECONDS` of 60. There
+was a thirty-second band — 60s to 90s after the last tap — where a single
+unconfirmed tap acted immediately **and** destructively: it silently retitled
+the block you were actually in. The correction window now sits well inside the
+confirm window, so every destructive path is confirmed by construction rather
+than by luck.
+
+It also makes a deliberate short block recordable for the first time. At 90
+seconds there was no way to log a 45-second task — the tap that ended it was
+treated as a correction and ate it. Test 50b logs one.
+
+A 19th lint rule pins the ordering, reading **both numbers out of `Code.gs`**
+rather than being told them, so it pins the relationship and not the two values
+configured today. Tuning either is fine; inverting them is not.
+
+**Tests: 50 through 50g. 716 → 738 assertions.** Four contracted zones green,
+lint clear across 19 rules, headless ok.
+
+**THE SWEEP is the criterion that matters, and it works.** Every individual
+window test would pass against a build where the two constants were merely
+different from each other. Only the sweep proves there is no reachable gap. I
+planted one — shrinking the confirm window to 5s while the correction window
+stayed at 20s — and it named the band exactly:
+
+```
+FAIL no single tap at any second from 0 to 120 changed an existing block's key
+     5s: block 0 went DW -> MTG | 6s: ... | 7s: ... | 8s: ...
+```
+
+Seconds 5 through 19. That is Contract 28 doing its job.
+
+**Mutation table:**
+
+| Mutation | Caught by |
+|---|---|
+| the two windows swapped back to 90 vs 60 | the new lint rule, by name, plus the suite |
+| the two windows made equal | the lint rule |
+| a gap planted between the windows | **the sweep**, naming every second in the band |
+
+**Seven existing sections moved, and none was weakened.** Sections 4, 4b, 15,
+22, 25 and 25c all exercised *correction* using elapsed times that sat inside
+the old 90-second window and now sit outside it. Each moved to a time inside the
+new window, so each still asserts exactly what it asserted before — that a
+correction retitles the block you are in — rather than being deleted or relaxed.
+
+Section 37j needed more thought. It asserted the drawer held exactly **2** rows
+after a second set-aside write, but that 2 was an artifact of the old window:
+the action used to land as a correction (one op) and now lands as a transition
+(a close and an open, two ops). Pinning 2 would have been pinning the old
+window. It now asserts what the section is actually named for — that a write set
+aside *while the drawer is open* appears in it without reopening — and pins it
+harder than before: the drawer must match the shelf exactly, and must have
+grown.
+
+One stale label fixed on the way past: A2's test 42d said "inside
+`MISTAP_SECONDS`" while using 30 seconds, which stopped being true when the
+window moved to 20. It still passed — for a different reason, asserted on the
+next line — and a test whose label no longer describes what it does is a test
+that will mislead someone. Now 10 seconds.

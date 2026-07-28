@@ -36,10 +36,14 @@ tap('FRAG'); wait(20); tap('DW');
 chk('no strip', $('strip').hidden);
 chk('FRAG autoMarked "-"', A()[0].t === 'FRAG: -', A()[0].t);
 
-console.log('\n4. DW then MTG 30s later -> one event, MTG, original start');
+console.log('\n4. DW then MTG 10s later -> one event, MTG, original start');
+/* C1 nested the correction window inside the confirm window, so this is 10s
+   rather than the 30s it used to be. 30s is now a transition, which section
+   50 asserts directly. The behaviour under test — a correction retitles the
+   block you are in — is unchanged. */
 reset(); reboot();
 const t4 = H.nowMs();
-tap('DW'); advance(30000); settle(); tap('MTG'); tap('MTG');
+tap('DW'); advance(10000); settle(); tap('MTG'); tap('MTG');
 chk('exactly one event', A().length === 1, A().map(show).join(' | '));
 chk('category MTG', A()[0].t === 'MTG:', A()[0].t);
 chk('start preserved', A()[0].s === t4, show(A()[0]));
@@ -49,7 +53,7 @@ console.log('\n4b. mis-tap after the queue already flushed');
 reset(); reboot();
 const t4b = H.nowMs();
 tap('DW'); settle(); settle();
-advance(45000); settle(); tap('ADM'); tap('ADM');
+advance(10000); settle(); tap('ADM'); tap('ADM');
 chk('exactly one event', A().length === 1, A().map(show).join(' | '));
 chk('category ADM, start preserved', A()[0].t === 'ADM:' && A()[0].s === t4b, show(A()[0]));
 
@@ -290,7 +294,7 @@ chk('older one was closed at the newer start', A()[0].e === A()[1].s, A().map(sh
 
 console.log('\n15. re-tapping the lit category');
 reset(); reboot();
-tap('DW'); advance(20000); settle();
+tap('DW'); advance(10000); settle();
 const before15 = A().map(e => e.t + e.s + e.e).join('|');
 tap('DW'); settle();
 chk('inside the mis-tap window it does nothing at all',
@@ -446,7 +450,7 @@ chk('closing a block does not disturb its colour', sameAsButton(A()[0], 'DW'));
 
 reset(); reboot();
 tap('DW'); settle(); settle();
-advance(40000); settle(); tap('BODY'); tap('BODY'); settle();
+advance(10000); settle(); tap('BODY'); tap('BODY'); settle();
 chk('a mis-tap correction recolours the surviving event',
   A().length === 1 && sameAsButton(A()[0], 'BODY'),
   'n=' + A().length + ' colour=' + evColour(A()[0]));
@@ -549,10 +553,10 @@ reset(); reboot();
 tap('DW'); settle();
 chk('the first tap needs no confirming', A().length === 1, A().map(show).join(' | '));
 
-advance(20000); settle();
+advance(10000); settle();
 const q25 = JSON.parse(H.STORE['tt.queue.v1'] || '[]').length;
 tap('MTG'); settle();
-chk('a tap 20s later writes nothing yet', A().length === 1 && A()[0].t === 'DW:',
+chk('a tap 10s later writes nothing yet', A().length === 1 && A()[0].t === 'DW:',
   A().map(show).join(' | '));
 chk('nothing queued either', JSON.parse(H.STORE['tt.queue.v1'] || '[]').length === q25,
   'queue grew');
@@ -573,7 +577,7 @@ chk('and never wrote anything', A().length === 1 && A()[0].t === 'DW:', A().map(
 
 console.log('\n25c. arming a different box moves the question');
 reset(); reboot();
-tap('DW'); settle(); advance(20000); settle();
+tap('DW'); settle(); advance(10000); settle();
 tap('MTG'); settle();
 tap('ADM'); settle();
 chk('only the newest is armed', armedKey() === 'ADM', String(armedKey()));
@@ -1477,10 +1481,23 @@ tapMark('+');
 pump(() => DEAD().length > 0);
 $('err').click(); settle();
 chk('one row on screen', uiRows().length === 1, String(uiRows().length));
+/* C1 nested the correction window inside the confirm window, and that changed
+ * how many ops this second action produces: the tap used to land as a
+ * correction (one recategorize) and now lands as a transition (a close and an
+ * open). The old assertion pinned the number 2, which was an artifact of the
+ * old window rather than anything this section is about.
+ *
+ * What it is about is that a write set aside WHILE THE DRAWER IS OPEN appears
+ * in it without reopening. So that is what is asserted, and pinned harder than
+ * before: the drawer must match the shelf exactly, and must have grown. */
+const before37j = DEAD().length;
 tap('FRAG'); wait(30); tap('DW'); tapMark('+');
-pump(() => DEAD().length > 1);
-chk('the new one is on the shelf too, without reopening the drawer',
-  uiRows().length === 2, 'rows=' + uiRows().length + ' dead=' + DEAD().length);
+pump(() => DEAD().length > before37j);
+chk('the drawer grew while it was open', DEAD().length > before37j,
+  'was ' + before37j + ', now ' + DEAD().length);
+chk('and it shows every set-aside write, without reopening',
+  uiRows().length === DEAD().length,
+  'rows=' + uiRows().length + ' dead=' + DEAD().length);
 H.setServerReject(null);
 reset();
 
@@ -2155,9 +2172,14 @@ chk('FRAG is marked "?", not "-"', parseTitle_(A()[0].t).mark === '?', A()[0].t)
 chk('and exactly one mark is on the title', A()[0].t === 'FRAG: ?', A()[0].t);
 
 console.log('\n42d. nothing is bounded that did not need bounding');
+/* C1 moved MISTAP_SECONDS from 90 to 20, so this is 10 seconds rather than the
+   30 it used to be — 30s now sits outside the window this line is about. The
+   block is still not bounded at 30s either, but for the different reason
+   asserted below it, and a test whose label no longer describes what it does is
+   a test that will mislead someone. */
 reset(D(2026, 7, 20, 9, 0)); reboot();
 tap('DW'); settle();
-H.setNow(D(2026, 7, 20, 9, 0, 30));
+H.setNow(D(2026, 7, 20, 9, 0, 10));
 reboot();
 chk('inside the mis-tap window, nothing is bounded', A().length === 1, A().map(show).join(' | '));
 chk('the block is still open', /#open/.test(A()[0].d), show(A()[0]));
@@ -2985,6 +3007,118 @@ chk('but the counts from the last good run survive',
 chk('and the report still states them',
   /found 2, of which 1 named a configured category/.test(rollupStatus()), rollupStatus());
 reset(); H.clearPropCache();
+
+/* ── C1: the tap windows nest ──────────────────────────────────────
+ *
+ * MISTAP_SECONDS was 90 and CONFIRM_WITHIN_SECONDS 60, so between 60 and 90
+ * seconds after the last tap a single unconfirmed tap acted immediately AND
+ * destructively — it retitled the block you were actually in. The correction
+ * window now sits well inside the confirm window, which makes every
+ * destructive path confirmed by construction rather than by luck. */
+
+console.log('\n50. the correction window sits inside the confirm window');
+chk('MISTAP_SECONDS is below CONFIRM_WITHIN_SECONDS',
+  MISTAP_SECONDS < CONFIRM_WITHIN_SECONDS,
+  MISTAP_SECONDS + ' vs ' + CONFIRM_WITHIN_SECONDS);
+chk('and both are positive numbers',
+  MISTAP_SECONDS > 0 && CONFIRM_WITHIN_SECONDS > 0,
+  MISTAP_SECONDS + ' / ' + CONFIRM_WITHIN_SECONDS);
+chk('the client is told the same two values',
+  clientConfig_().mistapSeconds === MISTAP_SECONDS &&
+  clientConfig_().confirmWithinSeconds === CONFIRM_WITHIN_SECONDS,
+  JSON.stringify([clientConfig_().mistapSeconds, clientConfig_().confirmWithinSeconds]));
+
+console.log('\n50b. a 45-second block is recordable for the first time');
+/* At 90 seconds there was no way to log a deliberate short block: the tap that
+ * ended it was treated as a correction and ate it. */
+reset(); reboot();
+const t50 = H.nowMs();
+tap('DW'); advance(45000); settle();
+tap('MTG'); tap('MTG'); settle();
+chk('two blocks exist', A().length === 2, A().map(show).join(' | '));
+chk('the first is still DW', A()[0].t === 'DW:', A()[0].t);
+chk('it ran 45 seconds', near(A()[0].e - A()[0].s, 45000, 1500),
+  String((A()[0].e - A()[0].s) / 1000) + 's');
+chk('and MTG is open from where it ended',
+  /#open/.test(A()[1].d) && A()[1].s === A()[0].e, A().map(show).join(' | '));
+
+console.log('\n50c. inside the correction window a confirmed tap still corrects');
+reset(); reboot();
+const t50c = H.nowMs();
+tap('DW'); advance(10000); settle();
+tap('MTG'); tap('MTG'); settle();
+chk('one block exists', A().length === 1, A().map(show).join(' | '));
+chk('keyed MTG', A()[0].t === 'MTG:', A()[0].t);
+chk('with the original start time', A()[0].s === t50c, show(A()[0]));
+
+console.log('\n50d. an unconfirmed tap at 45 seconds does nothing at all');
+reset(); reboot();
+tap('DW'); advance(45000); settle();
+tap('MTG');
+chk('it armed rather than acting', armedKey() === 'MTG', String(armedKey()));
+advance(CONFIRM_TIMEOUT_MS + 100); settle();
+chk('and forgot', armedKey() === null, String(armedKey()));
+chk('nothing was queued', JSON.parse(H.STORE['tt.queue.v1'] || '[]').length === 0,
+  H.STORE['tt.queue.v1'] || '[]');
+chk('DW is still the open block', A().length === 1 && A()[0].t === 'DW:' &&
+  /#open/.test(A()[0].d), A().map(show).join(' | '));
+
+console.log('\n50e. past the confirm window a tap is still just a tap');
+reset(); reboot();
+tap('DW'); wait(5); settle();
+tap('MTG'); settle();
+chk('it acted on one tap', A().length === 2, A().map(show).join(' | '));
+chk('DW closed and still keyed DW, MTG open',
+  A()[0].t === 'DW:' && !/#open/.test(A()[0].d) && /#open/.test(A()[1].d),
+  A().map(show).join(' | '));
+
+console.log('\n50f. THE SWEEP — no elapsed time lets one tap change a block\'s key');
+/* Contract 28, and the criterion that matters most in this task.
+ *
+ * Every individual window test above would pass against a build where the two
+ * constants were merely different from each other. Only this proves there is no
+ * reachable gap: second by second across the whole span, a single unconfirmed
+ * tap on a different category must never change an existing block's key.
+ *
+ * It sweeps past both windows deliberately — a gap could open on either side of
+ * either boundary, and the two configured values are not what is being tested. */
+const gaps50 = [];
+for (let secs = 0; secs <= 120; secs++) {
+  reset(); reboot();
+  tap('DW');
+  if (secs) advance(secs * 1000);
+  settle();
+  const keysBefore = A().map(e => (parseTitle_(e.t) || {}).key);
+  tap('MTG');                                   // exactly one tap, never confirmed
+  settle();
+  const keysAfter = A().map(e => (parseTitle_(e.t) || {}).key);
+  // Every block that existed before must still carry the key it had.
+  for (let i = 0; i < keysBefore.length; i++) {
+    if (keysBefore[i] !== keysAfter[i]) {
+      gaps50.push(secs + 's: block ' + i + ' went ' + keysBefore[i] + ' -> ' + keysAfter[i]);
+    }
+  }
+}
+chk('no single tap at any second from 0 to 120 changed an existing block\'s key',
+  gaps50.length === 0, gaps50.slice(0, 8).join(' | '));
+chk('and the sweep really ran across both windows',
+  MISTAP_SECONDS <= 120 && CONFIRM_WITHIN_SECONDS <= 120,
+  'swept 0..120 against ' + MISTAP_SECONDS + ' and ' + CONFIRM_WITHIN_SECONDS);
+
+console.log('\n50g. the one coupling survives the window change');
+/* Tapping BODY closes an open SIT. That is the app's only coupling, and it has
+ * to hold on the correction branch as well as the transition one. */
+reset(); reboot();
+tapSit(); settle();
+tap('DW'); advance(10000); settle();
+chk('a SIT is open before the correction', S().length === 1 && /#open/.test(S()[0].d),
+  S().map(show).join(' | '));
+tap('BODY'); tap('BODY'); settle();
+chk('the tap landed as a correction', A().length === 1 && A()[0].t === 'BODY:',
+  A().map(show).join(' | '));
+chk('and the SIT still closed', S().length === 1 && !/#open/.test(S()[0].d),
+  S().map(show).join(' | '));
+reset();
 
 console.log('\n────────────────────────────────────────');
 console.log(H.pass + ' passed, ' + H.fail + ' failed' +

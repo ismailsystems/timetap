@@ -53,8 +53,23 @@ var CATEGORIES = [
 /** Closed blocks shorter than this never get a mark and never show the strip. */
 var MIN_MARK_MINUTES = 15;
 
-/** A category tap this soon after the previous tap is a correction, not a transition. */
-var MISTAP_SECONDS = 90;
+/**
+ * A category tap this soon after the previous tap is a correction, not a
+ * transition: it retitles the block you are in rather than starting a new one.
+ *
+ * **This must stay below CONFIRM_WITHIN_SECONDS, and a lint rule fails if it
+ * ever stops being.** It used to be 90 against a confirm window of 60, which
+ * left a thirty-second band — 60s to 90s after the last tap — where a single
+ * unconfirmed tap acted immediately AND destructively: it silently retitled the
+ * block you were actually in. Nesting the correction window well inside the
+ * confirm window makes every destructive path confirmed by construction rather
+ * than by luck.
+ *
+ * It also makes a deliberate short block recordable for the first time. At 90s
+ * there was no way to log a 45-second task: the tap that ended it was treated
+ * as a correction and ate it.
+ */
+var MISTAP_SECONDS = 20;
 
 /**
  * A category tap this soon after the previous one asks before it acts. The tap
@@ -62,6 +77,10 @@ var MISTAP_SECONDS = 90;
  * button writes anything. Taps this close together are far more often a brush
  * than a decision, and the correction rule makes a brush destructive: it
  * silently retitles the block you are actually in.
+ *
+ * Deliberately LARGER than MISTAP_SECONDS, so the whole correction window sits
+ * inside it and no correction can ever happen without being confirmed. The
+ * ordering is the guarantee; the two particular numbers are not.
  */
 var CONFIRM_WITHIN_SECONDS = 60;
 

@@ -350,6 +350,36 @@ const NUMBER_WORDS = ['zero', 'one', 'two', 'three', 'four', 'five', 'six'];
  * was renamed or removed. A worked example naming a key that does not exist is
  * worse than no example.
  */
+/*
+ * The two tap windows have to nest, and the ordering is the guarantee.
+ *
+ * MISTAP_SECONDS was 90 against a CONFIRM_WITHIN_SECONDS of 60, which left a
+ * thirty-second band where a single unconfirmed tap acted immediately AND
+ * destructively: it silently retitled the block you were actually in. With the
+ * correction window inside the confirm window, every destructive path is
+ * confirmed by construction.
+ *
+ * This reads both numbers out of Code.gs rather than being told them, so it
+ * pins the RELATIONSHIP and not the two values that happen to be configured
+ * today. Tuning either is fine; inverting them is not.
+ */
+const winNum = name => {
+  const m = codeNoComments.match(new RegExp('var\\s+' + name + '\\s*=\\s*(\\d+)\\s*;'));
+  return m ? Number(m[1]) : null;
+};
+const MISTAP = winNum('MISTAP_SECONDS');
+const CONFIRM = winNum('CONFIRM_WITHIN_SECONDS');
+const winBad = [];
+if (MISTAP === null) winBad.push('could not read MISTAP_SECONDS out of Code.gs');
+if (CONFIRM === null) winBad.push('could not read CONFIRM_WITHIN_SECONDS out of Code.gs');
+if (MISTAP !== null && CONFIRM !== null && !(MISTAP < CONFIRM)) {
+  winBad.push('MISTAP_SECONDS is ' + MISTAP + ' and CONFIRM_WITHIN_SECONDS is ' + CONFIRM +
+              ', so between ' + CONFIRM + 's and ' + MISTAP + 's a single unconfirmed tap ' +
+              'retitles the block you are in');
+}
+check('the correction window nests inside the confirm window', winBad,
+  'inverted, a brush against a different category destroys the block you are actually in');
+
 const PLAN_DOCS = ['SETUP.md', 'README.md'];
 const CATEGORY_KEYS = (() => {
   const block = codeNoComments.match(/var CATEGORIES\s*=\s*\[([\s\S]*?)\];/);

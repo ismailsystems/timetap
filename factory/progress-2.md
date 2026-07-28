@@ -7,9 +7,9 @@ Round 1's progress record is `factory/progress.md` and is **read-only**.
 
 ## Status
 
-In progress. **10 of 16 tasks complete. Stage B is finished — the milestone stage.** Stage C, task C1 next.
+In progress. **11 of 16 tasks complete.** Stage C, task C2 next.
 
-Suite: **716 passed / 0 failed** (baseline was 492), green in all four
+Suite: **738 passed / 0 failed** (baseline was 492), green in all four
 contracted timezones. Lint all clear. Headless ok, 19 checks per viewport.
 
 ## Tasks
@@ -26,7 +26,7 @@ contracted timezones. Lint all clear. Headless ok, 19 checks per viewport.
 | B3 | B | **done** | 1 | done in the same pass as B2; reason in log-2.md |
 | B4 | B | **done** | 1 | three mutations tried, all caught |
 | B5 | B | **done** | 1 | vacuity check done, both halves one file at a time, plus key-drift |
-| C1 | C | pending | 0 | the sweep is the load-bearing criterion |
+| C1 | C | **done** | 1 | the sweep found a planted gap at exactly seconds 5-19 |
 | C2 | C | pending | 0 | |
 | C3 | C | pending | 0 | |
 | D1 | D | pending | 0 | golden fixture changes here, second and last time |
