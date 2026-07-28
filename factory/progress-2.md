@@ -7,16 +7,16 @@ Round 1's progress record is `factory/progress.md` and is **read-only**.
 
 ## Status
 
-In progress. **15 of 16 tasks complete.** Stage D, task D3 next.
+**All 16 tasks complete.** Nothing is parked, and no circuit breaker fired.
 
 **Two things need a human ruling before this round can be called finished.**
 **Q14** — D1 and contract 20 cannot both be true. **Q16** — D2's fourth
 criterion asserts something the code never did. A checker returned FAIL on each,
 and both are written up in full below with what was done instead and why.
 
-Suite: **868 passed / 0 failed** (baseline was 492), green in all four
+Suite: **908 passed / 0 failed** (baseline was 492), green in all four
 contracted timezones. Lint all clear, 20 rules. Headless ok, 20 checks per
-viewport plus the split-scope phase.
+viewport, plus the split-scope and set-aside phases.
 
 ## Resume here (context cleared 2026-07-28, after C2; C3 done 2026-07-28)
 
@@ -24,14 +24,13 @@ The loop was stopped deliberately after **C2**, at the human's request, not by a
 circuit breaker, and restarted at C3. Nothing is half-finished: every completed
 task is committed.
 
-To continue, run `/loop work through factory/HANDOFF-2.md exactly as written`.
-The next unfinished, unblocked task is **D3**. Read this file and
-`factory/log-2.md` first — between them they are the whole memory of the run.
+The build is finished. The next step is an independent review — `/factory` or
+`/factory-review` — which should start from the two blocking questions above.
 
-State after D2:
+State after D3:
 
 ```
-node test/tests.js      868 passed, 0 failed   (baseline 492)
+node test/tests.js      908 passed, 0 failed   (baseline 492)
 node test/lint.js       all clear — 20 rules
 node test/headless.js   ok — 20 checks per viewport
 ```
@@ -41,7 +40,7 @@ Green in all four contracted timezones. `appsscript.json` and
 pre-existing test assertion has been removed all round, and it is A2's — the one
 pinning the `=` that A2 exists to replace.
 
-**Sixteen questions are parked below and none has been answered.** **Q14 and
+**Eighteen questions are parked below and none has been answered.** **Q14 and
 Q16 are the ones that block sign-off** — a contract assertion and a task that cannot
 both be satisfied, which D1's checker returned FAIL on. After that, Q1, Q4, Q9
 and Q11 are where the handoff contradicts itself or where a contract assertion
@@ -67,7 +66,7 @@ read.
 | C3 | C | **done** | 1 | checker ran 8 criteria + 10 mutations; found a pre-existing silent data loss (addition 4) and two untested branches, all fixed. Q12/Q13 parked |
 | D1 | D | **done, with Q14 escalated** | 1 | checker returned FAIL: it found a real gap in the rewritten column tests (closed) and was right that the contract-20 conflict was under-escalated (Q14 now does it properly). Golden fixture deliberately NOT regenerated |
 | D2 | D | **done, criterion 4 unmet — Q16** | 1 | five of six criteria met and mutation-proved. Criterion 4 asserts `week of` is "still a date value, not a string" — it is a string, and was one before this round. Checker returned FAIL on that and it is escalated, not fixed |
-| D3 | D | pending | 0 | |
+| D3 | D | **done** | 1 | checker passed it and found three untested branches — the ref comparison, the posture, and whether the clear survives a reload — all now pinned. Q17/Q18 parked |
 
 ## Baseline, measured 2026-07-27 before any work
 
@@ -108,7 +107,8 @@ neither worth stalling the run over:
   a spreadsheet a person reads, and "parsed" is B4's word for something else —
   test 49e matches `/parsed/i` against every header, and `UNPARSED` tripped it.
 - D2's partial-week marker does not name the column. Settled at D2 as
-  **`days covered`**, on the weekly tab, appended after the mark columns. The
+  **`days covered (of 7)`**, on the weekly tab, appended after the mark
+  columns. The
   count *is* the marking: 7 is a whole week and anything less is not, in a
   column that also says how much less — which is what the criterion asks for in
   one column rather than two. A separate yes/no column would carry strictly
@@ -551,6 +551,50 @@ Judged the right trade and left alone: the app not claiming to know what a block
 is costs an affordance that only existed because it was claiming. Named because
 it is a capability the round removes without a criterion saying so.
 
+### Q17 (D3) — a set-aside split leaves a real block open that STOP can no longer reach
+
+Found by D3's checker. When a `splitActual` is set aside, the split never
+happened — so the *original* block is still genuinely `#open` on the calendar,
+while the client, correctly, stops claiming the split's new block is running.
+The consequence is that STOP goes inert while something real is running:
+
+```
+set aside: ["splitActual"]   grid now shows: null
+calendar holds: "MTG:" 09:00-09:01 OPEN      STOP is inert
+after STOP x2 -> queued: []  calendar still: "MTG:" OPEN
+after a reload -> grid: MTG  (the truth comes back)
+```
+
+**Not a regression, and left as it is.** Before D3 the grid showed the split's
+phantom block, STOP looked alive, and its `closeActual` was a server-side no-op
+against a ref that never existed — the same block stayed open, with the app
+pretending otherwise. D3 makes the appearance honest without changing the
+outcome, and a reload or a return-to-app refresh restores the truth.
+
+**The improvement the checker suggests, for the human:** the client does know
+the original block's ref, key and start (`op.ref` plus `blockIdx()`), so it
+could put *that* block back in hand instead of going idle — truthful, and STOP
+keeps working. Not done here because D3's fourth criterion says the grid "stops
+showing it as running" and restoring a different block is a bigger claim than
+the criterion makes, at the end of a round.
+
+### Q18 (D3) — a sheet open over the grid does not hear the clear either
+
+Same family as [Q12](#q12-c3--a-sheet-can-outlive-the-block-it-names-and-then-act-on-a-different-one),
+found by D3's checker, and it makes that question worth answering once for both.
+If the SPLIT sheet is open when the fifth failure lands, the grid goes idle
+underneath it but the sheet stays open, still headed with the block that no
+longer exists, and its subtitle degrades to a literal `? 5m → 0m remainder`.
+Choosing a category then does nothing: no write, no drawer entry. The SIT-edit
+sheet behaves the same way after an `openSit` is set aside — APPLY and DELETE
+silently no-op and close. Nothing throws on any of these paths.
+
+**One fix closes Q12, Q18 and half of Q17's awkwardness:** a sheet aimed at a
+block should close when the block it names stops being the one in hand. Named
+here rather than done, for the same reason as Q12 — it is round-1's
+`adoptServerState`/sheet-lifecycle question, and it wants deciding once rather
+than patching twice at the end of a round.
+
 ## Contract additions
 
 _Every bug found during the run gets a criterion written here first, then the
@@ -677,6 +721,26 @@ which is why nothing caught this.
 
 **Fixed in D1.** `SETUP.md` corrected, and `test/lint.js` gains
 "every constant SETUP.md quotes has that value in Code.gs" — 7 checked.
+
+### Addition 6 (found at D3, by reading its own criteria) — the posture row tells the same lie
+
+D3's criteria name the ACTUAL grid: a set-aside `openActual`, and a set-aside
+`splitActual` whose `newRef` is the open block. `openSit` is the identical lie
+one row down — the SIT was never created, every later `closeSit` for that ref is
+a no-op, and the posture button goes on reading `SITTING` with its clock
+running.
+
+Not named by any criterion, so it is written here before the fix rather than
+folded in silently:
+
+- [tier 1] Given the server rejects every call and an `openSit` is set aside
+  after `MAX_OP_TRIES`, then the posture falls back to standing, `S.sit` no
+  longer holds that ref, and the SITTING calendar is empty — which is the truth.
+
+**Fixed in D3**, in the same three lines of `quarantine` that D3's own criteria
+need. Test 55f. The narrowness D3's criterion 3 demands is preserved: a
+set-aside `setMark` or `setText` still leaves the grid and the posture exactly
+as they were, because those belong to blocks that really do exist.
 
 ## Parked tasks
 

@@ -1045,3 +1045,74 @@ that; only the paperwork was.
 
 868 / 0, green twice and in all four contracted timezones. Lint all clear at 20
 rules. Headless ok at 20 checks per viewport.
+
+## [2026-07-28 10:05] D3 | The grid stops showing a live block whose write was set aside
+
+**A set-aside `openActual` never reached the calendar, so the block does not
+exist.** Every later op for that ref is then a no-op nobody can see —
+`findByRef_` finds nothing and `opCloseActual_` returns early — while the grid
+went on showing the block lit with its clock ticking. The banner persists and
+the drawer holds the write, so the failure was always findable. The grid was
+the part that lied, so the grid is what stops.
+
+Three lines in `quarantine`, and the whole difficulty is in which ops count. A
+`splitActual` counts: its `newRef` **is** the open block, an open by another
+name. A `setMark` or `setText` does not — those belong to a block that really
+was created and really is running, and clearing the grid for them would be a
+different lie. That is D3's own third criterion, and it is the one that stops
+this task over-correcting into "any set-aside write blanks the grid".
+
+**Addition 6, written up before it was fixed:** `openSit` is the identical lie
+one row down. D3's criteria name only the ACTUAL grid, but a SIT that was never
+created is not one the posture row should go on claiming. Test 55f.
+
+**Tests: 55 through 55i, plus a `checkSetAsideOpen` phase in `test/headless.js`.
+868 → 908 assertions.**
+
+**Mutation table:**
+
+| Mutation | Caught by |
+|---|---|
+| the grid keeps showing the block — the bug itself | 4 tier-1 assertions, and the headless phase names both the lit cell and the ticking clock |
+| any set-aside write clears the grid — the over-correction | 55c |
+| the ref comparison dropped | 55g, both halves |
+| the clear takes the posture with it | 55h |
+| cleared but never saved | 55i |
+
+**The checker passed it, and found three untested branches.** All three were
+mutations that left the suite green at 894/0:
+
+- **the ref comparison.** An `openActual` can be set aside for a block the user
+  has already moved on from, while the block they are actually in was opened by
+  a later op. Deleting `S.open.ref === openedRef` passed everything. It is the
+  half of the narrowness the implementation spends its code on, and it was
+  unproven. **55g** now stacks three writes offline, lets the *first* one be
+  the one set aside, and asserts the grid still shows the block in hand.
+- **the posture.** Nothing stopped a future edit from clearing `S.sit` along
+  with the grid, which contract 7 names as untouched behaviour. **55h.**
+- **the reload.** Deleting `saveState()` passed — no test reloaded after a
+  clear. The checker measured the cost exactly: reload while the server is
+  still down and the phantom comes back, lit, clock ticking, with nothing on
+  the calendar. **55i** reloads offline, which is the case that tells a painted
+  clear from a saved one.
+
+Its two other findings are parked rather than fixed. **Q17:** a set-aside
+`splitActual` leaves the *original* block genuinely open on the calendar while
+the grid goes idle, so STOP greys out with something real running. Not a
+regression — before D3 the grid showed the phantom, STOP looked alive, and its
+close was a server-side no-op against a ref that never existed — but the client
+does know enough to put the original block back in hand, and that is a bigger
+claim than the criterion makes. **Q18:** a sheet open over the grid does not
+hear the clear either, which is the same lifecycle question as Q12. One fix
+closes both, and it wants deciding once rather than patched twice at the end of
+a round.
+
+It also corrected the headless phase's justification, which claimed the browser
+was needed for something the phase did not actually check. It now reads the
+clock's **computed** display rather than a class name — `.ge` is `display:none`
+until its cell goes active, and a class list is a proxy for that, not the thing
+itself.
+
+908 / 0, green twice and in all four contracted timezones. Lint all clear at 20
+rules. Headless ok at 20 checks per viewport. **Stage D complete, and with it
+the round.**

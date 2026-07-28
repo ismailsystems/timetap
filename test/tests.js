@@ -3861,6 +3861,193 @@ chk('no days covered column on the daily tab', dRows()[0].indexOf('days covered 
 ROLLUP_DAYS = DAYS_WAS;
 reset();
 
+console.log('\n55. the grid stops showing a block whose open was set aside');
+/*
+ * A set-aside openActual never reached the calendar, so the block does not
+ * exist — and every later op for that ref is a no-op nobody can see:
+ * findByRef_ finds nothing and opCloseActual_ returns early. The banner
+ * persists and the drawer holds the write, so the failure is findable. The
+ * grid was the part that lied, showing the block lit with its clock ticking.
+ */
+reset(); reboot();
+H.setServerReject('calendar said no');
+tap('DW');
+chk('it shows as running while the write is still being tried',
+  activeKey() === 'DW', String(activeKey()));
+pump(() => DEAD().length > 0);
+chk('the open was set aside',
+  DEAD().length === 1 && DEAD()[0].op.type === 'openActual',
+  JSON.stringify(DEAD().map(d => d.op.type)));
+chk('and now no cell renders as running', activeKey() === null, String(activeKey()));
+chk('which is the truth: nothing was created on either calendar',
+  A().length === 0 && S().length === 0, A().map(show).join(' | '));
+chk('the banner still says a write was set aside — the repaint does not clear it',
+  !$('err').hidden && /set it aside/.test($('err').textContent), $('err').textContent);
+chk('and the drawer still holds it, so it is not lost',
+  DEAD().length === 1, JSON.stringify(DEAD().map(d => d.op.type)));
+
+console.log('\n55b. and no later write is aimed at the block that never existed');
+H.setServerReject(null);
+tap('MTG'); settle();
+chk('a fresh block opens normally', A().length === 1 && A()[0].t === 'MTG:',
+  A().map(show).join(' | '));
+chk('with a new ref, not the set-aside one',
+  A()[0].d.indexOf(DEAD()[0].op.ref) < 0,
+  A()[0].d.replace(/\n/g, '|') + ' vs dead ref ' + DEAD()[0].op.ref);
+chk('and nothing was ever queued to close the block that was never created',
+  !Q().some(o => o.type === 'closeActual'), JSON.stringify(Q().map(o => o.type)));
+
+console.log('\n55c. a set-aside mark does NOT clear the grid');
+/* The over-correction this task has to avoid: "any set-aside write clears the
+ * grid" would be a different lie. A setMark belongs to a block that really was
+ * created and really is running. */
+reset(); reboot();
+tap('DW'); wait(30); tap('MTG'); settle();      // DW closes, MTG opens, strip shows
+chk('MTG is the running block', activeKey() === 'MTG', String(activeKey()));
+H.setServerReject('calendar said no');
+tapMark('+');                                   // a setMark for the CLOSED DW
+pump(() => DEAD().length > 0);
+chk('the mark was the thing set aside',
+  DEAD().length === 1 && DEAD()[0].op.type === 'setMark',
+  JSON.stringify(DEAD().map(d => d.op.type)));
+chk('and MTG is still shown running, because it really is',
+  activeKey() === 'MTG', String(activeKey()));
+chk('and is still open on the calendar',
+  A().length === 2 && /#open/.test(A()[1].d), A().map(show).join(' | '));
+H.setServerReject(null);
+
+console.log('\n55d. a set-aside split clears it too — its newRef is an open by another name');
+reset(); reboot();
+tap('MTG'); settle(); wait(120);
+H.setServerReject('calendar said no');
+tap('MTG'); settle();                           // re-tap the lit one: SPLIT
+$('spRange').value = '60'; $('spRange').fire('input');
+splitPick('ADM');
+chk('the client shows the remainder running', activeKey() === 'ADM', String(activeKey()));
+pump(() => DEAD().length > 0);
+chk('the split was set aside',
+  DEAD().length === 1 && DEAD()[0].op.type === 'splitActual',
+  JSON.stringify(DEAD().map(d => d.op.type)));
+chk('and the grid stops showing it running', activeKey() === null, String(activeKey()));
+H.setServerReject(null);
+
+console.log('\n55e. discarding the set-aside open from the drawer leaves it idle');
+reset(); reboot();
+H.setServerReject('calendar said no');
+tap('DW');
+pump(() => DEAD().length > 0);
+chk('idle after it was set aside', activeKey() === null, String(activeKey()));
+$('err').fire('click'); settle();               // the banner opens the drawer
+chk('the drawer opened with the one entry', uiRows().length === 1,
+  String(uiRows().length));
+let threw55 = null;
+try { discard(uiRows()[0]); } catch (e) { threw55 = String((e && e.message) || e); }
+chk('discarding it throws nothing', threw55 === null, String(threw55));
+chk('the drawer is empty', DEAD().length === 0, JSON.stringify(DEAD()));
+chk('and the grid is still idle', activeKey() === null, String(activeKey()));
+H.setServerReject(null);
+tap('REL'); settle();
+chk('a tap after that opens a fresh block normally',
+  A().length === 1 && A()[0].t === 'REL:' && /#open/.test(A()[0].d) && activeKey() === 'REL',
+  A().map(show).join(' | '));
+
+console.log('\n55g. it is the ref that decides, not the op type');
+/* The half of the narrowness that lives in `S.open.ref === openedRef`. An
+ * openActual can be set aside for a block the user has already moved on from,
+ * while the block they ARE in was opened by a later op that may still land.
+ * Deleting the ref comparison passes every other assertion in this section, so
+ * this is the one that pins it.
+ *
+ * Offline first, so the queue can be stacked up without anything counting
+ * against a try; then the server starts rejecting and the head — the first
+ * block's open — is the one that gets set aside. */
+reset(); reboot();
+H.setOnline(false);
+tap('DW'); advance(70000); settle();
+tap('MTG'); settle();
+chk('three writes are stacked up and MTG is the block in hand',
+  Q().length === 3 && activeKey() === 'MTG', JSON.stringify(Q().map(o => o.type)));
+H.setOnline(true); H.setServerReject('calendar said no');
+pump(() => DEAD().length > 0);
+chk('the first block\'s open was the one set aside',
+  DEAD().length === 1 && DEAD()[0].op.type === 'openActual' && DEAD()[0].key === 'DW',
+  JSON.stringify(DEAD().map(d => d.op.type + '/' + d.key)));
+chk('and the grid still shows MTG, which is a different block entirely',
+  activeKey() === 'MTG', String(activeKey()));
+H.setServerReject(null); H.setOnline(true);
+
+reset(); reboot();
+H.setOnline(false);
+tapSit(); settle();
+posture('stand'); settle();
+tapSit(); settle();
+chk('a SIT was opened, closed and opened again, all still queued',
+  Q().filter(o => o.type === 'openSit').length === 2 && litPosture() === 'sit',
+  JSON.stringify(Q().map(o => o.type)));
+H.setOnline(true); H.setServerReject('calendar said no');
+pump(() => DEAD().length > 0);
+chk('the first SIT open was set aside',
+  DEAD().length === 1 && DEAD()[0].op.type === 'openSit',
+  JSON.stringify(DEAD().map(d => d.op.type)));
+chk('and the posture still says sitting, because a later SIT is the live one',
+  litPosture() === 'sit', String(litPosture()));
+H.setServerReject(null); H.setOnline(true);
+
+console.log('\n55h. clearing one half leaves the other alone');
+/* Contract 7 names posture toggling as untouched by this round. A SIT that
+ * really was created must survive an ACTUAL open being set aside. */
+reset(); reboot();
+tapSit(); settle();
+chk('the SIT really is on the calendar', S().length === 1, S().map(show).join(' | '));
+H.setServerReject('calendar said no');
+tap('DW');
+pump(() => DEAD().length > 0);
+chk('the block\'s open was set aside', DEAD().length === 1, JSON.stringify(DEAD()));
+chk('the grid is idle', activeKey() === null, String(activeKey()));
+chk('and the posture is untouched — that SIT exists',
+  litPosture() === 'sit' && S().length === 1,
+  litPosture() + ' ' + S().map(show).join(' | '));
+H.setServerReject(null);
+
+console.log('\n55i. and the grid is still idle after a reload');
+/* The clear has to be written down, not just painted. Reloading offline is the
+ * case that tells them apart: the client falls back to what it saved, and an
+ * unsaved clear brings the phantom back with its clock ticking. */
+reset(); reboot();
+H.setServerReject('calendar said no');
+tap('DW');
+pump(() => DEAD().length > 0);
+chk('idle after the open was set aside', activeKey() === null, String(activeKey()));
+H.setOnline(false);
+reboot();
+chk('and still idle after a reload with no server to ask',
+  activeKey() === null, String(activeKey()));
+chk('with nothing on the calendar to have been showing',
+  A().length === 0, A().map(show).join(' | '));
+wait(2);
+chk('and no clock started ticking in the meantime',
+  activeKey() === null && elapsedBox() === '', String(activeKey()) + ' ' + elapsedBox());
+H.setOnline(true); H.setServerReject(null);
+
+console.log('\n55f. a set-aside SIT open stops the posture claiming it too');
+/* Addition 6: the same lie, one row down. Not named by D3's criteria; written
+ * up in factory/progress-2.md before being fixed here. */
+reset(); reboot();
+H.setServerReject('calendar said no');
+tapSit();
+chk('the posture says sitting while the write is being tried',
+  litPosture() === 'sit', String(litPosture()));
+pump(() => DEAD().length > 0);
+chk('the SIT open was set aside',
+  DEAD().length === 1 && DEAD()[0].op.type === 'openSit',
+  JSON.stringify(DEAD().map(d => d.op.type)));
+chk('and the posture falls back to standing',
+  litPosture() === 'stand', String(litPosture()));
+chk('which is the truth: the SITTING calendar is empty',
+  S().length === 0, S().map(show).join(' | '));
+H.setServerReject(null);
+reset();
+
 console.log('\n────────────────────────────────────────');
 console.log(H.pass + ' passed, ' + H.fail + ' failed' +
             (H.skipped.length ? ', ' + H.skipped.length + ' skipped' : ''));

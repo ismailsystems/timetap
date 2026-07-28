@@ -664,9 +664,36 @@
     dead.push({ at: Date.now(), why: err.message, op: q[i],
                 key: info.key, startMs: info.startMs });
     lsSet(K_DEAD, dead.slice(-50));
+    /*
+     * A set-aside open never reached the calendar, so the block it describes
+     * does not exist. Every later op for that ref is then a no-op nobody can
+     * see — findByRef_ finds nothing and opCloseActual_ returns early — while
+     * the grid goes on showing the block lit with its clock ticking.
+     *
+     * The banner persists and the drawer holds the write, so the failure is
+     * findable. The grid is the part that lies, so the grid is what stops.
+     *
+     * A splitActual counts: its newRef IS the open block, an open by another
+     * name. Nothing else does. A set-aside setMark or setText belongs to a
+     * block that was really created and really is running, and clearing the
+     * grid for those would be a different lie.
+     */
+    var openedRef = q[i].type === 'openActual' ? q[i].ref
+                  : q[i].type === 'splitActual' ? q[i].newRef
+                  : null;
+    var cleared = !!(openedRef && S.open && S.open.ref === openedRef);
+    if (cleared) S.open = null;
+    // The same, for the posture half: a SIT that was never created is not one
+    // the row should go on claiming.
+    if (q[i].type === 'openSit' && S.sit && S.sit.ref === q[i].ref) {
+      S.sit = null;
+      cleared = true;
+    }
+    if (cleared) saveState();
     q.splice(i, 1);
     setQueue(q);
     showErr('gave up on one write and set it aside: ' + err.message);
+    if (cleared) render();
     // If the reader is standing at the shelf when a new one lands, put it on the
     // shelf rather than making them close the drawer and open it again.
     if (!$('sheetDead').classList.contains('hidden')) renderDead();

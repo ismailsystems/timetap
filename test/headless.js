@@ -992,6 +992,146 @@ async function checkSplitScope(browser, view, page) {
   return problems;
 }
 
+/**
+ * D3, in a real browser: the server rejects every write, so the first tap's
+ * openActual is retried and then set aside — and the block it described was
+ * never created. The banner has always said so. What this checks is the grid,
+ * which used to go on showing the block lit with its clock ticking, and that
+ * the drawer is reachable from the banner while it does.
+ *
+ * Two things here the shim in tests.js cannot do. It reads the clock's COMPUTED
+ * display rather than a class name — `.ge` is `display:none` until a cell goes
+ * active, and a class list is a proxy for that, not the thing itself. And it
+ * drives the client's real retry ladder and the real banner-to-drawer tap,
+ * rather than a shim's idea of them.
+ */
+const REJECT_ORIGIN = 'http://timetap-reject.invalid/';
+
+function rejectingServerStub() {
+  const mk = () => {
+    const b = {
+      withSuccessHandler: f => (b._ok = f, b),
+      withFailureHandler: f => (b._fail = f, b),
+      /* A rejection, not a dropped connection: it comes back through the
+         SUCCESS handler as a non-empty errors array, which is the only path
+         that counts against an op's try count and can ever set one aside. */
+      applyOps: ops => setTimeout(() => b._ok && b._ok({
+        applied: [], dropped: [],
+        errors: (ops || []).slice(0, 1).map(o => ({ id: o.id, message: 'calendar said no' }))
+      }), 5),
+      getState: () => setTimeout(() => b._ok && b._ok({ open: null, today: [], sit: null, sitToday: [] }), 5),
+      addCategory: () => setTimeout(() => b._ok && b._ok({}), 5)
+    };
+    return b;
+  };
+  window.google = { script: { run: new Proxy({}, { get: (_, k) => (...a) => mk()[k](...a) }) } };
+}
+
+async function checkSetAsideOpen(browser, view, page) {
+  const problems = [];
+  const ctx = await browser.newContext({
+    viewport: { width: view.width, height: view.height },
+    isMobile: !!view.isMobile, hasTouch: !!view.isMobile,
+    deviceScaleFactor: view.isMobile ? 3 : 1
+  });
+  const pg = await ctx.newPage();
+  const errors = [];
+  pg.on('pageerror', e => errors.push(String((e && e.message) || e)));
+  try {
+    await pg.route(REJECT_ORIGIN, r =>
+      r.fulfill({ status: 200, contentType: 'text/html; charset=utf-8', body: documentFor(page, true) }));
+    await pg.addInitScript(rejectingServerStub);
+    await pg.goto(REJECT_ORIGIN, { waitUntil: 'load' });
+    await pg.waitForTimeout(120);
+
+    const lit = () => pg.evaluate(() => {
+      const cells = [].slice.call(document.querySelectorAll('#grid [data-key]'));
+      const active = cells.filter(c => c.classList.contains('active'));
+      /* Painted, not classed: `.ge` is display:none until its cell goes active,
+         so this is the clock the user can actually see ticking. */
+      const ticking = cells.filter(c => {
+        const el = c.querySelector('.ge');
+        return el && getComputedStyle(el).display !== 'none' && el.textContent.trim() !== '';
+      });
+      return {
+        cells: cells.length,
+        active: active.map(c => c.dataset.key),
+        ticking: ticking.map(c => c.dataset.key + '=' + c.querySelector('.ge').textContent.trim()),
+        dead: JSON.parse(localStorage.getItem('tt.dead.v1') || '[]').map(d => d.op && d.op.type),
+        bannerShown: !document.getElementById('err').classList.contains('hidden'),
+        bannerText: document.getElementById('err').textContent.trim()
+      };
+    });
+
+    await pg.click('#grid [data-key="DW"]');
+    await pg.waitForTimeout(80);
+    const before = await lit();
+    if (!before.active.length) {
+      problems.push(view.name + ': the tapped cell never rendered as running, so the ' +
+                    'set-aside case below could not be told apart from it');
+    }
+
+    /* The retry ladder is 4s doubling to a 60s ceiling, and five rejections set
+       the write aside. Real time would be a minute of waiting, so the clock is
+       moved rather than waited on: fire each pending retry by hand. */
+    for (let i = 0; i < 12 && !(await lit()).dead.length; i++) {
+      await pg.evaluate(() => {
+        // The client schedules its retry with setTimeout; nudging visibility
+        // and online both call flush() directly, which is what a real retry does.
+        window.dispatchEvent(new Event('online'));
+      });
+      await pg.waitForTimeout(120);
+    }
+
+    const after = await lit();
+    console.log('\nset-aside open (' + view.name + ')');
+    console.log('  before:          active=' + JSON.stringify(before.active) +
+                ' ticking=' + JSON.stringify(before.ticking));
+    console.log('  after:           active=' + JSON.stringify(after.active) +
+                ' ticking=' + JSON.stringify(after.ticking));
+    console.log('  set aside:       ' + JSON.stringify(after.dead));
+    console.log('  banner:          ' + JSON.stringify(after.bannerText.slice(0, 60)));
+
+    if (!after.dead.length) {
+      problems.push(view.name + ': no write was ever set aside, so this phase checked nothing');
+      return problems;
+    }
+    if (after.dead[0] !== 'openActual') {
+      problems.push(view.name + ': expected the openActual to be set aside, got ' +
+                    JSON.stringify(after.dead));
+    }
+    if (after.active.length) {
+      problems.push(view.name + ': a cell is still lit for a block that was never created — ' +
+                    JSON.stringify(after.active));
+    }
+    if (after.ticking.length) {
+      problems.push(view.name + ': a clock is still running in ' + JSON.stringify(after.ticking) +
+                    ' for a block that was never created');
+    }
+    if (!after.bannerShown) {
+      problems.push(view.name + ': the banner is gone, so the set-aside write is now ' +
+                    'invisible as well as ineffective');
+    }
+
+    // And the drawer still opens from the banner, with the write in it.
+    await pg.click('#err');
+    await pg.waitForTimeout(150);
+    if (!await pg.locator('#sheetDead').isVisible()) {
+      problems.push(view.name + ': tapping the banner did not open the set-aside drawer');
+    } else {
+      const rows = await pg.locator('#deadList .deadrow').count();
+      console.log('  drawer rows:     ' + rows);
+      if (rows !== 1) {
+        problems.push(view.name + ': the drawer shows ' + rows + ' rows for one set-aside write');
+      }
+    }
+    if (errors.length) problems.push(view.name + ': the page threw: ' + errors.join(' | '));
+  } finally {
+    await ctx.close();
+  }
+  return problems;
+}
+
 function sameMetas(a, b) {
   const norm = list => list.map(m => m[0] + '\0' + m[1]).sort();
   const x = norm(a), y = norm(b);
@@ -1144,6 +1284,7 @@ async function main() {
     problems = problems.concat(await checkInjectionMatters(browser, VIEWS[0], page));
     problems = problems.concat(await checkDrawer(browser, VIEWS[0], page));
     problems = problems.concat(await checkTapCount(browser, VIEWS[0], page));
+    problems = problems.concat(await checkSetAsideOpen(browser, VIEWS[0], page));
     /* A4: the worst-case posture row, on a phone and on a desktop. 980px is
        named in the contract specifically so STOP cannot become a phone-only
        control that nobody checked anywhere else. */
