@@ -1116,3 +1116,26 @@ itself.
 908 / 0, green twice and in all four contracted timezones. Lint all clear at 20
 rules. Headless ok at 20 checks per viewport. **Stage D complete, and with it
 the round.**
+
+## [2026-07-28 10:20] ROUND | Complete — 16 of 16, and the summary is written
+
+All four stages done, in dependency order, one commit each. 492 → 908
+assertions, green twice in a row and in all four contracted timezones; lint all
+clear at 20 rules; headless ok at 20 checks per viewport across seven phases.
+
+Nothing was parked and no circuit breaker fired. Two acceptance criteria are
+**unmet and escalated rather than engineered around** — Q14 (contract 20 versus
+D1, which cannot both be true) and Q16 (`week of` was never the date value the
+criterion says it "still" is). A checker returned FAIL on each and its verdict
+is quoted rather than paraphrased. Eighteen questions are parked in
+`factory/progress-2.md`, none answered, and six bugs found mid-run each got a
+written criterion before its fix.
+
+`test/fixtures/rollup-golden.json` has zero commits this round, against a
+guardrail that budgeted two. That is the single largest deviation and it is
+argued in full at Q11 and Q14: regenerating it would make the test that uses it
+compare the new code against itself, which is what round 1 wrote its `_note` to
+prevent.
+
+`## RUN SUMMARY` is at the top of `factory/progress-2.md`, with the commands a
+human can run to see all of it work. Next step is the independent review.

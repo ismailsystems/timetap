@@ -1,5 +1,123 @@
 # Progress — round 2, the honest record round
 
+## RUN SUMMARY
+
+**Outcome: all 16 tasks complete, nothing parked, no circuit breaker fired.**
+Two criteria are unmet and escalated rather than faked — **Q14** and **Q16** —
+and they are the first thing a reviewer should read. Everything else in the
+contract passes when run, not when read.
+
+```
+node test/tests.js      908 passed, 0 failed     (baseline 492, and it only ever went up)
+node test/lint.js       all clear — 20 rules     (17 pre-round + B5 + C1 + addition 5)
+node test/headless.js   ok — 20 checks per viewport, 7 phases
+```
+
+Green twice in a row and under all four contracted timezones. In a fifth zone
+the two golden-dependent sections skip **by name** and the rest still runs
+(`TZ=Asia/Kolkata` → 880 passed, 0 failed, 2 skipped). `appsscript.json` is
+byte-identical to `main` at `a256bdf` and still asks for exactly three OAuth
+scopes. `test/fixtures/rollup-golden.json` has **zero** commits this round — see
+Q11 and Q14 for why that is deliberate and what it costs.
+
+### What the round set out to fix, and what it did
+
+The stress test found an app that *captured more than it reported and inferred
+more than it admitted*. Six findings, four stages:
+
+| Stage | What you have now |
+|---|---|
+| **A** | The day can end. STOP closes the open block and any open SIT and opens nothing. A block the app had to bound says `?` in its title instead of pretending the user settled it — and `waking h` and `sitting %` stopped counting time nobody logged. |
+| **B** | Every hour in the rollup is traceable to something the user said or something visibly marked as the app's guess. Both tabs carry a column per category per mark; the rollup says how much of PLAN it could actually read; the docs say the one thing about PLAN that was never written down. |
+| **C** | It stops fighting you on a fast day: the correction window nests inside the confirm window, so nothing destructive happens unconfirmed, the armed button says which of the two things the next tap will do, and a misfiled block can be fixed whole from the SPLIT sheet. |
+| **D** | An unreadable title is filed as `UNFILED` rather than claimed as Admin, a week the window only partly covers says so, and the grid stops showing a live block whose write was set aside. |
+
+### Per-task status
+
+| Task | Status | What the checker found |
+|---|---|---|
+| A1 | done | a user's note could write `?` — addition 1, fixed |
+| A2 | done | two defects: a category could be configured to guess; bounding overwrote a mark — additions 2 and 3 |
+| A3 | done | two real bugs: a stuck armed STOP, a stale-read race — both fixed |
+| A4 | done | four mutations the phase missed — all now caught |
+| A5 | done | a 16-scenario × 6-zone differential moved nothing. Q9/Q10 parked |
+| B1 | done | four mutations, all caught |
+| B2 | done | golden deliberately not regenerated — Q11 |
+| B3 | done | same pass as B2 |
+| B4 | done | three mutations, all caught |
+| B5 | done | vacuity check both halves, one file at a time, plus key-drift |
+| C1 | done | the sweep found a planted gap at seconds 5–19 |
+| C2 | done | label and action share one predicate; boundary repaint closes the stale-label gap |
+| C3 | done | **a pre-existing silent data loss** — addition 4 — plus two untested branches |
+| D1 | **done, Q14 escalated** | checker returned **FAIL**: a real gap in the rewritten column tests (closed), and the contract-20 conflict was under-escalated (Q14 now does it properly) |
+| D2 | **done, criterion 4 unmet — Q16** | checker returned **FAIL**: `week of` is a string and always was. Also: the tests never touched a clock change, which is the hazard the task's own note names — 54e now does |
+| D3 | done | three branches the suite left unproven: the ref comparison, the posture, and whether the clear survives a reload. All three now pinned |
+
+### The two things that need a human ruling
+
+**Q14 (D1).** Contract 20 says no pre-round column moves. D1 adds a key to the
+rollup, and a key inserts a column into every group the grid is built from, so
+13 of 22 daily and 6 of 28 weekly columns necessarily move. Regenerating the
+golden fixture — the path D1's criterion 7 names — would make the test that
+compares against it compare the new code with itself. Parking D1 would leave
+hours being claimed as Admin and hours vanishing from the rollup. The substance
+ships; the tests now state exactly what moved and why; **the wording of contract
+20 is yours to settle.**
+
+**Q16 (D2).** D2's fourth criterion says `week of` is "still a date value, not a
+string". It is a string, and the round-1 golden fixture proves it was one before
+this round. The criterion asserts a property the code never had. D2 honours the
+clause it exists for — the marking is a column, not a suffix on `week of` — and
+the literal wording is escalated rather than engineered around.
+
+Sixteen further questions are parked below, none answered. Q1, Q4, Q9 and Q11
+are the other places the handoff contradicts itself.
+
+### Six bugs found during the run, each given a criterion before its fix
+
+1. A note ending in ` ?` could impersonate the app's guess (A1).
+2. A category could be configured with `autoMark: '?'` (A2).
+3. Bounding overwrote a mark that was no longer true (A2).
+4. **A correction rewritten onto a write already on the wire was silently lost**
+   (C3) — pre-existing, reachable from round 1's mis-tap path too, and C3
+   widened it from a 20-second window to any block age.
+5. `SETUP.md` still documented `MISTAP_SECONDS` as 90 after C1 changed it to 20
+   (D1). A lint rule now checks all seven documented constants.
+6. A set-aside `openSit` left the posture claiming a SIT that never existed (D3).
+
+### The three mandatory vacuity checks
+
+| Check | What it proved |
+|---|---|
+| **A1** — revert the mark regex to `[+=\-]` | 6 parse assertions went red. The new mark is load-bearing, not decorative. |
+| **A2** — revert `?` to `=` in the guard | 8 mark assertions went red **while every boundary assertion stayed green**. That separation is the point: it proves the boundary tests measure arithmetic and not the mark. Independently reproduced by the checker. |
+| **B5** — delete the PLAN sentence from each doc, one at a time | Each half fails alone and names the right file. A third revert renamed the example key out of `CATEGORIES`, and both files were named. |
+
+### What a human can run to see it work
+
+```bash
+node test/tests.js                          # 908 passed, 0 failed
+node test/lint.js                           # all clear — 20 rules
+node test/headless.js                       # ok — 20 checks per viewport (needs: npm install)
+
+TZ=America/New_York node test/tests.js      # all four contracted zones
+TZ=Europe/London     node test/tests.js
+TZ=Australia/Sydney  node test/tests.js
+TZ=UTC               node test/tests.js
+TZ=Asia/Kolkata      node test/tests.js     # a fifth zone: skips by name, does not crash
+
+git log --oneline a256bdf..HEAD             # one commit per task, in dependency order
+git diff a256bdf..HEAD -- Code.gs Index.html
+git diff a256bdf..HEAD -- appsscript.json   # empty, and it must stay that way
+```
+
+To watch a single task's proof, the section numbers are in `factory/log-2.md`:
+STOP is 43, the `?` mark is 41–42, the mark columns are 46–48, the tap windows
+are 50, recategorise-whole is 52, `UNFILED` is 53, partial weeks are 54, and the
+set-aside grid is 55.
+
+---
+
 handoff: factory/HANDOFF-2.md · branch: `factory/honest-record`
 started: _not yet — created 2026-07-27 at handoff time_
 
