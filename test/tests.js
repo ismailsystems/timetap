@@ -3224,6 +3224,253 @@ chk('at every second from 0 to 40, the label matched what confirming did',
   liars51.length === 0, liars51.slice(0, 6).join(' | '));
 reset();
 
+console.log('\n52. a whole block can be recategorised, not just its remainder');
+/* Past the correction window a misfiled block had no fix: a different category
+ * starts a new one, and re-tapping the lit one reassigns only the remainder.
+ * The write path is not new — opRecategorize_ is the same op a mis-tap
+ * correction uses — so what is being tested here is the affordance and the
+ * client state around it. */
+const splitPick = key => {
+  const i = CATEGORIES.findIndex(c => c.key === key);
+  $('splitGrid').children[i].fire('click'); settle();
+};
+const pickWhole = () => { $('spScopeAll').fire('click'); };
+/* Read the way splitOpen() does. The shim only makes a node once the client has
+ * asked for it, so a build that never paints this label would crash the suite
+ * here and take every later section with it. A missing label is a failure, not
+ * an abort. */
+const gridLab = () => {
+  const n = H.NODES['spGridLab'];
+  return n ? n.textContent : '(never painted)';
+};
+
+reset(); reboot();
+const t52 = H.nowMs();
+tap('DW'); settle(); wait(180);                          // three hours in
+tap('DW'); settle();                                     // re-tap the lit one
+chk('SPLIT opens on the lit block', splitOpen());
+chk('and opens on the remainder, the safer of the two',
+  gridLab() === 'REMAINDER IS', gridLab());
+const ends52 = A()[0].s + '/' + A()[0].e;
+chk('and says which option is chosen to something that cannot see the colour',
+  $('spScopeRem').getAttribute('aria-pressed') === 'true' &&
+  $('spScopeAll').getAttribute('aria-pressed') === 'false',
+  $('spScopeRem').getAttribute('aria-pressed') + '/' + $('spScopeAll').getAttribute('aria-pressed'));
+pickWhole();
+chk('choosing the whole block says what the next tap will do',
+  gridLab() === 'THE WHOLE BLOCK BECOMES', gridLab());
+chk('and the spoken state moves with the visible one',
+  $('spScopeRem').getAttribute('aria-pressed') === 'false' &&
+  $('spScopeAll').getAttribute('aria-pressed') === 'true',
+  $('spScopeRem').getAttribute('aria-pressed') + '/' + $('spScopeAll').getAttribute('aria-pressed'));
+splitPick('MTG');
+const a52 = A();
+chk('exactly one block', a52.length === 1, a52.map(show).join(' | '));
+chk('keyed MTG', a52[0].t === 'MTG:', a52[0].t);
+chk('with the original start time', a52[0].s === t52, show(a52[0]));
+chk('start and end both unchanged', a52[0].s + '/' + a52[0].e === ends52,
+  a52[0].s + '/' + a52[0].e + ' was ' + ends52);
+chk('and still open', /#open/.test(a52[0].d) && activeKey() === 'MTG',
+  show(a52[0]) + ' lit=' + String(activeKey()));
+chk('the sheet closed behind it', !splitOpen());
+chk('and the block wears MTG\'s colour', sameAsButton(a52[0], 'MTG'),
+  'colour=' + evColour(a52[0]));
+
+console.log('\n52b. the note survives being recategorised whole');
+reset(); reboot();
+tap('DW'); settle();
+noteBox().value = 'memo drafting'; noteBox().fire('input'); advance(1000); settle();
+wait(120);
+tap('DW'); settle();
+pickWhole(); splitPick('MTG');
+chk('one block, keyed MTG, note intact',
+  A().length === 1 && A()[0].t === 'MTG: memo drafting', A().map(show).join(' | '));
+chk('and the lit box still offers the note back',
+  noteBox().value === 'memo drafting', JSON.stringify(noteBox().value));
+
+console.log('\n52c. the new option does not disturb the old one');
+/* Section 11 is the remainder path's own test and is untouched. This one is
+ * about the toggle specifically: looking at the new option and going back must
+ * leave the old one exactly as it was. */
+reset(); reboot();
+const t52c = H.nowMs();
+tap('MTG'); settle(); wait(180);
+tap('MTG'); settle();
+pickWhole();
+chk('the slider stops offering a time that will not be used',
+  $('spRange').disabled === true, String($('spRange').disabled));
+$('spScopeRem').fire('click');
+chk('going back restores the label', gridLab() === 'REMAINDER IS',
+  gridLab());
+chk('and the slider is live again', $('spRange').disabled === false,
+  String($('spRange').disabled));
+$('spRange').value = '60'; $('spRange').fire('input');
+splitPick('ADM');
+chk('the remainder path still writes two blocks', A().length === 2,
+  A().map(show).join(' | '));
+chk('MTG keeps the first hour',
+  A()[0].t === 'MTG: =' && A()[0].s === t52c && near(A()[0].e - A()[0].s, 3600000),
+  show(A()[0]));
+chk('ADM takes the remainder and is the open one',
+  A()[1].s === A()[0].e && /#open/.test(A()[1].d) && activeKey() === 'ADM',
+  show(A()[1]));
+
+console.log('\n52d. recategorising whole to BODY closes the SIT, as a tap does');
+reset(); reboot();
+tapSit(); settle();
+tap('DW'); settle(); wait(120);
+chk('sitting to begin with', litPosture() === 'sit', String(litPosture()));
+tap('DW'); settle();
+pickWhole(); splitPick('BODY');
+chk('one block, keyed BODY', A().length === 1 && A()[0].t === 'BODY:',
+  A().map(show).join(' | '));
+chk('the SIT closed at that moment',
+  S().length === 1 && !/#open/.test(S()[0].d) && near(S()[0].e, H.nowMs()),
+  S().map(show).join(' | '));
+chk('and the posture fell back to standing', litPosture() === 'stand',
+  String(litPosture()));
+
+console.log('\n52e. rejected by the server, it is immediate and it is queued');
+reset(); reboot();
+tap('DW'); settle(); wait(120);
+H.setServerReject('nope');
+tap('DW'); settle();
+pickWhole(); splitPick('MTG');
+chk('the grid shows the new category at once', activeKey() === 'MTG', String(activeKey()));
+const q52 = JSON.parse(H.STORE['tt.queue.v1'] || '[]');
+chk('and a recategorize op is waiting in the queue',
+  q52.filter(o => o.type === 'recategorize' && o.key === 'MTG').length === 1,
+  JSON.stringify(q52.map(o => o.type + ':' + (o.key || ''))));
+reboot();
+const q52b = JSON.parse(H.STORE['tt.queue.v1'] || '[]');
+chk('a reboot before it drains keeps the op, unchanged',
+  q52b.filter(o => o.type === 'recategorize' && o.key === 'MTG').length === 1,
+  JSON.stringify(q52b.map(o => o.type + ':' + (o.key || ''))));
+chk('and the client still shows MTG rather than the server\'s stale DW',
+  activeKey() === 'MTG', String(activeKey()));
+H.setServerReject(null);
+advance(120000); settle(); settle();                     // let the retry timer run
+chk('once the server takes it, the calendar agrees',
+  A().length === 1 && A()[0].t === 'MTG:' && /#open/.test(A()[0].d),
+  A().map(show).join(' | '));
+
+console.log('\n52f. an open that never reached the server is corrected in place');
+/* Offline rather than rejecting, so nothing is ever set aside: the openActual
+ * is still in the queue when the whole block is recategorised, and the existing
+ * coalescing path absorbs it instead of chasing it with a second op. */
+reset(); reboot();
+H.setOnline(false);
+const t52f = H.nowMs();
+tap('DW'); settle(); wait(120);
+tap('DW'); settle();
+pickWhole(); splitPick('MTG');
+const q52f = JSON.parse(H.STORE['tt.queue.v1'] || '[]');
+chk('the pending open is corrected, not chased by a second op',
+  q52f.filter(o => o.type === 'openActual').length === 1 &&
+  q52f.filter(o => o.type === 'openActual')[0].key === 'MTG' &&
+  !q52f.some(o => o.type === 'recategorize'),
+  JSON.stringify(q52f.map(o => o.type + ':' + (o.key || ''))));
+H.setOnline(true);
+advance(120000); settle(); settle();
+chk('and the network coming back writes one MTG block from the original start',
+  A().length === 1 && A()[0].t === 'MTG:' && A()[0].s === t52f,
+  A().map(show).join(' | '));
+
+console.log('\n52g. the destructive option is never the one already chosen');
+/* A sheet that remembers WHOLE BLOCK would make the next visit — probably a
+ * genuine split — retitle three hours of work on one tap. Every opening starts
+ * on the option that cannot destroy anything. */
+reset(); reboot();
+tap('DW'); settle(); wait(180);
+tap('DW'); settle();
+pickWhole();
+$('spClose').fire('click'); settle();
+chk('the sheet closed without writing', A().length === 1 && A()[0].t === 'DW:',
+  A().map(show).join(' | '));
+tap('DW'); settle();
+chk('and re-opening it is back on the remainder',
+  splitOpen() && gridLab() === 'REMAINDER IS', gridLab());
+chk('with the slider live again', $('spRange').disabled === false,
+  String($('spRange').disabled));
+
+console.log('\n52h. recategorising whole does not re-open the correction window');
+/* S.lastTapMs is what willRetitle() reads, and a block reached from this sheet
+ * is at least MISTAP_SECONDS old. Moving it to now would make the next
+ * confirmed tap on another category retitle hours of work instead of starting
+ * a new block — C1's windows nest around when the block was tapped, and
+ * renaming it is not a tap. */
+reset(); reboot();
+const t52h = H.nowMs();
+tap('DW'); settle(); wait(180);
+tap('DW'); settle();
+pickWhole(); splitPick('MTG');
+const cut52h = H.nowMs();
+tap('REL'); settle();
+chk('a tap on another category acts at once, without arming',
+  armedKey() === null, String(armedKey()));
+chk('and starts a new block instead of retitling the old one',
+  A().length === 2 && A()[0].t === 'MTG: =' && A()[0].s === t52h && A()[1].t === 'REL:',
+  A().map(show).join(' | '));
+/* And the end, which cannot be read off an open block: the renamed block is the
+ * WHOLE three hours, not a fragment of them. */
+chk('the renamed block still spans the whole three hours',
+  near(A()[0].e, cut52h) && near(A()[0].e - A()[0].s, 180 * 60000),
+  show(A()[0]) + ' = ' + Math.round((A()[0].e - A()[0].s) / 60000) + 'm');
+
+console.log('\n52j. a correction is not lost to a write already on the wire');
+/* Addition 4 in factory/progress-2.md, found by the checker. mutatePendingOpen
+ * rewrites the queue in localStorage; a flush already in flight handed the
+ * server the queue as it was and drops those ops by id when it answers, so the
+ * rewrite is thrown away and no op is ever queued in its place. The client
+ * shows one category, the calendar holds another, and the sync dot reads
+ * synced. Pre-existing — the mis-tap path below reaches the same loss — but C3
+ * widens it from a 20-second window to any block age. */
+reset(); reboot();
+H.setCallLag('applyOps', 30000);                 // the open is sent, the answer is slow
+const t52j = H.nowMs();
+tap('DW'); settle();
+advance(25000); settle();                        // past MISTAP_SECONDS, still on the wire
+tap('DW'); settle();
+chk('SPLIT opens while the open block is still unacknowledged', splitOpen());
+pickWhole(); splitPick('MTG');
+chk('the client shows the new category at once', activeKey() === 'MTG', String(activeKey()));
+H.setCallLag('applyOps', null);
+advance(120000); settle(); settle();
+chk('and the calendar ends up carrying it too',
+  A().length === 1 && A()[0].t === 'MTG:' && A()[0].s === t52j, A().map(show).join(' | '));
+chk('with nothing left unsent', JSON.parse(H.STORE['tt.queue.v1'] || '[]').length === 0,
+  H.STORE['tt.queue.v1'] || '[]');
+
+console.log('\n52k. and the mis-tap correction it inherits that from is safe too');
+reset(); reboot();
+H.setCallLag('applyOps', 30000);
+const t52k = H.nowMs();
+tap('DW'); settle();
+advance(10000); settle();
+tap('MTG'); settle();                            // arms
+tap('MTG'); settle();                            // confirms, inside the mis-tap window
+chk('the client shows the corrected category', activeKey() === 'MTG', String(activeKey()));
+H.setCallLag('applyOps', null);
+advance(120000); settle(); settle();
+chk('and the calendar carries one MTG block from the original start',
+  A().length === 1 && A()[0].t === 'MTG:' && A()[0].s === t52k, A().map(show).join(' | '));
+
+console.log('\n52i. with nothing open, the whole-block option is out of reach');
+reset(); reboot();
+chk('nothing is lit', activeKey() === null, String(activeKey()));
+chk('and the sheet is not open — its only way in is a lit block', !splitOpen());
+/* The guard under it. In a browser the sheet is hidden so these buttons cannot
+ * be reached at all; the guard has to hold anyway, because "unreachable" is not
+ * something the code should be trusting the CSS for. */
+$('spScopeAll').fire('click');
+splitPick('MTG');
+chk('firing the grid with no open block writes nothing', A().length === 0,
+  A().map(show).join(' | '));
+chk('and queues nothing', JSON.parse(H.STORE['tt.queue.v1'] || '[]').length === 0,
+  H.STORE['tt.queue.v1'] || '[]');
+chk('and leaves the sheet shut', !splitOpen());
+reset();
+
 console.log('\n────────────────────────────────────────');
 console.log(H.pass + ' passed, ' + H.fail + ' failed' +
             (H.skipped.length ? ', ' + H.skipped.length + ' skipped' : ''));

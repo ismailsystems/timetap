@@ -104,6 +104,20 @@ It also measures the strip's own controls and prints them. They are not asserted
 strip is hidden in the resting worst case, so they fall outside the criterion. They are
 currently 42px tall, which is under the 44px floor the rest of the row is held to.
 
+A phase for the SPLIT sheet, which now does two different things — reassign the
+remainder, or recategorise the whole block — and asks in the sheet which one it will
+do. It seeds a three-hour-old block, re-taps the lit cell to open SPLIT for real, and
+checks that both options are on screen at once (an option you have to scroll to find
+is an option that does not exist), that each is at least 44x44 and hittable at its own
+centre, that they do not overlap, that the sheet is not already scrolled, and that the
+chosen one differs from the other on **two** channels rather than a hue shift alone.
+Then it chooses the other option and checks that the chosen state, the label naming
+what the next tap will do, and `aria-pressed` all move with it — `aria-pressed` is
+read only *after* the choice moves, because the static markup happens to be right
+before it does, so a first-read check would pass a build that never updated it. It
+runs at 390px and at 980px: the desktop viewport is the shorter of the two, so a sheet
+that needs scrolling shows up there first.
+
 A second drawer phase counts rather than watches: it taps one fixed point 2, 3, 4 and
 6 times and checks that 1, 1, 2 and 3 entries left, and — the part that actually
 matters — that **every** tap which destroyed an entry found a button already reading

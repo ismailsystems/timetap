@@ -810,6 +810,188 @@ async function checkPostureRow(browser, view, page) {
   return problems;
 }
 
+/**
+ * C3: the SPLIT sheet now does two different things, and which one it will do
+ * is a choice made in the sheet. Both options have to be on screen at once —
+ * an option you have to scroll to find is an option that does not exist — and
+ * they have to be told apart at a glance.
+ *
+ * Driven rather than faked: the block is seeded the way a reload gets it, and
+ * the sheet is opened by actually re-tapping the lit cell.
+ */
+const SPLIT_ORIGIN = 'http://timetap-split.invalid/';
+
+async function checkSplitScope(browser, view, page) {
+  const problems = [];
+  const label = view.name + ' ' + view.width + 'px';
+  const ctx = await browser.newContext({
+    viewport: { width: view.width, height: view.height },
+    isMobile: !!view.isMobile, hasTouch: !!view.isMobile,
+    deviceScaleFactor: view.isMobile ? 3 : 1
+  });
+  const pg = await ctx.newPage();
+  const errors = [];
+  pg.on('pageerror', e => errors.push(String((e && e.message) || e)));
+  try {
+    await pg.route(SPLIT_ORIGIN, r =>
+      r.fulfill({ status: 200, contentType: 'text/html; charset=utf-8', body: documentFor(page, true) }));
+    await pg.addInitScript(stallingServerStub);
+    await pg.addInitScript(() => {
+      // Three hours in, so re-tapping the lit cell opens SPLIT rather than
+      // being the no-op the mis-tap window makes of it.
+      const now = Date.now();
+      localStorage.setItem('tt.state.v1', JSON.stringify({
+        open: { ref: 'aaaabbbbccccdddd', key: 'DW', text: '', startMs: now - 3 * 3600000 },
+        sit: null, lastTapMs: 0
+      }));
+    });
+    await pg.goto(SPLIT_ORIGIN, { waitUntil: 'load' });
+    await pg.waitForTimeout(120);
+
+    await pg.click('#grid [data-key="DW"]');
+    await pg.waitForTimeout(80);
+    if (!await pg.locator('#sheetSplit').isVisible()) {
+      problems.push(label + ': re-tapping the lit block did not open SPLIT, so the two ' +
+                    'options could not be checked at all');
+      return problems;
+    }
+
+    const read = () => pg.evaluate(({ TOUCH_TARGET }) => {
+      const box = el => { const r = el.getBoundingClientRect();
+                          return { x: r.left, y: r.top, w: r.width, h: r.height,
+                                   r: r.right, b: r.bottom }; };
+      const styleOf = el => { const s = getComputedStyle(el);
+                              return { background: s.backgroundColor, color: s.color,
+                                       fontWeight: s.fontWeight, outline: s.outlineStyle,
+                                       opacity: s.opacity }; };
+      const one = id => {
+        const el = document.getElementById(id);
+        if (!el) return null;
+        const s = getComputedStyle(el);
+        const r = el.getBoundingClientRect();
+        const mid = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+        return {
+          id: id, text: el.textContent.trim(),
+          visible: s.display !== 'none' && s.visibility !== 'hidden' && r.width > 0 && r.height > 0,
+          pressed: el.getAttribute('aria-pressed'),
+          on: el.classList.contains('on'),
+          rect: box(el), style: styleOf(el),
+          hit: mid ? (mid.id || (mid.closest('button') && mid.closest('button').id) || mid.tagName) : null,
+          small: r.width < TOUCH_TARGET || r.height < TOUCH_TARGET
+        };
+      };
+      const body = document.querySelector('#sheetSplit .sheetbody');
+      const lab = document.getElementById('spGridLab');
+      return {
+        rem: one('spScopeRem'), all: one('spScopeAll'),
+        gridLab: lab ? lab.textContent.trim() : null,
+        // "Without scrolling": the sheet is a scroller, so both the fact that it
+        // is not scrolled and the fact that the options sit inside its visible
+        // box have to hold. Either one alone can be true while the option is
+        // still off screen.
+        bodyScrollTop: body ? body.scrollTop : null,
+        bodyScrolls: body ? body.scrollHeight > body.clientHeight + 1 : null,
+        bodyRect: body ? box(body) : null,
+        docScrollsX: document.documentElement.scrollWidth > window.innerWidth + 1,
+        viewH: window.innerHeight, viewW: window.innerWidth
+      };
+    }, { TOUCH_TARGET });
+
+    const g = await read();
+    console.log('\nsplit scope (' + view.name + ')');
+    ['rem', 'all'].forEach(k => {
+      const o = g[k];
+      console.log('  ' + (o ? o.id + ': "' + o.text + '" ' +
+        Math.round(o.rect.w) + 'x' + Math.round(o.rect.h) +
+        ' on=' + o.on + ' ' + o.style.background + '/' + o.style.color : k + ': MISSING'));
+    });
+    console.log('  grid label:      "' + g.gridLab + '"');
+    console.log('  sheet scrolled:  ' + g.bodyScrolls + ' (scrollTop ' + g.bodyScrollTop + ')');
+
+    if (!g.rem || !g.all) {
+      problems.push(label + ': the SPLIT sheet is missing a scope option — ' +
+                    JSON.stringify({ rem: !!g.rem, all: !!g.all }));
+      return problems;
+    }
+    [g.rem, g.all].forEach(o => {
+      if (!o.visible) problems.push(label + ': ' + o.id + ' is not visible with SPLIT open');
+      if (o.small) {
+        problems.push(label + ': ' + o.id + ' is under the touch target at ' +
+                      Math.round(o.rect.w) + 'x' + Math.round(o.rect.h));
+      }
+      if (o.rect.b > g.viewH + 0.5 || o.rect.y < -0.5) {
+        problems.push(label + ': ' + o.id + ' is off screen (' + Math.round(o.rect.y) + '-' +
+                      Math.round(o.rect.b) + ' in a ' + g.viewH + 'px viewport), so it can only ' +
+                      'be found by scrolling');
+      }
+      if (g.bodyRect && (o.rect.b > g.bodyRect.b + 0.5 || o.rect.y < g.bodyRect.y - 0.5)) {
+        problems.push(label + ': ' + o.id + ' sits outside the visible part of the sheet body, ' +
+                      'so it takes a scroll to reach');
+      }
+      if (o.hit !== o.id) {
+        problems.push(label + ': ' + o.id + ' is not hittable — the element at its centre is ' + o.hit);
+      }
+    });
+    if (g.bodyScrollTop) {
+      problems.push(label + ': the SPLIT sheet opens already scrolled (' + g.bodyScrollTop + 'px)');
+    }
+    if (g.docScrollsX) {
+      problems.push(label + ': the SPLIT sheet overflows horizontally at ' + g.viewW + 'px');
+    }
+    const overlap = !(g.rem.rect.r <= g.all.rect.x + 0.5 || g.all.rect.r <= g.rem.rect.x + 0.5 ||
+                      g.rem.rect.b <= g.all.rect.y + 0.5 || g.all.rect.b <= g.rem.rect.y + 0.5);
+    if (overlap) problems.push(label + ': the two scope options overlap each other');
+
+    /* Distinguishable, and on more than one channel. The chosen one differs in
+       fill and in text colour; requiring two properties means a build that
+       dropped the fill and kept only a hue shift would fail here. */
+    const keys = ['background', 'color', 'fontWeight', 'outline', 'opacity'];
+    const differ = keys.filter(k => g.rem.style[k] !== g.all.style[k]);
+    if (differ.length < 2) {
+      problems.push(label + ': the chosen scope option looks the same as the other one — ' +
+                    JSON.stringify(g.rem.style) + ' vs ' + JSON.stringify(g.all.style) +
+                    ' (differs only in ' + (differ.join(', ') || 'nothing') + ')');
+    }
+    if (g.rem.on === g.all.on || g.rem.pressed === g.all.pressed) {
+      problems.push(label + ': both scope options claim the same state — on=' +
+                    g.rem.on + '/' + g.all.on + ' aria-pressed=' +
+                    g.rem.pressed + '/' + g.all.pressed);
+    }
+
+    // And the choice has to actually move when it is made.
+    await pg.click('#spScopeAll');
+    await pg.waitForTimeout(30);
+    const g2 = await read();
+    console.log('  after choosing:  "' + g2.gridLab + '" (rem on=' + g2.rem.on +
+                ', all on=' + g2.all.on + ')');
+    if (!g2.all.on || g2.rem.on) {
+      problems.push(label + ': choosing WHOLE BLOCK did not move the chosen state — rem on=' +
+                    g2.rem.on + ' all on=' + g2.all.on);
+    }
+    /* The state as it is spoken, not as it is drawn. Checked after the choice
+       moves, because the static markup happens to be right before it does — a
+       build that never updated aria-pressed would pass a first-read check. */
+    if (g2.all.pressed !== 'true' || g2.rem.pressed !== 'false') {
+      problems.push(label + ': after choosing WHOLE BLOCK the options still say aria-pressed ' +
+                    g2.rem.pressed + '/' + g2.all.pressed + ', so a screen reader is told the ' +
+                    'wrong option is chosen');
+    }
+    if (g2.gridLab === g.gridLab) {
+      problems.push(label + ': the label over the category grid still reads "' + g2.gridLab +
+                    '" after the other option was chosen, so it names the wrong action');
+    }
+    if (JSON.stringify(g2.all.style) === JSON.stringify(g.all.style)) {
+      problems.push(label + ': WHOLE BLOCK renders identically chosen and unchosen — ' +
+                    JSON.stringify(g2.all.style));
+    }
+
+    if (errors.length) problems.push(label + ': page errors — ' + errors.join(' | '));
+  } finally {
+    await ctx.close();
+  }
+  return problems;
+}
+
 function sameMetas(a, b) {
   const norm = list => list.map(m => m[0] + '\0' + m[1]).sort();
   const x = norm(a), y = norm(b);
@@ -967,6 +1149,10 @@ async function main() {
        control that nobody checked anywhere else. */
     for (const view of [VIEWS[0], { name: 'desktop', width: 980, height: 800, isMobile: false }]) {
       problems = problems.concat(await checkPostureRow(browser, view, page));
+      /* C3, at both widths for the reason A4 found: the desktop viewport is the
+         shorter of the two, so a sheet that needs scrolling would show up there
+         first, and a phone-only check would have missed it. */
+      problems = problems.concat(await checkSplitScope(browser, view, page));
     }
   } finally {
     await browser.close();

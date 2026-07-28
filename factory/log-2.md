@@ -809,3 +809,84 @@ C2's uncommitted implementation with it. The handoff's restart permission covers
 exactly this: the work was rebuilt from the same edits and the tests — already
 written — confirmed the rebuild was equivalent. No criteria were changed. It
 cost one pass and is logged rather than quietly redone.
+
+## [2026-07-28 07:51] C3 | A whole block can be recategorised, not just its remainder
+
+**What it is.** The SPLIT sheet asks which of two things a category tap will do:
+reassign the **remainder** (round 1's behaviour, unchanged) or recategorise the
+**whole block**. Two buttons, and the label over the category grid names the one
+that will happen — the same rule C2 settled on for the armed cell. Every opening
+starts on REMAINDER, the option that cannot destroy anything. Choosing WHOLE
+BLOCK dims the split slider and disables it, because a split time that will not
+be used is a claim the sheet should stop making.
+
+No new server op, exactly as the handoff said: `opRecategorize_` is the op a
+mis-tap correction already uses, so `recatWhole` is 12 lines of client and the
+write path is code that was already exercised.
+
+**Two decisions worth the ink.**
+
+`S.lastTapMs` is deliberately **not** moved to now. It is what `willRetitle()`
+reads, and a block reachable from this sheet is at least `MISTAP_SECONDS` old.
+Moving it would re-open C1's correction window on an hours-old block, so the
+next confirmed tap on another category would retitle three hours of work instead
+of starting a new block. Nothing about *when* the block was tapped changed here,
+only what it is called. Pinned by test 52h, which is what caught the mutation
+that sets it.
+
+Recategorising to the same category writes and queues nothing.
+
+**Tests: 52 through 52k. 759 → 807 assertions**, plus a new headless phase
+(`checkSplitScope`) at 390px and 980px, and a paragraph in `test/README.md`
+describing it.
+
+**Mutation table — ten mutations, all caught:**
+
+| Mutation | Caught by |
+|---|---|
+| the whole-block branch removed from `doSplit` | 15 assertions |
+| `openSplit` stops resetting the scope (sticky WHOLE BLOCK) | 52, 52g |
+| `recatWhole` moves `S.lastTapMs` to now | 52h |
+| the BODY/SIT coupling dropped | 52d |
+| the pending open chased by a second op instead of corrected | 52f |
+| `S.open.key = key` removed | 3 assertions (checker) |
+| `applyCatColor_` removed from `opRecategorize_` | 52 (checker) |
+| `opRecategorize_` drops the note text | 52b (checker) |
+| `.scopebtn.on` styling removed | headless, both viewports |
+| the options pushed below the fold; the options at 30px | headless, both viewports |
+| `aria-pressed` never updated | 52, headless post-click read |
+
+**The checker earned its keep.** It ran all eight criteria, its own mutations,
+and found one thing that matters: **addition 4**, a silent data loss that
+predates this round. `mutatePendingOpen` rewrites the queue in `localStorage`;
+if a flush is already in flight the server was handed the queue as it was and
+drops those ops **by id** when it answers, so the rewrite is discarded, nothing
+is queued in its place, and the queue empties looking synced while the calendar
+holds the old category. Reproduced here before fixing, on both paths:
+
+```
+52j FAIL and the calendar ends up carrying it too          "DW:" 09:00-09:01 OPEN
+52k FAIL and the calendar carries one MTG block ...        "DW:" 09:00-09:01 OPEN
+```
+
+Fixed in one line — `mutatePendingOpen` refuses to coalesce while `flushing` —
+which costs one extra op and saves a correction. 52f proves the coalescing it
+exists to protect still happens when no flush is in flight.
+
+**Why that one was fixed and Q12 was parked.** C3 widens addition 4 from a
+20-second window (`MISTAP_SECONDS`) to *any* block age, so it is part of this
+task's own risk surface. Q12 — a sheet outliving the block it names — is
+reachable exactly as much before C3 as after, and is worse on round 1's
+remainder path, so it is a finding about existing behaviour and the handoff says
+those get reported, not silently repaired. Both are written up in
+`factory/progress-2.md` with reproductions I ran myself rather than took on
+trust.
+
+**One test-shape note.** The suite's DOM shim only makes a node once the client
+has asked for it, so reading `$('spGridLab').textContent` directly crashed the
+whole run under a mutation instead of failing one assertion — taking every later
+section with it. It now reads through a `gridLab()` helper the way `splitOpen()`
+does. A missing label is a failure, not an abort.
+
+Green twice in a row and in all four contracted timezones: 807 / 0, lint all
+clear at 19 rules, headless ok at 20 checks per viewport. **Stage C complete.**

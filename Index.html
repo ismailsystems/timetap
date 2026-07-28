@@ -296,6 +296,15 @@
   input[type=range] { width: 100%; margin: 16px 0 2px; accent-color: #949aa3; height: 34px; }
   .ends { display: flex; justify-content: space-between; font-size: 11px; color: var(--dim); font-variant-numeric: tabular-nums; }
   #splitGrid { display: grid; gap: 6px; }
+  /* Which of the two things a category tap in SPLIT does. Two states that
+     differ in fill AND in text colour, so the choice is not carried by hue
+     alone. 44px is the same floor A4 holds the posture row to. */
+  .scope { display: flex; gap: 6px; margin-bottom: 12px; }
+  .scopebtn { flex: 1; min-height: 44px; background: var(--panel2); color: var(--dim);
+    border-radius: 10px; font-size: 12px; font-weight: 700; letter-spacing: .1em; }
+  .scopebtn.on { background: #fff; color: #000; }
+  /* A split time that will not be used is a claim the sheet should stop making. */
+  .card.dim { opacity: .45; }
   .sbtn { background: var(--panel2); border-radius: 10px; padding: 14px 8px;
     display: flex; align-items: center; justify-content: center; }
   .sbtn .f { background: #000; color: #fff; font-size: 16px; font-weight: 700;
@@ -365,7 +374,7 @@
     <button id="spClose" class="fbtn">DONE</button>
   </div>
   <div class="sheetbody">
-    <div class="card">
+    <div class="card" id="spCard">
       <div class="lab" id="spLab">OPEN BLOCK</div>
       <div class="big" id="spAt">--:--</div>
       <input type="range" id="spRange" min="0" max="1" value="0" step="1">
@@ -373,7 +382,11 @@
       <div class="sub" id="spSub"></div>
     </div>
     <div class="card">
-      <div class="lab">REMAINDER IS</div>
+      <div class="scope" role="group" aria-label="what a category below applies to">
+        <button id="spScopeRem" class="scopebtn on" aria-pressed="true">REMAINDER</button>
+        <button id="spScopeAll" class="scopebtn" aria-pressed="false">WHOLE BLOCK</button>
+      </div>
+      <div class="lab" id="spGridLab">REMAINDER IS</div>
       <div id="splitGrid"></div>
     </div>
   </div>
@@ -437,7 +450,7 @@
    */
   var localGen = 0;
   var noteTimer = null;
-  var split = { atMs: 0, startMs: 0, nowMs: 0 };
+  var split = { atMs: 0, startMs: 0, nowMs: 0, whole: false };
   var sitEdit = { lo: 0, hi: 0, atMs: 0 };
 
   var $ = function (id) { return document.getElementById(id); };
@@ -546,6 +559,15 @@
 
   /** Coalesce a still-pending open into a correction. Returns true if absorbed. */
   function mutatePendingOpen(ref, key) {
+    /*
+     * Not while a flush is in flight. The server was handed the queue as it
+     * was, and the success handler drops those ops by id — so a rewrite made
+     * here in the meantime is discarded when the answer lands, no op is queued
+     * in its place, and the queue empties looking synced while the calendar
+     * holds the old category. Saying no costs one extra op; saying yes loses
+     * the correction silently, which is the thing this round exists to stop.
+     */
+    if (flushing) return false;
     var q = queue(), hit = false;
     for (var i = 0; i < q.length; i++) {
       if (q[i].type === 'openActual' && q[i].ref === ref) { q[i].key = key; hit = true; }
@@ -1357,6 +1379,7 @@
 
   function openSplit() {
     if (!S.open) return;
+    setSplitScope(false);            // every opening starts on the safer of the two
     split.startMs = S.open.startMs;
     split.nowMs = Date.now();
     var span = Math.max(1, Math.round((split.nowMs - split.startMs) / MS_MIN));
@@ -1378,8 +1401,27 @@
       '   →   ' + fmtDur(split.nowMs - split.atMs) + ' remainder';
   }
 
+  /**
+   * Which of the two things a tap in the category grid below will do. The label
+   * over the grid names it, the same rule C2 settled on for the armed cell:
+   * state what the next tap does, and stop.
+   */
+  function setSplitScope(whole) {
+    split.whole = !!whole;
+    $('spScopeRem').classList.toggle('on', !split.whole);
+    $('spScopeAll').classList.toggle('on', split.whole);
+    $('spScopeRem').setAttribute('aria-pressed', String(!split.whole));
+    $('spScopeAll').setAttribute('aria-pressed', String(split.whole));
+    $('spGridLab').textContent = split.whole ? 'THE WHOLE BLOCK BECOMES' : 'REMAINDER IS';
+    // The split time is not used when the whole block is being recategorised,
+    // so the sheet stops presenting it as though it were.
+    $('spCard').classList.toggle('dim', split.whole);
+    $('spRange').disabled = split.whole;
+  }
+
   function doSplit(key) {
     if (!S.open) { $('sheetSplit').classList.add('hidden'); return; }
+    if (split.whole) { recatWhole(key); return; }
     var at = split.atMs, now = Date.now();
     var m = markFor(S.open.key, at - S.open.startMs);
     var newRef = uid();
@@ -1388,6 +1430,33 @@
     S.open = { ref: newRef, key: key, text: '', startMs: at };
     S.lastTapMs = now;
     if (key === CFG.bodyKey) closeSit(now);
+    hideStrip();
+    $('sheetSplit').classList.add('hidden');
+    saveState(); render(); flush();
+  }
+
+  /**
+   * The whole block, not its remainder — the only way to fix a misfiled block
+   * once the correction window has closed. `opRecategorize_` already does this
+   * and is the op the mis-tap correction uses, so this is a missing affordance
+   * rather than missing behaviour.
+   *
+   * `S.lastTapMs` is deliberately NOT moved to now. It is what willRetitle()
+   * reads, and a block reachable from this sheet is at least MISTAP_SECONDS
+   * old; moving it would re-open the correction window on an hours-old block,
+   * so the next confirmed tap on another category would retitle the whole thing
+   * instead of starting a new one. Nothing about when the block was tapped has
+   * changed here — only what it is called.
+   */
+  function recatWhole(key) {
+    var now = Date.now();
+    if (S.open.key !== key) {                    // same category: nothing to say
+      S.open.key = key;
+      if (!mutatePendingOpen(S.open.ref, key)) {
+        enqueue({ type: 'recategorize', ref: S.open.ref, key: key, hintMs: S.open.startMs });
+      }
+      if (key === CFG.bodyKey) closeSit(now);                // 8.2, as a tap does
+    }
     hideStrip();
     $('sheetSplit').classList.add('hidden');
     saveState(); render(); flush();
@@ -1515,6 +1584,8 @@
 
   $('spClose').addEventListener('click', function () { $('sheetSplit').classList.add('hidden'); });
   $('spRange').addEventListener('input', renderSplit);
+  $('spScopeRem').addEventListener('click', function () { setSplitScope(false); });
+  $('spScopeAll').addEventListener('click', function () { setSplitScope(true); });
 
   $('ssClose').addEventListener('click', function () { $('sheetSit').classList.add('hidden'); });
   $('ssRange').addEventListener('input', renderSitEdit);

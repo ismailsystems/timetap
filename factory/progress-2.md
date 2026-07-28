@@ -7,25 +7,27 @@ Round 1's progress record is `factory/progress.md` and is **read-only**.
 
 ## Status
 
-In progress. **12 of 16 tasks complete.** Stage C, task C3 next.
+In progress. **13 of 16 tasks complete. Stage C is complete.** Stage D, task D1
+next.
 
-Suite: **759 passed / 0 failed** (baseline was 492), green in all four
-contracted timezones. Lint all clear. Headless ok, 19 checks per viewport.
+Suite: **807 passed / 0 failed** (baseline was 492), green in all four
+contracted timezones. Lint all clear, 19 rules. Headless ok, 20 checks per
+viewport plus the new split-scope phase.
 
-## Resume here (context cleared 2026-07-28, after C2)
+## Resume here (context cleared 2026-07-28, after C2; C3 done 2026-07-28)
 
 The loop was stopped deliberately after **C2**, at the human's request, not by a
-circuit breaker. Nothing is half-finished: the working tree is clean and every
-completed task is committed.
+circuit breaker, and restarted at C3. Nothing is half-finished: every completed
+task is committed.
 
 To continue, run `/loop work through factory/HANDOFF-2.md exactly as written`.
-The next unfinished, unblocked task is **C3**. Read this file and
+The next unfinished, unblocked task is **D1**. Read this file and
 `factory/log-2.md` first — between them they are the whole memory of the run.
 
-State as of stopping:
+State after C3:
 
 ```
-node test/tests.js      759 passed, 0 failed   (baseline 492)
+node test/tests.js      807 passed, 0 failed   (baseline 492)
 node test/lint.js       all clear — 19 rules
 node test/headless.js   ok — 20 checks per viewport
 ```
@@ -56,7 +58,7 @@ thing to read.
 | B5 | B | **done** | 1 | vacuity check done, both halves one file at a time, plus key-drift |
 | C1 | C | **done** | 1 | the sweep found a planted gap at exactly seconds 5-19 |
 | C2 | C | **done** | 1 | label and action share one predicate; boundary repaint closes the stale-label gap |
-| C3 | C | pending | 0 | |
+| C3 | C | **done** | 1 | checker ran 8 criteria + 10 mutations; found a pre-existing silent data loss (addition 4) and two untested branches, all fixed. Q12/Q13 parked |
 | D1 | D | pending | 0 | golden fixture changes here, second and last time |
 | D2 | D | pending | 0 | |
 | D3 | D | pending | 0 | |
@@ -354,6 +356,48 @@ always writes one. Pre-existing and identical for every mark at `a256bdf`
 round-trips, including `"DW: ?"`, `"DW: why? ?"` and `"DW: a ? ?"`. Left alone
 as out of scope; contract 18's wording is what is wrong, not the code.
 
+### Q12 (C3) — a sheet can outlive the block it names, and then act on a different one
+
+Found by the checker, **reproduced independently here** rather than taken on
+trust. `adoptServerState` replaces `S.open` when a refresh finds a different
+open block — another device, another tab — and it does not close any sheet that
+is currently aimed at the old one. SPLIT stays open, still headed with the old
+block's key, and the next tap in it acts on the block that replaced it:
+
+```
+sheet open: true | header: OPEN BLOCK: DW
+another device closes DW at 12:00 and opens REL
+after refresh -> lit: REL | sheet still open: true | header still says: OPEN BLOCK: DW
+tap MTG in the sheet
+CALENDAR: "DW:" 09:00-12:00 | "MTG:" 12:00-12:01 OPEN     <- REL was relabelled
+```
+
+**Pre-existing, and C3 does not widen it.** The checker reports the remainder
+path — round 1's — does the same thing and worse: it wrote an `MTG` block
+overlapping the closed `DW` and orphaned `REL`. C3 inherits the hazard at
+exactly the same reachability it already had, which is why it is parked rather
+than fixed here, unlike addition 4 where C3 genuinely widened the window.
+
+**The fix, if the human wants it:** `adoptServerState` closes `#sheetSplit`
+(and `#sheetSit`, which has the same shape) when it replaces `S.open` with a
+different ref. A sheet aimed at a block that no longer exists must not act on
+whatever took its place. One line, round-1 territory, no criterion covers it.
+
+### Q13 (C3) — an armed cell survives into SPLIT and keeps promising an action
+
+Also from the checker, and C2's gap rather than C3's: arm a category, then
+re-tap the lit block before the confirmation lapses. SPLIT opens with the other
+cell still armed and still reading `TAP AGAIN TO SWITCH`, which by then is not
+what a tap on it would do — it would open SPLIT again. Identical on round 1's
+remainder path (`TAP AGAIN TO RETITLE`), self-clears within
+`CONFIRM_TIMEOUT_MS` (4s), and STOP is unaffected because `tapCategory` disarms
+it before `openSplit` runs.
+
+Not fixed: `disarm()` inside `openSplit` would do it, but arming is C2's
+territory, C2's tests pin behaviour around it, and a four-second stale label on
+a cell hidden behind a sheet is not worth a second unscoped change in this
+commit. Named so it is a known gap rather than a surprise.
+
 ## Contract additions
 
 _Every bug found during the run gets a criterion written here first, then the
@@ -421,6 +465,40 @@ no criterion and no test, which the standing rule forbids.
 
 **Recorded here, then pinned by test 42h.**
 
+
+### Addition 4 (found at C3, by the checker) — a correction rewritten onto a write already on the wire is silently lost
+
+`mutatePendingOpen` rewrites the queue in `localStorage`. If a `flush` is
+already in flight, the server was handed the queue as it was, and the success
+handler drops those ops **by id** — so the rewrite is discarded, no
+`recategorize` is ever queued, and the client shows a category the calendar
+does not have. Nothing is reported: the queue empties, the sync dot goes green.
+
+Reproduced with a lagged `applyOps`:
+
+```
+open DW, still on the wire | recategorise whole to MTG
+client lit : MTG
+calendar   : "DW:" 09:00-12:00 OPEN
+queue      : []            (empty, and the sync dot reads synced)
+```
+
+**Pre-existing, not introduced by C3** — the round-1 mis-tap correction path
+reaches the identical loss. But C3 widens it from a 20-second window
+(`MISTAP_SECONDS`) to *any* block age, so it ships as a reachable way to lose a
+correction unless it is closed here.
+
+- [tier 1] Given an `openActual` still in flight, when the block is
+  recategorised whole, then the correction survives: the calendar carries the
+  new key once everything lands.
+- [tier 1] Given the same, for round 1's mis-tap correction path.
+- [tier 1] Given no flush in flight, then the pending open is still corrected in
+  place rather than chased by a second op. The fix must not cost the coalescing
+  it exists to protect.
+
+**Fixed in C3**, in `mutatePendingOpen`: it refuses to coalesce while a flush is
+in flight and returns false, so the caller queues a real `recategorize` behind
+the op already on the wire. Tests 52j, 52k, 52f.
 
 ## Parked tasks
 
