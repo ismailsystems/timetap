@@ -1908,6 +1908,9 @@ if (!gz) {
     if (TABS_WITH_MARKS.includes(tab)) {
       goldKeys.forEach(k => MARK_BUCKETS.forEach(m => expectNew.push(markCol_(k, m))));
     }
+    // D2 appends one more, on the weekly tab only — after the mark block, so it
+    // disturbs nothing that B3 put there. Stated per tab rather than sniffed.
+    if (tab === 'weekly') expectNew.push('days covered (of 7)');
     chk(tab + ': the golden header really did yield the keys', goldKeys.length > 0,
       JSON.stringify(goldKeys));
     // The appended block starts after the pre-round columns plus the ones D1
@@ -3707,6 +3710,155 @@ chk('splitActual does not claim the first half as Admin',
 chk('and keeps its text', /Lunch with Ada/.test(A()[0].t), A()[0].t);
 chk('while the remainder is the category that was asked for',
   A().length === 2 && A()[1].t === 'MTG:', A().map(show).join(' | '));
+reset();
+
+console.log('\n54. a week the window only partly covers says so');
+/*
+ * The window is ROLLUP_DAYS long counting back from today, so its oldest week is
+ * almost always a few days of a week shown exactly like a whole one — and so is
+ * its newest, which is however much of this week has happened. Both had
+ * plan-versus-actual ratios that were misleading by construction and said
+ * nothing about it.
+ *
+ * The dates below are chosen so the window's edges land on known weekdays:
+ * 2026-07-24 is a Friday, 2026-07-08 a Wednesday, 2026-07-26 a Sunday.
+ */
+const DAYS_WAS = ROLLUP_DAYS;
+const wCol54 = n => wRows()[0].indexOf(n);
+const wRow54 = wk => wRows().find(r => r[0] === wk);
+const covered54 = wk => { const r = wRow54(wk); return r ? r[wCol54('days covered (of 7)')] : undefined; };
+
+ROLLUP_DAYS = 17;                      // Wed 2026-07-08 .. Fri 2026-07-24
+reset(D(2026, 7, 24, 15, 0)); goodSheet();
+AC('DW: a =', 20, 9, 0, 11, 0);
+dailyRollup();
+chk('the column exists', wCol54('days covered (of 7)') >= 0, JSON.stringify(wRows()[0].slice(-3)));
+chk('the oldest week says how many of its seven days the window covered',
+  covered54('2026-07-06') === 5, String(covered54('2026-07-06')));
+chk('a week the window covers completely says seven',
+  covered54('2026-07-13') === 7, String(covered54('2026-07-13')));
+chk('and the current week, which is only half over, says five',
+  covered54('2026-07-20') === 5, String(covered54('2026-07-20')));
+chk('so exactly one week of the three is whole',
+  wRows().slice(1).filter(r => r[wCol54('days covered (of 7)')] === 7).length === 1,
+  JSON.stringify(wRows().slice(1).map(r => r[0] + '=' + r[wCol54('days covered (of 7)')])));
+chk('every row still carries a week of value in the same form as before',
+  wRows().slice(1).every(r => /^\d{4}-\d{2}-\d{2}$/.test(String(r[0]))),
+  JSON.stringify(wRows().slice(1).map(r => r[0])));
+chk('and nothing was appended to it — the marking is a column, not a suffix',
+  wRows().slice(1).every(r => !/partial/i.test(String(r[0]))),
+  JSON.stringify(wRows().slice(1).map(r => r[0])));
+chk('the count is the sum of the days it covered, so the weeks add to the window',
+  wRows().slice(1).reduce((s, r) => s + r[wCol54('days covered (of 7)')], 0) === 17,
+  String(wRows().slice(1).reduce((s, r) => s + r[wCol54('days covered (of 7)')], 0)));
+
+console.log('\n54b. a window that is whole weeks marks nothing partial');
+/* The rule is about coverage, not about position in the list: here the oldest
+ * row and the newest row are both complete, which is the case a rule written as
+ * "the first and last rows are partial" would get wrong. */
+ROLLUP_DAYS = 14;                      // Mon 2026-07-13 .. Sun 2026-07-26
+reset(D(2026, 7, 26, 15, 0)); goodSheet();
+dailyRollup();
+chk('two weeks, both whole',
+  wRows().length === 3 && wRows().slice(1).every(r => r[wCol54('days covered (of 7)')] === 7),
+  JSON.stringify(wRows().slice(1).map(r => r[0] + '=' + r[wCol54('days covered (of 7)')])));
+
+console.log('\n54c. a window inside a single week is one partial row, well formed');
+ROLLUP_DAYS = 3;                       // Mon 2026-07-20 .. Wed 2026-07-22
+reset(D(2026, 7, 22, 15, 0)); goodSheet();
+AC('DW: a =', 21, 9, 0, 11, 0);
+dailyRollup();
+chk('one week row', wRows().length === 2,
+  JSON.stringify(wRows().slice(1).map(r => r[0])));
+chk('marked partial, and it says three',
+  covered54('2026-07-20') === 3, String(covered54('2026-07-20')));
+chk('the row is the width of the header',
+  wRows()[1].length === wRows()[0].length,
+  wRows()[1].length + ' vs ' + wRows()[0].length);
+chk('and there is still exactly one stamp, after the last data column',
+  wRows()[0].filter(h => /^last rebuilt /.test(String(h))).length === 1 &&
+  /^last rebuilt /.test(String(wRows()[0][wRows()[0].length - 1])),
+  JSON.stringify(wRows()[0].slice(-2)));
+chk('the numbers the week reports are still its days\' numbers',
+  wRow54('2026-07-20')[wCol54('DW')] === 2, String(wRow54('2026-07-20')[wCol54('DW')]));
+
+console.log('\n54e. the count survives a week containing a clock change');
+/*
+ * D2's test note names `mondayStartMs_` as "exactly where a timezone bug would
+ * hide", and it is right, but the July windows above never touch one: none of
+ * the four contracted zones changes its clocks in July. So this walks a window
+ * across every spring-forward and fall-back weekend the four zones have in
+ * 2026, and over a year boundary, in whatever zone the suite is running in.
+ *
+ * The expectation is computed from plain local-date arithmetic — new Date(y, m,
+ * d) and getDay(), never epoch milliseconds and never one of Code.gs's own
+ * helpers — so it is an independent answer rather than the same arithmetic
+ * agreeing with itself. A day that is 23 or 25 hours long is exactly where
+ * counting in milliseconds goes wrong, and this is the assertion that would
+ * notice.
+ */
+const DST_ANCHORS = [
+  [2026, 3, 11],   // US spring forward, 2026-03-08, inside the window
+  [2026, 11, 4],   // US fall back, 2026-11-01
+  [2026, 4, 1],    // EU spring forward 2026-03-29
+  [2026, 4, 8],    // AU DST ends 2026-04-05 — the hour that goes BACKWARDS, which
+                   // is the direction that moves a fixed-24h step onto 23:00 of
+                   // the day before and so onto the wrong date entirely
+  [2026, 10, 28],  // EU fall back 2026-10-25
+  [2026, 10, 7],   // AU spring forward 2026-10-04
+  [2027, 1, 2]     // across a year boundary
+];
+const wrong54 = [];
+DST_ANCHORS.forEach(([y, mo, dy]) => {
+  [3, 10, 17].forEach(len => {
+    ROLLUP_DAYS = len;
+    reset(new Date(y, mo - 1, dy, 15, 0, 0, 0).getTime()); goodSheet();
+    dailyRollup();
+    // The oracle: walk back `len` local days from the anchor, bucket each into
+    // its own Monday, and count. No milliseconds anywhere.
+    const want = {};
+    for (let i = 0; i < len; i++) {
+      const d = new Date(y, mo - 1, dy - i);
+      const back = (d.getDay() + 6) % 7;
+      const mon = new Date(d.getFullYear(), d.getMonth(), d.getDate() - back);
+      const k = mon.getFullYear() + '-' + String(mon.getMonth() + 1).padStart(2, '0') +
+                '-' + String(mon.getDate()).padStart(2, '0');
+      want[k] = (want[k] || 0) + 1;
+    }
+    const got = {};
+    wRows().slice(1).forEach(r => { got[r[0]] = r[wCol54('days covered (of 7)')]; });
+    /* Sorted pairs, not JSON of the objects: the oracle walks backwards from the
+       anchor, so it meets the weeks in the opposite order to the grid, and
+       key order is not what is being asserted. */
+    const flat = o => Object.keys(o).sort().map(k => k + '=' + o[k]).join(',');
+    if (flat(got) !== flat(want)) {
+      wrong54.push(y + '-' + mo + '-' + dy + ' over ' + len + ' days: got ' +
+                   flat(got) + ' wanted ' + flat(want));
+    }
+  });
+});
+chk('across six clock-change weekends and three window lengths, the counts are right',
+  wrong54.length === 0, wrong54.slice(0, 3).join(' | '));
+
+console.log('\n54f. and the ninety-day window the criterion actually names');
+ROLLUP_DAYS = DAYS_WAS;                                  // 90, the shipped value
+reset(D(2026, 7, 24, 15, 0)); goodSheet();               // a Friday
+dailyRollup();
+const cov54f = wRows().slice(1).map(r => r[wCol54('days covered (of 7)')]);
+chk('ninety days, and they add up to ninety',
+  cov54f.reduce((s, n) => s + n, 0) === 90, JSON.stringify(cov54f));
+chk('the oldest week is partial and the newest is too',
+  cov54f[0] < 7 && cov54f[cov54f.length - 1] < 7,
+  cov54f[0] + ' ... ' + cov54f[cov54f.length - 1]);
+chk('and every week between them is whole',
+  cov54f.slice(1, -1).every(n => n === 7), JSON.stringify(cov54f));
+chk('no week can report more than the seven days it has',
+  cov54f.every(n => n >= 1 && n <= 7), JSON.stringify(cov54f));
+
+console.log('\n54d. the daily tab is untouched by any of it');
+chk('no days covered column on the daily tab', dRows()[0].indexOf('days covered (of 7)') < 0,
+  JSON.stringify(dRows()[0].slice(-3)));
+ROLLUP_DAYS = DAYS_WAS;
 reset();
 
 console.log('\n────────────────────────────────────────');

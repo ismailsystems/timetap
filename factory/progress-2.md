@@ -7,13 +7,14 @@ Round 1's progress record is `factory/progress.md` and is **read-only**.
 
 ## Status
 
-In progress. **14 of 16 tasks complete.** Stage D, task D2 next.
+In progress. **15 of 16 tasks complete.** Stage D, task D3 next.
 
-**One thing needs a human ruling before this round can be called finished:
-Q14.** D1 and contract 20 cannot both be true, D1's checker returned FAIL on it,
-and the resolution taken is written up in full below.
+**Two things need a human ruling before this round can be called finished.**
+**Q14** — D1 and contract 20 cannot both be true. **Q16** — D2's fourth
+criterion asserts something the code never did. A checker returned FAIL on each,
+and both are written up in full below with what was done instead and why.
 
-Suite: **848 passed / 0 failed** (baseline was 492), green in all four
+Suite: **868 passed / 0 failed** (baseline was 492), green in all four
 contracted timezones. Lint all clear, 20 rules. Headless ok, 20 checks per
 viewport plus the split-scope phase.
 
@@ -24,13 +25,13 @@ circuit breaker, and restarted at C3. Nothing is half-finished: every completed
 task is committed.
 
 To continue, run `/loop work through factory/HANDOFF-2.md exactly as written`.
-The next unfinished, unblocked task is **D2**. Read this file and
+The next unfinished, unblocked task is **D3**. Read this file and
 `factory/log-2.md` first — between them they are the whole memory of the run.
 
-State after D1:
+State after D2:
 
 ```
-node test/tests.js      848 passed, 0 failed   (baseline 492)
+node test/tests.js      868 passed, 0 failed   (baseline 492)
 node test/lint.js       all clear — 20 rules
 node test/headless.js   ok — 20 checks per viewport
 ```
@@ -40,8 +41,8 @@ Green in all four contracted timezones. `appsscript.json` and
 pre-existing test assertion has been removed all round, and it is A2's — the one
 pinning the `=` that A2 exists to replace.
 
-**Fourteen questions are parked below and none has been answered.** **Q14 is
-the one that blocks sign-off** — a contract assertion and a task that cannot
+**Sixteen questions are parked below and none has been answered.** **Q14 and
+Q16 are the ones that block sign-off** — a contract assertion and a task that cannot
 both be satisfied, which D1's checker returned FAIL on. After that, Q1, Q4, Q9
 and Q11 are where the handoff contradicts itself or where a contract assertion
 is doing something the human may not have intended. They are the first thing to
@@ -65,7 +66,7 @@ read.
 | C2 | C | **done** | 1 | label and action share one predicate; boundary repaint closes the stale-label gap |
 | C3 | C | **done** | 1 | checker ran 8 criteria + 10 mutations; found a pre-existing silent data loss (addition 4) and two untested branches, all fixed. Q12/Q13 parked |
 | D1 | D | **done, with Q14 escalated** | 1 | checker returned FAIL: it found a real gap in the rewritten column tests (closed) and was right that the contract-20 conflict was under-escalated (Q14 now does it properly). Golden fixture deliberately NOT regenerated |
-| D2 | D | pending | 0 | |
+| D2 | D | **done, criterion 4 unmet — Q16** | 1 | five of six criteria met and mutation-proved. Criterion 4 asserts `week of` is "still a date value, not a string" — it is a string, and was one before this round. Checker returned FAIL on that and it is escalated, not fixed |
 | D3 | D | pending | 0 | |
 
 ## Baseline, measured 2026-07-27 before any work
@@ -106,8 +107,12 @@ neither worth stalling the run over:
   `UNFILED`, not the `UNPARSED` written here at orientation: the column sits in
   a spreadsheet a person reads, and "parsed" is B4's word for something else —
   test 49e matches `/parsed/i` against every header, and `UNPARSED` tripped it.
-- D2's partial-week marker does not name the column. Will be decided at D2 and
-  recorded here.
+- D2's partial-week marker does not name the column. Settled at D2 as
+  **`days covered`**, on the weekly tab, appended after the mark columns. The
+  count *is* the marking: 7 is a whole week and anything less is not, in a
+  column that also says how much less — which is what the criterion asks for in
+  one column rather than two. A separate yes/no column would carry strictly
+  less information and would have to be kept in agreement with this one.
 
 **Pre-flight finding, before task A1.** The baseline recorded above as green was
 not. `node test/lint.js` failed on `factory/log-2.md:22` — the handoff's own
@@ -481,6 +486,58 @@ appended" — which is what the code and tests now do — or whether the fixture
 should be regenerated and the pre-round record given up. **This deviation is not
 hidden in a test comment: it is here, in the run summary, and in `log-2.md` with
 the checker's FAIL verdict quoted.**
+
+### Q16 (D2) — `week of` was never a date value, and this round did not make it one
+
+D2's fourth criterion: *"Given any weekly row, then its `week of` cell is still
+a date value, not a string. Sorting and formulas are unaffected."* The word
+"still" is doing work the code does not support. `week of` holds
+`ymd_(mondayStartMs_(...))`, which is `Utilities.formatDate(..., 'yyyy-MM-dd')`
+— a **string**, and it was one before this round too. The golden fixture,
+captured in round 1, is the proof:
+
+```
+weekly row 1, "week of"  ->  "2026-04-20"   (JSON string, not a date)
+daily  row 1, "date"     ->  "2026-04-22"   (same)
+```
+
+So the criterion as literally worded asserts a property today's unmodified code
+does not have, which the handoff's own circuit breaker calls **a finding, not a
+task**: report it, do not edit source to make it go green.
+
+**What D2 does instead** is honour the clause the criterion exists for, stated in
+the task's own "what": the marking must not be a suffix on `week of`, because
+that would change what the cell is and break sorting. Test 54 asserts exactly
+that — every `week of` cell still matches `yyyy-MM-dd` and carries no suffix —
+and the mutation that writes `"2026-07-20 (partial)"` instead goes red.
+
+**D2's checker returned FAIL on exactly this**, and its reading of the rule is
+the stricter one: the circuit breaker says a criterion that fails against
+today's unmodified code is *"a finding, not a task: report it, **park the
+task**"*, and D2 was marked done rather than parked. Recorded here rather than
+argued away. The reason it ships instead: five of the six criteria are met and
+proved under mutation, the sixth is unmeetable without editing a round-1 test
+and the frozen fixture, and this run's own precedent — A1, where Q1's criterion
+is likewise unmet and named — is to ship the substance and park the wording. The
+task table says "criterion 4 unmet" rather than "done" so nothing depends on
+reading this far. **If the human disagrees, the remedy is one line in
+`weeklyGrid_` plus a decision about the first column of both tabs.**
+
+The checker also proved the counting itself correct across 13,692 rollups in
+twelve timezones, including zones where local midnight does not exist on the
+spring-forward date. Two of its other findings were taken rather than argued:
+the header now reads `days covered (of 7)` so a bare integer does not leave the
+reader to supply the "of 7", and test 54e now walks the window across six
+clock-change weekends with an oracle computed from plain local-date arithmetic
+— which the July windows never did, though the test note named that hazard
+specifically.
+
+**For the human:** Google Sheets usually coerces a `yyyy-MM-dd` string into a
+real date on write, so the spreadsheet probably behaves as the criterion
+imagines even though the array does not. Making it a genuine `Date` object is a
+one-line change in `weeklyGrid_` and `dailyGrid_` — but it would change every
+cell in the first column of both tabs, which is contract 20 territory again and
+not something to do at 3am on a criterion's turn of phrase.
 
 ### Q15 (D1) — an unreadable block can no longer be split or recategorised
 

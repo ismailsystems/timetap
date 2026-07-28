@@ -973,3 +973,75 @@ judged the right trade.
 848 / 0, green twice and in all four contracted timezones. Lint all clear at 20
 rules. Headless ok at 20 checks per viewport. `appsscript.json` and
 `test/fixtures/rollup-golden.json` byte-identical to `a256bdf`.
+
+## [2026-07-28 09:20] D2 | A week the window only partly covers says so
+
+**The column is `days covered (of 7)`, on the weekly tab, appended after the
+mark columns.** The window is ninety days back from today, so its oldest week is
+almost always a few days of a week shown exactly like a whole one — and so is
+its newest, which is however much of this week has happened. Both had ratios
+that were misleading by construction and said nothing about it.
+
+The count *is* the marking: 7 is a whole week and anything less is not, in a
+column that also says how much less. One column rather than two, because a
+separate yes/no column would carry strictly less information and would have to
+be kept in agreement with this one. The `(of 7)` is in the header because a bare
+integer leaves the reader to supply the thing being said.
+
+**Not a suffix on `week of`.** That cell is what the tab sorts by and what
+formulas outside this repo point at, and the task says so explicitly. The
+mutation that writes `2026-07-20 (partial)` instead breaks a round-1 test
+outright.
+
+**Tests: 54 through 54f. 848 → 868 assertions.** Eleven mutations tried between
+me and the checker — always-7, count-only-active-days, off-by-one, the header
+renamed, the column moved to the front, the column added to the daily tab too,
+weeks bucketed Sun-Sat, the `week of` suffix — and every one goes red.
+
+**The checker returned FAIL, and two of its findings were taken.**
+
+First, the tests did not exercise the hazard D2's own test note names. *"Run
+under all four contracted timezones — `mondayStartMs_` is local-midnight
+arithmetic and is exactly where a timezone bug would hide."* True, and the July
+windows I had written never touch a clock change: none of the four contracted
+zones changes its clocks in July. Four zones at four fixed offsets is not the
+same test. **54e now walks the window across six clock-change weekends** —
+including each contracted zone's fall-back, the direction that moves a
+fixed-24h step onto 23:00 of the day before and so onto the wrong date — with
+the expectation computed from plain `new Date(y, m, d)` arithmetic that never
+touches epoch milliseconds or any of `Code.gs`'s own helpers. An independent
+answer, not the same arithmetic agreeing with itself.
+
+It earned itself immediately. Replacing `addLocalDaysMs_(firstDay, i)` with
+`firstDay + i * 86400000` — the exact bug the note warns about — now fails in
+New York, London and Sydney and correctly passes in UTC, which has no clock to
+change. My first version of 54e caught only New York, because the April anchor
+stopped four days before Sydney's transition.
+
+Second, `days covered` did not say seven anywhere a reader could reach.
+Renamed, and `SETUP.md` now documents this column, the mark columns from B2/B3
+and `UNFILED` from D1 — none of which had been written down.
+
+**The finding it failed the task on: criterion 4, and it is right on the facts.**
+*"Given any weekly row, then its `week of` cell is still a date value, not a
+string."* It is a string, `ymd_` has always made it one, and the golden fixture
+captured in round 1 proves it was one before this round. So the criterion
+asserts a property today's unmodified code does not have, which the handoff
+calls a finding rather than a task — and the checker reads the rule as requiring
+the task be **parked**, not shipped.
+
+It ships, with the disagreement recorded rather than resolved in my favour: five
+of six criteria met and mutation-proved, the sixth unmeetable without editing a
+round-1 test and the frozen fixture, and the run's own precedent (A1/Q1) is to
+ship the substance and park the wording. The task table says
+"criterion 4 unmet — Q16" rather than "done", so nothing depends on anyone
+reading this far. Q16 has the runtime proof and the one-line remedy if the human
+rules the other way.
+
+Worth recording plainly: **the checker also proved the counting correct across
+13,692 rollups in twelve timezones**, including zones where local midnight does
+not exist on the spring-forward date. The arithmetic was never in doubt after
+that; only the paperwork was.
+
+868 / 0, green twice and in all four contracted timezones. Lint all clear at 20
+rules. Headless ok at 20 checks per viewport.

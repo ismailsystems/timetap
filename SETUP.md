@@ -398,6 +398,28 @@ chart it without being asked twice. A ratio against zero planned hours is blank
 rather than an error, and so is a sitting percentage on a day with no waking
 span.
 
+Both tabs then carry, appended after everything above so that formulas pointed
+at the columns already there keep working:
+
+- **one column per category per mark** — `DW +`, `DW =`, `DW -`, `DW ?`,
+  `DW unmarked`, and the same five for every other key. A category's five
+  buckets always add up to its own total column. `unmarked` is a real bucket:
+  blocks under `MIN_MARK_MINUTES` never get a mark, and that is not the same as
+  a zero.
+- **`UNFILED`** — an ACTUAL event whose title the app cannot read as one of your
+  categories, either because it does not start with a key and a colon or
+  because it starts with one you have not configured. Those hours used to
+  disappear from these tabs entirely. They are yours; they are here.
+- **`UNLOGGED`** — the stretch the app wrote off after bounding a block you left
+  running. Neither this nor a `?`-marked block extends `waking h`, because
+  neither is a time you told it about.
+
+The weekly tab carries one more: **`days covered (of 7)`**. The window is ninety
+days back from today, so its oldest week is usually a few days of a week and its
+newest is however much of this week has happened. A 7 is a whole week. Anything
+less means that row's ratios are comparing part of a week to a whole one's plan,
+and now says so.
+
 ### Two things to know
 
 **These tabs are generated output.** Every run clears them and writes them

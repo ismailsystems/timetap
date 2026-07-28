@@ -1317,6 +1317,27 @@ function weeklyGrid_(days, keys) {
   keys.forEach(function (k) {
     MARK_BUCKETS.forEach(function (m) { head.push(markCol_(k, m)); });
   });
+  /*
+   * How many of the week's seven days the window actually covered.
+   *
+   * The window is ROLLUP_DAYS long and starts wherever counting back from today
+   * lands, so its oldest week is almost always a few days of a week presented
+   * exactly like a whole one — and its plan-versus-actual ratio is misleading by
+   * construction. So is the newest week, which is however much of this week has
+   * happened so far. Neither said so.
+   *
+   * The count is the marking: a 7 is a whole week and anything less is not, in a
+   * column that also says how much less. A separate yes/no column would carry
+   * strictly less information and would have to be kept in agreement with this
+   * one. The header carries the "of 7" because a bare integer under a bare
+   * "days covered" leaves the reader to know that a week has seven days in it
+   * and that this one did not — which is the whole thing being said.
+   *
+   * Deliberately NOT a suffix on 'week of'. That cell is what the tab sorts by
+   * and what formulas outside this repo point at; "2026-04-20 (partial)" is a
+   * different kind of value, and this task is not worth breaking sorting for.
+   */
+  head.push('days covered (of 7)');
 
   var weeks = [], index = {};
   days.forEach(function (d) {
@@ -1324,7 +1345,7 @@ function weeklyGrid_(days, keys) {
     if (!(wk in index)) {
       index[wk] = weeks.length;
       var blank = { wk: wk, plan: {}, actual: {}, marks: {}, switches: 0, waking: 0,
-                    sitting: 0, longestSit: 0, sitsOver90: 0 };
+                    sitting: 0, longestSit: 0, sitsOver90: 0, covered: 0 };
       keys.forEach(function (k) {
         blank.plan[k] = 0;
         blank.actual[k] = 0;
@@ -1345,6 +1366,9 @@ function weeklyGrid_(days, keys) {
     w.sitting += d.sitting;
     w.sitsOver90 += d.sitsOver90;
     if (d.longestSit > w.longestSit) w.longestSit = d.longestSit;
+    // rollupOnce_ builds exactly one entry per day in the window, including the
+    // days nothing happened on, so counting them is the coverage.
+    w.covered++;
   });
 
   var rows = [head];
@@ -1362,6 +1386,7 @@ function weeklyGrid_(days, keys) {
     keys.forEach(function (k) {
       MARK_BUCKETS.forEach(function (m) { r.push(round2_(w.marks[k][m])); });
     });
+    r.push(w.covered);
     rows.push(r);
   });
   return rows;
