@@ -1257,3 +1257,44 @@ And one test edit that was not disclosed: section 55's regex moved from
 `/set it aside/` to `/set aside/` when the banner started counting what is on
 the shelf. Same strength, but it now says so in a comment, because "same
 strength" is exactly what a quiet weakening also claims.
+
+## [2026-07-28 18:00] IN USE | Three faults the user found by using the app
+
+None of the three could have been caught by the offline suite. It calls handlers
+directly, so nothing bubbles, and it has no layout at all. 994 assertions did not
+see any of them; a person using the app saw all three in a few minutes.
+
+**1. A key typed in a note reached the cell around it.** The cell is a `div`
+playing the part of a button, so it answers to Enter and Space. Both were
+arriving from inside the note box:
+
+```
+typed "one two"  ->  stored as "onetwo"     the space was swallowed AND counted as a tap
+pressed Enter    ->  the SPLIT sheet opened
+```
+
+So notes could not contain spaces. **This is round-1 code** — `a256bdf` has the
+identical handler — not something this round introduced. The box now stops its
+own keys; Enter still dismisses the keyboard.
+
+**2. APPLY in the sit-start sheet rendered 374x505.** `.fbtn` is `flex: 1` so it
+fills a header row. In a sheet body, which is a column, that same rule made it
+fill the height. A button in a sheet body now keeps a control's height, and the
+inline `style="width:100%;height:48px"` that was trying to say so is gone.
+
+**3. An empty grid slot carried a faint outline**, so it read as a box you could
+tap and could not. The slot stays — it holds the grid's shape — and shows
+nothing.
+
+**A new headless phase, `checkNoteAndSheets`.** Three checks, each proved to bite
+by reverting its fix: the note reads back `"onetwo"`, APPLY measures 505px beside
+a 48px DISCARD, and the empty slot is drawn with a box-shadow. Two of them are
+judged against the app itself rather than against a number written here — APPLY
+against the other button in the same sheet, and the empty slot against the add
+box, which must still look like something or the rule is met by making the whole
+grid invisible.
+
+**The lesson worth keeping.** Every one of these lives in a layer the offline
+suite cannot reach: event bubbling and computed layout. The headless layer is
+where they belong, and it had no phase that used the app the way a person does —
+type a note, finish it, open a sheet, look at the grid. It has one now.

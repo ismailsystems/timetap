@@ -216,7 +216,9 @@
   }
   /* The add box. Outlined rather than filled, because it is not a category
      yet and must not read like one. */
-  .gspacer { border-radius: 12px; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .045); }
+  /* An empty slot holds the grid's shape and shows nothing. It used to carry a
+     faint outline, which read as a box you could tap and could not. */
+  .gspacer { border-radius: 12px; }
   /* Dashed, so a glance tells you it is a slot for a category rather than one
      you can log against. Same size as the rest, per the grid's own rule. */
   .addcell {
@@ -253,6 +255,11 @@
     font-size: 13px; font-weight: 700; letter-spacing: .12em; color: var(--dim);
   }
   .fbtn:active { background: var(--panel2); }
+  /* .fbtn is flex: 1 so that it fills a header row. In a sheet body — which is a
+     COLUMN — that same rule made it fill the height instead, and APPLY rendered
+     374x505 where it meant to be 48 tall. A button in a sheet body is a control
+     and keeps a control's height. */
+  .sheetbody > .fbtn { flex: 0 0 48px; }
   #strip {
     position: absolute; inset: 0; display: flex; gap: 6px;
     align-items: center; background: var(--panel2); border-radius: 12px;
@@ -428,7 +435,7 @@
       <div class="ends"><span id="ssLo"></span><span id="ssHi"></span></div>
       <div class="sub" id="ssSub"></div>
     </div>
-    <button id="ssApply" class="fbtn" style="width:100%;height:48px">APPLY</button>
+    <button id="ssApply" class="fbtn">APPLY</button>
     <button id="ssDelete" class="danger">DISCARD THIS SIT BLOCK</button>
   </div>
 </div>
@@ -1310,7 +1317,21 @@
       gn.addEventListener('input', function () {
         if (S.open && S.open.key === c.key) noteChanged(gn.value);
       });
-      gn.addEventListener('keydown', function (e) { if (e && e.key === 'Enter') gn.blur(); });
+      /*
+       * The cell around this box answers to Enter and Space, because it is a div
+       * playing the part of a button and a keyboard user has to be able to work
+       * it. Those keys were reaching it from in here: a space typed in a note
+       * was swallowed and counted as a tap on the category, and Enter opened the
+       * SPLIT sheet. So "one two" was stored as "onetwo", and finishing a note
+       * took you somewhere you did not ask to go.
+       *
+       * The box stops its own keys. Enter still dismisses the keyboard, which is
+       * what enterkeyhint="done" promises.
+       */
+      gn.addEventListener('keydown', function (e) {
+        if (e && e.stopPropagation) e.stopPropagation();
+        if (e && e.key === 'Enter') gn.blur();
+      });
 
       CELL[c.key] = { box: b, note: gn, el: b.querySelector('.ge') };
       b.addEventListener('click', function () { confirmTap(b); tapCategory(c.key); });

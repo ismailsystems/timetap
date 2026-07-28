@@ -1179,6 +1179,157 @@ async function checkSetAsideOpen(browser, view, page) {
   return problems;
 }
 
+/**
+ * The three faults the user found by using the app, none of which the offline
+ * suite could ever have seen: it calls handlers directly and nothing bubbles,
+ * and it has no layout at all.
+ *
+ *   1. A key typed in a note reached the cell around it. The cell is a div
+ *      playing the part of a button, so it answers to Enter and Space — which
+ *      meant a space was swallowed AND counted as a tap ("one two" was stored
+ *      as "onetwo"), and Enter opened the SPLIT sheet.
+ *   2. `.fbtn` is flex: 1 so it fills a header row. APPLY is an .fbtn in a sheet
+ *      body, which is a column, so it filled the height: 374x505 for a control
+ *      meant to be 48 tall.
+ *   3. An empty grid slot carried a faint outline, so it read as a box you
+ *      could tap and could not.
+ */
+const USE_ORIGIN = 'http://timetap-use.invalid/';
+
+async function checkNoteAndSheets(browser, view, page) {
+  const problems = [];
+  const label = view.name + ' ' + view.width + 'px';
+  const ctx = await browser.newContext({
+    viewport: { width: view.width, height: view.height },
+    isMobile: !!view.isMobile, hasTouch: !!view.isMobile,
+    deviceScaleFactor: view.isMobile ? 3 : 1
+  });
+  const pg = await ctx.newPage();
+  const errors = [];
+  pg.on('pageerror', e => errors.push(String((e && e.message) || e)));
+  try {
+    await pg.route(USE_ORIGIN, r =>
+      r.fulfill({ status: 200, contentType: 'text/html; charset=utf-8', body: documentFor(page, true) }));
+    // Stalls rather than answers, so the seeded state stands and the lit cell
+    // keeps its note box open for the length of the check.
+    await pg.addInitScript(stallingServerStub);
+    await pg.addInitScript(() => {
+      const now = Date.now();
+      localStorage.setItem('tt.state.v1', JSON.stringify({
+        open: { ref: 'aaaabbbbccccdddd', key: 'DW', text: '', startMs: now - 3 * 3600000 },
+        sit: { ref: 'eeeeffff11112222', startMs: now - 3600000 },
+        lastTapMs: 0
+      }));
+    });
+    await pg.goto(USE_ORIGIN, { waitUntil: 'load' });
+    await pg.waitForTimeout(150);
+
+    // ── 1. the note box keeps its own keys ─────────────────────────
+    const note = pg.locator('#grid [data-key="DW"] .gn');
+    if (!await note.isVisible()) {
+      problems.push(label + ': the lit cell has no visible note box, so the checks ' +
+                    'below could not run');
+      return problems;
+    }
+    await note.click();
+    await note.type('one two');
+    await pg.waitForTimeout(60);
+    const typed = await note.inputValue();
+    console.log('\nnote and sheets (' + view.name + ')');
+    console.log('  typed "one two":  ' + JSON.stringify(typed));
+    if (typed !== 'one two') {
+      problems.push(label + ': a note typed as "one two" reads back as ' +
+                    JSON.stringify(typed) + ' — the space reached the cell behind it ' +
+                    'instead of the box');
+    }
+    await note.press('Enter');
+    await pg.waitForTimeout(120);
+    const splitAfterEnter = await pg.locator('#sheetSplit').isVisible();
+    console.log('  Enter opened SPLIT: ' + splitAfterEnter);
+    if (splitAfterEnter) {
+      problems.push(label + ': pressing Enter in a note opened the SPLIT sheet. ' +
+                    'Finishing a note is not a tap on the category.');
+    }
+    const stillFocused = await pg.evaluate(() =>
+      document.activeElement && document.activeElement.classList.contains('gn'));
+    if (stillFocused) {
+      problems.push(label + ': Enter did not dismiss the keyboard — the note box ' +
+                    'still holds focus, which enterkeyhint="done" promises it will not');
+    }
+
+    // ── 2. a button in a sheet body is a control, not a panel ───────
+    await pg.evaluate(() => document.getElementById('sheetSplit').classList.add('hidden'));
+    await pg.click('#sitEdit');
+    await pg.waitForTimeout(120);
+    if (!await pg.locator('#sheetSit').isVisible()) {
+      problems.push(label + ': the sit-start sheet did not open, so its buttons were ' +
+                    'not measured');
+    } else {
+      const btns = await pg.evaluate(() => {
+        const box = id => { const r = document.getElementById(id).getBoundingClientRect();
+                            return { w: +r.width.toFixed(1), h: +r.height.toFixed(1) }; };
+        return { apply: box('ssApply'), del: box('ssDelete'), close: box('ssClose'),
+                 body: document.querySelector('#sheetSit .sheetbody').getBoundingClientRect().height };
+      });
+      console.log('  sit sheet:        APPLY ' + Math.round(btns.apply.w) + 'x' + Math.round(btns.apply.h) +
+                  ', DISCARD ' + Math.round(btns.del.w) + 'x' + Math.round(btns.del.h));
+      /* Judged against the other button in the same sheet, not against a number
+         written down here: they are both one-line controls, so neither may be
+         much taller than the other. A rule of "48px" would have to be edited the
+         first time the design changes; this one would not. */
+      if (btns.apply.h > btns.del.h * 1.5) {
+        problems.push(label + ': APPLY is ' + Math.round(btns.apply.h) + 'px tall beside a ' +
+                      Math.round(btns.del.h) + 'px DISCARD in the same sheet — it is filling ' +
+                      'the sheet body rather than sitting in it');
+      }
+      if (btns.apply.h < TOUCH_TARGET) {
+        problems.push(label + ': APPLY is ' + Math.round(btns.apply.h) + 'px tall, under the ' +
+                      TOUCH_TARGET + 'px floor');
+      }
+      await pg.evaluate(() => document.getElementById('sheetSit').classList.add('hidden'));
+    }
+
+    // ── 3. an empty slot shows nothing ─────────────────────────────
+    const cells = await pg.evaluate(() => [].slice.call(document.getElementById('grid').children)
+      .map(c => {
+        const s = getComputedStyle(c);
+        return { cls: c.className, key: c.dataset.key || null,
+                 shadow: s.boxShadow, borderStyle: s.borderTopStyle, borderWidth: s.borderTopWidth,
+                 bg: s.backgroundColor };
+      }));
+    const spacers = cells.filter(c => /gspacer/.test(c.cls));
+    const add = cells.filter(c => /addcell/.test(c.cls));
+    console.log('  grid slots:       ' + cells.length + ' (' + spacers.length + ' empty, ' +
+                add.length + ' add box)');
+    if (!spacers.length) {
+      problems.push(label + ': the grid has no empty slot at this category count, so the ' +
+                    'check below proved nothing. Seed a count that leaves one.');
+    }
+    spacers.forEach(c => {
+      const marks = [];
+      if (c.shadow && c.shadow !== 'none') marks.push('box-shadow ' + c.shadow);
+      if (c.borderStyle && c.borderStyle !== 'none' && parseFloat(c.borderWidth) > 0) {
+        marks.push('border ' + c.borderWidth + ' ' + c.borderStyle);
+      }
+      if (marks.length) {
+        problems.push(label + ': an empty grid slot is drawn with ' + marks.join(' and ') +
+                      ', so it reads as a box you can tap and cannot');
+      }
+    });
+    /* And the add box must still look like something, or the rule above is
+       satisfied by making the whole grid invisible. */
+    if (add.length && add[0].borderStyle === 'none') {
+      problems.push(label + ': the add box has no outline of its own, so "an empty slot ' +
+                    'shows nothing" is being met by showing nothing anywhere');
+    }
+
+    if (errors.length) problems.push(label + ': the page threw: ' + errors.join(' | '));
+  } finally {
+    await ctx.close();
+  }
+  return problems;
+}
+
 function sameMetas(a, b) {
   const norm = list => list.map(m => m[0] + '\0' + m[1]).sort();
   const x = norm(a), y = norm(b);
@@ -1332,6 +1483,7 @@ async function main() {
     problems = problems.concat(await checkDrawer(browser, VIEWS[0], page));
     problems = problems.concat(await checkTapCount(browser, VIEWS[0], page));
     problems = problems.concat(await checkSetAsideOpen(browser, VIEWS[0], page));
+    problems = problems.concat(await checkNoteAndSheets(browser, VIEWS[0], page));
     /* A4: the worst-case posture row, on a phone and on a desktop. 980px is
        named in the contract specifically so STOP cannot become a phone-only
        control that nobody checked anywhere else. */
