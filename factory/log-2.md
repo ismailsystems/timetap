@@ -1139,3 +1139,20 @@ prevent.
 
 `## RUN SUMMARY` is at the top of `factory/progress-2.md`, with the commands a
 human can run to see all of it work. Next step is the independent review.
+
+## [2026-07-28 11:00] RULINGS | Every parked question answered by the human
+
+Fifteen questions put to the human one at a time, highest damage first; Q11
+folded into Q14 as the same decision. All sixteen are now ruled on, and the
+rulings are recorded at the top of `factory/progress-2.md`.
+
+**Eight code changes, five rewordings, three accepted as they are.** The two
+that were blocking sign-off — Q14 and Q16 — are settled in favour of the code
+that shipped, so the golden fixture stays frozen and `week of` stays text.
+
+Three rulings change what an acceptance criterion says, and each was put to the
+human as exactly that rather than folded in quietly: A1's criterion 4, contract
+22, and D3's criterion 4. The new wording is to be written and approved before
+any of it counts as settled.
+
+**None of the work is started.** This entry records the instruction only.

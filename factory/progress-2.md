@@ -1,5 +1,48 @@
 # Progress — round 2, the honest record round
 
+## ANSWERS FROM THE HUMAN — 2026-07-28
+
+Every parked question is now ruled on. The rulings are below, in the order they
+were asked, which was highest damage first. **Nothing here is done yet.** This
+section is the instruction; the work is a fix pass.
+
+| # | Question | Ruling | Kind |
+|---|---|---|---|
+| 1 | **Q14** — D1 moves columns that contract 20 pins | **Keep the frozen fixture.** Reword contract 20 | words |
+| 2 | **Q16** — `week of` is text, not a date value | **Keep the text.** Reword D2's criterion 4 | words |
+| 3 | **Q12 + Q18** — a sheet outlives the block it names | **Close the sheet** when its block changes or goes | code |
+| 4 | **Q9** — a guessed block's start is a fact, its end is not | **Count the start, not the end** | code |
+| 5 | **Q10** — a user category can take a reserved key | **Add `UNLOGGED` and `UNFILED` to the taken list** | code |
+| 6 | **Q2** — a note ending in `+`, `=` or `-` marks the block | **Protect all four marks**, as A1 did for `?` | code |
+| 7 | **Q4** — `validOp_` accepts a `?` from the browser store | **Refuse it**, as before this round | code |
+| 8 | **Q17** — STOP goes dead after a set-aside split | **Put the first block back in hand** | code |
+| 9 | **Q8** — the strip's mark buttons are 42px | **Raise them to 44px** and extend A4's rule to cover them | code |
+| 10 | **Q13** — an armed label survives into SPLIT | **Clear it when SPLIT opens** | code |
+| 11 | **Q15** — an unreadable block cannot be repaired in-app | **Leave it.** The controls existed only because the app was claiming | none |
+| 12 | **Q1** — A1's criterion 6 contradicts itself | **Reword it** to what test 41d already proves | words |
+| 13 | **Q6** — `UNLOGGED ?` gains a colon when rebuilt | **Make the title stable.** Build the bare form the app already writes | code |
+| 14 | **Q5** — a user can type `?` in Google Calendar | **Accept the limit.** It follows from contracts 13 and 18 | none |
+| 15 | **Q7** — a STOP whose writes never land still makes a phantom | **Accept it.** The calendar is the record, and the banner says so | none |
+| 16 | **Q11** — the golden fixture | Same ruling as Q14: **stays frozen** | none |
+
+**Eight code changes, five rewordings, three accepted as they are.** Two of the
+rewordings — contract 20 and D2's criterion 4 — are the ones that were blocking
+sign-off, and both are now settled in favour of the code that shipped.
+
+Three rulings change what an acceptance criterion says, and each was approved
+explicitly rather than assumed: **A1's criterion 4** (`validOp_` may reject
+`?`), **contract 22** (a guessed block's start may bound the waking span), and
+**D3's criterion 4** (the grid may show the first block again after a set-aside
+split). The new wording for all five is written for approval before any of it
+is treated as settled.
+
+Two rulings ask for work that is bigger than the line it changes: Q12/Q18 wants
+one sheet-lifecycle rule that closes three separate findings, and Q9 changes a
+number the sheet has already been reporting — days logged before it and after it
+are not comparable, which is A5's own warning and now applies twice.
+
+---
+
 ## RUN SUMMARY
 
 **Outcome: all 16 tasks complete, nothing parked, no circuit breaker fired.**
@@ -127,10 +170,11 @@ Round 1's progress record is `factory/progress.md` and is **read-only**.
 
 **All 16 tasks complete.** Nothing is parked, and no circuit breaker fired.
 
-**Two things need a human ruling before this round can be called finished.**
-**Q14** — D1 and contract 20 cannot both be true. **Q16** — D2's fourth
-criterion asserts something the code never did. A checker returned FAIL on each,
-and both are written up in full below with what was done instead and why.
+**Every parked question has now been ruled on by the human** — see
+`## ANSWERS FROM THE HUMAN` at the top of this file. The two that were blocking
+sign-off, Q14 and Q16, are both settled in favour of the code that shipped. What
+remains is a fix pass: eight code changes and five rewordings, all approved,
+none of them started.
 
 Suite: **908 passed / 0 failed** (baseline was 492), green in all four
 contracted timezones. Lint all clear, 20 rules. Headless ok, 20 checks per
