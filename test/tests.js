@@ -11,6 +11,24 @@ const CFG_UNDO_MS = clientConfig_().undoSeconds * 1000;
 // The one coupling names a category by key, so the tests read it from the same
 // place the client does rather than spelling 'BODY' out and drifting from it.
 const CFG_BODY = clientConfig_().bodyKey;
+
+/*
+ * Pick a category in the SPLIT sheet by key.
+ *
+ * Deliberately NOT by index. The sheet lists every category except the one
+ * being cut, so a position means a different category depending on which block
+ * is open — which is how three call sites here quietly moved by one when the
+ * filter the sheet's own comment described was finally implemented. Throwing
+ * names the mismatch instead of clicking whatever happens to be there.
+ */
+const splitPick = key => {
+  const cat = clientConfig_().categories.find(c => c.key === key);
+  const face = cat ? (cat.label || cat.key) : key;
+  const listed = () => $('splitGrid').children.map(x => x.querySelector('.f').textContent);
+  const b = $('splitGrid').children.find(x => x.querySelector('.f').textContent === face);
+  if (!b) throw new Error('SPLIT does not offer ' + key + ' — it lists ' + listed().join(','));
+  b.fire('click'); settle();
+};
 const D = (y, m, d, hh, mm) => new Date(y, m - 1, d, hh, mm, 0, 0).getTime();
 
 console.log('\n1. cold open, no open block');
@@ -33,8 +51,8 @@ console.log('\n2. ADM, 52m, DW -> strip, ignore 6s -> "ADM: ="');
 reset(); reboot();
 tap('ADM'); wait(52); tap('DW');
 chk('strip visible', !$('strip').hidden);
-chk('strip head "ADM · 52m — MARK IT"',
-  $('stripHead').textContent === 'ADM · 52m — MARK IT', $('stripHead').textContent);
+chk('strip head "ADMIN · 52m — MARK IT"',
+  $('stripHead').textContent === 'ADMIN · 52m — MARK IT', $('stripHead').textContent);
 advance(6000); settle();
 chk('strip auto-dismissed', $('strip').hidden);
 chk('ADM titled "ADM: ="', A()[0].t === 'ADM: =', A()[0].t);
@@ -162,7 +180,7 @@ const t11 = H.nowMs();
 tap('MTG'); settle(); wait(180);
 tap('MTG'); settle();                                    // re-tap the lit one
 $('spRange').value = '60'; $('spRange').fire('input');
-$('splitGrid').children[2].fire('click'); settle();     // ADM
+splitPick('ADM');
 const a11 = A();
 chk('two events', a11.length === 2, a11.map(show).join(' | '));
 chk('MTG 1h from the original start', a11[0].t === 'MTG: =' && a11[0].s === t11 && near(a11[0].e - a11[0].s, 3600000), show(a11[0]));
@@ -303,7 +321,8 @@ tap('DW'); settle();
 chk('past it, the lit button opens SPLIT', splitOpen());
 chk('and still churns no events',
   A().length === 1 && A().map(e => e.t + e.s + e.e).join('|') === before15b, A().map(show).join(' | '));
-chk('the sheet is aimed at the open block', /DW/.test($('spLab').textContent), $('spLab').textContent);
+chk('the sheet is aimed at the open block', /DEEP WORK/.test($('spLab').textContent),
+  $('spLab').textContent);
 $('spClose').fire('click'); settle();
 chk('closing it leaves the block alone', A().length === 1 && /#open/.test(A()[0].d), show(A()[0]));
 
@@ -463,7 +482,7 @@ reset(); reboot();
 tap('MTG'); settle(); wait(120);
 tap('MTG'); settle();
 $('spRange').value = '60'; $('spRange').fire('input');
-$('splitGrid').children[5].fire('click'); settle();      // FRAG
+splitPick('FRAG');
 chk('split writes the remainder in the chosen colour', sameAsButton(A()[1], 'FRAG'),
   'colour=' + evColour(A()[1]));
 chk('and leaves the original block its own', sameAsButton(A()[0], 'MTG'), 'colour=' + evColour(A()[0]));
@@ -1250,11 +1269,12 @@ chk('oldest last', /start a block/.test(rowText(uiRows()[1])), rowText(uiRows()[
 console.log('\n36b. every row says when, which, what and why');
 const r36 = rowText(uiRows()[0]);
 chk('a clock time', /\d{1,2}:\d\d (AM|PM)/.test(r36), r36);
-chk('the category the mark belonged to', /MTG/.test(r36), r36);
+chk('the category the mark belonged to', /MEETINGS/.test(r36), r36);
 chk('what it was trying to do, in words', /tried to save the mark/.test(r36), r36);
 chk('never the op type', !/setMark|closeActual|openActual/.test(r36), r36);
 chk('and why it failed', /the calendar refused/.test(r36), r36);
-chk('the other row names its own category', /DW/.test(rowText(uiRows()[1])), rowText(uiRows()[1]));
+chk('the other row names its own category', /DEEP WORK/.test(rowText(uiRows()[1])),
+  rowText(uiRows()[1]));
 
 console.log('\n36c. closing the drawer gives the grid back');
 $('dgClose').click(); settle();
@@ -2438,7 +2458,7 @@ tap('DW'); wait(40); settle();
 tapStop(); settle();
 chk('the strip is visible', !$('strip').hidden);
 chk('and names the block and its duration',
-  $('stripHead').textContent === 'DW · 40m — MARK IT', $('stripHead').textContent);
+  $('stripHead').textContent === 'DEEP WORK · 40m — MARK IT', $('stripHead').textContent);
 tapMark('+');
 chk('and the mark it offers still lands', A()[0].t === 'DW: +', A()[0].t);
 
@@ -3140,10 +3160,6 @@ console.log('\n52. a whole block can be recategorised, not just its remainder');
  * The write path is not new — opRecategorize_ is the same op a mis-tap
  * correction uses — so what is being tested here is the affordance and the
  * client state around it. */
-const splitPick = key => {
-  const i = CATEGORIES.findIndex(c => c.key === key);
-  $('splitGrid').children[i].fire('click'); settle();
-};
 const pickWhole = () => { $('spScopeAll').fire('click'); };
 /* Read the way splitOpen() does. The shim only makes a node once the client has
  * asked for it, so a build that never paints this label would crash the suite
@@ -3353,14 +3369,33 @@ console.log('\n52i. with nothing open, the whole-block option is out of reach');
 reset(); reboot();
 chk('nothing is lit', activeKey() === null, String(activeKey()));
 chk('and the sheet is not open — its only way in is a lit block', !splitOpen());
-/* The guard under it. In a browser the sheet is hidden so these buttons cannot
- * be reached at all; the guard has to hold anyway, because "unreachable" is not
- * something the code should be trusting the CSS for. */
+/* Stronger than it was. The list is built when the sheet opens, so with nothing
+ * open there is no row to fire at in the first place. */
+chk('and there is no list to fire at',
+  !H.NODES['splitGrid'] || H.NODES['splitGrid'].children.length === 0,
+  H.NODES['splitGrid'] ? String(H.NODES['splitGrid'].children.length) : '(never built)');
+
+/* The guard under it. Open the sheet on a real block, end the day underneath
+ * it, then fire a row. A browser puts the sheet over the whole screen so this
+ * sequence is not one a thumb can perform — which is exactly why the guard has
+ * to hold anyway. "Unreachable" is not something this should be trusting the
+ * CSS for. */
+reset(); reboot();
+tap('DW'); settle(); wait(120);
+tap('DW'); settle();
+chk('the sheet is open on a real block',
+  splitOpen() && $('splitGrid').children.length === 5,
+  String($('splitGrid').children.length));
+tapStop(); settle();
+chk('the day ended underneath it', activeKey() === null, String(activeKey()));
+const a52i = A().map(show).join(' | ');
 $('spScopeAll').fire('click');
 splitPick('MTG');
-chk('firing the grid with no open block writes nothing', A().length === 0,
-  A().map(show).join(' | '));
-chk('and queues nothing', JSON.parse(H.STORE['tt.queue.v1'] || '[]').length === 0,
+chk('firing the grid with no open block writes nothing',
+  A().map(show).join(' | ') === a52i, A().map(show).join(' | ') + ' was ' + a52i);
+chk('and queues no split or recategorise',
+  !JSON.parse(H.STORE['tt.queue.v1'] || '[]')
+    .some(o => o.type === 'splitActual' || o.type === 'recategorize'),
   H.STORE['tt.queue.v1'] || '[]');
 chk('and leaves the sheet shut', !splitOpen());
 reset();
@@ -4071,7 +4106,7 @@ console.log('\n61. a sheet closes when the block it names stops being the one in
 reset(); reboot();
 tap('DW'); settle(); wait(180);
 tap('DW'); settle();
-chk('the sheet is open on DW', splitOpen() && /DW/.test($('spLab').textContent),
+chk('the sheet is open on DW', splitOpen() && /DEEP WORK/.test($('spLab').textContent),
   $('spLab').textContent);
 // another device: close DW, open REL
 const dw61 = H.CALS.actual.events[0];
@@ -4348,7 +4383,7 @@ chk('and names the block it was about, at the start time it really had',
 chk('and the start it kept is the real one, not the epoch isFinite(null) allows',
   DEAD()[0].startMs === t71, String(DEAD()[0].startMs) + ' wanted ' + t71);
 chk('and it names the category rather than "unknown category"',
-  /DW/.test(said71) && !/unknown category/.test(said71), said71);
+  /DEEP WORK/.test(said71) && !/unknown category/.test(said71), said71);
 
 /* The grid stops claiming a block the calendar does not hold. */
 chk('the grid is not still showing the block the undo tried to put back',
@@ -4693,6 +4728,80 @@ $('undo').fire('click'); settle();
 chk('and one again after taking it back', segKinds().join(',') === 'DEEP WORK',
   segKinds().join(','));
 chk('which is the open one', segs()[0]._cls.has('open'), segs()[0].className);
+
+console.log('\n72. no screen shows the record\'s vocabulary at the user');
+/* REVIEW-4's finding 1. faceOf() exists and is used correctly in the grid, the
+ * NOW panel, the rail and the undo label. Four places never routed through it
+ * and printed the internal key instead — OPEN BLOCK: DW where the spec says
+ * OPEN BLOCK · DEEP WORK. The key is the record's vocabulary; the label is the
+ * button's. Every string below is byte-exact against the handoff. */
+reset(); reboot();
+tap('DW'); settle(); wait(43);
+tap('MTG'); settle();
+chk('the mark strip names the category the way the user does',
+  $('stripHead').textContent === 'DEEP WORK · 43m — MARK IT', $('stripHead').textContent);
+
+reset(); reboot();
+tap('DW'); settle(); wait(43);
+tap('DW'); settle();                             // re-tap the running row: SPLIT
+chk('the SPLIT kicker does too',
+  $('spLab').textContent === 'OPEN BLOCK · DEEP WORK', $('spLab').textContent);
+$('spRange').value = '20'; $('spRange').fire('input');
+chk('and the SPLIT sub-copy says what each half becomes',
+  $('spSub').textContent === '20m stays DEEP WORK · 23m becomes ↓', $('spSub').textContent);
+
+console.log('\n72b. SPLIT offers every category except the one being cut');
+/* Finding 3. The comment above the loop said "the same list, minus the block
+ * you are cutting"; the loop had no filter, so the sheet offered to make the
+ * remainder the category it already was. */
+chk('the sheet lists five rows, not six', $('splitGrid').children.length === 5,
+  String($('splitGrid').children.length));
+chk('and Deep work is not among them',
+  !$('splitGrid').children.some(b => /Deep work/.test(b.querySelector('.f').textContent)),
+  $('splitGrid').children.map(b => b.querySelector('.f').textContent).join(','));
+chk('while the others all are',
+  $('splitGrid').children.map(b => b.querySelector('.f').textContent).sort().join(',') ===
+    ['Meetings', 'Admin', 'Body', 'People', 'Fragments'].sort().join(','),
+  $('splitGrid').children.map(b => b.querySelector('.f').textContent).join(','));
+/* The list is per-block, so switching and reopening must rebuild it. A list
+   built once at boot would pass the check above and fail this one. */
+$('spClose').click(); settle();
+tap('MTG'); settle(); wait(43);
+tap('MTG'); settle();
+chk('after switching, the sheet excludes the new running category instead',
+  $('splitGrid').children.length === 5 &&
+  !$('splitGrid').children.some(b => /Meetings/.test(b.querySelector('.f').textContent)),
+  $('splitGrid').children.map(b => b.querySelector('.f').textContent).join(','));
+$('spClose').click(); settle();
+
+console.log('\n72c. the sitting sheet says what applying it would mean');
+/* Finding 6. It read "16m sitting", which names a duration; the spec names a
+ * consequence — this is what the record will say if you tap APPLY. */
+reset(); reboot();
+tapSit(); settle(); wait(16);
+$('sitEdit').click(); settle();
+chk('the sub-copy is byte-exact against the spec',
+  $('ssSub').textContent === 'sitting for 16m if applied', $('ssSub').textContent);
+
+console.log('\n72d. the set-aside drawer counts what is in it, and names categories');
+/* Findings 1 and 5. The title was a bare SET ASIDE however many were behind
+ * it, and the rows printed the internal key. */
+reset(); reboot();
+H.setServerReject('calendar is not having it');
+tap('DW');
+pump(() => DEAD().length > 0);
+tap('MTG');
+pump(() => DEAD().length > 1, 400);
+H.setServerReject(null);
+$('err').click(); settle();
+chk('the title carries the count', $('dgTitle').textContent === 'SET ASIDE · 2',
+  $('dgTitle').textContent);
+chk('and the rows name categories the way the user does',
+  rowText(uiRows()[0]).indexOf('· MEETINGS') > 0 &&
+  rowText(uiRows()[1]).indexOf('· DEEP WORK') > 0,
+  rowText(uiRows()[0]) + ' // ' + rowText(uiRows()[1]));
+$('dgClose').click(); settle();
+reset();
 
 console.log('\n70. the rail\'s picture of today is not stored, and does not grow for ever');
 /* REVIEW-4's finding 10. saveState wrote the whole of S, so S.today went into

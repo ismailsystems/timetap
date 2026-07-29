@@ -182,9 +182,19 @@
 
   /* The mark strip. It no longer covers the footer: it sits above the undo
      ribbon, in the column it belongs to, so STOP is never hidden by it. */
-  #strip { display: flex; align-items: center; gap: 5px;
+  /*
+   * Stacked, not side by side.
+   *
+   * Three 44px buttons and their gaps take 142px of a 250px column, which left
+   * the label an 83px box for the 159px its own copy needs — so it ellipsised
+   * to "DEEP WOR…" and the reader could not tell which block the mark was
+   * about. The label names the block the mark will land on; a strip you cannot
+   * read is a strip you cannot use. On its own line it gets the whole column.
+   * REVIEW-4's finding 4.
+   */
+  #strip { display: flex; flex-direction: column; align-items: stretch; gap: 8px;
            border-top: 2px solid var(--rule); padding: 8px 8px 8px 12px; }
-  #stripHead { flex: 1; min-width: 0; font: 700 10px var(--font); letter-spacing: .06em;
+  #stripHead { min-width: 0; font: 700 10px var(--font); letter-spacing: .06em;
                color: var(--dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .strip-marks { display: flex; gap: 5px; flex: none; }
   .strip-marks button { width: 44px; height: 44px; background: var(--panel2);
@@ -249,6 +259,26 @@
   #ssAt { font-size: 52px; }
   input[type=range] { width: 100%; margin: 18px 0 6px; accent-color: var(--accent); height: 34px; }
   .ends { display: flex; justify-content: space-between; font: 600 11px var(--font); color: var(--dim); }
+
+  /* ── the clocks are tabular, and stay tabular ─────────────────────
+   *
+   * .tnum above is the marker, and on its own it did almost nothing. The `font:`
+   * SHORTHAND resets font-variant-numeric to normal, and nearly every rule that
+   * styles a clock sets it — most of them from an ID selector, which outranks a
+   * bare .tnum however the source is ordered. Only #undoChip survived, because
+   * it has no shorthand of its own. The 48px headline timer was affected, which
+   * is the one place where digits changing width is impossible to miss: the
+   * elapsed time visibly jitters once a second.
+   *
+   * So the marker is restated here, once, at a specificity that beats each of
+   * those rules. The shorthands are left alone deliberately: rewriting them as
+   * longhands would also drop `line-height: normal`, and body sets 1.3, so
+   * every one of these would silently grow. smoke.js measures the computed
+   * value on EVERY element carrying the class, so a clock added later with a
+   * shorthand of its own is caught rather than trusted to this list.
+   * REVIEW-4's finding 2. */
+  #nowEl.tnum, #railStart.tnum, #sitEdit.tnum, .big.tnum, .ends.tnum,
+  .gbtn .ge.tnum, .segDur.tnum { font-variant-numeric: tabular-nums; }
   .sub  { font: 400 13px var(--font); color: var(--dim); margin-top: 12px; }
   .dim  { opacity: .45; }
 
@@ -351,7 +381,7 @@
 <!-- ── set-aside writes ─────────────────────────────────────────── -->
 <div id="sheetDead" class="view hidden">
   <div class="vhead">
-    <div class="vtitle">SET ASIDE</div>
+    <div class="vtitle" id="dgTitle">SET ASIDE</div>
     <button id="dgClose" class="fbtn">DONE</button>
   </div>
   <div id="deadList"></div>
@@ -828,7 +858,7 @@
       rows.push({
         token: deadToken(e),
         when:    isMs(e.at) ? clock(e.at) : 'unknown time',
-        key:     e.key || op.key || 'unknown category',
+        key:     faceOfKey(e.key || op.key),
         started: isMs(e.startMs) ? clock(e.startMs) : 'unknown start',
         what:    OP_WORDS[op.type] || (op.type ? String(op.type) : 'unknown write'),
         why:     e.why || 'no reason recorded'
@@ -942,6 +972,9 @@
   function renderDead() {
     var host = $('deadList');
     disarmDead();
+    // The title counts what is behind it. It read a bare SET ASIDE however many
+    // there were, while the banner that opened it said two.
+    $('dgTitle').textContent = 'SET ASIDE · ' + deadCount();
     host.innerHTML = '';
     deadRows().forEach(function (r) {
       var row = document.createElement('div');
@@ -1138,6 +1171,17 @@
     return c ? faceOf(c) : key;
   }
 
+  /**
+   * The same, uppercased, for a key that may be missing entirely.
+   *
+   * A set-aside row written by an older version carries no key at all, and a
+   * row that cannot say something has to say so rather than render blank — a
+   * blank cell reads like there was nothing there, which is a different claim.
+   */
+  function faceOfKey(key) {
+    return key ? labelFor(key).toUpperCase() : 'unknown category';
+  }
+
   /* ── undo ──────────────────────────────────────────────────────
    *
    * The ribbon holds one switch — the last — for CFG.undoSeconds. Taking it
@@ -1281,7 +1325,10 @@
   function showStrip(p) {
     hideStrip();
     strip = p;
-    $('stripHead').textContent = p.key.toUpperCase() + ' · ' + fmtEl(p.durMs) + ' — MARK IT';
+    // labelFor, not the key: the strip is a screen, and a screen says what the
+    // user calls the thing. REVIEW-4's finding 1.
+    $('stripHead').textContent = labelFor(p.key).toUpperCase() + ' · ' +
+                                 fmtEl(p.durMs) + ' — MARK IT';
     $('strip').classList.remove('hidden');
     strip.timer = setTimeout(hideStrip, CFG.markTimeoutMs);          // "=" already written
   }
@@ -1477,10 +1524,23 @@
     });
     if (CATS.length < CFG.maxCategories) g.appendChild(buildAddCell());
 
-    // The split sheet is the same list, minus the block you are cutting.
+  }
+
+  /**
+   * The split sheet's list: the same categories, minus the block you are
+   * cutting. Offering the running category would offer to make the remainder
+   * what it already is.
+   *
+   * Built when the sheet opens rather than once at boot, because which category
+   * to leave out is a fact about the block in hand and changes with every
+   * switch. It was built once, with a comment describing a filter the loop did
+   * not have. REVIEW-4's finding 3.
+   */
+  function buildSplitGrid() {
     var sg = $('splitGrid');
     sg.innerHTML = '';
     CATS.forEach(function (c) {
+      if (S.open && c.key === S.open.key) return;
       var b = document.createElement('button');
       b.className = 'sbtn';
       b.innerHTML = '<span class="sw"></span><span class="f"></span>';
@@ -1735,15 +1795,7 @@
 
   function openSplit() {
     if (!S.open) return;
-    /* An armed category must not survive into a sheet. It kept its label —
-       TAP AGAIN TO SWITCH — on a button that, from here, opens this sheet
-       instead. A label that promises the wrong action is the thing C2 exists
-       to prevent, and a sheet over the top does not excuse it. */
-    /* render(), not just disarm(): the branch that calls this returns without
-       repainting, and disarming already cancelled the timer whose repaint would
-       have cleaned the cell up. Round 1 left an armed STOP looking armed the
-       same way. */
-    disarm();
+    buildSplitGrid();               // which category to leave out is per-block
     /* And the way back to the last switch goes with it. Opening this sheet is
        a new intention; a ribbon offering to undo the previous one has no
        business sitting underneath it, and would be acting on a block the
@@ -1757,7 +1809,7 @@
     var r = $('spRange');
     r.min = 1; r.max = Math.max(1, span - 1); r.step = 1;
     r.value = Math.max(1, Math.round(span / 2));
-    $('spLab').textContent = 'OPEN BLOCK: ' + S.open.key;
+    $('spLab').textContent = 'OPEN BLOCK · ' + labelFor(S.open.key).toUpperCase();
     $('spStart').textContent = clock(split.startMs);
     $('spNow').textContent = clock(split.nowMs);
     renderSplit();
@@ -1768,8 +1820,11 @@
     var mins = parseInt($('spRange').value, 10) || 1;
     split.atMs = split.startMs + mins * MS_MIN;
     $('spAt').textContent = clock(split.atMs);
-    $('spSub').textContent = (S.open ? S.open.key : '?') + ' ' + fmtDur(split.atMs - split.startMs) +
-      '   →   ' + fmtDur(split.nowMs - split.atMs) + ' remainder';
+    // What each half becomes, named the way the user names it. The arrow points
+    // at the list underneath, which is where the second half is chosen.
+    $('spSub').textContent = fmtDur(split.atMs - split.startMs) + ' stays ' +
+      (S.open ? labelFor(S.open.key).toUpperCase() : '?') + ' · ' +
+      fmtDur(split.nowMs - split.atMs) + ' becomes \u2193';
   }
 
   /**
@@ -1864,7 +1919,9 @@
     var mins = parseInt($('ssRange').value, 10) || 0;
     sitEdit.atMs = Math.min(sitEdit.lo + mins * MS_MIN, sitEdit.hi - MS_MIN);
     $('ssAt').textContent = clock(sitEdit.atMs);
-    $('ssSub').textContent = fmtDur(Date.now() - sitEdit.atMs) + ' sitting';
+    // A consequence, not a measurement: this is what the record will say if the
+    // user taps APPLY. Nothing has been written yet.
+    $('ssSub').textContent = 'sitting for ' + fmtDur(Date.now() - sitEdit.atMs) + ' if applied';
   }
 
   /* ── boot ──────────────────────────────────────────────────── */

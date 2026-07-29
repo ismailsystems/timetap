@@ -1478,6 +1478,9 @@ function documentWithCategories(page, n) {
   const m = /var CFG = (\{[\s\S]*?\});\n/.exec(doc);
   if (!m) throw new Error('could not find the bootstrap in the served page');
   const cfg = JSON.parse(m[1]);
+  /* Names a user could plausibly type, and the last is deliberately the longest
+     the strip will ever have to hold. addCategory caps a name at 24 characters
+     (Code.gs), so this is the real worst case rather than a shorter one. */
   const SPARE = [['C7', 'Reading', '#7986cb'], ['C8', 'Errands', '#33b679'],
                  ['C9', 'Practice', '#f6bf26'], ['C10', 'Correspondence', '#039be5']];
   if (n < cfg.categories.length) cfg.categories = cfg.categories.slice(0, n);
@@ -1486,8 +1489,12 @@ function documentWithCategories(page, n) {
     if (!s) throw new Error('no spare category defined for count ' + n);
     cfg.categories.push({ key: s[0], label: s[1], color: '9', hex: s[2], autoMark: null });
   }
-  return doc.slice(0, m.index) + 'var CFG = ' + JSON.stringify(cfg) + ';\n' +
-         doc.slice(m.index + m[0].length);
+  return { html: doc.slice(0, m.index) + 'var CFG = ' + JSON.stringify(cfg) + ';\n' +
+                 doc.slice(m.index + m[0].length),
+           // The longest label on offer at this count, which is the one the
+           // mark strip has the least room for.
+           longest: cfg.categories.slice().sort(
+             (a, b) => (b.label || b.key).length - (a.label || a.key).length)[0] };
 }
 
 async function checkReach(browser, view, page, n) {
@@ -1502,33 +1509,38 @@ async function checkReach(browser, view, page, n) {
   const errors = [];
   pg.on('pageerror', e => errors.push(String((e && e.message) || e)));
   try {
+    const built = documentWithCategories(page, n);
     await pg.route(REACH_ORIGIN, r => r.fulfill({
-      status: 200, contentType: 'text/html; charset=utf-8',
-      body: documentWithCategories(page, n) }));
+      status: 200, contentType: 'text/html; charset=utf-8', body: built.html }));
     await pg.addInitScript(stallingServerStub);
-    await pg.addInitScript(() => {
+    await pg.addInitScript(key => {
       // A block that has run 40 minutes, so the switch below is over
-      // MIN_MARK_MINUTES and raises the mark strip as well as the ribbon.
+      // MIN_MARK_MINUTES and raises the mark strip as well as the ribbon. It is
+      // the longest-named category on offer, because the strip has to hold its
+      // name beside three 44px buttons in a 250px column.
       const now = Date.now();
       localStorage.setItem('tt.state.v1', JSON.stringify({
-        open: { ref: 'aaaabbbbccccdddd', key: 'DW', text: '', startMs: now - 40 * 60000 },
+        open: { ref: 'aaaabbbbccccdddd', key: key, text: '', startMs: now - 40 * 60000 },
         sit: null, lastTapMs: 0
       }));
-    });
+    }, built.longest.key);
     await pg.goto(REACH_ORIGIN, { waitUntil: 'load' });
     await pg.waitForTimeout(120);
 
-    const built = await pg.locator('#grid [data-key]').count();
-    if (built !== n) {
-      problems.push(label + ': the grid built ' + built + ' rows, so this count was ' +
+    const rows = await pg.locator('#grid [data-key]').count();
+    if (rows !== n) {
+      problems.push(label + ': the grid built ' + rows + ' rows, so this count was ' +
                     'never really on screen and every check below would be about ' +
                     'a different screen');
       return problems;
     }
 
-    // Switch, for real, to the second category — which raises both guardrails.
-    const second = await pg.locator('#grid [data-key]').nth(1).getAttribute('data-key');
-    await pg.click('#grid [data-key="' + second + '"]', { timeout: 2000 });
+    // Switch, for real, to a category that is not the running one — which
+    // raises both guardrails and puts the running one's name on the strip.
+    const keys = await pg.locator('#grid [data-key]').evaluateAll(
+      els => els.map(e => e.dataset.key));
+    const to = keys.find(k => k !== built.longest.key);
+    await pg.click('#grid [data-key="' + to + '"]', { timeout: 2000 });
     await pg.waitForTimeout(60);
 
     const g = await pg.evaluate(() => {
@@ -1561,6 +1573,28 @@ async function checkReach(browser, view, page, n) {
         vh, docScrollsY: document.documentElement.scrollHeight > vh + 1,
         undo: look(document.getElementById('undo')),
         strip: look(document.getElementById('strip')),
+        // The label, and whether the box it was given can hold it. `clipped` is
+        // the honest measure: scrollWidth is what the text needs, clientWidth is
+        // what it got.
+        head: (() => {
+          const el = document.getElementById('stripHead');
+          if (!el) return null;
+          const s = getComputedStyle(el);
+          /* The width the TEXT wants, measured over the text node itself.
+             scrollWidth is no use here: on a block that fills its column it
+             equals clientWidth whether the text is 40px or 400px, so it would
+             report "needs exactly what it got" for every string and the number
+             would say nothing. */
+          let need = el.scrollWidth;
+          if (el.firstChild) {
+            const r = document.createRange();
+            r.selectNodeContents(el);
+            need = Math.ceil(r.getBoundingClientRect().width);
+          }
+          return { text: el.textContent, need: need, got: el.clientWidth,
+                   clipped: el.scrollWidth > el.clientWidth + 1,
+                   ellipsis: s.textOverflow === 'ellipsis' && s.overflow !== 'visible' };
+        })(),
         // `mark` is what the user reads on the button; `want` is what the app
         // calls it. They differ for minus: the glyph is U+2212, the value '-'.
         marks: [].slice.call(document.querySelectorAll('#strip .strip-marks button'))
@@ -1602,6 +1636,32 @@ async function checkReach(browser, view, page, n) {
       }
       if (g.marks.length !== 3) {
         problems.push(label + ': found ' + g.marks.length + ' mark buttons, not three');
+      }
+      /* C4. The label names the block the mark will land on, so a reader who
+         cannot tell which block it is cannot use the strip at all.
+         Two rules, both stated:
+           - it never cuts silently. A clip must ellipsise, at any name length.
+           - with the categories the app actually ships, it is not clipped at
+             all. A name a user types can be up to 24 characters (Code.gs
+             addCategory), and at that length an ellipsis is the contracted
+             answer rather than a defect — so the hard rule is scoped to the
+             shipped set, and the measurement is printed for every count. */
+      if (!g.head || !g.head.text) {
+        problems.push(label + ': the mark strip rendered no label');
+      } else {
+        console.log('    strip label: "' + g.head.text + '" needs ' + g.head.need +
+                    'px, got ' + g.head.got + 'px' + (g.head.clipped ? ' — ELLIPSISED' : ''));
+        if (g.head.clipped && !g.head.ellipsis) {
+          problems.push(label + ': the mark strip label "' + g.head.text + '" needs ' +
+                        g.head.need + 'px and got ' + g.head.got + 'px, and is cut off with ' +
+                        'no ellipsis — so it renders a partial word');
+        }
+        if (n === 6 && g.head.clipped) {
+          problems.push(label + ': the mark strip label "' + g.head.text + '" needs ' +
+                        g.head.need + 'px and got ' + g.head.got + 'px — this is the ' +
+                        'shipped category list, so the reader cannot tell which block ' +
+                        'the mark is for on a stock install');
+        }
       }
       g.marks.forEach(m => {
         if (m.visibleH < m.h - 0.5) {

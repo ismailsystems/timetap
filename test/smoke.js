@@ -191,6 +191,27 @@
       return k.textContent + ':' + px(k.getBoundingClientRect().height);
     }).join(' '));
 
+  /* ── the clocks are actually tabular ─────────────────────────────
+   *
+   * .tnum is applied correctly everywhere and did almost nothing. The `font:`
+   * SHORTHAND resets font-variant-numeric to normal, and nearly every rule that
+   * styles a clock sets it — most of them from an ID selector, which outranks
+   * .tnum however the source is ordered. Only #undoChip survived, because it
+   * has no shorthand of its own. The 48px headline timer was affected, which is
+   * the one place on the screen where digits changing width is impossible to
+   * miss: the elapsed time visibly jitters every second.
+   *
+   * Measured computed, on every element carrying the class, so an element added
+   * later with a shorthand of its own is caught rather than assumed. */
+  var tnums = [].slice.call(document.querySelectorAll('.tnum'));
+  ok('there are clocks on this screen to check', tnums.length > 0, String(tnums.length));
+  var flat = tnums.filter(function (el) {
+    return getComputedStyle(el).fontVariantNumeric.indexOf('tabular-nums') < 0;
+  }).map(function (el) {
+    return (el.id || el.className) + '=' + getComputedStyle(el).fontVariantNumeric;
+  });
+  ok('every element carrying .tnum computes to tabular-nums', flat, flat.join(' '));
+
   // ── touch targets and the safe area ─────────────────────────────
   var footRoom = window.innerHeight - (document.getElementById('postureRow')
     ? document.getElementById('postureRow').getBoundingClientRect().bottom : window.innerHeight);
