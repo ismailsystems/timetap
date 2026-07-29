@@ -8,31 +8,49 @@ This is the last planned review before daily use of the redesign.
 
 ---
 
-## Models (cost / variety — fixed for this round)
+## Preferred: one chat, three subagents
 
-Three independent reviewers. Different models. None of them may be Composer
-(that is the FIXES-5 builder voice).
+Open **one** fresh Cursor chat. Paste the kickoff at the bottom of this file.
+The parent chat is an **orchestrator only**:
 
-| Angle | Model to use |
-|---|---|
-| 1. Did it fix what it claimed? | Claude Sonnet 5 thinking |
-| 2. What did the fixes break? | GPT-5.6 (sol or terra medium) |
-| 3. How does it fail a user? | Claude Opus 5 thinking (or Opus 4.8 thinking) |
+1. Read this whole file.
+2. In a **single** turn, launch **three** `Task` subagents in parallel.
+3. Give each subagent the full contract below plus **only its angle**. Subagents
+   do not see this chat; put everything they need in the Task `prompt`.
+4. Set `model` on each Task as in the table. Do **not** use Composer /
+   `composer-2.5-fast` for any reviewer.
+5. When all three return, you (parent) do the **fourth** hand pass: re-reproduce
+   every finding that would block, then write `factory/REVIEW-6.md` in the shape
+   of `factory/REVIEW-5.md`.
 
-Run each angle in its **own** fresh chat (or an isolated subagent with that
-model). Do not share findings between angles until a fourth pass assembles
-`factory/REVIEW-6.md`.
+Parent may use any model; it must not invent findings the subagents did not
+produce. It may only merge, falsify by re-running, and write the file.
 
-A fourth, short hand pass then re-reproduces every finding that would block
-shipping — same bar as review 5.
+### Model map (Cursor Task `model` slugs)
+
+| Angle | Role | Task `model` |
+|---|---|---|
+| 1 | Did it fix what it claimed? | `claude-sonnet-5-thinking-high` |
+| 2 | What did the fixes break? | `gpt-5.6-sol-medium` (or `gpt-5.6-terra-medium`) |
+| 3 | How does it fail a user? | `claude-opus-5-thinking-high` |
+
+`subagent_type`: `generalPurpose` for each. `description`: short, e.g.
+`Review6 angle 1`, `Review6 angle 2`, `Review6 angle 3`.
+
+---
+
+## Models (if running as three separate chats instead)
+
+Same angles and models as the table above. None may be Composer.
 
 ---
 
 ## The task
 
-Review the FIXES-5 pass at `89058d2..HEAD` (through `3c39593`) — about 25
-commits on `main`. It claims to close every item in `factory/FIXES-5.md`, which
-is the fix list compiled from `factory/REVIEW-5.md`.
+Review the FIXES-5 pass at `89058d2..HEAD` (through `3c39593`, and any later
+commits that only prepare this review) — about 25 commits of fix work on
+`main`. It claims to close every item in `factory/FIXES-5.md`, which is the fix
+list compiled from `factory/REVIEW-5.md`.
 
 The three faults that blocked in review 5 were fixed first (`a540787`,
 `0df0282`, `fd12407`) and listed as closed in FIXES-5 so its lettering works.
@@ -62,7 +80,7 @@ whether the account matches what you found — a mismatch is itself a finding.
 ## How to run it
 
 Three independent reviewers, each on a different angle, none given the others'
-findings:
+findings until assembly:
 
 1. **Did it actually fix what it claimed?** Take REVIEW-5's three blocking
    faults and reproduce each one from scratch — do not run the suite and
@@ -76,7 +94,7 @@ findings:
 3. **How does it fail a user?** Drive the app. Long days, ten categories, a
    flaky network, a second device, midnight, a screen reader, a keyboard only,
    a reflex double tap after a switch. Prefer the **live /exec** redesign if you
-   have it; otherwise headless + the suite. Never invent a phone pass you did
+   have it; otherwise headless + the suite. Never invent a phone paste you did
    not run.
 
 **Measure, do not read.** A comment saying a thing is true is not evidence.
@@ -139,12 +157,22 @@ Report a consequence if you find one; do not re-argue the choice.
   can span 25 hours.
 - Body and an open sitting at once is a legal state under ruling 1.
 
-## What to produce
+## What each subagent returns
+
+Plain text (not yet a full REVIEW-6.md):
+
+- Angle number and model used
+- Verdict for this angle: SHIP / FIX FIRST / NOT DONE — one paragraph
+- Findings, worst first: what happens, how proved, severity
+- What is right (calibration)
+- Decisions for the human (only real tradeoffs)
+
+## What the orchestrator produces
 
 `factory/REVIEW-6.md`, in the shape of `factory/REVIEW-5.md`:
 
 - a verdict per reviewer
-- **Blocking**, with a reproduction for each
+- **Blocking**, with a reproduction for each (re-run by the orchestrator)
 - **Should fix**
 - **Cosmetic**
 - **What is right, for calibration**
@@ -165,3 +193,37 @@ suite at a real calendar. Manual probing of the live URL is allowed; do not
 burn the user's day with mass deletes.
 
 Never deploy from this review unless the human asks.
+
+Replies to the human use ASD-STE100 Simplified Technical English. Code,
+comments, commit messages, and `factory/` docs keep their existing voice.
+
+---
+
+## Kickoff paste (one new chat)
+
+```
+Work in /Users/Sam/Desktop/timetap. No prior context.
+
+You are the orchestrator for review 6. Read factory/REVIEW-6-PROMPT.md and
+follow it exactly — especially "Preferred: one chat, three subagents".
+
+In one turn, launch three Task subagents in parallel (subagent_type
+generalPurpose):
+
+1. description "Review6 angle 1", model claude-sonnet-5-thinking-high
+   — Did FIXES-5 fix what it claimed?
+2. description "Review6 angle 2", model gpt-5.6-sol-medium
+   — What did the fixes break?
+3. description "Review6 angle 3", model claude-opus-5-thinking-high
+   — How does it fail a user?
+
+Each Task prompt must include everything from factory/REVIEW-6-PROMPT.md that
+the reviewer needs (repo path, read list, forbid list, settled rulings, their
+angle only). Say: return your angle section only; do not write REVIEW-6.md.
+
+Do not review the code yourself before they finish. Do not use Composer /
+composer-2.5-fast as a reviewer model.
+
+When all three return: re-reproduce anything Blocking by hand yourself, then
+write factory/REVIEW-6.md shaped like factory/REVIEW-5.md. Commit only if I ask.
+```
