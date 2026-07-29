@@ -165,9 +165,10 @@ surface of the app. There is no settings screen and there will never be one.
   is marked `?`, which means the app guessed the end time. Nothing you can tap
   produces that mark, and a note may not end in one — see README's "The mark".
 - `MARK_TIMEOUT_MS` (6000) — how long the strip waits before applying `=`.
-- `BODY_KEY` (`'BODY'`) — the one category whose tap closes an open SIT block
-  and drops the posture button back to `NOT SITTING`. Set it to `''` to remove even
-  that coupling.
+There is no `BODY_KEY` any more. It named the one category whose tap closed an
+open SIT block, and that coupling is gone: a category tap says nothing about your
+body, and the footer is the only control that writes a sitting block. `STOP` still
+closes both, because it ends the day rather than choosing a category.
 - `SHEET_ID`, `DAILY_TAB`, `WEEKLY_TAB`, `ROLLUP_DAYS`, `ROLLUP_HOUR` — the
   nightly rollup. See section 9.
 

@@ -1136,14 +1136,24 @@
     S.open = { ref: ref, key: key, text: '', startMs: now };
     openId = enqueue({ type: 'openActual', ref: ref, key: key, startMs: now });
 
-    var sit = key === CFG.bodyKey ? closeSit(now) : null;            // 8.2 the only coupling
-
+    /*
+     * A tap says what you are doing. It says nothing about your body.
+     *
+     * BODY used to close an open SIT here — 8.2, and for two rounds the only
+     * coupling in the app. It is gone. The rule cost more than it bought: the
+     * undo then owed the sitting back, which is the machinery REVIEW-5's C1 lived
+     * in, and one round earlier the same machinery closed a sitting that had been
+     * running before the switch and had nothing to do with it. Both faults were
+     * the coupling, not the code around it.
+     *
+     * So BODY is an ordinary category, and the posture is the user's. The footer
+     * is the only control that writes a sitting. STOP is the one exception, and
+     * it is an exception about ending the day rather than about a category —
+     * see endDay. The human's ruling.
+     */
     if (pending) showStrip(pending); else hideStrip();
-    // `sit` rides along: a tap that closed the sitting has to offer that back
-    // too, or the undo puts the work block back and leaves the record saying
-    // the user stood up.
     armUndo({ prev: prev, newRef: ref, atMs: now, closeId: closeId, openId: openId,
-              sit: sit, label: 'SWITCHED TO ' + labelFor(key).toUpperCase() });
+              sit: null, label: 'SWITCHED TO ' + labelFor(key).toUpperCase() });
     saveState(); render(); flush();
   }
 
@@ -1220,11 +1230,40 @@
     var u = undo, now = Date.now();
     clearUndo();
 
-    // Every write this action made. dropOps takes them all or none, which is
-    // how we know whether the calendar ever saw any of it.
+    /*
+     * A sitting the user started AFTER this action is not the one being put
+     * back. It is one more thing to take away, exactly like the block the switch
+     * opened — and it is reached the ordinary way: a mis-tap closes the sitting,
+     * the footer then says NOT SITTING to someone who can see they are sitting
+     * down, they tap the footer to say so, and only then do they notice the
+     * ribbon.
+     *
+     * It used to be CLOSED here instead, which reads correct and is not. Its
+     * openSit is still in the queue, and opOpenSit_ heals an already-open SIT by
+     * closing it — so the block this undo had just restored was closed again on
+     * the way past the server, by a write the undo itself had left behind. The
+     * calendar ended with no open SIT at all, the footer went on saying SITTING
+     * for the rest of the session, and a reload discarded the claim. REVIEW-5's
+     * C1, and the human's ruling: one unbroken sitting, not two with a seam.
+     */
+    var newSit = (u.sit && S.sit && S.sit.ref !== u.sit.ref) ? S.sit : null;
+    var newSitOpenId = newSit ? pendingOpenSit(newSit.ref) : null;
+
+    // Every write this action made, and the sitting the user opened since.
+    // dropOps takes them all or none, which is how we know whether the calendar
+    // ever saw any of it.
     var ids = [u.closeId, u.openId];
     if (u.sit) ids.push(u.sit.closeId);
-    if (!dropOps(ids)) {
+    if (newSit) ids.push(newSitOpenId);
+    /*
+     * A sitting whose open has already gone cannot be dropped, so the whole
+     * action is compensated instead. Without this the drop would succeed: an id
+     * that is missing from the list is skipped rather than failed, so dropOps
+     * would report that the calendar never heard any of this while that block
+     * went on running.
+     */
+    var droppable = !newSit || !!newSitOpenId;
+    if (!droppable || !dropOps(ids)) {
       // At least one landed. One op puts every half back.
       enqueue({ type: 'undoSwitch', newRef: u.newRef, atMs: u.atMs,
                 prevRef: u.prev ? u.prev.ref : null,
@@ -1233,6 +1272,7 @@
                 prevStartMs: u.prev ? u.prev.startMs : null,
                 sitRef: u.sit ? u.sit.ref : null,
                 sitStartMs: u.sit ? u.sit.startMs : null,
+                killSitRef: newSit ? newSit.ref : null,
                 nowMs: now });
     }
 
@@ -1259,27 +1299,23 @@
      * complete. REVIEW-4's B3.
      */
     if (u.sit) {
-      // A sitting block opened since is not the one this is putting back, and
-      // two open SIT blocks is a state nothing downstream can read.
-      if (S.sit && S.sit.ref !== u.sit.ref) closeSit(now);
+      // Taken away above rather than closed here. Two open SIT blocks is a state
+      // nothing downstream can read, and a closed one left behind is a second
+      // sitting block the user never had — which dayStats_ then counts.
       S.sit = { ref: u.sit.ref, startMs: u.sit.startMs };
-    } else if (S.open && S.open.key === CFG.bodyKey) {
-      /*
-       * 8.2, the one coupling, on the one path the handoff names that nothing
-       * checked: "opening Body (by tap, split remainder, OR UNDO) closes any
-       * open SIT block."
-       *
-       * Reached only when this undo closed no sitting of its own. If it did,
-       * the branch above has already put back the exact SIT that was open
-       * alongside Body a moment ago — restoring a state is not opening Body,
-       * and closing it again would take back half of what the user asked for.
-       *
-       * The sitting closed here is one the user opened AFTER the switch, so it
-       * is not part of what is being restored. REVIEW-4's B4, and the successor
-       * to the deleted 50g.
-       */
-      closeSit(now);
     }
+    /*
+     * There used to be a second branch here: when the block being restored was
+     * BODY and this undo had closed no sitting of its own, it closed whatever
+     * sitting was open. That was 8.2 on the undo path, and it is gone with the
+     * rest of the coupling.
+     *
+     * It was also wrong about itself. Its comment said the sitting it closed was
+     * one the user had opened AFTER the switch; it closed any open sitting,
+     * including one that had been running before BODY started and had nothing to
+     * do with the tap being taken back. Posture has no undo, so there was no way
+     * back from it. REVIEW-5's should-fix 2, answered by deletion.
+     */
     hideStrip();
     saveState(); render(); flush();
   }
@@ -1318,6 +1354,20 @@
     if (hit < n) return false;
     setQueue(q.filter(function (o) { return !want[o.id]; }));
     return true;
+  }
+
+  /**
+   * The id of the queued openSit for `ref`, or null when none is waiting.
+   *
+   * Looked up rather than remembered. An id kept on `S.sit` would be written to
+   * localStorage by saveState and go stale across a reload, and `S.sit` can also
+   * arrive from adoptServerState carrying no id at all. The queue is the only
+   * thing that knows whether that write is still ours to take back.
+   */
+  function pendingOpenSit(ref) {
+    var id = null;
+    queue().forEach(function (o) { if (o.type === 'openSit' && o.ref === ref) id = o.id; });
+    return id;
   }
 
   /* ── the mark ──────────────────────────────────────────────── */
@@ -1917,7 +1967,8 @@
     // do. REVIEW-4's finding 8.
     railClosed(S.open, at);
     S.open = { ref: newRef, key: key, text: '', startMs: at };
-    if (key === CFG.bodyKey) closeSit(now);
+    // No posture write here. Choosing what the remainder was is a statement about
+    // the record, not about the user's body — see tapCategory.
     hideStrip();
     $('sheetSplit').classList.add('hidden');
     saveState(); render(); flush();
@@ -1940,7 +1991,7 @@
       if (!mutatePendingOpen(S.open.ref, key)) {
         enqueue({ type: 'recategorize', ref: S.open.ref, key: key, hintMs: S.open.startMs });
       }
-      if (key === CFG.bodyKey) closeSit(now);                // 8.2, as a tap does
+      // And no posture write here either, as a tap does not make one.
     }
     hideStrip();
     $('sheetSplit').classList.add('hidden');

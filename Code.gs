@@ -91,11 +91,24 @@ var MARK_TIMEOUT_MS = 6000;
  */
 var UNDO_SECONDS = 5;
 
-/**
- * The one and only coupling in the app: tapping this category closes an open
- * SITTING block. Definitional, not inference. Set to '' to remove the coupling.
+/*
+ * BODY_KEY used to live here: the one and only coupling in the app, the category
+ * whose tap closed an open SITTING block. It is gone, and so is the value — a
+ * constant nothing reads is a constant a reader takes as evidence the mechanism
+ * is still there.
+ *
+ * What removed it: the coupling made an undo owe a sitting back, and that debt is
+ * where REVIEW-5's C1 lived — an undo that threw a sitting away and then claimed
+ * SITTING for the rest of the session. One round earlier the same machinery closed
+ * a sitting that had been running before the switch. Both faults were the rule,
+ * not the code around it. The human ruled: a category tap says what you are
+ * doing and says nothing about your body.
+ *
+ * STOP is the exception and is unchanged. It ends the day, and ending the day
+ * ends the sitting; endDay closes both and the ribbon owes both back. That is an
+ * exception about the day rather than about a category, which is why it survives
+ * a ruling that removed every other one.
  */
-var BODY_KEY = 'BODY';
 
 /** Colour used for the recovery "UNLOGGED -" block written by stale handling. */
 var UNLOGGED_COLOR = CalendarApp.EventColor.GRAY;
@@ -248,7 +261,9 @@ function clientConfig_() {
     longBlockMinutes: LONG_BLOCK_MINUTES,
     maxCategories: MAX_CATEGORIES,
     maxOpTries: MAX_OP_TRIES,
-    bodyKey: BODY_KEY,
+    /* bodyKey is deliberately NOT here. The client had four uses for it and has
+       none: a category tap no longer touches the posture. Shipping a value the
+       client cannot act on is what F2 was written about. */
     tz: Session.getScriptTimeZone()
   };
 }
@@ -787,7 +802,7 @@ function validOp_(op) {
     var v = op[ms[i]];
     if (v !== undefined && v !== null && !(typeof v === 'number' && isFinite(v))) return false;
   }
-  var refs = ['ref', 'newRef'];
+  var refs = ['ref', 'newRef', 'killSitRef'];
   for (var j = 0; j < refs.length; j++) {
     var r = op[refs[j]];
     if (r !== undefined && !/^[A-Za-z0-9]{4,64}$/.test(String(r))) return false;
@@ -936,6 +951,8 @@ function opRecategorize_(op) {
  *     happens: half an undo is better than a phantom block.
  *   - it reopens sitRef on the same terms, and only if that SIT still ends
  *     exactly where this undo closed it.
+ *   - it DELETES killSitRef, a sitting the user started after the action and
+ *     which this undo is therefore taking away rather than restoring.
  *   - replayed, it finds nothing to do and returns.
  */
 function opUndoSwitch_(op) {
@@ -980,20 +997,44 @@ function opUndoSwitch_(op) {
   }
 
   /*
-   * The sitting half. Every path into Body closes an open SIT, and so does
-   * STOP — so an undo that put the work block back and left the sitting closed
-   * had restored half of what it took, while looking complete. The footer said
-   * NOT SITTING to a person who could see they were sitting down.
+   * The sitting half, which now belongs to STOP alone.
+   *
+   * Every path into Body used to close an open SIT as well, and an undo that put
+   * the work block back and left the sitting closed had restored half of what it
+   * took, while looking complete — the footer said NOT SITTING to a person who
+   * could see they were sitting down. Those paths no longer touch the posture at
+   * all, so nothing but STOP arrives here with a sitting to answer for.
    *
    * Posture carries no title and no mark, so this only has to move the end back
    * and set the open marker again.
    */
-  if (op.sitRef) {
+  if (op.killSitRef || op.sitRef) {
     var sc = calSitting_();
-    var se = findByRef_(sc, op.sitRef, op.sitStartMs);
-    if (se && !isOpenEvent_(se) && se.getEndTime().getTime() === op.atMs) {
-      endEventAt_(se, Math.max(op.sitStartMs + MS_MIN, op.nowMs || Date.now()));
-      writeDesc_(se, op.sitRef, true);
+    /*
+     * killSitRef is a sitting the user started AFTER the action — because the
+     * mis-tap had closed the one they were in, and the footer then said NOT
+     * SITTING to someone who could see otherwise. This undo takes it away rather
+     * than putting it back, which makes it the exact counterpart of newRef:
+     * remove what the mis-tap led to, restore what it ended.
+     *
+     * Deleted rather than closed. A closed one is a second sitting block
+     * overlapping the block reopened below, and dayStats_ sums sit events
+     * without merging overlaps, so it would count that span twice. A replay
+     * finds nothing and does nothing.
+     *
+     * It goes first so the reopen below never has to hold two open SIT blocks,
+     * even for the length of one call.
+     */
+    if (op.killSitRef) {
+      var ke = findByRef_(sc, op.killSitRef, op.nowMs);
+      if (ke) ke.deleteEvent();
+    }
+    if (op.sitRef) {
+      var se = findByRef_(sc, op.sitRef, op.sitStartMs);
+      if (se && !isOpenEvent_(se) && se.getEndTime().getTime() === op.atMs) {
+        endEventAt_(se, Math.max(op.sitStartMs + MS_MIN, op.nowMs || Date.now()));
+        writeDesc_(se, op.sitRef, true);
+      }
     }
   }
 }

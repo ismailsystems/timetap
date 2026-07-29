@@ -112,9 +112,16 @@ its own, so the button needs nothing remembered to know what it says. Only
 sitting carries a duration, because only sitting has a start to count from, and
 that duration is also the way in to correcting it.
 
-The only coupling in the entire app: tapping `BODY` closes an open SIT block
-and drops the button to not sitting. That is definitional, not inference. No
-accelerometer, no screen time, no heuristics, ever.
+Nothing you tap in the category list changes it. Tapping `BODY` used to close an
+open SIT block, on the grounds that Body means movement — that is gone. A tap
+says what you are doing; only the footer says what your body is doing, and the
+two are yours to keep separately. No accelerometer, no screen time, no
+heuristics, ever.
+
+The one exception is `STOP`, and it is about the day rather than about a
+category: ending the day closes the running block and any open sitting block at
+the same instant, and the undo ribbon puts both back. If you end the day and stay
+in the chair, tap the footer as well.
 
 ### The numbers
 

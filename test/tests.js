@@ -8,9 +8,11 @@ const armedKey = () => {
 };
 const splitOpen = () => { const n = H.NODES['sheetSplit']; return !!n && !n.hidden; };
 const CFG_UNDO_MS = clientConfig_().undoSeconds * 1000;
-// The one coupling names a category by key, so the tests read it from the same
-// place the client does rather than spelling 'BODY' out and drifting from it.
-const CFG_BODY = clientConfig_().bodyKey;
+/* There used to be a CFG_BODY here, read out of clientConfig_ because the one
+ * coupling named a category by key and a spelled-out 'BODY' would drift from it.
+ * The coupling is gone — the human's ruling after REVIEW-5 — so BODY is an
+ * ordinary category, spelled out like DW and MTG, and bodyKey is no longer sent
+ * to the client at all. Section 68 holds what replaced the rule. */
 
 /*
  * Pick a category in the SPLIT sheet by key.
@@ -92,13 +94,23 @@ chk('SIT ran 65m', near(S()[0].e - S()[0].s, 65 * 60000), String((S()[0].e - S()
 chk('three ACTUAL events', A().length === 3, A().map(show).join(' | '));
 chk('ADM still open', /#open/.test(A()[2].d));
 
-console.log('\n7. SIT open, tap BODY -> SIT closes at that instant');
+console.log('\n7. SIT open, tap BODY -> the sitting is untouched');
+/* The Body-closes-sitting coupling is GONE. A category tap has no implications
+ * for the posture: BODY is an ordinary category now, and the user keeps the
+ * posture himself. The human's ruling after REVIEW-5 — the machinery keeping the
+ * two in step produced C1 and one regression before it.
+ *
+ * STOP is the exception and stays coupled: it ends the day, and ending the day
+ * ends the sitting. Sections 43 and 66i hold that, and 66i holds the undo that
+ * owes it back. Section 68 holds the whole per-path list.
+ *
+ * Everything this section ever said about the BODY BLOCK survives unchanged. The
+ * one claim it made about the SIT is now the opposite claim. */
 reset(); reboot();
 tapSit(); wait(30);
-const t7 = H.nowMs();
 tap('BODY');
-chk('SIT closed at the tap', S()[0].e === t7, show(S()[0]));
-chk('SIT no longer open', !/#open/.test(S()[0].d));
+chk('the SIT is still open', S().length === 1 && /#open/.test(S()[0].d), show(S()[0]));
+chk('and the footer still says sitting', litPosture() === 'sit', String(litPosture()));
 chk('BODY block open', A()[0].t === 'BODY:' && /#open/.test(A()[0].d), show(A()[0]));
 wait(20); tap('DW');
 chk('BODY autoMarked "+", no strip', A()[0].t === 'BODY: +' && $('strip').hidden, A()[0].t);
@@ -524,13 +536,14 @@ chk('sitting labels itself', $('postureLabel').textContent === 'SITTING');
 chk('and shows only its own duration', /(19|20|21)m/.test($('sitEl').textContent),
   $('sitEl').textContent);
 
-console.log('\n23b. BODY still closes sitting, and the row follows');
+console.log('\n23b. BODY leaves the sitting and the row alone');
 reset(); reboot();
 posture('sit'); wait(30);
-const tBody = H.nowMs();
+const sitStart23b = S()[0].s;
 tap('BODY');
-chk('SIT closed at the tap', near(S()[0].e, tBody), show(S()[0]));
-chk('row moved off sitting', litPosture() === 'stand', String(litPosture()));
+chk('the SIT is still open, and still the same one',
+  S().length === 1 && /#open/.test(S()[0].d) && S()[0].s === sitStart23b, show(S()[0]));
+chk('the row did not move off sitting', litPosture() === 'sit', String(litPosture()));
 
 console.log('\n23c. only sitting is ever written');
 reset(); reboot();
@@ -3301,19 +3314,20 @@ chk('ADM takes the remainder and is the open one',
   A()[1].s === A()[0].e && /#open/.test(A()[1].d) && activeKey() === 'ADM',
   show(A()[1]));
 
-console.log('\n52d. recategorising whole to BODY closes the SIT, as a tap does');
+console.log('\n52d. recategorising whole to BODY leaves the SIT alone, as a tap does');
 reset(); reboot();
 tapSit(); settle();
 tap('DW'); settle(); wait(120);
 chk('sitting to begin with', litPosture() === 'sit', String(litPosture()));
+const sitStart52d = S()[0].s;
 tap('DW'); settle();
 pickWhole(); splitPick('BODY');
 chk('one block, keyed BODY', A().length === 1 && A()[0].t === 'BODY:',
   A().map(show).join(' | '));
-chk('the SIT closed at that moment',
-  S().length === 1 && !/#open/.test(S()[0].d) && near(S()[0].e, H.nowMs()),
+chk('the SIT is still open, and still the same one',
+  S().length === 1 && /#open/.test(S()[0].d) && S()[0].s === sitStart52d,
   S().map(show).join(' | '));
-chk('and the posture fell back to standing', litPosture() === 'stand',
+chk('and the posture is still sitting', litPosture() === 'sit',
   String(litPosture()));
 
 console.log('\n52e. rejected by the server, it is immediate and it is queued');
@@ -4557,80 +4571,137 @@ chk('untouched: undo still walks the switch back completely',
   A().length === 1 && A()[0].t === 'DW:' && A()[0].s === t69 && nOpen() === 1,
   A().map(show).join(' | '));
 
-console.log('\n68. opening Body closes an open SIT, by every path there is');
-/* REVIEW-4's B4, and the successor to the deleted 50g.
+console.log('\n68. a category tap and the sitting are independent, by every path that used to couple them');
+/* The successor to "opening Body closes an open SIT, by every path there is",
+ * which was itself REVIEW-4's B4 and the successor to the deleted 50g.
  *
- * The handoff names the paths explicitly: "opening Body (by tap, split
- * remainder, or undo) closes any open SIT block." 50g existed to prove the
- * coupling survives whatever replaces the tap — it was deleted with
- * arm-and-confirm, no successor was written, and the successor path was broken.
- * Undo into BODY left BODY open and a SIT open at the same time, which is a
- * state the model forbids.
+ * The handoff named four paths and one rule: "opening Body (by tap, split
+ * remainder, or undo) closes any open SIT block." THAT RULE IS GONE, and its
+ * criterion — FIXES-4's A4 — is deliberately INVERTED. The human ruled after
+ * REVIEW-5 that a category tap has no implications for the posture, because the
+ * machinery keeping the two in step produced C1 — an undo that threw a sitting
+ * away and then lied about it for the rest of the session — and one regression
+ * before that. The answer was to remove the machinery, not to add a branch.
  *
- * All four paths are here rather than only the broken one, because the failure
- * was not "undo is wrong", it was "one path was added and nothing checked the
- * rule against it". A per-path list is what makes the next added path visible. */
-const bothOpen = () => (activeKey() === CFG_BODY) && openSits().length > 0;
+ * This deviates from a design contract the human accepted. Deliberately, and it
+ * is recorded as a deviation rather than as a fix.
+ *
+ * STOP IS THE EXCEPTION and is unchanged: it ends the day, ending the day ends
+ * the sitting, and the ribbon owes both halves back. Sections 43, 66i, 66j, 66k
+ * and 66o hold that, and it is the only place a block action still reaches the
+ * posture.
+ *
+ * The per-path list survives, and it is the SAME list, because the failure it was
+ * written for was never "undo is wrong" — it was "a path was added and nothing
+ * checked the rule against it". What each path is checked for is now the opposite
+ * claim: it leaves the sitting exactly as it found it, same block, same start,
+ * still open. A per-path list is still what makes the next added path visible.
+ *
+ * What has NO successor: "BODY is open and no SIT is". Nothing asserts that,
+ * because it is no longer true and is not meant to be. */
+let sitAt = 0;                                   // the sitting's start, before the path runs
+const sitUntouched = at => {
+  chk(at + ': BODY is open', activeKey() === 'BODY', String(activeKey()));
+  chk(at + ': and the SIT is the same block, still open',
+    S().length === 1 && openSits().length === 1 && S()[0].s === sitAt,
+    S().map(show).join(' | '));
+  chk(at + ': and the footer still says sitting', litPosture() === 'sit',
+    String(litPosture()));
+};
 
 /* by tap */
 reset(); reboot();
 tapSit(); wait(20);
+sitAt = S()[0].s;
 tap('BODY'); settle();
-chk('tap: BODY is open and no SIT is', activeKey() === CFG_BODY && openSits().length === 0,
-  activeKey() + ' // ' + S().map(show).join(' | '));
+sitUntouched('tap');
+
+/* The structural half of the same claim: no write is made about the posture at
+   all. Driven OFFLINE, because online the queue drains before it can be read and
+   the check passes on any build — which is what the first version of it did.
+   Without this, a build that closed the SIT and reopened it a millisecond later
+   would satisfy every check above. */
+reset(); reboot();
+H.setOnline(false);
+tapSit(); wait(20);
+tap('BODY'); settle();
+chk('tap: and the queue holds one posture write, the one the user made',
+  Q().filter(o => o.type === 'openSit' || o.type === 'closeSit').length === 1 &&
+  Q()[0].type === 'openSit',
+  JSON.stringify(Q().map(o => o.type)));
+$('undo').fire('click'); settle();
+chk('tap: and taking the tap back still writes nothing about it',
+  Q().filter(o => o.type === 'openSit' || o.type === 'closeSit').length === 1 &&
+  !Q().some(o => o.sitRef || o.killSitRef),
+  JSON.stringify(Q().map(o => o.type)));
+H.setOnline(true); advance(60000); settle();
+chk('tap: and the sitting is open when the writes land',
+  openSits().length === 1 && litPosture() === 'sit', S().map(show).join(' | '));
 
 /* by split remainder */
 reset(); reboot();
 tap('DW'); settle(); wait(120);
 tapSit(); settle();
+sitAt = S()[0].s;
 tap('DW'); settle();                             // re-tap the running row: SPLIT
 $('spRange').value = '60'; $('spRange').fire('input');
 splitPick('BODY');
-chk('split remainder: BODY is open and no SIT is',
-  activeKey() === CFG_BODY && openSits().length === 0,
-  activeKey() + ' // ' + S().map(show).join(' | '));
+sitUntouched('split remainder');
 
 /* by recategorising the whole block — 52d holds this too, kept here so the list
    is the whole list rather than most of it */
 reset(); reboot();
 tap('DW'); settle(); wait(120);
 tapSit(); settle();
+sitAt = S()[0].s;
 tap('DW'); settle();
 pickWhole(); splitPick('BODY');
-chk('whole-block recategorise: BODY is open and no SIT is',
-  activeKey() === CFG_BODY && openSits().length === 0,
-  activeKey() + ' // ' + S().map(show).join(' | '));
+sitUntouched('whole-block recategorise');
 
-/* by undo — the path that was broken */
+/* by undo — the path the old rule was broken on, and the path the machinery that
+   replaced it went wrong on. This is A4's own scenario, and its answer is now the
+   other one. */
 reset(); reboot();
 tap('BODY'); settle(); wait(30);
-chk('BODY is running and nothing is sitting',
-  activeKey() === CFG_BODY && openSits().length === 0, activeKey());
 tap('DW'); settle();                             // switch away
 tapSit(); settle();                              // and sit down
+sitAt = S()[0].s;
 chk('DW is running and the user is sitting',
   activeKey() === 'DW' && openSits().length === 1,
   activeKey() + ' // ' + S().map(show).join(' | '));
 $('undo').fire('click'); settle();
-chk('undo: BODY is open again', activeKey() === CFG_BODY, String(activeKey()));
-chk('and the SIT it walked into is closed', openSits().length === 0,
-  S().map(show).join(' | '));
-chk('the footer says so too', litPosture() === 'stand', String(litPosture()));
-chk('so the forbidden state is not reachable by any of the four', !bothOpen(),
-  activeKey() + ' // ' + S().map(show).join(' | '));
+sitUntouched('undo');
+/* And a sitting that was already running when BODY started, which is the case
+   REVIEW-5's should-fix 2 lost silently. The undo has no business with it. */
+reset(); reboot();
+tap('BODY'); settle(); wait(5);
+tapSit(); settle();
+sitAt = S()[0].s;
+wait(20); tap('DW'); settle();
+$('undo').fire('click'); settle();
+sitUntouched('undo, sitting older than the block');
 /* And the calendar agrees, not only the screen. */
 reboot();
-chk('a reload finds BODY open and no SIT open',
-  activeKey() === CFG_BODY && openSits().length === 0,
+chk('a reload finds BODY open and the SIT still open',
+  activeKey() === 'BODY' && openSits().length === 1 && S()[0].s === sitAt,
   A().map(show).join(' | ') + ' // ' + S().map(show).join(' | '));
 reset();
 
-console.log('\n66h. undo puts the sitting back too');
-/* REVIEW-4's B3. tapCategory and endDay both close an open SIT; takeUndo had no
- * sitting branch at all. So an undo put the work block back and left the record
- * saying the user was standing while they sat — and the footer said NOT SITTING
- * to a person who could see they were sitting down. Half an undo is worse than
- * none, because it looks complete. */
+console.log('\n66h. a category mis-tap never reaches the sitting, so its undo has none to put back');
+/* Was "undo puts the sitting back too" — REVIEW-4's B3, on the switch path.
+ *
+ * B3 was real: a switch closed the sitting and the undo did not put it back, so
+ * the footer said NOT SITTING to a person who could see they were sitting down.
+ * The repair for it, and the repair for the repair, both lived in one mechanism —
+ * a category tap closing a sitting, and an undo owing it back. The human removed
+ * the mechanism. What is left to assert is that the posture is never involved on
+ * this path, which is a stronger claim than "it is restored correctly" and needs
+ * no branches to be true.
+ *
+ * B3's assertions on the STOP path are untouched and live in 66i, because STOP
+ * still closes the sitting and its undo still owes it back. What has no successor
+ * anywhere is "restored from its original start" ON A SWITCH, because a switch
+ * does not move it. */
 reset(); reboot();
 tapSit(); wait(10);
 tap('MTG'); wait(30); settle();
@@ -4638,16 +4709,15 @@ const sitStart66h = S()[0].s;
 chk('a work block is running and a SIT is open',
   openEvents().length === 1 && openSits().length === 1,
   A().map(show).join(' | ') + ' // ' + S().map(show).join(' | '));
-tap('BODY'); settle();                           // the one coupling: BODY closes the SIT
-chk('the mis-tap on BODY closed the sitting',
-  openSits().length === 0 && litPosture() === 'stand', S().map(show).join(' | '));
+tap('BODY'); settle();                           // the tap that used to close it
+chk('the mis-tap on BODY left the sitting alone',
+  openSits().length === 1 && litPosture() === 'sit', S().map(show).join(' | '));
 $('undo').fire('click'); settle();
 chk('undo restores the work block', activeKey() === 'MTG', String(activeKey()));
-chk('and the SIT is open again', openSits().length === 1, S().map(show).join(' | '));
-chk('from its original start', S()[0].s === sitStart66h,
+chk('the SIT is the same block, still open, and never moved',
+  S().length === 1 && openSits().length === 1 && S()[0].s === sitStart66h,
   S().map(show).join(' | ') + ' wanted ' + H.hhmm(sitStart66h));
-chk('and the footer says SITTING', litPosture() === 'sit', String(litPosture()));
-chk('exactly one SIT block exists, not two', S().length === 1, S().map(show).join(' | '));
+chk('and the footer never moved either', litPosture() === 'sit', String(litPosture()));
 reboot();
 chk('and a reload agrees', litPosture() === 'sit' && activeKey() === 'MTG',
   litPosture() + '/' + activeKey());
@@ -4756,6 +4826,104 @@ H.setOnline(true); advance(120000); settle(); settle();
 chk('the network coming back leaves one open block and one open SIT',
   openEvents().length === 1 && openSits().length === 1,
   A().map(show).join(' | ') + ' // ' + S().map(show).join(' | '));
+reset();
+
+console.log('\n66o. a sitting the user restarts before the undo is taken away, not closed');
+/* REVIEW-5's C1.
+ *
+ * A mis-tap that closes the sitting leaves the footer saying NOT SITTING to
+ * someone who can see they are sitting down, so they tap the footer to say so —
+ * and THEN notice the ribbon. Two SIT blocks are now in play: the one the
+ * mis-tap ended, and the one they just started.
+ *
+ * The undo used to put the first back and CLOSE the second. That reads correct
+ * and is not: the second one's openSit is still in the queue, and opOpenSit_
+ * heals an already-open SIT by closing it — so the block the undo had just
+ * restored was closed again on the way past the server, by a write the undo
+ * itself had left there. The calendar ended with no open SIT, the footer went on
+ * saying SITTING for the rest of the session, and a reload discarded the claim.
+ * Fifty minutes of sitting were recorded out of the hundred and seventy the app
+ * was claiming.
+ *
+ * So the second one is taken AWAY rather than closed: its open joins the
+ * all-or-nothing set, and where that cannot be dropped the one compensating op
+ * deletes it. Two outcomes still, exactly as dropOps' docstring requires — the
+ * calendar never heard any of this, or one op walks all of it back.
+ *
+ * The human ruled on this: one unbroken sitting, not two with a seam. */
+/*
+ * The sitting is opened and left to LAND before the writes stop travelling, in
+ * every one of the three cells. That is the shape of the fault: the block the
+ * undo has to put back is real and on the calendar, and it is the mis-tap's
+ * close of it that is still in flight or still queued.
+ *
+ * `reset()` puts the shim back online, so `mode` is applied after it rather than
+ * around it. Applying it before was the first version of this, and it made all
+ * three cells the same cell.
+ */
+function resitAndUndo(mistap, mode) {
+  reset(); reboot();
+  tapSit(); wait(10); settle();
+  /* The original sitting's start, read off the calendar rather than assumed:
+     every check below asks whether the block still open at the end is THIS one,
+     and a hard-coded clock would pass on a build that reopened the wrong one. */
+  const sitStart = S()[0].s;
+  tap('DW'); wait(50); settle();
+  const landed = openSits().length === 1;
+  if (mode === 'queued') H.setOnline(false);
+  if (mode === 'mid-flush') H.setCallLag('applyOps', 2500);
+  mistap();
+  const stood = litPosture() === 'stand';
+  tapSit(); settle();                     // "I am still sitting"
+  const two = S().length === 2 || Q().filter(o => o.type === 'openSit').length === 1;
+  $('undo').fire('click'); settle();
+  const q = Q().map(o => o.type);
+  H.setOnline(true); H.setCallLag('applyOps', null);
+  for (let i = 0; i < 12; i++) { advance(30000); settle(); }
+  return { stood, two, landed, sitStart, q };
+}
+/*
+ * STOP only. The BODY arm of this section is gone with the coupling it exercised:
+ * a category tap no longer closes the sitting, so there is no footer tap for the
+ * user to make afterwards and no second sitting to be in the way. What that arm
+ * asserted now lives as independence, in 68's per-path list and in 66h.
+ *
+ * STOP still closes the sitting, so C1 is still reachable through it, and this is
+ * where it is held.
+ */
+['STOP'].forEach(function (how) {
+  const mistap = () => { tapStop(); settle(); };
+  ['queued', 'landed', 'mid-flush'].forEach(function (mode) {
+    const at = how + ', ' + mode + ': ';
+    const r = resitAndUndo(mistap, mode);
+    /* Three controls on the setup, because every assertion below is about what
+       the undo did to a state the setup has to have reached first. */
+    chk(at + 'the sitting was on the calendar before the mis-tap', r.landed,
+      String(r.landed));
+    chk(at + 'the mis-tap really did stand the user up', r.stood, String(r.stood));
+    chk(at + 'and they really had started a second sitting', r.two, JSON.stringify(r.q));
+
+    chk(at + 'one SIT block on the calendar, open, and the original',
+      S().length === 1 && openSits().length === 1 && near(S()[0].s, r.sitStart),
+      S().map(show).join(' | '));
+    chk(at + 'the footer agrees with the calendar',
+      litPosture() === 'sit' && openSits().length === 1,
+      String(litPosture()) + ' // ' + S().map(show).join(' | '));
+    chk(at + 'no write was set aside', DEAD().length === 0,
+      JSON.stringify(DEAD().map(d => d.op && d.op.type)));
+    reboot();
+    chk(at + 'and a reload does not take it back', litPosture() === 'sit',
+      String(litPosture()) + ' // ' + S().map(show).join(' | '));
+  });
+  /* Queued means queued: nothing about this may reach the calendar, so the
+     second sitting's open goes with the rest rather than being closed after the
+     fact. Asserted only where dropping is legitimate. */
+  const rq = resitAndUndo(mistap, 'queued');
+  chk(how + ', queued: no openSit was left waiting for the sitting taken away',
+    rq.q.filter(t => t === 'openSit').length === 0, JSON.stringify(rq.q));
+  chk(how + ', queued: and nothing had to be compensated',
+    rq.q.indexOf('undoSwitch') < 0, JSON.stringify(rq.q));
+});
 reset();
 
 console.log('\n66m. the ribbon is a control, not a picture of one');
