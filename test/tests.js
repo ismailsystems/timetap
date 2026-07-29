@@ -908,21 +908,33 @@ H.fireVisible(); settle();
 chk('and the stale guard leaving nothing open dims it again',
   $('grid')._cls.has('idle') && activeKey() === null, String(activeKey()));
 
-console.log('\n30b. the sync pill is absent unless it has something to say');
+console.log('\n30b. the sync state is a sentence, and it says what is happening');
+/* REDESIGNED. This used to read #syncN, a count in a span that the redesign
+ * left permanently hidden — so it asserted a number no user could see while the
+ * sentence beside it went unchecked. #syncN is deleted; the sentence is what is
+ * asserted now. A dot cannot say "two writes are set aside", which is the state
+ * that actually matters, and that is why the pill became a sentence. */
 // document.getElementById is what the client uses; H.$ only sees nodes already made.
 const el = id => document.getElementById(id);
 reset(); reboot();
-chk('quiet means the synced class, which CSS hides',
+chk('quiet says so in words', el('syncText').textContent === 'GOOGLE CALENDAR · SYNCED',
+  el('syncText').textContent);
+chk('and carries the class CSS styles it by',
   el('sync').className === 's-synced', el('sync').className);
 H.setOnline(false);
 tap('DW'); settle();
 chk('a failure switches it to a class that shows', el('sync').className === 's-failed',
   el('sync').className);
-chk('and it carries the count', el('syncN').textContent === '1', el('syncN').textContent);
+chk('and the sentence counts what is waiting',
+  el('syncText').textContent === 'SYNCING · 1', el('syncText').textContent);
+tap('MTG'); settle();
+chk('two more writes, and it counts those too',
+  el('syncText').textContent === 'SYNCING · 3', el('syncText').textContent);
 H.setOnline(true);
 advance(60000); settle(); settle();
-chk('draining puts it back to hidden', el('sync').className === 's-synced' &&
-  el('syncN').textContent === '', el('sync').className + ' ' + el('syncN').textContent);
+chk('draining puts the sentence back', el('sync').className === 's-synced' &&
+  el('syncText').textContent === 'GOOGLE CALENDAR · SYNCED',
+  el('sync').className + ' "' + el('syncText').textContent + '"');
 reset();
 
 console.log('\n31. the grid answers to a keyboard and announces itself');
@@ -1089,10 +1101,29 @@ const headTries = () => { const q = Q(); return q.length ? (q[0].tries || 0) : n
 // whole early ladder — 4+8+16+32s inside a single 61s jump, five attempts where
 // the test meant to observe one. Small steps to count attempts exactly; big
 // steps only once the delay has pinned at its ceiling.
+/*
+ * Every call site discarded the return value, so a cap set too low gave up
+ * quietly and the run failed at the NEXT assertion — which then reported a
+ * product fault that was really a test that had not waited long enough.
+ * REVIEW-4's cosmetic list.
+ *
+ * It throws now rather than returning false. A pump that never reaches its
+ * condition is a bug in this file, not a finding about the app, and the two
+ * should not look alike. Every existing call expects the condition to become
+ * true; the one that legitimately wants to stop early passes its own cap and
+ * a condition that includes the early exit.
+ */
 function pump(cond, cap, stepMs) {
   const step = stepMs === undefined ? 1000 : stepMs;
-  for (let i = 0; i < (cap === undefined ? 200 : cap) && !cond(); i++) { advance(step); settle(); }
-  return cond();
+  const limit = cap === undefined ? 200 : cap;
+  for (let i = 0; i < limit && !cond(); i++) { advance(step); settle(); }
+  if (!cond()) {
+    throw new Error('pump gave up after ' + limit + ' steps of ' + step + 'ms (' +
+      (limit * step / 1000) + 's of virtual time) without its condition becoming true. ' +
+      'This is a cap set too low, not a finding about the app — raise it, or ' +
+      'assert on what actually happened instead of waiting for it.');
+  }
+  return true;
 }
 
 console.log('\n34. a server rejection travels the server path, not the offline one');
@@ -3349,7 +3380,7 @@ chk('with the slider live again', $('spRange').disabled === false,
   String($('spRange').disabled));
 
 console.log('\n52h. recategorising whole does not re-open the correction window');
-/* S.lastTapMs is what willRetitle() reads, and a block reached from this sheet
+/* S.lastTapMs is gone with the correction window; a block reached from this sheet
  * is at least MISTAP_SECONDS old. Moving it to now would make the next
  * confirmed tap on another category retitle hours of work instead of starting
  * a new block — C1's windows nest around when the block was tapped, and
@@ -4658,6 +4689,29 @@ chk('taking it back reopens the SIT', openSits().length === 1 && S()[0].s === si
 chk('with nothing invented on ACTUAL', A().length === 0, A().map(show).join(' | '));
 chk('and the footer says SITTING', litPosture() === 'sit', String(litPosture()));
 
+console.log('\n66n. undo drops a mark that belonged to the close it is cancelling');
+/* Cosmetic, from REVIEW-4's list, and it is only self-repairing while the write
+ * is slow. The mark the user taps belongs to the CLOSE — and the compensating
+ * op strips the mark off the block it reopens, so a setMark still in the queue
+ * would land afterwards and mark a RUNNING block for a close that never
+ * happened. Then the next real close would overwrite it with a different mark,
+ * or not, depending on timing. */
+reset(); reboot();
+H.setOnline(false);
+tap('DW'); settle(); wait(40);
+tap('MTG'); settle();
+chk('the strip is up for the block that closed', !$('strip').hidden, $('strip').className);
+tapMark('+');
+chk('and the mark is queued', Q().some(o => o.type === 'setMark'),
+  JSON.stringify(Q().map(o => o.type)));
+$('undo').fire('click'); settle();
+chk('undo takes the mark back with the close it belonged to',
+  !Q().some(o => o.type === 'setMark'), JSON.stringify(Q().map(o => o.type)));
+H.setOnline(true); advance(120000); settle(); settle();
+chk('so the reopened block carries no mark at all',
+  A().length === 1 && A()[0].t === 'DW:' && /#open/.test(A()[0].d),
+  A().map(show).join(' | '));
+
 console.log('\n66l. a STOP taken back while offline leaves nothing behind');
 /* REVIEW-4's finding 11. takeUndo compared what it had dropped against a
  * hard-coded 2, and STOP has only one write to drop — so `dropped < 2` was
@@ -5037,6 +5091,54 @@ chk('after midnight the rail has let yesterday go',
   !segKinds().includes('DEEP WORK'), segKinds().join(','));
 chk('and shows what is running now', activeKey() === 'ADM' && segKinds().includes('ADMIN'),
   segKinds().join(','));
+reset();
+
+console.log('\n67f. a gap says what it is, in words');
+/* REVIEW-4's finding 22. A gap was hatching and a duration, so "this hole is
+ * time nobody logged" was carried by a background pattern alone — nothing for
+ * a screen reader to read, and nothing for anyone who cannot tell the hatch
+ * from a dark block. The rail exists to make missing time visible. */
+reset(); reboot();
+tap('DW'); settle(); wait(30);
+tapStop(); settle();
+wait(40);
+const gapSeg = segs().find(d => d._cls.has('gap'));
+chk('there is a gap on the rail', !!gapSeg, segKinds().join(','));
+chk('and it says UNLOGGED, not only a shade of grey',
+  gapSeg.querySelector('.segName').textContent === 'UNLOGGED',
+  '"' + gapSeg.querySelector('.segName').textContent + '"');
+chk('while still saying how long it has been',
+  /^(39|40|41)m$/.test(gapSeg.querySelector('.segDur').textContent),
+  gapSeg.querySelector('.segDur').textContent);
+
+console.log('\n67g. a block shorter than a minute is not drawn as nothing');
+/* Cosmetic, from the same list. "0m" reads as "nothing happened". A thirty
+ * second block is real — the redesign is what made one recordable — and the
+ * rail should say it was short rather than say it was empty. */
+reset(); reboot();
+tap('DW'); settle(); advance(30000); settle();
+tap('MTG'); settle();
+chk('the short block is on the rail', segKinds()[0] === 'DEEP WORK', segKinds().join(','));
+chk('and reads as under a minute rather than as zero',
+  segs()[0].querySelector('.segDur').textContent === '<1m',
+  segs()[0].querySelector('.segDur').textContent);
+
+console.log('\n67h. past midnight, the rail is today and not two days at once');
+/* Cosmetic, from the same list. Left running overnight without a reload, the
+ * rail drew yesterday morning and this morning side by side with no seam. */
+reset(); reboot();
+tap('DW'); settle(); wait(60);
+tap('MTG'); settle();
+chk('two blocks before midnight', segs().length === 2, segKinds().join(','));
+H.setNow(D(2026, 7, 21, 0, 40));
+settle();
+chk('after midnight only what is running is on the rail',
+  segKinds().join(',') === 'MEETINGS', segKinds().join(','));
+chk('and it is drawn from midnight, not from yesterday morning',
+  $('railStart').textContent === '12:00 AM', $('railStart').textContent);
+chk('showing the part of it that happened today',
+  segs()[0].querySelector('.segDur').textContent === '40m',
+  segs()[0].querySelector('.segDur').textContent);
 reset();
 
 console.log('\n67e. overlapping blocks do not invent a hole in the record');

@@ -137,51 +137,17 @@ async function renderOnce(browser, view, page, metaTiming) {
   const smoke = await pg.evaluate(fs.readFileSync(SMOKE, 'utf8'));
 
   /*
-   * C2: the armed cell now names which of two things the next tap will do, and
-   * TAP AGAIN TO RETITLE is nearly twice the length of the TAP AGAIN it
-   * replaced. This is the narrowest place either label has to fit.
-   *
-   * It measures a CONTROL string as well, deliberately far too long. The
-   * control must be flagged; if it is not, the measurement is broken and the
-   * two real labels were never really checked. A layout assertion that cannot
-   * fail is the thing this whole file exists to avoid.
+   * REMOVED with the mechanism it measured: the armed cell's two labels,
+   * TAP AGAIN TO RETITLE and TAP AGAIN TO SWITCH, and its .cf span. Nothing
+   * arms, so there is no label to fit and no element to fit it in. This check
+   * had already stopped measuring anything real — it wrote strings into a span
+   * the client never fills — and it was reporting on that non-event on every
+   * run. The nearest thing that is still true is the mark strip's label, which
+   * checkReach measures against the box it actually gets. REVIEW-4's F1.
    */
-  /* Long enough that no cell at any viewport this runs at could hold it in two
-     lines. The first version of this control was 67 characters and FIT the
-     629px desktop cell — the self-check caught that, which is the entire reason
-     it is here. */
-  const CONTROL_LABEL = ('TAP AGAIN TO DO THE VERY LONG THING THAT COULD NOT ' +
-                         'POSSIBLY FIT IN ANY CELL THIS APP HAS EVER HAD ').repeat(6);
-  const confirmLabels = await pg.evaluate(control => {
-    const cell = document.querySelector('#grid [data-key]');
-    const cf = cell && cell.querySelector('.cf');
-    if (!cf) return null;
-    const was = cf.textContent;
-    const out = {};
-    ['TAP AGAIN TO RETITLE', 'TAP AGAIN TO SWITCH', control].forEach(text => {
-      cf.textContent = text;
-      const cs = getComputedStyle(cf);
-      let lh = parseFloat(cs.lineHeight);
-      if (!lh || isNaN(lh)) lh = parseFloat(cs.fontSize) * 1.2;
-      const box = cf.getBoundingClientRect();
-      const cellBox = cell.getBoundingClientRect();
-      out[text] = {
-        w: +box.width.toFixed(1),
-        cellW: +cellBox.width.toFixed(1),
-        lines: Math.max(1, Math.round(box.height / lh)),
-        fontSize: parseFloat(cs.fontSize),
-        // Any of these means the label is not readable where it is shown.
-        overflowsX: cf.scrollWidth > cf.clientWidth + 1,
-        spillsRight: box.right > cellBox.right + 1,
-        spillsBottom: box.bottom > cellBox.bottom + 1
-      };
-    });
-    cf.textContent = was;
-    return out;
-  }, CONTROL_LABEL);
 
   await ctx.close();
-  return { metas, layoutWidth, cells, smoke, errors, confirmLabels, CONTROL_LABEL };
+  return { metas, layoutWidth, cells, smoke, errors };
 }
 
 /**
@@ -1339,36 +1305,6 @@ async function checkViewport(browser, view, page, expectedChecks) {
   console.log('  smoke checks:    ' + r.smoke.pass + ' passed, ' + r.smoke.fail + ' failed');
 
   if (r.errors.length) problems.push(view.name + ': the page threw: ' + r.errors.join(' | '));
-
-  // C2: both armed labels have to fit the cell they are shown in.
-  if (!r.confirmLabels) {
-    problems.push(view.name + ': found no .cf element to measure the armed labels in');
-  } else {
-    const unfit = m => m.overflowsX || m.spillsRight || m.spillsBottom || m.lines > 2 ||
-                       m.fontSize < 9;
-    Object.keys(r.confirmLabels).forEach(text => {
-      const m = r.confirmLabels[text];
-      const isControl = (text === r.CONTROL_LABEL);
-      if (!isControl) {
-        console.log('  "' + text + '": ' + Math.round(m.w) + 'px in a ' +
-                    Math.round(m.cellW) + 'px cell, ' + m.lines + ' line(s) at ' +
-                    m.fontSize + 'px');
-      }
-      if (isControl) {
-        // The control proves the measurement above can say no.
-        if (!unfit(m)) {
-          problems.push(view.name + ': the armed-label measurement passed a control string ' +
-                        'that cannot possibly fit (' + JSON.stringify(m) + '), so it was ' +
-                        'not really checking the two real labels either');
-        }
-        return;
-      }
-      if (unfit(m)) {
-        problems.push(view.name + ': the armed label "' + text + '" does not fit its cell — ' +
-                      JSON.stringify(m));
-      }
-    });
-  }
 
   if (!sameMetas(r.metas, META_TAGS)) {
     problems.push(view.name + ': the rendered page does not carry the tags this harness ' +

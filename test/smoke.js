@@ -240,6 +240,15 @@
     say ? (say.getAttribute('aria-live') + '/' + getComputedStyle(say).display)
         : 'no #undoSay in the document');
 
+  /* The rail is a picture, and a picture needs a name. Without a role and a
+     label it is a stack of coloured boxes a screen reader walks with no idea
+     what it is walking. */
+  var rail = document.getElementById('rail');
+  ok('the day rail names itself',
+    !!rail && !!rail.getAttribute('role') && !!rail.getAttribute('aria-label'),
+    rail ? (rail.getAttribute('role') + ' "' + rail.getAttribute('aria-label') + '"')
+         : 'no #rail in the document');
+
   // ── touch targets and the safe area ─────────────────────────────
   var footRoom = window.innerHeight - (document.getElementById('postureRow')
     ? document.getElementById('postureRow').getBoundingClientRect().bottom : window.innerHeight);

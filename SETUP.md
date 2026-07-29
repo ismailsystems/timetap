@@ -151,16 +151,15 @@ surface of the app. There is no settings screen and there will never be one.
   never shows the mark strip; the mark is applied silently. `null` means the
   strip may appear.
 - `MIN_MARK_MINUTES` (15) — shorter blocks get no mark and no strip.
-- `MISTAP_SECONDS` (20) — a tap this soon after the last one is a correction:
-  it retitles the open block rather than starting a new one, keeping the
-  original start time. It must stay **smaller** than `CONFIRM_WITHIN_SECONDS`
-  below, so that every correction is confirmed before it happens; a lint rule
-  fails if the two are ever swapped.
-- `CONFIRM_WITHIN_SECONDS` (60) — a tap this soon after the last one arms the
-  button instead of acting, and waits for a second tap on the same button.
-  Nothing is written or queued until that second tap.
-- `CONFIRM_TIMEOUT_MS` (4000) — how long an armed button waits before
-  forgetting. Ignoring it is always the safe outcome.
+- `MISTAP_SECONDS` (20) — how new an open block has to be for the stale guard
+  to leave it alone. A block opened this recently was not forgotten, even if the
+  clock has crossed midnight since, so bounding it would chop a block you are
+  watching tick. The name is history: it used to govern a tap-correction window
+  in the app, which the undo ribbon replaced.
+- `CONFIRM_TIMEOUT_MS` (4000) — how long the armed `DISCARD` button in the
+  set-aside drawer waits for its second tap before forgetting. Ignoring it is
+  always the safe outcome. It is the only two-tap control left; every other
+  guardrail is the undo ribbon.
 - `STALE_OPEN_HOURS` (5) — how far a forgotten open block may run before the
   app bounds it and writes `UNLOGGED -` for the rest. A block bounded this way
   is marked `?`, which means the app guessed the end time. Nothing you can tap

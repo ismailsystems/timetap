@@ -351,34 +351,18 @@ const NUMBER_WORDS = ['zero', 'one', 'two', 'three', 'four', 'five', 'six'];
  * worse than no example.
  */
 /*
- * The two tap windows have to nest, and the ordering is the guarantee.
+ * RETIRED: "the correction window nests inside the confirm window".
  *
- * MISTAP_SECONDS was 90 against a CONFIRM_WITHIN_SECONDS of 60, which left a
- * thirty-second band where a single unconfirmed tap acted immediately AND
- * destructively: it silently retitled the block you were actually in. With the
- * correction window inside the confirm window, every destructive path is
- * confirmed by construction.
- *
- * This reads both numbers out of Code.gs rather than being told them, so it
- * pins the RELATIONSHIP and not the two values that happen to be configured
- * today. Tuning either is fine; inverting them is not.
+ * It pinned MISTAP_SECONDS below CONFIRM_WITHIN_SECONDS, because inverted they
+ * left a band where a single unconfirmed tap silently retitled the block you
+ * were in. The redesign replaced arm-and-confirm and the correction window with
+ * one undo; CONFIRM_WITHIN_SECONDS no longer exists and the client is not sent
+ * either value. A rule enforcing an ordering between a constant and a deleted
+ * one cannot fail, and a rule that cannot fail is worse than no rule — it reads
+ * like coverage. MISTAP_SECONDS survives for staleGuard_ and is still checked
+ * by the SETUP.md constants rule below, which reads it out of Code.gs.
+ * REVIEW-4's F2.
  */
-const winNum = name => {
-  const m = codeNoComments.match(new RegExp('var\\s+' + name + '\\s*=\\s*(\\d+)\\s*;'));
-  return m ? Number(m[1]) : null;
-};
-const MISTAP = winNum('MISTAP_SECONDS');
-const CONFIRM = winNum('CONFIRM_WITHIN_SECONDS');
-const winBad = [];
-if (MISTAP === null) winBad.push('could not read MISTAP_SECONDS out of Code.gs');
-if (CONFIRM === null) winBad.push('could not read CONFIRM_WITHIN_SECONDS out of Code.gs');
-if (MISTAP !== null && CONFIRM !== null && !(MISTAP < CONFIRM)) {
-  winBad.push('MISTAP_SECONDS is ' + MISTAP + ' and CONFIRM_WITHIN_SECONDS is ' + CONFIRM +
-              ', so between ' + CONFIRM + 's and ' + MISTAP + 's a single unconfirmed tap ' +
-              'retitles the block you are in');
-}
-check('the correction window nests inside the confirm window', winBad,
-  'inverted, a brush against a different category destroys the block you are actually in');
 
 const PLAN_DOCS = ['SETUP.md', 'README.md'];
 const CATEGORY_KEYS = (() => {
@@ -455,6 +439,25 @@ if (!fs.existsSync(readmePath)) {
   }
   if (!/guess(ed)? when this block ended|app guessed/i.test(flat)) {
     docClaims.push('README.md does not say what the "?" mark means');
+  }
+  /*
+   * The undo ribbon is the guardrail of the whole redesign — the reason a tap
+   * no longer asks before it acts — and no user-facing prose mentioned it. That
+   * is precisely the gap this rule was written for, one round later and one
+   * control along. Read out of Index.html, like STOP_LABEL, so renaming the
+   * ribbon's copy without touching the docs is what fails.
+   */
+  const stopUndo = (html.match(/label:\s*'(STOPPED[^']*)'/) || [])[1];
+  if (!stopUndo) {
+    docClaims.push('could not read the STOP undo label out of Index.html, so the ' +
+                   'check below would have compared nothing');
+  } else if (flat.indexOf(stopUndo) < 0) {
+    docClaims.push('README.md never mentions the "' + stopUndo + '" ribbon, which is the ' +
+                   'only way back from ending the day');
+  }
+  if (!/undo/i.test(flat)) {
+    docClaims.push('README.md never mentions undo, which is the app\'s only guardrail ' +
+                   'on an ordinary tap');
   }
   /* Two things, not one phrase: the rule, and a worked example of it. The first
      version of this matched a nearby sentence and survived deleting the rule

@@ -150,7 +150,6 @@
   .gbtn .k  { flex: 1; min-width: 0; font: 700 15px var(--font);
               overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .gbtn .ge { font: 800 13px var(--font); color: var(--accent-on); flex: none; }
-  .gbtn .cf { font: 700 9px var(--font); letter-spacing: .1em; color: var(--accent-on); flex: none; }
   /* Running: the row itself changes ground and takes a 4px edge. Two channels,
      so it does not depend on colour alone. */
   .gbtn.active { background: var(--panel); box-shadow: inset 4px 0 0 var(--accent); }
@@ -338,9 +337,9 @@
 <div id="app">
   <div id="hdr">
     <span id="hdrName">TIMETAP</span>
-    <!-- The sentence goes in its own span. Writing textContent on #sync itself
-         would delete #syncN, which is nested inside it. -->
-    <span id="sync" class="s-synced"><span id="syncText">GOOGLE CALENDAR · SYNCED</span><span id="syncN" class="hidden"></span></span>
+    <!-- The sentence goes in its own span, because writing textContent on
+         #sync itself would delete anything nested inside it. -->
+    <span id="sync" class="s-synced"><span id="syncText">GOOGLE CALENDAR · SYNCED</span></span>
   </div>
 
   <div id="scroll">
@@ -358,7 +357,9 @@
     </div>
 
     <div id="bodyRow">
-      <div id="rail">
+      <!-- A group, and named. Without this the rail is a stack of coloured
+           boxes that a screen reader walks with no idea what it is walking. -->
+      <div id="rail" role="group" aria-label="today so far, drawn to scale">
         <div id="railStart" class="tnum"></div>
         <div id="railSegs"></div>
         <div id="railNow">NOW ▲</div>
@@ -476,9 +477,8 @@
 
   /* ── state ─────────────────────────────────────────────────── */
 
-  var S = { open: null, sit: null, lastTapMs: 0 };
+  var S = { open: null, sit: null };
   var strip = null;          // {ref, key, durMs, hintMs, timer}
-  var armed = null;          // {key, timer} — a tap waiting to be confirmed
   var CELL = {};             // key -> {box, note, el}, so the lit one is O(1)
   var flushing = false, retryTimer = null, retryDelay = 4000, lastStateMs = 0;
   /*
@@ -522,7 +522,7 @@
    * first thing to fail when it does is the write queue. REVIEW-4's finding 10.
    */
   function saveState() {
-    lsSet(K_STATE, { open: S.open, sit: S.sit, lastTapMs: S.lastTapMs });
+    lsSet(K_STATE, { open: S.open, sit: S.sit });
   }
 
   /** Local midnight for the day `ms` falls in. */
@@ -708,7 +708,6 @@
       ? dead + ' SET ASIDE · RETRYING'
       : (n ? 'SYNCING · ' + n : 'GOOGLE CALENDAR · SYNCED');
     el.className = failed ? 's-failed' : ('s-' + syncCls);
-    $('syncN').textContent = n ? String(n) : '';
   }
 
   function flush() {
@@ -1097,57 +1096,6 @@
     return { mark: null, strip: false };
   }
 
-  /** Light the button and wait. Nothing is queued until the second tap. */
-  /*
-   * Would a confirmed tap on a different category retitle the block you are in,
-   * or close it and start a new one?
-   *
-   * This is deliberately the ONE place that question is answered. The armed
-   * label reads it and the tap that acts reads it, so the label cannot promise
-   * something the action will not do — not because the two were kept in step,
-   * but because there is only one of them.
-   */
-  function willRetitle() {
-    return !!(S.open && S.lastTapMs &&
-              (Date.now() - S.lastTapMs) < CFG.mistapSeconds * 1000);
-  }
-
-  var CONFIRM_RETITLE = 'TAP AGAIN TO RETITLE';
-  var CONFIRM_SWITCH  = 'TAP AGAIN TO SWITCH';
-
-  /** What the next tap will actually do, named. Round 1's rule, applied here. */
-  function confirmLabel() {
-    return willRetitle() ? CONFIRM_RETITLE : CONFIRM_SWITCH;
-  }
-
-  function arm(key) {
-    disarm();
-    var timers = [];
-    // Repaint when it forgets, or the button keeps offering a confirmation it
-    // is no longer holding.
-    timers.push(setTimeout(function () { disarm(); render(); }, CFG.confirmTimeoutMs));
-    /*
-     * And repaint at the exact moment the correction window closes, if that
-     * falls while this is still armed. The action changes there, so the label
-     * has to change there too — otherwise arming at 17 seconds shows
-     * TAP AGAIN TO RETITLE, and a tap three seconds later switches instead. A
-     * label that promises the wrong action is worse than no label.
-     */
-    if (S.open && S.lastTapMs) {
-      var untilSwitch = S.lastTapMs + CFG.mistapSeconds * 1000 - Date.now();
-      if (untilSwitch > 0 && untilSwitch < CFG.confirmTimeoutMs) {
-        timers.push(setTimeout(render, untilSwitch));
-      }
-    }
-    armed = { key: key, timers: timers };
-    render();
-  }
-
-  function disarm() {
-    if (armed && armed.timers) armed.timers.forEach(clearTimeout);
-    armed = null;
-  }
-
   /*
    * A tap acts at once, and for five seconds afterwards the whole ribbon is a
    * way back.
@@ -1186,7 +1134,6 @@
 
     var ref = uid();
     S.open = { ref: ref, key: key, text: '', startMs: now };
-    S.lastTapMs = now;
     openId = enqueue({ type: 'openActual', ref: ref, key: key, startMs: now });
 
     var sit = key === CFG.bodyKey ? closeSit(now) : null;            // 8.2 the only coupling
@@ -1289,7 +1236,19 @@
                 nowMs: now });
     }
 
-    if (u.prev) railReopen(u.prev.ref);
+    /*
+     * A mark the user tapped in the last few seconds belonged to the CLOSE this
+     * undo is cancelling. The compensating op strips the mark off the reopened
+     * block, so a setMark still in the queue would land on a running block and
+     * mark it for a close that never happened. Dropping it is the honest half
+     * of putting the block back.
+     */
+    if (u.prev) {
+      setQueue(queue().filter(function (o) {
+        return !(o.type === 'setMark' && o.ref === u.prev.ref);
+      }));
+      railReopen(u.prev.ref);
+    }
     S.open = u.prev ? { ref: u.prev.ref, key: u.prev.key, text: u.prev.text,
                         startMs: u.prev.startMs } : null;
     /*
@@ -1321,7 +1280,6 @@
        */
       closeSit(now);
     }
-    S.lastTapMs = 0;
     hideStrip();
     saveState(); render(); flush();
   }
@@ -1499,41 +1457,6 @@
 
   /* ── render ────────────────────────────────────────────────── */
 
-  /* Two columns for as long as the labels stay readable in them. Three makes a
-     cell 137px wide, which turns "Fragments" into "Fragm ents". */
-  function colsFor(n) { return n <= 3 ? 1 : (n <= 10 ? 2 : 3); }
-
-  /**
-   * Lay the grid out as slots rather than as a list, because three things want
-   * different parts of it: the categories belong in the bottom rows where the
-   * thumb is, and the two things that are not categories — the add box and any
-   * leftover cell — belong in the top row, furthest from it. Putting the add
-   * box last gave the rarest action on the screen the best corner on it.
-   *
-   * Returns one entry per slot: a category, null for the add box, or undefined
-   * for an empty one.
-   */
-  function layoutCells(cats, cols, showAdd) {
-    var total = cats.length + (showAdd ? 1 : 0);
-    var slots = Math.max(cols, Math.ceil(total / cols) * cols);
-    var out = [];
-    for (var i = 0; i < slots; i++) out.push(undefined);
-    if (showAdd) out[0] = null;
-
-    var free = [];
-    for (var r = (slots / cols) - 1; r >= 0; r--) {
-      for (var c = 0; c < cols; c++) {
-        var ix = r * cols + c;
-        if (out[ix] === undefined) free.push(ix);
-      }
-    }
-    cats.forEach(function (cat, n) { if (n < free.length) out[free[n]] = cat; });
-    // Anything still undefined stays an empty cell. Every box is the same size
-    // and every row holds the same number of them; a box that spanned a row to
-    // close a gap would be buying a tidier grid with an inconsistent one.
-    return out;
-  }
-
   /** What you aim at. The key is the record's vocabulary, not the button's. */
   function faceOf(c) { return c.label || c.key; }
 
@@ -1559,7 +1482,7 @@
       b.setAttribute('aria-label', faceOf(c));
       b.dataset.key = c.key;
       b.innerHTML = '<span class="sw"></span><span class="k"></span>' +
-                    '<span class="ge tnum"></span><span class="cf"></span>';
+                    '<span class="ge tnum"></span>';
       b.querySelector('.sw').style.background = c.hex;
       b.querySelector('.k').textContent = faceOf(c);
 
@@ -1743,13 +1666,7 @@
       kids[i].classList.toggle('long',
         isOpen && (now - S.open.startMs) > CFG.longBlockMinutes * MS_MIN);
 
-      var isArmed = !!armed && armed.key === k;
-      kids[i].classList.toggle('arming', isArmed);
-      if (cell) {
-        cell.el.textContent = isOpen ? fmtEl(now - S.open.startMs) : '';
-        var cf = kids[i].querySelector('.cf');
-        if (cf) cf.textContent = isArmed ? confirmLabel() : '';
-      }
+      if (cell) cell.el.textContent = isOpen ? fmtEl(now - S.open.startMs) : '';
     }
     paintRail(now);
     paintSync();
@@ -1765,6 +1682,17 @@
    * open block carries an inset outline and grows on every tick.
    */
   var RAIL_PX = 340, RAIL_MIN = 26, GAP_MIN = 20, GAP_MS = 90000;
+
+  /*
+   * A gap says what it is, in words.
+   *
+   * It was hatching and a duration, so "this hole is time nobody logged" was
+   * carried by a background pattern alone — nothing for a screen reader to
+   * read, and nothing for anyone who cannot tell the hatch from a dark block.
+   * The rail exists to make missing time visible; a gap that cannot say what it
+   * is fails at the one job the rail has. REVIEW-4's finding 22.
+   */
+  var GAP_NAME = 'UNLOGGED';
 
   /**
    * How tall the rail may draw. Measured, not assumed.
@@ -1807,7 +1735,11 @@
   }
 
   function railBlocks(now) {
-    var out = (S.today || []).slice();
+    // Today's, and only today's. A phone left open across midnight drew two
+    // days as one rail, with yesterday's morning and this morning side by side
+    // and no seam between them.
+    var dayStart = dayStartMs(now);
+    var out = (S.today || []).filter(function (b) { return b.endMs > dayStart; });
     if (S.open) out.push({ key: S.open.key, startMs: S.open.startMs, endMs: now, open: true });
     out.sort(function (a, b) { return a.startMs - b.startMs; });
     return out;
@@ -1817,7 +1749,15 @@
     var host = $('railSegs'), all = railBlocks(now);
     host.innerHTML = '';
     if (!all.length) { $('railStart').textContent = ''; return; }
-    var first = all[0].startMs;
+    /*
+     * The rail starts at the day's first block, or at midnight if that block
+     * began yesterday. A block running across midnight belongs to the rail — it
+     * is what is on the screen right now — but only the part that happened
+     * today is today's, and drawing it from yesterday morning made a fifteen
+     * hour rail in which everything real was a sliver.
+     */
+    var dayStart = dayStartMs(now);
+    var first = Math.max(all[0].startMs, dayStart);
     var span = Math.max(now - first, 60000);
     $('railStart').textContent = clock(first);
 
@@ -1835,10 +1775,12 @@
     }
     all.forEach(function (b) {
       if (prevEnd !== null && b.startMs - prevEnd > GAP_MS) {
-        want('seg gap', b.startMs - prevEnd, '', null, GAP_MIN);
+        want('seg gap', b.startMs - prevEnd, GAP_NAME, null, GAP_MIN);
       }
       var cat = catByKey[b.key];
-      want('seg' + (b.open ? ' open' : ''), b.endMs - b.startMs,
+      // The part of it that is today. A block that began yesterday shows the
+      // hours it has run since midnight, which is what a rail of today means.
+      want('seg' + (b.open ? ' open' : ''), b.endMs - Math.max(b.startMs, dayStart),
            (cat ? faceOf(cat) : b.key).toUpperCase(), cat ? cat.hex : '#616161', RAIL_MIN);
       /*
        * How far the day has got to, not where the last block happened to end.
@@ -1853,7 +1795,7 @@
     });
     // Nothing running: the gap at the end of the day grows while you watch.
     if (!S.open && prevEnd !== null && now - prevEnd > 5000) {
-      want('seg gap', now - prevEnd, '', null, GAP_MIN);
+      want('seg gap', now - prevEnd, GAP_NAME, null, GAP_MIN);
     }
 
     var budget = railBudget(), px = budget / span;
@@ -1878,7 +1820,10 @@
       if (i.hex) d.style.background = i.hex;
       d.innerHTML = '<span class="segName"></span><span class="segDur tnum"></span>';
       d.querySelector('.segName').textContent = i.name;
-      d.querySelector('.segDur').textContent = fmtEl(i.ms);
+      // "0m" reads as nothing happened. A block really can be thirty seconds
+      // long — the redesign made that recordable — and the rail should say it
+      // was short rather than say it was empty.
+      d.querySelector('.segDur').textContent = i.ms < MS_MIN ? '<1m' : fmtEl(i.ms);
       host.appendChild(d);
     });
   }
@@ -1937,8 +1882,8 @@
 
   /**
    * Which of the two things a tap in the category grid below will do. The label
-   * over the grid names it, the same rule C2 settled on for the armed cell:
-   * state what the next tap does, and stop.
+   * over the grid names it, by the rule round 2 settled on: state what the next
+   * tap does, and stop.
    */
   function setSplitScope(whole) {
     split.whole = !!whole;
@@ -1972,7 +1917,6 @@
     // do. REVIEW-4's finding 8.
     railClosed(S.open, at);
     S.open = { ref: newRef, key: key, text: '', startMs: at };
-    S.lastTapMs = now;
     if (key === CFG.bodyKey) closeSit(now);
     hideStrip();
     $('sheetSplit').classList.add('hidden');
@@ -1985,12 +1929,9 @@
    * and is the op the mis-tap correction uses, so this is a missing affordance
    * rather than missing behaviour.
    *
-   * `S.lastTapMs` is deliberately NOT moved to now. It is what willRetitle()
-   * reads, and a block reachable from this sheet is at least MISTAP_SECONDS
-   * old; moving it would re-open the correction window on an hours-old block,
-   * so the next confirmed tap on another category would retitle the whole thing
-   * instead of starting a new one. Nothing about when the block was tapped has
-   * changed here — only what it is called.
+   * It changes what the block is called and nothing else. There is no
+   * correction window left for it to disturb: the mis-tap retitle went with
+   * arm-and-confirm, and one level of undo replaced it.
    */
   function recatWhole(key) {
     var now = Date.now();
@@ -2066,7 +2007,6 @@
       // Today's closed blocks, for the rail. Not persisted: it is a picture of
       // the calendar, and the calendar is the thing that is true.
       S.today = st.today || [];
-      S.lastTapMs = 0;
       if (wasRef !== (S.open && S.open.ref) || wasSit !== (S.sit && S.sit.ref)) {
         closeBlockSheets();
       }
@@ -2080,7 +2020,6 @@
     if (saved && typeof saved === 'object') {
       S.open = saved.open || null;
       S.sit = saved.sit || null;
-      S.lastTapMs = 0;                 // a reload is never a mis-tap window
     }
     buildGrid();
     render();

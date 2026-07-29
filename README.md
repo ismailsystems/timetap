@@ -47,6 +47,26 @@ The UI updates on tap and the write happens in the background. When the write
 fails, the operation is queued in localStorage, ordered and idempotent, and
 retried on the next interaction and on load.
 
+### The way back
+
+Every tap acts at once. Nothing asks you to tap twice — you tap, the block
+switches, and for five seconds a solid red ribbon sits above the footer saying
+`SWITCHED TO MEETINGS` with an `UNDO · 5` countdown beside it. Tap anywhere on
+the ribbon and the switch is undone completely: the block it opened is removed,
+the block it closed is running again with its original start time and note, and
+any sitting it closed is open again. If the writes are still queued they are
+simply dropped, so the calendar never hears about a switch you took back.
+
+The same ribbon appears after `STOP`, reading `STOPPED — NOW UNLOGGED`.
+
+It is a real button: it is in the tab order, `Enter` and `Space` take the undo,
+and a screen reader is told when it appears and what it will undo. It holds one
+switch — the last one — and it forgets after five seconds. Opening the split
+sheet clears it, because that is a new intention.
+
+There is one two-tap control left in the app: `DISCARD` in the set-aside
+drawer, which destroys the only record that a failed write ever happened.
+
 ### The mark
 
 The mark belongs to the block that just **closed**, captured at the transition

@@ -54,37 +54,24 @@ var CATEGORIES = [
 var MIN_MARK_MINUTES = 15;
 
 /**
- * A category tap this soon after the previous tap is a correction, not a
- * transition: it retitles the block you are in rather than starting a new one.
+ * How new a block has to be for staleGuard_ to leave it alone.
  *
- * **This must stay below CONFIRM_WITHIN_SECONDS, and a lint rule fails if it
- * ever stops being.** It used to be 90 against a confirm window of 60, which
- * left a thirty-second band — 60s to 90s after the last tap — where a single
- * unconfirmed tap acted immediately AND destructively: it silently retitled the
- * block you were actually in. Nesting the correction window well inside the
- * confirm window makes every destructive path confirmed by construction rather
- * than by luck.
+ * A block this young was opened moments ago, so it is not a block someone
+ * forgot — even if the clock has crossed midnight since. Bounding it would
+ * chop a block the user is watching tick.
  *
- * It also makes a deliberate short block recordable for the first time. At 90s
- * there was no way to log a 45-second task: the tap that ended it was treated
- * as a correction and ate it.
+ * THE NAME IS HISTORY. It used to govern a client-side correction window: a tap
+ * this soon after the last one retitled the block you were in rather than
+ * starting a new one, and had to nest inside a confirm window, and a lint rule
+ * pinned the two in order. The redesign replaced arm-and-confirm and the
+ * correction window with one undo, so the client no longer receives this value
+ * and CONFIRM_WITHIN_SECONDS is gone. This one survives because staleGuard_
+ * genuinely uses it, and it is not renamed because SETUP.md, the rollup and
+ * this file all name it — a rename buys tidiness with a migration.
  */
 var MISTAP_SECONDS = 20;
 
-/**
- * A category tap this soon after the previous one asks before it acts. The tap
- * arms the button instead of committing, and only a second tap on the same
- * button writes anything. Taps this close together are far more often a brush
- * than a decision, and the correction rule makes a brush destructive: it
- * silently retitles the block you are actually in.
- *
- * Deliberately LARGER than MISTAP_SECONDS, so the whole correction window sits
- * inside it and no correction can ever happen without being confirmed. The
- * ordering is the guarantee; the two particular numbers are not.
- */
-var CONFIRM_WITHIN_SECONDS = 60;
-
-/** How long an armed button waits for that second tap before forgetting. */
+/** How long an armed DISCARD waits for its second tap before forgetting. */
 var CONFIRM_TIMEOUT_MS = 4000;
 
 /** On load, an open block older than this (or from a previous day) is bounded, not extended. */
@@ -249,8 +236,11 @@ function clientConfig_() {
       };
     }),
     minMarkMinutes: MIN_MARK_MINUTES,
-    mistapSeconds: MISTAP_SECONDS,
-    confirmWithinSeconds: CONFIRM_WITHIN_SECONDS,
+    /* mistapSeconds and confirmWithinSeconds are deliberately NOT here. The
+       client had no reader for either once undo replaced arm-and-confirm, and
+       shipping a constant a client cannot act on invites the next reader to
+       believe a mechanism is still running. confirmTimeoutMs stays: the DISCARD
+       button in the set-aside drawer still arms and confirms. */
     confirmTimeoutMs: CONFIRM_TIMEOUT_MS,
     staleOpenHours: STALE_OPEN_HOURS,
     markTimeoutMs: MARK_TIMEOUT_MS,
