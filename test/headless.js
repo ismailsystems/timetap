@@ -1295,9 +1295,11 @@ function sameMetas(a, b) {
   return x.length === y.length && x.every((v, i) => v === y[i]);
 }
 
-async function checkViewport(browser, view, page, expectedChecks) {
+async function checkViewport(browser, view, page, expectedChecks, smokeRuns) {
   const problems = [];
   const r = await renderOnce(browser, view, page, 'before');
+  smokeRuns.push({ view: view.name, pass: r.smoke.pass, fail: r.smoke.fail,
+                   skipped: r.smoke.skipped || [] });
 
   console.log('\n' + view.name + ' (' + view.width + 'x' + view.height + ')');
   console.log('  meta tags:       ' + r.metas.map(m => m[0]).join(', '));
@@ -2035,6 +2037,7 @@ async function main() {
   const { chromium } = loadPlaywright();
   const page = served();
   const expectedChecks = countChecks();
+  const smokeRuns = [];
   if (!expectedChecks) fail('Found no checks in test/smoke.js to run.');
 
   let browser;
@@ -2055,7 +2058,7 @@ async function main() {
   let problems = [];
   try {
     for (const view of VIEWS) {
-      problems = problems.concat(await checkViewport(browser, view, page, expectedChecks));
+      problems = problems.concat(await checkViewport(browser, view, page, expectedChecks, smokeRuns));
     }
     problems = problems.concat(await checkInjectionMatters(browser, VIEWS[0], page));
     problems = problems.concat(await checkDrawer(browser, VIEWS[0], page));
@@ -2097,7 +2100,28 @@ async function main() {
   }
 
   if (problems.length) fail(problems);
-  console.log('\nheadless: ok (' + expectedChecks + ' checks per viewport)');
+  /*
+   * REVIEW-5 C2. A check which could not run is not a pass. The last line used
+   * the number of ok() calls in the file, so "30 checks" described the source
+   * while each cold viewport had run 28 and skipped two. The total guard above
+   * proves nothing vanished; this guard proves the human-facing claim says what
+   * happened and names what did not.
+   */
+  const firstSmoke = smokeRuns[0];
+  const skipNames = firstSmoke.skipped.map(s => s.name);
+  const summary = 'headless: ok (' + firstSmoke.pass + ' passed, ' +
+                  firstSmoke.skipped.length + ' skipped per viewport: ' +
+                  skipNames.join('; ') + ')';
+  const missing = [];
+  if (summary.indexOf(firstSmoke.pass + ' passed') < 0) missing.push(firstSmoke.pass + ' passed');
+  if (summary.indexOf(firstSmoke.skipped.length + ' skipped') < 0) {
+    missing.push(firstSmoke.skipped.length + ' skipped');
+  }
+  skipNames.forEach(name => { if (summary.indexOf(name) < 0) missing.push(name); });
+  if (missing.length) {
+    fail('the headless summary omits: ' + missing.join(' | ') + '\nreported: ' + summary);
+  }
+  console.log('\n' + summary);
 }
 
 main().catch(e => fail(String((e && e.stack) || e)));
