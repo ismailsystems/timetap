@@ -1251,6 +1251,11 @@
 
   function paintUndo() {
     if (!undo) { $('undo').classList.add('hidden'); return; }
+    /*
+     * One is the floor because it is the last actionable second. At expiry the
+     * ribbon disappears; showing zero would leave a control on screen beside a
+     * promise it can no longer keep. FIXES-5 D1, the human's ruling.
+     */
     var left = Math.max(1, Math.ceil((undo.until - Date.now()) / 1000));
     $('undo').classList.remove('hidden');
     $('undoLabel').textContent = undo.label;

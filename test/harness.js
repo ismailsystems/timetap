@@ -511,7 +511,7 @@ module.exports = { LOGGED, fireVisible: () => VIS.forEach(f => f()),
   posture, activeKey, litPosture, noteBox, elapsedBox, nowElapsed, addCell,
   clearPropCache: () => { global.PROPS_ = null; }, tap, tapSit, tapMark, tapStop, stopArmedNow, stopLabel, armedText,
   wait, advance, settle, A, S, show, hhmm, $,
-  CALS, NODES, STORE, desc,
+  CALS, NODES, STORE, desc, indexSource: html,
   get pass() { return pass; }, get fail() { return fail; }, get skipped() { return skipped; },
   setOnline: v => { ONLINE = v; },
   // The call's answer is computed immediately and delivered `ms` later, so a

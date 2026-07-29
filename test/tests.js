@@ -4428,11 +4428,27 @@ chk('taking it back puts the day back',
 chk('from the same start time', A()[0].s === t66d, show(A()[0]));
 
 console.log('\n66e. the ribbon forgets, and forgetting is safe');
+/*
+ * FIXES-5 D1, and the human's ruling. Zero is not an actionable second: at
+ * expiry clearUndo removes the offer. The last visible value is therefore one,
+ * and the ribbon disappears rather than presenting UNDO beside a zero.
+ *
+ * The timer order happens to clear the ribbon before a zero repaint today, so
+ * observing the screen alone cannot pin the floor. The source check is the
+ * mutation check: Math.max(1...) changed to Math.max(0...) must fail here.
+ */
+chk('the countdown has an explicit floor of one, not zero',
+  /var left = Math\.max\(1,\s*Math\.ceil\(/.test(H.indexSource),
+  (H.indexSource.match(/var left = [^\n]+/) || ['no countdown floor found'])[0]);
 reset(); reboot();
 tap('DW'); settle(); wait(40);
 tap('MTG'); settle();
 chk('the ribbon is up', !$('undo').hidden);
-advance(CFG_UNDO_MS + 500); settle();
+advance(CFG_UNDO_MS - 100); settle();
+chk('one is the last visible value while UNDO still works',
+  $('undoChip').textContent === 'UNDO · 1' && !$('undo').hidden,
+  $('undoChip').textContent + ' / ' + $('undo').className);
+advance(600); settle();
 chk('it goes away on its own', $('undo').hidden, $('undo').className);
 chk('and the switch stands', A().length === 2 && /#open/.test(A()[1].d),
   A().map(show).join(' | '));

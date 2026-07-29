@@ -69,7 +69,7 @@ and **9** are closed by the documentation pass that produced this file.
 
 | # | Fix |
 |---|---|
-| D1 | **Decision first.** F4's undo chip: it never shows `0`, `FIXES-4` asked for it, `paintUndo` is byte-identical to `2a15553`, and `test/tests.js` now *pins* `/^UNDO · [1-5]$/`. Fix it, or take it off the list and say why `1` is the floor. |
+| D1 | **Closed by decision.** `1` is the last actionable second. At expiry the ribbon disappears; it does not show `0` beside an undo that is no longer available. The floor is stated beside `paintUndo` and section 66e pins both the source and the boundary. |
 | D2 | `validOp_` accepts the STOP undo's `newRef: null` only because `String(null)` is `"null"` — four alphanumeric characters that satisfy the ref regex. Tightening that regex would silently drop every STOP undo and report it applied. |
 | D3 | `#postureRow` carries `cursor: pointer` and has no click listener. The design's *"Row tap toggles sitting"* is not implemented — safer than the alternative, but the cursor is a lie. |
 | D4 | `#spGridLab` renders `REMAINDER IS`; the handoff says `REMAINDER BECOMES`. The markup has it right and `setSplitScope` overwrites it. |
