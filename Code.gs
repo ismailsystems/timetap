@@ -953,8 +953,27 @@ function opUndoSwitch_(op) {
 
   var ne = op.newRef ? findByRef_(cal, op.newRef, op.atMs) : null;
   if (ne && isOpenEvent_(ne) && ne.getStartTime().getTime() === op.atMs) {
-    try { ne.deleteEvent(); } catch (e) {}
+    try { ne.deleteEvent(); ne = null; } catch (e) {}
   }
+
+  /*
+   * If the block this undo opened is still there, somebody has acted after the
+   * undo was armed, and this undo has been overtaken. Do nothing rather than
+   * half of something.
+   *
+   * The delete above is deliberately narrow: a block another device has moved
+   * or closed is not the block this undo was about. But the reopen below was
+   * not conditional on it — so an undo that correctly declined to delete a
+   * moved block still put the previous one back, and the calendar held TWO OPEN
+   * BLOCKS, which the model forbids and nothing downstream can read. Where the
+   * other device had closed it instead, the reopen resurrected a day that
+   * device had ended, overlapping it.
+   *
+   * `ne` is null here in every case where putting the block back is right: we
+   * just deleted it, a replay deleted it last time, or another device deleted
+   * it. REVIEW-4's finding 7.
+   */
+  if (ne) return;
 
   if (op.prevRef) {
     var pe = findByRef_(cal, op.prevRef, op.prevStartMs);

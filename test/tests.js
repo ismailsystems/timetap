@@ -4306,6 +4306,59 @@ chk('taking it back returns to MEETINGS, not to DEEP WORK',
 chk('and DW stays closed where it was', A()[0].t === 'DW: =', A().map(show).join(' | '));
 reset();
 
+console.log('\n69. an undo another device has overtaken does nothing, not half of something');
+/* REVIEW-4's finding 7. opUndoSwitch_ refuses to delete a new block that has
+ * moved or been closed elsewhere — correctly, because that is no longer the
+ * block this undo was about — and then reopened the previous one regardless.
+ * A moved new block plus a reopened previous one is TWO OPEN BLOCKS, which the
+ * model forbids and nothing downstream can read.
+ *
+ * The rule: the reopen is conditional on the new block being gone. Gone covers
+ * "we just deleted it", "a replay deleted it last time" and "another device
+ * deleted it" — all three are cases where putting the previous block back is
+ * exactly right. Anything else means somebody has acted after this undo was
+ * armed, and half an undo is worse than none. */
+const nOpen = () => A().filter(e => /#open/.test(e.d)).length;
+
+/* another device MOVED the new block */
+reset(); reboot();
+tap('DW'); settle(); wait(40);
+tap('MTG'); settle();
+chk('the switch landed on the calendar', A().length === 2 && nOpen() === 1,
+  A().map(show).join(' | '));
+A().find(e => /^MTG/.test(e.t)).s += 5 * 60000;   // a hand edit, or a second device
+$('undo').fire('click'); settle();
+chk('moved: the calendar never holds two open blocks', nOpen() <= 1,
+  A().map(show).join(' | '));
+chk('moved: the moved block is left alone, and it is the open one',
+  nOpen() === 1 && /^MTG/.test(A().find(e => /#open/.test(e.d)).t),
+  A().map(show).join(' | '));
+chk('moved: and the previous block stays closed where it was',
+  /^DW/.test(A()[0].t) && !/#open/.test(A()[0].d), A().map(show).join(' | '));
+
+/* another device CLOSED the new block */
+reset(); reboot();
+tap('DW'); settle(); wait(40);
+tap('MTG'); settle();
+const mtg69 = A().find(e => /^MTG/.test(e.t));
+mtg69.d = mtg69.d.replace('#open', '');
+mtg69.e = H.nowMs() + 10 * 60000;
+$('undo').fire('click'); settle();
+chk('closed: the calendar never holds two open blocks', nOpen() <= 1,
+  A().map(show).join(' | '));
+chk('closed: the day that other device ended stays ended', nOpen() === 0,
+  A().map(show).join(' | '));
+
+/* and the ordinary case still works, or the guard above has simply broken undo */
+reset(); reboot();
+const t69 = H.nowMs();
+tap('DW'); settle(); wait(40);
+tap('MTG'); settle();
+$('undo').fire('click'); settle();
+chk('untouched: undo still walks the switch back completely',
+  A().length === 1 && A()[0].t === 'DW:' && A()[0].s === t69 && nOpen() === 1,
+  A().map(show).join(' | '));
+
 console.log('\n68. opening Body closes an open SIT, by every path there is');
 /* REVIEW-4's B4, and the successor to the deleted 50g.
  *
