@@ -446,9 +446,40 @@
   }
   function ls(k, d) { try { var v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch (e) { return d; } }
   function lsSet(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
-  function saveState() { lsSet(K_STATE, S); }
+  /*
+   * What a reload genuinely needs, and nothing else.
+   *
+   * This used to store the whole of S, which swept S.today in with it — the
+   * rail's picture of the day, against the handoff's "No new persistent state"
+   * and against adoptServerState's own comment three lines from where it is
+   * set: the rail is a picture of the calendar, and the calendar is the thing
+   * that is true. Nothing read it back. Offline it reached 119 entries and 10KB
+   * after 120 switches, in a store the browser is entitled to cap — and the
+   * first thing to fail when it does is the write queue. REVIEW-4's finding 10.
+   */
+  function saveState() {
+    lsSet(K_STATE, { open: S.open, sit: S.sit, lastTapMs: S.lastTapMs });
+  }
+
+  /** Local midnight for the day `ms` falls in. */
+  function dayStartMs(ms) {
+    var d = new Date(ms);
+    d.setHours(0, 0, 0, 0);
+    return d.getTime();
+  }
 
   /* ── formatting ────────────────────────────────────────────── */
+
+  /*
+   * A timestamp, and not null.
+   *
+   * isFinite(null) is TRUE — Number(null) is 0 — so every `isFinite(x)` guard
+   * on a field that can be explicitly null lets null through and hands a 1970
+   * date to whatever formats it. The drawer printed one at a reader trying to
+   * repair the damage by hand. isFinite(undefined) is false, which is why this
+   * only ever showed up on the fields the client sets to null on purpose.
+   */
+  function isMs(v) { return typeof v === 'number' && isFinite(v); }
 
   function pad2(n) { return String(n).replace(/^(\d)$/, '0$1'); }
   function fmtEl(ms) {
@@ -508,14 +539,14 @@
       // Only a start is a start. closeActual carries endMs, which is the one
       // time that must never be recorded as when the block began.
       if ((op.type === 'openActual' || op.type === 'openSit' ||
-           op.type === 'setSitStart') && isFinite(op.startMs)) e.startMs = op.startMs;
-      if (e.startMs === undefined && isFinite(op.hintMs)) e.startMs = op.hintMs;
+           op.type === 'setSitStart') && isMs(op.startMs)) e.startMs = op.startMs;
+      if (e.startMs === undefined && isMs(op.hintMs)) e.startMs = op.hintMs;
       idx[op.ref] = e;
     }
     if (op.newRef) {
       var n = idx[op.newRef] || {};
       if (op.newKey) n.key = op.newKey;
-      if (isFinite(op.atMs)) n.startMs = op.atMs;   // the split is the new block's start
+      if (isMs(op.atMs)) n.startMs = op.atMs;      // the split is the new block's start
       idx[op.newRef] = n;
     }
     saveBlocks(idx);
@@ -533,11 +564,23 @@
 
   /** What a set-aside op can say about the block it belonged to. */
   function blockInfo(op) {
+    /*
+     * undoSwitch names no `ref` at all — it carries prevRef and newRef — so it
+     * arrived here able to say nothing about itself, and the drawer printed
+     * "unknown category" and a 1970 start beside it. The block an undo is about
+     * is the one it puts back, which is the previous one.
+     */
+    if (op.type === 'undoSwitch') {
+      var pe = (op.prevRef && blockIdx()[op.prevRef]) || {};
+      return { key: op.prevKey || pe.key || null,
+               startMs: isMs(op.prevStartMs) ? op.prevStartMs
+                      : (isMs(pe.startMs) ? pe.startMs : null) };
+    }
     var e = (op && op.ref && blockIdx()[op.ref]) || {};
     var startMs = null;
-    if ((op.type === 'openActual' || op.type === 'openSit') && isFinite(op.startMs)) startMs = op.startMs;
-    if (startMs === null && isFinite(op.hintMs)) startMs = op.hintMs;
-    if (startMs === null && isFinite(e.startMs)) startMs = e.startMs;
+    if ((op.type === 'openActual' || op.type === 'openSit') && isMs(op.startMs)) startMs = op.startMs;
+    if (startMs === null && isMs(op.hintMs)) startMs = op.hintMs;
+    if (startMs === null && isMs(e.startMs)) startMs = e.startMs;
     return { key: op.key || e.key || null, startMs: startMs };
   }
 
@@ -675,24 +718,37 @@
      * block that was really created and really is running, and clearing the
      * grid for those would be a different lie.
      */
+    /*
+     * A set-aside undo is the same lie in reverse, and belongs in the same
+     * list. The undo never reached the calendar, so the block the ribbon put
+     * back in hand is not the one running there — the one the switch opened
+     * still is. The grid claimed the wrong block, and the clock in it ticked.
+     */
     var openedRef = q[i].type === 'openActual' ? q[i].ref
                   : q[i].type === 'splitActual' ? q[i].newRef
+                  : q[i].type === 'undoSwitch' ? q[i].prevRef
                   : null;
     var cleared = !!(openedRef && S.open && S.open.ref === openedRef);
     if (cleared) {
       /*
-       * A set-aside split is the one case where something IS still running: the
+       * A set-aside split is one case where something IS still running: the
        * split never happened, so the block it was cutting is still open on the
        * calendar with its original ref. Going idle there made STOP inert while
        * a real block ran, and said less than the app knew. Where the record of
        * that block survives — noteBlock keeps its key and start by ref — put it
        * back in hand. Where it does not, idle is the honest answer.
+       *
+       * A set-aside undo of a SWITCH is the other: the block the switch opened
+       * is still running, and the client recorded its key and start when it
+       * enqueued the open. A set-aside undo of a STOP has no such block —
+       * the day really is ended on the calendar — so idle is right there.
        */
-      var back = null;
-      if (q[i].type === 'splitActual' && q[i].ref) {
-        var e = blockIdx()[q[i].ref];
-        if (e && e.key && isFinite(e.startMs)) {
-          back = { ref: q[i].ref, key: e.key, text: '', startMs: e.startMs };
+      var back = null, keepRef = q[i].type === 'splitActual' ? q[i].ref
+                              : q[i].type === 'undoSwitch' ? q[i].newRef : null;
+      if (keepRef) {
+        var e = blockIdx()[keepRef];
+        if (e && e.key && isMs(e.startMs)) {
+          back = { ref: keepRef, key: e.key, text: '', startMs: e.startMs };
         }
       }
       S.open = back;
@@ -700,6 +756,12 @@
     // The same, for the posture half: a SIT that was never created is not one
     // the row should go on claiming.
     if (q[i].type === 'openSit' && S.sit && S.sit.ref === q[i].ref) {
+      S.sit = null;
+      cleared = true;
+    }
+    // And a sitting block an undo tried to reopen and never did.
+    if (q[i].type === 'undoSwitch' && q[i].sitRef &&
+        S.sit && S.sit.ref === q[i].sitRef) {
       S.sit = null;
       cleared = true;
     }
@@ -735,7 +797,10 @@
     openSit:      'start sitting',
     closeSit:     'stop sitting',
     setSitStart:  'correct when sitting started',
-    deleteSit:    'remove a sitting block'
+    deleteSit:    'remove a sitting block',
+    // Added with the op. A row that prints the internal name at a reader
+    // holding a phone in front of Google Calendar is telling them nothing.
+    undoSwitch:   'take back a switch'
   };
 
   /**
@@ -762,9 +827,9 @@
       var e = d[i] || {}, op = e.op || {};
       rows.push({
         token: deadToken(e),
-        when:    isFinite(e.at) ? clock(e.at) : 'unknown time',
+        when:    isMs(e.at) ? clock(e.at) : 'unknown time',
         key:     e.key || op.key || 'unknown category',
-        started: isFinite(e.startMs) ? clock(e.startMs) : 'unknown start',
+        started: isMs(e.startMs) ? clock(e.startMs) : 'unknown start',
         what:    OP_WORDS[op.type] || (op.type ? String(op.type) : 'unknown write'),
         why:     e.why || 'no reason recorded'
       });
@@ -1586,8 +1651,12 @@
    * it says so.
    */
   function railClosed(prev, endMs) {
-    S.today = (S.today || []).concat([
-      { ref: prev.ref, key: prev.key, startMs: prev.startMs, endMs: endMs }]);
+    // Today's, and only today's. A phone left open across midnight kept
+    // yesterday's blocks for ever, which is what "grows without bound" means
+    // once the store is no longer the thing holding them.
+    var dayStart = dayStartMs(endMs);
+    S.today = (S.today || []).filter(function (b) { return b.startMs >= dayStart; })
+      .concat([{ ref: prev.ref, key: prev.key, startMs: prev.startMs, endMs: endMs }]);
   }
 
   /** And takes it off again when the switch that made it is undone. */

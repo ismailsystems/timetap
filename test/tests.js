@@ -4306,6 +4306,83 @@ chk('taking it back returns to MEETINGS, not to DEEP WORK',
 chk('and DW stays closed where it was', A()[0].t === 'DW: =', A().map(show).join(' | '));
 reset();
 
+console.log('\n71. a set-aside undo says what it was, when it was, and stops the grid lying');
+/* REVIEW-4's finding 12. undoSwitch was added to the ops the client can send
+ * and to nothing that reads them back:
+ *
+ *   - OP_WORDS had no entry, so the drawer printed the raw op name at a reader
+ *     holding a phone in front of Google Calendar trying to repair the damage.
+ *   - blockInfo could say nothing about it, and a null start reads as FINITE to
+ *     isFinite — so the row printed 1 January 1970 as the block's start.
+ *   - quarantine clears the grid for a set-aside open, because a block that was
+ *     never created is not one the grid should go on showing. A set-aside undo
+ *     is the same lie in reverse: the undo never happened, so what is running
+ *     on the calendar is the block the switch opened, not the one the ribbon
+ *     put back in hand. */
+reset(); reboot();
+const t71 = H.nowMs();
+// The same 12-hour clock the drawer prints, built here rather than assumed, so
+// this reads the same under every contracted timezone.
+const clk71 = (d => { const h = d.getHours() % 12; return (h === 0 ? 12 : h) + ':' +
+  String(d.getMinutes()).padStart(2, '0') + (d.getHours() < 12 ? ' AM' : ' PM'); })(new Date(t71));
+tap('DW'); settle(); wait(40);
+tap('MTG'); settle();                            // both land on the calendar
+chk('the switch landed, so undo must compensate rather than drop',
+  A().length === 2, A().map(show).join(' | '));
+H.setServerReject('calendar is not having it');
+$('undo').fire('click'); settle();
+pump(() => DEAD().length > 0);
+H.setServerReject(null);
+chk('the undo write was set aside', DEAD().length === 1 && DEAD()[0].op.type === 'undoSwitch',
+  JSON.stringify(DEAD().map(d => d.op.type)));
+
+$('err').click(); settle();                      // open the drawer
+chk('the drawer holds one row', uiRows().length === 1, String(uiRows().length));
+const said71 = uiRows().length ? rowText(uiRows()[0]) : '(no row)';
+chk('the row says what it tried to do in plain words, not the op name',
+  /tried to take back a switch/.test(said71) && !/undoSwitch/.test(said71), said71);
+chk('and names the block it was about, at the start time it really had',
+  said71.indexOf('block started ' + clk71) >= 0, said71 + ' wanted ' + clk71);
+/* The display carries no year, so a 1970 start is invisible in the string. The
+   stored value is where it can be seen, and where it can fail. */
+chk('and the start it kept is the real one, not the epoch isFinite(null) allows',
+  DEAD()[0].startMs === t71, String(DEAD()[0].startMs) + ' wanted ' + t71);
+chk('and it names the category rather than "unknown category"',
+  /DW/.test(said71) && !/unknown category/.test(said71), said71);
+
+/* The grid stops claiming a block the calendar does not hold. */
+chk('the grid is not still showing the block the undo tried to put back',
+  activeKey() !== 'DW', String(activeKey()));
+chk('it shows what is really running instead — the block the switch opened',
+  activeKey() === 'MTG', String(activeKey()));
+chk('which is what the calendar holds', A().length === 2 && /#open/.test(A()[1].d) &&
+  /^MTG/.test(A()[1].t), A().map(show).join(' | '));
+chk('and the start it shows is the one on the calendar',
+  JSON.parse(H.STORE['tt.state.v1']).open.startMs === A()[1].s,
+  JSON.stringify(JSON.parse(H.STORE['tt.state.v1']).open) + ' vs ' + show(A()[1]));
+$('dgClose').click(); settle();
+
+console.log('\n71b. a set-aside STOP-undo has nothing to put back in hand, and says so');
+reset(); reboot();
+const t71b = H.nowMs();
+tap('DW'); settle(); wait(40);
+tapStop(); settle();                             // the close lands
+H.setServerReject('no');
+$('undo').fire('click'); settle();
+pump(() => DEAD().length > 0);
+H.setServerReject(null);
+$('err').fire('click'); settle();
+const said71b = uiRows()[0] ? uiRows()[0].children.map(c => c.textContent).join(' | ') : '(no row)';
+chk('the row still reads in plain words', /tried to take back a switch/.test(said71b), said71b);
+chk('and still carries the real start of the block it was about',
+  DEAD()[0].startMs === t71b, String(DEAD()[0].startMs) + ' wanted ' + t71b);
+chk('the grid goes idle, because the day really is ended on the calendar',
+  activeKey() === null, String(activeKey()));
+chk('and the calendar agrees', A().length === 1 && !/#open/.test(A()[0].d),
+  A().map(show).join(' | '));
+$('dgClose').click(); settle();
+reset();
+
 console.log('\n69. an undo another device has overtaken does nothing, not half of something');
 /* REVIEW-4's finding 7. opUndoSwitch_ refuses to delete a new block that has
  * moved or been closed elsewhere — correctly, because that is no longer the
@@ -4491,6 +4568,31 @@ chk('taking it back reopens the SIT', openSits().length === 1 && S()[0].s === si
 chk('with nothing invented on ACTUAL', A().length === 0, A().map(show).join(' | '));
 chk('and the footer says SITTING', litPosture() === 'sit', String(litPosture()));
 
+console.log('\n66l. a STOP taken back while offline leaves nothing behind');
+/* REVIEW-4's finding 11. takeUndo compared what it had dropped against a
+ * hard-coded 2, and STOP has only one write to drop — so `dropped < 2` was
+ * true whatever happened, and a compensating op went out even when the close
+ * was still sitting in the queue where nobody had seen it. Harmless in effect,
+ * and it was the accidental reason STOP escaped the mid-flight fault 66g holds:
+ * a test that always compensated could never observe the wrong branch. The
+ * count is now the number of writes the action actually made. */
+reset(); reboot();
+H.setOnline(false);
+tap('DW'); settle(); wait(40);
+tapStop(); settle();
+chk('the close is waiting in the queue',
+  Q().map(o => o.type).join(',') === 'openActual,closeActual',
+  JSON.stringify(Q().map(o => o.type)));
+$('undo').fire('click'); settle();
+chk('undo drops it rather than compensating for it',
+  !Q().some(o => o.type === 'undoSwitch'), JSON.stringify(Q().map(o => o.type)));
+chk('leaving only the open that started the day',
+  Q().map(o => o.type).join(',') === 'openActual', JSON.stringify(Q().map(o => o.type)));
+H.setOnline(true); advance(120000); settle(); settle();
+chk('so the network coming back writes one open block and no second thoughts',
+  A().length === 1 && A()[0].t === 'DW:' && /#open/.test(A()[0].d),
+  A().map(show).join(' | '));
+
 console.log('\n66k. offline, the sitting close is dropped rather than compensated');
 reset(); reboot();
 H.setOnline(false);
@@ -4591,6 +4693,48 @@ $('undo').fire('click'); settle();
 chk('and one again after taking it back', segKinds().join(',') === 'DEEP WORK',
   segKinds().join(','));
 chk('which is the open one', segs()[0]._cls.has('open'), segs()[0].className);
+
+console.log('\n70. the rail\'s picture of today is not stored, and does not grow for ever');
+/* REVIEW-4's finding 10. saveState wrote the whole of S, so S.today went into
+ * tt.state.v1 — against the handoff's "No new persistent state" and against the
+ * comment sitting three lines above it, which says the rail is a picture of the
+ * calendar and the calendar is the thing that is true. Nothing ever read it
+ * back. Offline it reached 119 entries and 10KB after 120 switches, on a store
+ * every browser is entitled to cap. */
+reset(); reboot();
+tap('DW'); settle(); wait(30);
+tap('MTG'); settle();
+const st70 = JSON.parse(H.STORE['tt.state.v1'] || '{}');
+chk('the rail is drawing from something', segs().length === 2, segKinds().join(','));
+chk('and the stored state has no today key', !('today' in st70),
+  JSON.stringify(Object.keys(st70)));
+chk('while still storing what a reload does need',
+  st70.open && st70.open.key === 'MTG' && 'sit' in st70,
+  JSON.stringify(Object.keys(st70)));
+
+reset(); reboot();
+H.setOnline(false);
+for (let i = 0; i < 120; i++) { tap(i % 2 ? 'DW' : 'MTG'); advance(60000); }
+settle();
+const bytes70 = (H.STORE['tt.state.v1'] || '').length;
+chk('120 offline switches leave the stored state under 2KB', bytes70 < 2048,
+  bytes70 + ' bytes');
+H.setOnline(true);
+
+/* And it is a picture of TODAY. Left open across midnight without a reload, the
+   list kept yesterday for ever — which is what "grows without bound" means once
+   the store is no longer the thing holding it. */
+reset(); reboot();
+tap('DW'); settle(); wait(30);
+tap('MTG'); settle();
+chk('two blocks on the rail before midnight', segs().length === 2, segKinds().join(','));
+H.setNow(D(2026, 7, 21, 0, 30));
+tap('ADM'); settle();
+chk('after midnight the rail has let yesterday go',
+  !segKinds().includes('DEEP WORK'), segKinds().join(','));
+chk('and shows what is running now', activeKey() === 'ADM' && segKinds().includes('ADMIN'),
+  segKinds().join(','));
+reset();
 
 console.log('\n67e. overlapping blocks do not invent a hole in the record');
 /* REVIEW-4's finding 9. paintRail walked the day keeping one prevEnd and
