@@ -237,8 +237,10 @@ None of those is reachable without a real engine, a real cascade and a real
 viewport. Every check in the file corresponds to a bug that actually shipped, so
 a failure names the regression rather than a symptom.
 
-There are 30 checks. Two of them skip on a cold load — the lit ring's colour and
-inset, which need a running block — so a clean run reads `28 passed, 0 failed`.
+There are 31 checks. Two need a running block: the lit ring's colour and inset.
+The headless cold-load path seeds one, so both viewports read `31 passed, 0
+failed` and neither check skips. A phone paste can still skip them when the page
+is idle; start a block before a paste that claims to prove the lit edge.
 `node test/headless.js` counts `pass + fail + skipped` against the number of
 `ok(` calls in the file, so a check that quietly stopped running is caught rather
 than absorbed into the total.

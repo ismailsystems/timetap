@@ -39,6 +39,10 @@ const META_TAGS = [
 ];
 const INSTALL_PKG = 'npm install';
 const INSTALL_BROWSER = 'npx playwright install chromium';
+const LIT_CHECKS = [
+  'the lit ring is not the colour of the page',
+  'the lit row takes a 4px inset accent edge'
+];
 
 /* A skipped run is never a pass, so every exit from here is non-zero. */
 function fail(lines) {
@@ -105,6 +109,7 @@ function documentFor(page, withMetas) {
  * point is load-bearing rather than decorative: a viewport meta added once the
  * page has already been laid out does not lay it out again.
  */
+const SMOKE_ORIGIN = 'http://timetap-smoke.invalid/';
 async function renderOnce(browser, view, page, metaTiming) {
   const ctx = await browser.newContext({
     viewport: { width: view.width, height: view.height },
@@ -116,7 +121,19 @@ async function renderOnce(browser, view, page, metaTiming) {
   const errors = [];
   pg.on('pageerror', e => errors.push(String((e && e.message) || e)));
 
-  await pg.setContent(documentFor(page, metaTiming === 'before'), { waitUntil: 'load' });
+  await pg.route(SMOKE_ORIGIN, r => r.fulfill({
+    status: 200, contentType: 'text/html; charset=utf-8',
+    body: documentFor(page, metaTiming === 'before')
+  }));
+  await pg.addInitScript(stallingServerStub);
+  await pg.addInitScript(() => {
+    const now = Date.now();
+    localStorage.setItem('tt.state.v1', JSON.stringify({
+      open: { ref: 'aaaabbbbccccdddd', key: 'DW', text: '', startMs: now - 40 * 60000 },
+      sit: null
+    }));
+  });
+  await pg.goto(SMOKE_ORIGIN, { waitUntil: 'load' });
 
   if (metaTiming === 'after') {
     await pg.evaluate(metas => {
@@ -1376,6 +1393,11 @@ async function checkViewport(browser, view, page, expectedChecks, smokeRuns) {
     problems.push(view.name + ': smoke.js accounts for ' + total + ' checks but the file ' +
                   'contains ' + expectedChecks + ' — one is neither passing, failing nor skipped');
   }
+  const skippedLit = skipped.filter(s => LIT_CHECKS.includes(s.name));
+  if (skippedLit.length) {
+    problems.push(view.name + ': the cold-load path skipped the lit-row checks: ' +
+                  skippedLit.map(s => s.name).join('; '));
+  }
 
   if (r.smoke.fail !== 0) {
     problems.push(view.name + ': ' + r.smoke.fail + ' smoke check(s) failed:\n' +
@@ -2322,8 +2344,8 @@ async function main() {
   const firstSmoke = smokeRuns[0];
   const skipNames = firstSmoke.skipped.map(s => s.name);
   const summary = 'headless: ok (' + firstSmoke.pass + ' passed, ' +
-                  firstSmoke.skipped.length + ' skipped per viewport: ' +
-                  skipNames.join('; ') + ')';
+                  firstSmoke.skipped.length + ' skipped per viewport' +
+                  (skipNames.length ? ': ' + skipNames.join('; ') : '') + ')';
   const missing = [];
   if (summary.indexOf(firstSmoke.pass + ' passed') < 0) missing.push(firstSmoke.pass + ' passed');
   if (summary.indexOf(firstSmoke.skipped.length + ' skipped') < 0) {
