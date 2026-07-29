@@ -55,6 +55,15 @@
     !!document.getElementById('note') &&
     document.getElementById('note').tagName === 'INPUT',
     'a <button> would have had the <input> stripped');
+  /*
+   * FIXES-5 D5. The note is a control, not only a line of text. It used to
+   * render 38px high while every other control met the 44px touch-target floor.
+   */
+  var note = document.getElementById('note');
+  var noteRect = note ? note.getBoundingClientRect() : null;
+  ok('the note field meets the touch-target floor',
+    !!noteRect && noteRect.width >= 44 && noteRect.height >= 44,
+    noteRect ? Math.round(noteRect.width) + 'x' + Math.round(noteRect.height) : 'no note field');
   ok('every category row has its clock',
     cats.every(function (c) { return !!c.querySelector('.ge'); }));
   ok('every category row has its colour swatch',

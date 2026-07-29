@@ -90,7 +90,12 @@
   #nowEl.long { color: var(--flag); }
   #note {
     width: 100%; margin-top: 12px; background: var(--panel2); border: 0;
-    color: var(--fg); font: 400 15px var(--font); padding: 11px 12px; outline: none;
+    /*
+     * This is a touch control like the buttons below it. It used to render
+     * 38px high, the only control under the 44px floor. FIXES-5 D5.
+     */
+    min-height: 44px; color: var(--fg); font: 400 15px var(--font);
+    padding: 11px 12px; outline: none;
   }
   #note::placeholder { color: var(--mute); }
 
