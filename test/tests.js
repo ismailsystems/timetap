@@ -4268,9 +4268,35 @@ reset();
 
 console.log('\n66. a switch can be taken back');
 /* Undo is what replaced arm-and-confirm. The old design asked before acting;
- * this one acts and then offers a way back for CFG.undoSeconds. Every
- * assertion the arm/confirm sections used to make is now made here, about the
- * property that actually matters: no single tap can cost you a block. */
+ * this one acts and then offers a way back for CFG.undoSeconds.
+ *
+ * This section used to claim that "every assertion the arm/confirm sections
+ * used to make is now made here". That was NOT accurate, and REVIEW-4's finding
+ * 19 said so: four of those assertions had no successor anywhere, and two of
+ * the round's five blocking faults were exactly the things they had covered.
+ * Deleting a mechanism deletes its tests, and a mechanism's tests usually
+ * describe a property that outlives it.
+ *
+ * So, plainly, where each one went:
+ *
+ *   50f  THE SWEEP, no tap changes an existing block's key  -> section 74
+ *   50g  opening Body closes an open SIT                    -> section 68
+ *   52k  queue surgery while a flush is in flight           -> section 66g
+ *   "an unlit box cannot write a note"                      -> section 75
+ *
+ * And what has NO successor, deliberately:
+ *
+ *   the armed label naming which of two things the next tap would do. Nothing
+ *   arms, so there is no label that could promise the wrong action. DISCARD in
+ *   the set-aside drawer still arms and confirms and keeps its own tests.
+ *
+ *   the mis-tap RETITLE window, where tapping the right category soon after the
+ *   wrong one rejoined the block. That behaviour is gone and is not coming back
+ *   in this round: the human ruled to leave the merge out and see whether it
+ *   hurts in use. One level of undo, no merge.
+ *
+ * What is asserted below is the property that replaced all of it: no single tap
+ * can cost you a block. */
 reset(); reboot();
 const t66 = H.nowMs();
 tap('DW'); settle(); wait(40);
@@ -4810,6 +4836,92 @@ $('undo').fire('click'); settle();
 chk('and one again after taking it back', segKinds().join(',') === 'DEEP WORK',
   segKinds().join(','));
 chk('which is the open one', segs()[0]._cls.has('open'), segs()[0].className);
+
+console.log('\n74. THE SWEEP — no elapsed time lets one tap change a block that exists');
+/* The successor to the deleted 50f, and REVIEW-4's finding 19.
+ *
+ * 50f swept second by second across the mis-tap and confirm windows, because
+ * every individual window test would pass against a build whose two constants
+ * were merely different from each other, and only a sweep proves there is no
+ * reachable gap. Those windows are gone. The property is not: it is stronger
+ * now, because a tap can no longer retitle anything at all, and it was asserted
+ * NOWHERE — section 66's claim that every assertion the arm/confirm sections
+ * made is now made there was not accurate.
+ *
+ * Swept rather than spot-checked at a few seconds, for the same reason as
+ * before: a gap can open anywhere, and a build with one is a build where the
+ * category a block is filed under depends on how fast the user was. */
+const gaps74 = [], inert74 = [];
+for (let secs = 0; secs <= 120; secs++) {
+  reset(); reboot();
+  tap('DW');
+  if (secs) advance(secs * 1000);
+  settle();
+  const before = A().map(e => (parseTitle_(e.t) || {}).key);
+  tap('MTG');                                    // exactly one tap
+  settle();
+  const after = A().map(e => (parseTitle_(e.t) || {}).key);
+  for (let i = 0; i < before.length; i++) {
+    if (before[i] !== after[i]) {
+      gaps74.push(secs + 's: block ' + i + ' went ' + before[i] + ' -> ' + after[i]);
+    }
+  }
+  /* And the tap has to have DONE something, or the sweep above passes on a
+     build where nothing happens at all — which is the shape of vacuous pass
+     this file exists to refuse. */
+  if (!(after.length === 2 && after[0] === 'DW' && after[1] === 'MTG')) {
+    inert74.push(secs + 's: ' + JSON.stringify(after));
+  }
+}
+chk('no single tap at any second from 0 to 120 changed an existing block\'s key',
+  gaps74.length === 0, gaps74.slice(0, 8).join(' | '));
+chk('and every one of those 121 taps really switched, so the sweep swept something',
+  inert74.length === 0, inert74.slice(0, 8).join(' | '));
+
+console.log('\n75. a note may only title the block that is running');
+/* The successor to the deleted "an unlit box cannot write a note", and the same
+ * finding 19. The property survives as $('note').disabled = !open, and was
+ * tested nowhere — a disabled attribute is not the guarantee, it is the
+ * decoration on it. What matters is that nothing is queued and nothing reaches
+ * the calendar. */
+reset(); reboot();
+/* Offline, so a write that WAS queued cannot drain away before this looks at
+   the queue. Online, "the queue is empty" is equally true of a build that
+   queued a note and flushed it, which is the opposite of what is claimed. */
+H.setOnline(false);
+chk('with nothing running, the note box is disabled', noteBox().disabled === true,
+  String(noteBox().disabled));
+noteBox().value = 'a thought with nowhere to go';
+noteBox().fire('input');
+advance(2000); settle();
+chk('typing into it queues nothing',
+  Q().length === 0, JSON.stringify(Q().map(o => o.type)));
+H.setOnline(true); advance(1000); settle();
+chk('and writes nothing to the calendar', A().length === 0, A().map(show).join(' | '));
+
+/* Running, it works — or the check above passes on a build where notes are
+   broken outright. */
+tap('DW'); settle();
+chk('once a block is running the box is live', noteBox().disabled === false,
+  String(noteBox().disabled));
+noteBox().value = 'memo'; noteBox().fire('input');
+advance(2000); settle();
+chk('and what is typed reaches the block',
+  A().length === 1 && parseTitle_(A()[0].t).text === 'memo', A()[0].t);
+
+/* And it closes again when the day ends. STOP leaves nothing running, so there
+   is no block for a note to belong to. */
+tapStop(); settle();
+chk('STOP disables it again', noteBox().disabled === true, String(noteBox().disabled));
+H.setOnline(false);
+noteBox().value = 'after hours'; noteBox().fire('input');
+advance(2000); settle();
+chk('and typing after the day ended queues nothing',
+  Q().length === 0, JSON.stringify(Q().map(o => o.type)));
+H.setOnline(true); advance(1000); settle();
+chk('nor retitles the block the day ended on',
+  A().length === 1 && parseTitle_(A()[0].t).text === 'memo', A().map(show).join(' | '));
+reset();
 
 console.log('\n72. no screen shows the record\'s vocabulary at the user');
 /* REVIEW-4's finding 1. faceOf() exists and is used correctly in the grid, the
