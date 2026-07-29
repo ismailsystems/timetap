@@ -4591,6 +4591,60 @@ $('undo').fire('click'); settle();
 chk('and one again after taking it back', segKinds().join(',') === 'DEEP WORK',
   segKinds().join(','));
 chk('which is the open one', segs()[0]._cls.has('open'), segs()[0].className);
+
+console.log('\n67e. overlapping blocks do not invent a hole in the record');
+/* REVIEW-4's finding 9. paintRail walked the day keeping one prevEnd and
+ * assuming blocks never overlap, so a block nested inside a longer one moved
+ * prevEnd BACKWARDS — and the next real block then looked like it started an
+ * hour after the day had got to, which the rail drew as time nobody logged.
+ *
+ * Overlaps are not exotic. A hand edit in Google Calendar makes one, and so
+ * does a second device. The rail's whole job is to show where the record has
+ * holes in it, so a hole it invents is the most expensive thing it can draw. */
+reset(); reboot();
+const at67e = h => new Date(2026, 6, 20, h, 0, 0, 0).getTime();
+const mk67e = (key, from, to) => H.CALS.actual.createEvent(
+  key + ':', new Date(from), new Date(to), { description: '#ref:' + key.toLowerCase() + '000000000000' });
+mk67e('DW',  at67e(9),  at67e(11));              // 9:00-11:00
+mk67e('MTG', at67e(9) + 30 * 60000, at67e(10));  // 9:30-10:00, nested inside it
+mk67e('ADM', at67e(11), at67e(11) + 30 * 60000); // 11:00-11:30, flush against DW's end
+H.setNow(at67e(11) + 30 * 60000);
+reboot();
+chk('all three blocks are on the rail', segKinds().length === 3, segKinds().join(','));
+chk('and not one hatched segment among them',
+  !segKinds().includes('gap'), segKinds().join(','));
+/* The check above passes on a rail that drew nothing at all, so say what it
+   did draw. */
+chk('in start order, keyed correctly',
+  segKinds().join(',') === 'DEEP WORK,MEETINGS,ADMIN', segKinds().join(','));
+reset();
+
+console.log('\n67d. a split leaves both halves on the rail, with no hole between them');
+/* REVIEW-4's finding 8. The rail learns about closed blocks from the server,
+ * which it asks once on load; railClosed is how the client tells it about a
+ * block it has only just closed itself. tapCategory and endDay call it and
+ * doSplit did not — so after a split the rail drew the first half as time
+ * NOBODY LOGGED until the next page load, which is the one thing this rail
+ * exists not to do. */
+reset(); reboot();
+tap('DW'); settle(); wait(120);
+tap('DW'); settle();                             // re-tap the running row: SPLIT
+$('spRange').value = '60'; $('spRange').fire('input');
+splitPick('MTG');
+chk('both halves are on the rail, in order, and nothing is hatched between them',
+  segKinds().join(',') === 'DEEP WORK,MEETINGS', segKinds().join(','));
+chk('and only the remainder is the open one',
+  !segs()[0]._cls.has('open') && segs()[1]._cls.has('open'),
+  segs().map(d => d.className).join(' | '));
+chk('the first half carries the duration it actually ran',
+  segs()[0].querySelector('.segDur').textContent === '1h00',
+  segs()[0].querySelector('.segDur').textContent);
+/* And the rail a reload builds from the calendar agrees with the one the
+   client drew, which is the whole claim railClosed is making. */
+const drawn67d = segKinds().join(',');
+reboot();
+chk('a reload draws the same rail', segKinds().join(',') === drawn67d,
+  segKinds().join(',') + ' vs ' + drawn67d);
 reset();
 
 console.log('\n────────────────────────────────────────');

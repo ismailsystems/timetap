@@ -1629,7 +1629,16 @@
       seg('seg' + (b.open ? ' open' : ''), Math.max((b.endMs - b.startMs) * px, 26),
           (cat ? faceOf(cat) : b.key).toUpperCase(), fmtEl(b.endMs - b.startMs),
           cat ? cat.hex : '#616161');
-      prevEnd = b.endMs;
+      /*
+       * How far the day has got to, not where the last block happened to end.
+       * Blocks CAN overlap — a hand edit in Google Calendar makes one, and so
+       * does a second device — and a block nested inside a longer one used to
+       * move this backwards. The next real block then looked like it started an
+       * hour after the day had reached, and the rail drew that as time nobody
+       * logged. A hole the rail invents is the most expensive thing it can
+       * draw. REVIEW-4's finding 9.
+       */
+      prevEnd = Math.max(prevEnd === null ? b.endMs : prevEnd, b.endMs);
     });
     // Nothing running: the gap at the end of the day grows while you watch.
     if (!S.open && prevEnd !== null && now - prevEnd > 5000) {
@@ -1725,6 +1734,11 @@
     var newRef = uid();
     enqueue({ type: 'splitActual', ref: S.open.ref, atMs: at, mark: m.mark,
               text: S.open.text || '', newRef: newRef, newKey: key, nowMs: now });
+    // The half this closes, told to the rail — the same thing a switch and a
+    // STOP do. Without it the rail drew the first half as time nobody logged
+    // until the next page load, which is the one thing the rail exists not to
+    // do. REVIEW-4's finding 8.
+    railClosed(S.open, at);
     S.open = { ref: newRef, key: key, text: '', startMs: at };
     S.lastTapMs = now;
     if (key === CFG.bodyKey) closeSit(now);
