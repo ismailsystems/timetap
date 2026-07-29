@@ -1494,6 +1494,28 @@ async function checkReach(browser, view, page, n) {
       return problems;
     }
 
+    /*
+     * FIXES-5 B2. At ten categories the list gives way to the pinned guardrails
+     * and scrolls, which is the right trade. A restored block in the last row
+     * used to leave the list at the top: nine unlit rows were visible and the
+     * one row that said what was running — and opened SPLIT on a re-tap — was
+     * below the box with no sign that the list continued.
+     */
+    const restored = await pg.evaluate(() => {
+      const row = document.querySelector('#grid .active');
+      const grid = document.getElementById('grid');
+      if (!row || !grid) return { key: null, visible: false };
+      const r = row.getBoundingClientRect(), g = grid.getBoundingClientRect();
+      return { key: row.dataset.key, visible: r.top >= g.top - 0.5 && r.bottom <= g.bottom + 0.5,
+               rowTop: +r.top.toFixed(1), rowBottom: +r.bottom.toFixed(1),
+               gridTop: +g.top.toFixed(1), gridBottom: +g.bottom.toFixed(1) };
+    });
+    if (!restored.visible) {
+      problems.push(label + ': the running ' + restored.key + ' row is at ' +
+                    restored.rowTop + '..' + restored.rowBottom + ' outside the visible list ' +
+                    restored.gridTop + '..' + restored.gridBottom + ' after load');
+    }
+
     // Switch, for real, to a category that is not the running one — which
     // raises both guardrails and puts the running one's name on the strip.
     const keys = await pg.locator('#grid [data-key]').evaluateAll(

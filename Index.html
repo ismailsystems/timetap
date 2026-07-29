@@ -1758,6 +1758,21 @@
   }
 
   /*
+   * The category list is the part that gives way when guardrails need room. At
+   * ten categories a restored block in the last row left the list at the top,
+   * showing nine unlit rows and hiding the one row that said what was running.
+   *
+   * Only on a restored state, not on every render: calling this from tick would
+   * drag the reader back once a second while they were trying to scroll.
+   */
+  function revealOpenRow() {
+    var cell = S.open && CELL[S.open.key];
+    if (cell && cell.box && typeof cell.box.scrollIntoView === 'function') {
+      cell.box.scrollIntoView({ block: 'nearest' });
+    }
+  }
+
+  /*
    * The day rail: today drawn to scale, from the first block to now.
    *
    * Segment heights are proportional to duration with a 26px floor, so a
@@ -2186,6 +2201,7 @@
         closeBlockSheets();
       }
       render();
+      revealOpenRow();
       saveState();
     }
   }
@@ -2198,6 +2214,7 @@
     }
     buildGrid();
     render();
+    revealOpenRow();
     if (deadCount()) showErr(deadMsg());
 
     if (!hasRun) { showErr('google.script.run unavailable'); return; }
