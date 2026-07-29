@@ -70,7 +70,7 @@ and **9** are closed by the documentation pass that produced this file.
 | # | Fix |
 |---|---|
 | D1 | **Closed by decision.** `1` is the last actionable second. At expiry the ribbon disappears; it does not show `0` beside an undo that is no longer available. The floor is stated beside `paintUndo` and section 66e pins both the source and the boundary. |
-| D2 | `validOp_` accepts the STOP undo's `newRef: null` only because `String(null)` is `"null"` — four alphanumeric characters that satisfy the ref regex. Tightening that regex would silently drop every STOP undo and report it applied. |
+| D2 | **Fixed.** `validOp_` now permits `null` explicitly as an absent optional reference, while requiring every present reference to already be a string. Section 66q pins both sides of that rule. |
 | D3 | `#postureRow` carries `cursor: pointer` and has no click listener. The design's *"Row tap toggles sitting"* is not implemented — safer than the alternative, but the cursor is a lie. |
 | D4 | `#spGridLab` renders `REMAINDER IS`; the handoff says `REMAINDER BECOMES`. The markup has it right and `setSplitScope` overwrites it. |
 | D5 | The note box is 354×38 — six pixels under the 44px floor, and the only control that is. |

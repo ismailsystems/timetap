@@ -805,7 +805,14 @@ function validOp_(op) {
   var refs = ['ref', 'newRef', 'killSitRef'];
   for (var j = 0; j < refs.length; j++) {
     var r = op[refs[j]];
-    if (r !== undefined && !/^[A-Za-z0-9]{4,64}$/.test(String(r))) return false;
+    /*
+     * STOP's undo has no successor and deliberately sends newRef: null. Null
+     * is absence, not a reference which happens to spell "null"; a present
+     * reference must already be a string before its characters are trusted.
+     * FIXES-5 D2.
+     */
+    if (r !== undefined && r !== null &&
+        (typeof r !== 'string' || !/^[A-Za-z0-9]{4,64}$/.test(r))) return false;
   }
   /*
    * A mark must be one the user can choose. '?' is the app's own: only

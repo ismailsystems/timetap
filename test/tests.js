@@ -4427,6 +4427,22 @@ chk('taking it back puts the day back',
   activeKey() === 'DW' && /#open/.test(A()[0].d), A().map(show).join(' | '));
 chk('from the same start time', A()[0].s === t66d, show(A()[0]));
 
+console.log('\n66q. a STOP undo names no successor, without weakening reference types');
+/*
+ * FIXES-5 D2. STOP opens no successor block, so its undo deliberately carries
+ * newRef: null. That absence is part of the schema; it must not survive merely
+ * because String(null) happens to look like a four-letter reference. A present
+ * reference, meanwhile, must already be a string rather than an object which
+ * can dress itself as one during coercion.
+ */
+chk('the STOP undo explicitly permits no successor reference',
+  validOp_({ id: 'stopundo66q', type: 'undoSwitch', newRef: null, atMs: H.nowMs() }));
+chk('a present reference must be a string before its characters are checked',
+  !validOp_({
+    id: 'false-ref66q', type: 'undoSwitch', atMs: H.nowMs(),
+    newRef: { toString: () => 'abcd' }
+  }));
+
 console.log('\n66e. the ribbon forgets, and forgetting is safe');
 /*
  * FIXES-5 D1, and the human's ruling. Zero is not an actionable second: at
