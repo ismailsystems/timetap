@@ -1,10 +1,40 @@
 # Factory State
 project: timetap
-stage: 7
-stage_name: Built, reviewed, fixed and verified — waiting on the human to accept and deploy
-last_updated: 2026-07-28 (round 2 complete)
-next_action: "THE HUMAN ACCEPTS AND DEPLOYS. The work is 25 commits on factory/honest-record; main is untouched at a256bdf and nothing has been pushed. Read factory/REVIEW-3.md, above all its 'Decisions for you' — all five are answered and the answers are in progress-2.md. Then merge, deploy, and CHECK YOUR OWN SPREADSHEET FORMULAS: D1 added a rollup key, which moved 13 of the 22 columns the daily tab had. SETUP.md says which, and shows a formula that survives the next change. Optional and offered, not done: the proof video (auto-loom-proof) and the plain-language explainer (factory-explain, which also owes GUIDE.md Part 2 a correction carried over from round 1)."
+stage: 6
+stage_name: The Day Rail redesign is built and reviewed — it does not ship yet
+last_updated: 2026-07-28 (redesign reviewed, FIX FIRST)
+next_action: "WORK THROUGH factory/FIXES-4.md, in a fresh session. Read factory/REVIEW-4.md first — it holds the reproductions. Three reviewers returned BROKEN, NOT DONE and MINOR DRIFT on the redesign; five faults block, and three of them break the redesign's own central claim that nothing is lost to one tap. Three decisions are open and are listed at the end of REVIEW-4; the STOP one should be settled before it is built. THE LIVE APP IS NOT AFFECTED: deployed version 30 is the pre-redesign build, and the redesign has never been pushed or deployed. The round-2 work below is complete and was accepted."
+old_next_action: "THE HUMAN ACCEPTS AND DEPLOYS. The work is 25 commits on factory/honest-record; main is untouched at a256bdf and nothing has been pushed. Read factory/REVIEW-3.md, above all its 'Decisions for you' — all five are answered and the answers are in progress-2.md. Then merge, deploy, and CHECK YOUR OWN SPREADSHEET FORMULAS: D1 added a rollup key, which moved 13 of the 22 columns the daily tab had. SETUP.md says which, and shows a formula that survives the next change. Optional and offered, not done: the proof video (auto-loom-proof) and the plain-language explainer (factory-explain, which also owes GUIDE.md Part 2 a correction carried over from round 1)."
 notes: |
+  THE DAY RAIL REDESIGN — built 2026-07-28, reviewed the same day, NOT SHIPPED.
+
+  Design 2a from ~/Downloads/design_handoff_dayrail_redesign/ (README plus an
+  interactive prototype; the prototype extracted and readable at
+  scratchpad/prototype-2a.html, section 2a from line 555). Two commits:
+  37bcf77 (the shell, the list, the NOW panel, the rail) and 4b26e0a (undo
+  replacing arm-and-confirm, plus one new server op, undoSwitch).
+
+  REVIEWED BY THREE INDEPENDENT REVIEWERS: BROKEN / NOT DONE / MINOR DRIFT.
+  factory/REVIEW-4.md has all of it; factory/FIXES-4.md is the work.
+
+  THE FIVE THAT BLOCK:
+    - undo does nothing while the write is still travelling, and says it worked.
+      This is round 2's addition 4 repeated: the guard exists in
+      mutatePendingOpen and was not written into the new dropOps.
+    - the undo ribbon leaves the screen at seven categories; at seven a tap
+      where it appears toggles sitting and writes a block.
+    - undo never puts back the sitting it closed.
+    - undo into BODY does not close an open SIT — the one coupling, broken on
+      the one path the handoff names explicitly.
+    - STOP still arms and confirms, which is the pattern the redesign exists to
+      remove, on the most destructive control.
+
+  THE LESSON WORTH CARRYING: 970 assertions were green throughout. Two of the
+  five blocking faults were covered by tests that were DELETED along with the
+  mechanism they tested — 52k (a lagged flush) and 50g (the coupling) — and no
+  successor was written. When a mechanism is replaced, its tests describe a
+  property that usually survives it. Read them before deleting them.
+
   ROUND 2 IS COMPLETE. 16 of 16 tasks, then a three-reviewer review, then a
   26-item fix pass, then an independent verification of that fix pass.
 

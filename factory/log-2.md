@@ -1298,3 +1298,46 @@ grid invisible.
 suite cannot reach: event bubbling and computed layout. The headless layer is
 where they belong, and it had no phase that used the app the way a person does —
 type a note, finish it, open a sheet, look at the grid. It has one now.
+
+## [2026-07-28 21:30] REDESIGN | Built, reviewed by three, and it does not ship
+
+Design 2a — "Day Rail" — implemented against the single-file, no-build,
+no-network constraint. Two commits: the shell, the ruled list, the NOW panel and
+the rail; then undo replacing arm-and-confirm, with one new server op.
+
+**Three independent reviewers, none given this log: BROKEN, NOT DONE, MINOR
+DRIFT.** `factory/REVIEW-4.md` is the record; `factory/FIXES-4.md` is the work.
+Five faults block. Three of them break the redesign's own central claim — that
+nothing is lost to one tap — and all three break it silently.
+
+**The one that matters most is a repeat of my own fix.** Round 2 found that
+rewriting a queue a flush has already handed to the server loses the write
+silently; it is written up as addition 4, and the guard sits in
+`mutatePendingOpen` with a comment naming the hazard. I read that entry, wrote
+that fix, and then wrote `dropOps` without the guard eight hours later. Undo now
+reports success and changes nothing on the calendar for every server round trip
+except an impossible zero.
+
+**Two of the five were covered by tests I deleted.** `52k` drove a lagged flush
+— the exact shape of the fault above. `50g` proved the Body-to-sitting coupling
+survives whatever replaces the tap. Both tested mechanisms that genuinely went
+away, so both were cut with them, and no successor was written. Their *subject*
+survived; only their *mechanism* did not.
+
+That is the lesson worth carrying out of this: **a test written against a
+mechanism usually describes a property that outlives it.** Before deleting one,
+work out which of the two it was really about. Section 66 claims "every
+assertion the arm/confirm sections used to make is now made here". That claim is
+false, and a reviewer found it in the diff rather than in the prose.
+
+**Also:** 970 assertions were green the whole time, in four timezones, twice.
+Green was not the same as done, and this is the clearest case of that the
+project has produced.
+
+What the reviewers confirm is right: all twelve tokens hex-exact, every weight
+and size and letter-spacing exact, zero radius, the font genuinely self-hosted
+with no network request, the rail's geometry exact to the prototype's own
+function, and undo correct in both clean cases. The drift is small in surface
+area. The faults are not small.
+
+Nothing is deployed. Version 30 on the phone is the pre-redesign build.
