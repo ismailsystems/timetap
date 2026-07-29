@@ -78,6 +78,7 @@ properties of the file.
 | the docs say how a PLAN event has to be titled, and show a real key | a plan written any other way counts toward nothing and the sheet cannot say why. The example key is checked against `CATEGORIES`, so the docs cannot drift into showing a key the app does not have |
 | every constant `SETUP.md` quotes has that value in `Code.gs` | C1 changed `MISTAP_SECONDS` from 90 to 20 and left the setup guide saying 90. Every documented constant is checked, and documenting one that `Code.gs` does not declare fails too |
 | every `.md` in the repo agrees with the manifest about scope counts | `README.md`'s manifest row disagreed with `appsscript.json` for long enough that a build contract quoted the wrong number as fact, and then two more docs quoted it from there |
+| `GUIDE.md` Part 2 does not present the shelf double-tap as live | Part 2 kept describing the round-1 drawer bug in the present tense after Part 3 had the shipped fix; five markers were not a repair. The rule fails if Part 2 again says the bug "is broken", that "the build isn't finished", or that a double-tap destroys a second entry |
 
 ## `node test/headless.js`
 

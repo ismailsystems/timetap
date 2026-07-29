@@ -565,5 +565,46 @@ console.log('         ' + (scopeDocs.length - Object.keys(SCOPE_QUOTE_EXEMPT).le
             ' of ' + scopeDocs.length + ' .md files checked; ' +
             Object.keys(SCOPE_QUOTE_EXEMPT).length + ' exempt as the record of the mistake');
 
+/*
+ * FIXES-5 F1. Part 2 of the guide described the round-1 shelf double-tap as if
+ * it were still live. Part 3 already corrected it, and five inline markers
+ * pointed there, but a reader who skipped the markers got the wrong story:
+ * "the one thing that is broken", "the build isn't finished", and a "what you
+ * can now say" sentence stating that a double-tap destroys a second entry as
+ * current fact. The markers were not a repair.
+ *
+ * The rule reads only the text between the Part 2 and Part 3 headings. The
+ * phrases are the exact present-tense claims that made the markers necessary;
+ * rewriting that stretch into the past tense (or moving a claim into Part 3)
+ * is what clears it. Putting any of them back turns the rule red again.
+ */
+const guidePath = path.join(ROOT, 'factory/GUIDE.md');
+const guideLive = [];
+if (!fs.existsSync(guidePath)) {
+  guideLive.push('factory/GUIDE.md is missing');
+} else {
+  const guideText = fs.readFileSync(guidePath, 'utf8');
+  const part2 = guideText.match(/# Part 2[\s\S]*?(?=\n# Part 3\b)/);
+  if (!part2) {
+    guideLive.push('factory/GUIDE.md has no Part 2 section before Part 3, so this ' +
+                   'rule would have passed while reading nothing');
+  } else {
+    const flat = part2[0].replace(/\s+/g, ' ');
+    const liveClaims = [
+      [/the one thing that is broken/i,
+       'heading still says the shelf bug "is broken"'],
+      [/the build isn't finished/i,
+       'still says "the build isn\'t finished" about a closed fault'],
+      [/a double-tap destroys a second/i,
+       '"what you can now say" still states the double-tap destroy as current fact']
+    ];
+    liveClaims.forEach(function (pair) {
+      if (pair[0].test(flat)) guideLive.push(pair[1]);
+    });
+  }
+}
+check('GUIDE.md Part 2 does not present the shelf double-tap as live', guideLive,
+  'Part 2 is the record of what was wrong that day; Part 3 is where the shipped fix lives');
+
 console.log(fails ? '\n' + fails + ' failed\n' : '\nall clear\n');
 process.exit(fails ? 1 : 0);

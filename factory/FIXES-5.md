@@ -93,7 +93,7 @@ they were not counted against it — but they are live.
 
 | # | Fix |
 |---|---|
-| F1 | `factory/GUIDE.md` Part 2 describes the round-1 double-tap bug as live; Part 3 corrects it. The explain stage has owed that a proper repair since round 1. |
+| F1 | **Fixed.** `factory/GUIDE.md` Part 2 now tells the round-1 shelf double-tap in the past tense; Part 3 keeps the shipped arm-then-act repair. The lint rule fails if Part 2 again claims the bug is live. |
 | F2 | `test/smoke.js` gained eight checks across the Day Rail rounds and has never been pasted into a phone console since. Two of the three bug classes it exists for only ever appeared on the handset. |
 
 ---

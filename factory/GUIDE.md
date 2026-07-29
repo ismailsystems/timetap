@@ -293,16 +293,15 @@ than a code, and a letter written by an older version of the app — one with no
 address book entry — renders as *"unknown category"* instead of a blank line or a
 crash.
 
-### The one thing that is broken, in plain words
+### The one thing that was broken, in plain words
 
-> **⚠ Fixed since this was written — see Part 3.** This section describes the bug as
-> it stood on 2026-07-27, before the fix pass. It is kept because it is the clearest
-> account of what was wrong, and because the fix only makes sense if you know what it
-> was fixing. The letter-destroying double tap is gone and verified gone. **The fix
-> proposed at the end of this section is not the fix that shipped, and would not have
-> been enough on its own** — Part 3 explains why.
+This is what the shelf did on 2026-07-27, before the fix passes. The account stays
+because it is the clearest picture of what was wrong, and because the repair only
+makes sense if you know what it was repairing. **What shipped is in Part 3** — and
+it is not the fix this section first proposed.
 
-The review found a real bug and it is the reason the build isn't finished.
+The review found a real bug, and that day it was the reason the build was not
+finished.
 
 ```mermaid
 flowchart LR
@@ -312,36 +311,36 @@ flowchart LR
     D --> E["A second tap<br/>throws away a DIFFERENT letter"]
 ```
 
-That's it. That's the whole bug. Tap DISCARD twice quickly — the way anyone taps a
-button on a phone — and you destroy two letters instead of one, and the second one
-is a letter you never looked at. There's no undo, and the shelf is the *only*
-record that letter ever existed.
+That was the whole bug. Tapping DISCARD twice quickly — the way anyone taps a
+button on a phone — destroyed two letters instead of one, and the second one was a
+letter you never looked at. There was no undo, and the shelf was the *only* record
+that letter ever existed.
 
-**Why the tests said this was fine.** There is a test named "discard invoked twice
-on the same row is a no-op", and it passes. Here's the gap. Most of the tests run
+**Why the tests said this was fine.** There was a test named "discard invoked twice
+on the same row is a no-op", and it passed. Here's the gap. Most of the tests run
 in a pretend browser — fast, no windows, good enough for logic. In the pretend
 browser, "tap the same button twice" means literally the same button object, and
 the app *does* correctly refuse the second tap: each card carries a little
 fingerprint, and once a card is gone its fingerprint matches nothing. That guard is
 real and it works.
 
-But in a **real** browser the whole list is thrown away and redrawn after a
-discard. The button you tap the second time isn't the same button — it's the next
-card's button, sitting in the same place on the glass, carrying a *valid*
-fingerprint. So the app does exactly what it was asked: it discards that card.
+But in a **real** browser the whole list was thrown away and redrawn after a
+discard. The button you tapped the second time wasn't the same button — it was the
+next card's button, sitting in the same place on the glass, carrying a *valid*
+fingerprint. So the app did exactly what it was asked: it discarded that card.
 
 The pretend browser cannot express "a different control moved under your finger."
-That's a category of bug it is structurally blind to — and it is precisely the
-category the new inspector was hired to catch, except the inspector only runs the
-old shopfront checklist, which has nothing about the shelf on it.
+That is a category of bug it is structurally blind to — and it is precisely the
+category the new inspector was hired to catch, except the inspector only ran the
+old shopfront checklist, which had nothing about the shelf on it.
 
-The fix is small: when a card is discarded, remove just that one card instead of
-redrawing the list. Then nothing moves under your finger.
+The fix we proposed that day was small: when a card is discarded, remove just that
+one card instead of redrawing the list. Then nothing moves under your finger.
 
-> **⚠ That last paragraph is wrong, and finding out why was the useful part.**
-> Removing just the one card *does* stop the list being rebuilt — but the cards below
-> it still slide up into the gap, by exactly the same distance. Nothing about "remove
-> one card" holds the layout still. See Part 3.
+That last paragraph was wrong, and finding out why was the useful part. Removing
+just the one card *does* stop the list being rebuilt — but the cards below it still
+slide up into the gap, by exactly the same distance. Nothing about "remove one card"
+holds the layout still. Part 3 is where the fix that actually shipped lives.
 
 ### The inspector's honest limits
 
@@ -381,12 +380,12 @@ plainly why.
 
 **1. A passing test is not the same as a working feature.** This round produced the
 cleanest possible demonstration: 459 checks, green under four different world
-clocks, three runs in a row — and a feature that throws away your data on a
-double-tap. *(459 was the count that day; it is 492 now, and the double-tap is
-fixed — Part 3. The lesson is the point, and the lesson stands.)* The test wasn't
-fake or lazy. It tested the right idea in an
-environment where that idea can't go wrong. Whenever a test runs somewhere simpler
-than reality, ask what reality does that the simpler place can't.
+clocks, three runs in a row — and a feature that threw away your data on a
+double-tap. *(459 was the count that day; it is 492 now, and Part 3 holds the
+repair. The lesson is the point, and the lesson stands.)* The test wasn't fake or
+lazy. It tested the right idea in an environment where that idea can't go wrong.
+Whenever a test runs somewhere simpler than reality, ask what reality does that
+the simpler place can't.
 
 **2. "Recorded the failure" and "hid the failure" look identical from outside.** The
 van writes its note and then crashes anyway. That deliberate second step is what
@@ -394,7 +393,8 @@ keeps Google's own run history honest. A version that recorded the problem and t
 returned quietly would look better and tell you less — the exact bargain this
 codebase's rule ("automate capture, never automate judgment") exists to refuse.
 
-**3. One rollup problem is still open, and it's a judgment call, not a bug hunt.**
+**3. One rollup problem was still open that day, and it was a judgment call, not a
+bug hunt.**
 *(You ruled on it on 2026-07-27 — you took the per-tab reading, and added a
 condition the build hadn't thought of. Part 3.)*
 The van rebuilds two tabs, daily then weekly. If the second one fails halfway, the
@@ -407,13 +407,13 @@ allowed to make. Not because its answer is wrong; because it's yours to give.
 
 ### What you can now say
 
-*(Sentence 1 was true on 2026-07-27 and is not true any more. Part 3 gives you the
-replacement.)*
+*(Sentence 1 below is what was true on 2026-07-27. Part 3 replaces it with what
+shipped — arm, then act — and with the check that pins it.)*
 
-1. "The drawer identifies each set-aside write by a fingerprint rather than its
-   position, which correctly blocks re-discarding a stale entry — but the list
-   re-renders on discard, so in a real browser the next row's button lands under
-   the finger and a double-tap destroys a second, different entry."
+1. "The drawer identified each set-aside write by a fingerprint rather than its
+   position, which correctly blocked re-discarding a stale entry — but the list
+   re-rendered on discard, so in a real browser the next row's button landed under
+   the finger and a fast second tap threw away a second, different entry."
 2. "The rollup records its outcome in a script property rather than in the
    spreadsheet, because the likeliest failure is the spreadsheet being unopenable,
    and it keeps the last success separately from the last failure so a breakdown
@@ -591,8 +591,11 @@ flowchart TD
   It now says plainly *"skipped: no reference grid for Asia/Kolkata"* and carries on
   — and a skip is never counted as a pass, so a run that couldn't check everything
   looks different from one that did.
-- **A settled question still read as an open one.** This guide's own Part 2 was part
-  of that problem, which is why you're reading Part 3.
+- **A settled question still read as an open one.** This guide's own Part 2 did
+  that for the shelf bug — it kept describing the fault in the present tense after
+  the fix had shipped. Part 3 was written because of it; a later pass put Part 2
+  into the past tense so a reader who never opens this section still gets a true
+  story.
 
 ### The parts most likely to confuse you
 
