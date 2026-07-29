@@ -5419,11 +5419,20 @@ H.setNow(D(2026, 7, 21, 0, 40));
 settle();
 chk('after midnight only what is running is on the rail',
   segKinds().join(',') === 'MEETINGS', segKinds().join(','));
-chk('and it is drawn from midnight, not from yesterday morning',
-  $('railStart').textContent === '12:00 AM', $('railStart').textContent);
+/*
+ * FIXES-5 D6. The NOW clock is the whole open block; the rail is today's part.
+ * Both numbers are right after midnight, but the screen has to name why they
+ * differ rather than leave the reader to infer it from two clocks.
+ */
+chk('and the rail names its midnight start as today',
+  $('railStart').textContent === 'TODAY · 12:00 AM', $('railStart').textContent);
 chk('showing the part of it that happened today',
   segs()[0].querySelector('.segDur').textContent === '40m',
   segs()[0].querySelector('.segDur').textContent);
+chk('while NOW says its longer clock runs from the original start',
+  $('nowKick').textContent === 'NOW · SINCE 10:00 AM' &&
+  /^14h(39|40)$/.test($('nowEl').textContent),
+  $('nowKick').textContent + ' / ' + $('nowEl').textContent);
 reset();
 
 console.log('\n67e. overlapping blocks do not invent a hole in the record');

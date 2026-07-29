@@ -1886,7 +1886,12 @@
     var dayStart = dayStartMs(now);
     var first = Math.max(all[0].startMs, dayStart);
     var span = Math.max(now - first, 60000);
-    $('railStart').textContent = clock(first);
+    /*
+     * The NOW timer is the whole open block; this rail is only today's part.
+     * Across midnight those honest numbers differ, so the rail names its scope
+     * instead of leaving two clocks to explain each other. FIXES-5 D6.
+     */
+    $('railStart').textContent = 'TODAY · ' + clock(first);
 
     /*
      * Describe the day first, then decide how tall each piece may be.

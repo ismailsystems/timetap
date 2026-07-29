@@ -74,7 +74,7 @@ and **9** are closed by the documentation pass that produced this file.
 | D3 | **Fixed.** `#postureRow` no longer carries a pointer cursor. It is a box around three separate controls, not a fourth control; the real buttons keep their own pointer cursors. The real-browser posture criterion pins the row's computed cursor. |
 | D4 | **Fixed.** `setSplitScope` now keeps the markup's action phrase, `REMAINDER BECOMES`. Section 52 pins it on first open, after returning from whole-block mode, and after reopening the sheet. |
 | D5 | **Fixed.** The note input now has a 44px minimum height, like the other touch controls. The shared browser smoke criterion measures its rendered box in both viewports. |
-| D6 | Past midnight the same block reads `2h30` in the NOW panel and `1h30` on the rail. Both are correct; nothing explains the pair. |
+| D6 | **Fixed.** The rail start now says `TODAY · …`, while the NOW panel continues to say `SINCE …`. Section 67h pins the shorter today-only rail beside the longer full-block timer across midnight. |
 | D7 | The undo ribbon moves 38px up when the error banner is present, so where UNDO appears depends on whether writes are set aside. |
 | D8 | Focus drops to `BODY` when the ribbon expires under it. One Tab recovers. |
 | D9 | The Add row is clipped out of the scrolling grid while the mark strip is up, and returns when the strip dismisses. |
