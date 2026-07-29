@@ -1680,6 +1680,33 @@ async function checkRail(browser, view, page, blocks) {
   try {
     await pg.route(RAIL_ORIGIN, r =>
       r.fulfill({ status: 200, contentType: 'text/html; charset=utf-8', body: documentFor(page, true) }));
+    /*
+     * The page's clock is pinned to nine in the evening, local, before anything
+     * loads.
+     *
+     * The fixture lays `blocks` fifteen-minute slots BACKWARDS from now, so forty
+     * of them reach ten and a quarter hours into the past. railBlocks correctly
+     * drops every block that ended before local midnight — that is F4's midnight
+     * fix — so before about 10:15 in the morning most of the fixture fell on
+     * yesterday and vanished. The phase then could not assemble the screen it
+     * exists to measure, said so through the guard below, and the run exited
+     * non-zero: red for the first ten hours of every local day and green for the
+     * rest, with deploy.sh refusing to deploy in the mornings and D2 unverified
+     * exactly when it was. REVIEW-5's C2.
+     *
+     * Pinning the clock rather than compressing the day keeps the premise real —
+     * a forty-block day is ten hours long, which is what the criterion means —
+     * and makes the numbers identical at every hour, so a failure reproduces at
+     * the time of day it is convenient to look at it.
+     *
+     * setFixedTime, not install(): it moves Date.now() and leaves setTimeout and
+     * setInterval on the real clock, so tick() still fires and the stub's
+     * getState reply still arrives. A frozen clock stops the open segment growing
+     * live, which this phase does not measure.
+     */
+    const pinned = new Date();
+    pinned.setHours(21, 0, 0, 0);
+    await pg.clock.setFixedTime(pinned);
     /* A server that answers getState with a day of `blocks` closed blocks and
        one open. The rail draws from what the server reports, so this is the
        only honest way to put a long day on the screen — a localStorage seed
@@ -1744,9 +1771,19 @@ async function checkRail(browser, view, page, blocks) {
                 (g.last ? g.last.bottom : '?') + 'px of ' + g.vh +
                 ', NOW ▲ at ' + g.railNow.bottom + 'px, ' + g.rowsOnScreen + ' category rows visible');
 
-    if (g.count < blocks) {
+    /*
+     * `blocks` closed, plus the open one, and the slots are contiguous so there
+     * are no gap segments: the honest count is blocks + 1.
+     *
+     * It read `< blocks`, which is one short, so a rail missing a segment passed
+     * this guard and went on to be measured as though it were the day it names.
+     * At twenty blocks it drew twenty and the guard stayed quiet. REVIEW-5,
+     * cosmetic.
+     */
+    if (g.count < blocks + 1) {
       problems.push(label + ': the rail drew ' + g.count + ' segments for a day of ' + blocks +
-                    ' blocks, so this was never the screen the check below is about');
+                    ' blocks plus the open one, so this was never the screen the check below ' +
+                    'is about');
       return problems;
     }
     if (g.last && g.last.bottom > g.vh + 0.5) {
