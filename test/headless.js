@@ -1620,6 +1620,34 @@ async function checkReach(browser, view, page, n) {
       problems.push(label + ': the undo ribbon is ' + g.undo.h + 'px tall, under the ' +
                     TOUCH_TARGET + 'px floor every other control here keeps');
     }
+    /* D3. A dead zone under the ribbon.
+     *
+     * The ribbon's bottom edge sat at 758 and the sitting toggle's top edge at
+     * 760, so a thumb reaching for UNDO and landing two pixels low toggled
+     * posture instead. Posture has no undo of its own, so that stray tap splits
+     * an hour of sitting into two blocks with a permanent seam — and the ribbon
+     * the user was reaching for is the thing that would have taken it back.
+     * The ribbon is also the only control that appears UNDER a thumb already in
+     * motion, which is what makes this different from any other near-miss. */
+    const under = await pg.evaluate(() => {
+      const el = document.getElementById('undo');
+      const r = el.getBoundingClientRect();
+      const probe = y => {
+        const at = document.elementFromPoint(r.left + r.width / 2, y);
+        const own = at && at.closest('button, a, [role="button"]');
+        return { y: Math.round(y), hit: own ? (own.id || own.tagName) : (at ? at.id || at.tagName : null) };
+      };
+      return { bottom: Math.round(r.bottom), at4: probe(r.bottom + 4), at2: probe(r.bottom + 2) };
+    });
+    console.log('    4px under the ribbon (' + under.bottom + 'px): ' + under.at4.hit);
+    [under.at2, under.at4].forEach(p => {
+      if (p.hit === 'postureBtn' || p.hit === 'postureRow') {
+        problems.push(label + ': a tap ' + (p.y - under.bottom) + 'px below the undo ribbon ' +
+                      'lands on ' + p.hit + ' — it toggles sitting, which has no undo of ' +
+                      'its own and leaves a permanent seam in the day');
+      }
+    });
+
     if (g.undo.hit !== 'undo') {
       problems.push(label + ': a tap at the undo ribbon\'s centre lands on ' + g.undo.hit +
                     ' rather than the ribbon' +
@@ -1687,6 +1715,146 @@ async function checkReach(browser, view, page, n) {
   return problems;
 }
 
+/* ═══════════════════════════════════════════════════════════════════
+ * D2: the rail fits its box, whatever kind of day it was
+ *
+ * REVIEW-4's finding 14. RAIL_PX was a constant 340 against a box that is
+ * about 517px on a phone, with a 26px floor per segment and no total budget.
+ * Twenty blocks overflowed it. Forty put the last segment at y=1310 on an
+ * 844px display — off the bottom, with NOW ▲ below that and the category
+ * column scrolled off the side, so the screen lost the controls in order to
+ * draw a picture that did not fit either.
+ *
+ * Forty blocks is a normal day for someone who switches often, which is who
+ * this app is for.
+ * ═══════════════════════════════════════════════════════════════════ */
+const RAIL_ORIGIN = 'http://timetap-rail.invalid/';
+
+async function checkRail(browser, view, page, blocks) {
+  const problems = [];
+  const label = view.name + ' ' + view.width + 'px, ' + blocks + ' blocks';
+  const ctx = await browser.newContext({
+    viewport: { width: view.width, height: view.height },
+    isMobile: !!view.isMobile, hasTouch: !!view.isMobile,
+    deviceScaleFactor: view.isMobile ? 3 : 1
+  });
+  const pg = await ctx.newPage();
+  const errors = [];
+  pg.on('pageerror', e => errors.push(String((e && e.message) || e)));
+  try {
+    await pg.route(RAIL_ORIGIN, r =>
+      r.fulfill({ status: 200, contentType: 'text/html; charset=utf-8', body: documentFor(page, true) }));
+    /* A server that answers getState with a day of `blocks` closed blocks and
+       one open. The rail draws from what the server reports, so this is the
+       only honest way to put a long day on the screen — a localStorage seed
+       would not reach it, since S.today is deliberately not persisted. */
+    await pg.addInitScript(n => {
+      const now = Date.now();
+      const KEYS = ['DW', 'MTG', 'ADM', 'BODY', 'REL', 'FRAG'];
+      const today = [];
+      for (let i = 0; i < n; i++) {
+        today.push({ key: KEYS[i % KEYS.length],
+                     startMs: now - (n - i + 1) * 15 * 60000,
+                     endMs:   now - (n - i) * 15 * 60000 });
+      }
+      const state = { nowMs: now, tz: 'local', notes: [], today: today, sit: null,
+                      open: { ref: 'aaaabbbbccccdddd', key: 'DW', text: '',
+                              startMs: now - 15 * 60000 } };
+      const mk = () => {
+        const b = {
+          withSuccessHandler: f => { b._ok = f; return b; },
+          withFailureHandler: () => b,
+          applyOps: () => {},
+          getState: () => { setTimeout(() => b._ok && b._ok(state), 5); },
+          addCategory: () => {}
+        };
+        return b;
+      };
+      window.google = { script: { run: new Proxy({}, { get: (_, k) => (...a) => mk()[k](...a) }) } };
+    }, blocks);
+    await pg.goto(RAIL_ORIGIN, { waitUntil: 'load' });
+    await pg.waitForTimeout(200);
+
+    const g = await pg.evaluate(() => {
+      const vh = window.innerHeight, vw = window.innerWidth;
+      const box = el => { const r = el.getBoundingClientRect();
+                          return { top: +r.top.toFixed(1), bottom: +r.bottom.toFixed(1),
+                                   left: +r.left.toFixed(1), right: +r.right.toFixed(1),
+                                   w: +r.width.toFixed(1), h: +r.height.toFixed(1) }; };
+      const segs = [].slice.call(document.querySelectorAll('#railSegs .seg'));
+      const grid = document.getElementById('grid');
+      const rows = [].slice.call(grid.querySelectorAll('[data-key]'));
+      return {
+        vh, vw,
+        count: segs.length,
+        last: segs.length ? box(segs[segs.length - 1]) : null,
+        railNow: box(document.getElementById('railNow')),
+        railSegs: box(document.getElementById('railSegs')),
+        rail: box(document.getElementById('rail')),
+        scroll: box(document.getElementById('scroll')),
+        grid: box(grid),
+        rowsOnScreen: rows.filter(r => { const b = r.getBoundingClientRect();
+                                         return b.top < vh && b.bottom > 0 && b.width > 0; }).length,
+        docScrollsY: document.documentElement.scrollHeight > vh + 1,
+        docScrollsX: document.documentElement.scrollWidth > vw + 1,
+        undoHit: (() => {
+          const u = document.getElementById('undo');
+          return u ? getComputedStyle(u).display : 'none';
+        })()
+      };
+    });
+
+    console.log('  ' + blocks + ' blocks: rail drew ' + g.count + ' segments, last ends at ' +
+                (g.last ? g.last.bottom : '?') + 'px of ' + g.vh +
+                ', NOW ▲ at ' + g.railNow.bottom + 'px, ' + g.rowsOnScreen + ' category rows visible');
+
+    if (g.count < blocks) {
+      problems.push(label + ': the rail drew ' + g.count + ' segments for a day of ' + blocks +
+                    ' blocks, so this was never the screen the check below is about');
+      return problems;
+    }
+    if (g.last && g.last.bottom > g.vh + 0.5) {
+      problems.push(label + ': the rail\'s last segment ends at ' + g.last.bottom +
+                    'px on a ' + g.vh + 'px screen — it is off the bottom');
+    }
+    if (g.railNow.bottom > g.vh + 0.5 || g.railNow.top < 0) {
+      problems.push(label + ': NOW ▲ is off the screen (top ' + g.railNow.top +
+                    ', bottom ' + g.railNow.bottom + ' of ' + g.vh + ')');
+    }
+    /* Inside the column it labels, not merely inside the window.
+     *
+     * #rail's own box is stretched by its parent and stays put however much is
+     * drawn inside it, so comparing it to anything above it can never fail.
+     * What actually moves is #railSegs, which has no min-height:0 and therefore
+     * grows past its flex allocation — pushing NOW ▲ out of the bottom of the
+     * column. That is the comparison with a wrong answer available, and it
+     * fails one length of day earlier than the viewport check does. */
+    if (g.railNow.bottom > g.rail.bottom + 0.5) {
+      problems.push(label + ': NOW ▲ ends at ' + g.railNow.bottom +
+                    ' and the rail column it labels ends at ' + g.rail.bottom +
+                    ' — the segments have pushed it out of their own column, ' +
+                    'whatever the window happens to fit');
+    }
+    if (g.docScrollsY) {
+      problems.push(label + ': the page scrolls vertically — the app is taller than the screen');
+    }
+    if (g.docScrollsX) {
+      problems.push(label + ': the page scrolls horizontally');
+    }
+    if (g.grid.w < 100 || g.grid.right > g.vw + 0.5) {
+      problems.push(label + ': the category column is ' + g.grid.w + 'px wide ending at ' +
+                    g.grid.right + ' of ' + g.vw + ' — it has been pushed off the display');
+    }
+    if (g.rowsOnScreen < 1) {
+      problems.push(label + ': no category row is on screen, so the day cannot be logged at all');
+    }
+    if (errors.length) problems.push(label + ': page errors — ' + errors.join(' | '));
+  } finally {
+    await ctx.close();
+  }
+  return problems;
+}
+
 async function main() {
   const { chromium } = loadPlaywright();
   const page = served();
@@ -1734,6 +1902,12 @@ async function main() {
     console.log('\nreach of the guardrails (phone 390px)');
     for (const n of [6, 7, 8, 10]) {
       problems = problems.concat(await checkReach(browser, VIEWS[0], page, n));
+    }
+    /* D2: the rail at three lengths of day. 6 is an ordinary one, 20 is where
+       the old constant first overflowed, 40 is the criterion. */
+    console.log('\nthe rail\'s box (phone 390px)');
+    for (const n of [6, 20, 40]) {
+      problems = problems.concat(await checkRail(browser, VIEWS[0], page, n));
     }
   } finally {
     await browser.close();

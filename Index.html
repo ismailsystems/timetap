@@ -207,8 +207,26 @@
     display: flex; justify-content: space-between; align-items: center; gap: 8px;
     background: var(--accent); color: #fff; padding: 14px; cursor: pointer;
     font: 800 11px var(--font); letter-spacing: .1em;
+    /*
+     * A dead zone under it, and only while it is showing — .hidden is
+     * display:none, so this margin exists exactly when the ribbon does.
+     *
+     * Its bottom edge sat at 758 and the sitting toggle's top edge at 760, so a
+     * thumb reaching for UNDO and landing two pixels low toggled posture
+     * instead. Posture has no undo of its own, so that stray tap splits an hour
+     * of sitting into two blocks with a permanent seam — and the ribbon the
+     * thumb was reaching for is the very thing that would have taken it back.
+     * The ribbon is also the only control that appears UNDER a thumb already in
+     * motion, which is what makes this different from any other near-miss.
+     * REVIEW-4's finding 16.
+     */
+    margin-bottom: 12px;
   }
   #undoChip { border: 2px solid #fff; padding: 6px 8px; flex: none; }
+  /* Announced, never drawn. Not display:none — a hidden live region is not read
+     at all, which is the whole failure this element exists to fix. */
+  .sr { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0;
+        overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
 
   /* ── the error banner ────────────────────────────────────────── */
   #err {
@@ -357,14 +375,30 @@
               <button data-mark="-">−</button>
             </div>
           </div>
-          <div id="undo" class="hidden">
+          <!-- A div rather than a button, for the same reason the category
+               rows are: it holds two spans and the parser keeps them. Role,
+               tabindex and the key handler are given by hand. -->
+          <div id="undo" class="hidden" role="button" tabindex="0">
             <span id="undoLabel"></span>
-            <span id="undoChip" class="tnum">UNDO · 5</span>
+            <!-- The countdown is decoration for a screen reader: it changes
+                 four times a second and says nothing the label does not. -->
+            <span id="undoChip" class="tnum" aria-hidden="true">UNDO · 5</span>
           </div>
         </div>
       </div>
     </div>
   </div>
+
+  <!--
+    What a screen reader is told when the ribbon appears.
+
+    A live region has to be in the accessibility tree BEFORE its content
+    changes, and the ribbon is display:none until a switch — so announcing from
+    inside it is unreliable in exactly the case that matters. This stays in the
+    document always, holds nothing at rest, and is written once when the ribbon
+    arms rather than on every tick of the countdown.
+  -->
+  <div id="undoSay" class="sr" aria-live="polite" aria-atomic="true"></div>
 
   <div id="err" class="hidden"></div>
 
@@ -1203,6 +1237,13 @@
     u.tick = setInterval(paintUndo, 250);
     undo = u;
     paintUndo();
+    /*
+     * Said once, when the offer appears. Not on every tick: the countdown
+     * changes four times a second and a polite region that busy is one a
+     * screen reader user turns off.
+     */
+    $('undoSay').textContent = u.label + ' — undo available for ' +
+                               CFG.undoSeconds + ' seconds';
   }
 
   function clearUndo() {
@@ -1210,6 +1251,9 @@
     if (undo && undo.tick) clearInterval(undo.tick);
     undo = null;
     $('undo').classList.add('hidden');
+    // The offer has gone, so the announcement of it goes too. Leaving it would
+    // have a screen reader describe a guardrail that is no longer there.
+    $('undoSay').textContent = '';
   }
 
   function paintUndo() {
@@ -1217,6 +1261,10 @@
     var left = Math.max(1, Math.ceil((undo.until - Date.now()) / 1000));
     $('undo').classList.remove('hidden');
     $('undoLabel').textContent = undo.label;
+    // The name says what the button does, not merely what happened. The chip is
+    // aria-hidden, so without this the button would be called "SWITCHED TO
+    // MEETINGS" — a statement, with no hint that pressing it takes it back.
+    $('undo').setAttribute('aria-label', 'undo: ' + undo.label);
     $('undoChip').textContent = 'UNDO · ' + left;
   }
 
@@ -1522,6 +1570,21 @@
       });
       g.appendChild(b);
     });
+    /*
+     * The Add row goes LAST, at the end of the list, nearest the thumb.
+     *
+     * Round 1 ruled the opposite and put it furthest from the thumb, on the
+     * grounds that the rarest action should not get the best reach; layoutCells
+     * existed to keep it there. The redesign's list puts it at the end, the
+     * handoff calls the layout final, and the human ruled: follow the design.
+     * So the rule round 1 wrote into a function is now carried by the design.
+     *
+     * A rule nothing enforces is a rule that drifts — which is exactly what
+     * happened to layoutCells, whose comment went on describing a position it
+     * had stopped enforcing the moment nothing called it. Section 27d pins this
+     * one instead, including after a category is added at runtime.
+     * REVIEW-4's finding 15.
+     */
     if (CATS.length < CFG.maxCategories) g.appendChild(buildAddCell());
 
   }
@@ -1701,7 +1764,26 @@
    * rather than an absence, which is the whole reason the rail is here. The
    * open block carries an inset outline and grows on every tick.
    */
-  var RAIL_PX = 340, GAP_MS = 90000;
+  var RAIL_PX = 340, RAIL_MIN = 26, GAP_MIN = 20, GAP_MS = 90000;
+
+  /**
+   * How tall the rail may draw. Measured, not assumed.
+   *
+   * RAIL_PX was a constant against a box that is about 517px on a phone and a
+   * different size on every other screen — and with a 26px floor per segment
+   * and no total budget, 20 blocks overflowed it and 40 put the last segment at
+   * y=1310 on an 844px display: off the bottom, with NOW ▲ below that and the
+   * category column scrolled off the side. A day with 40 blocks in it is a
+   * normal day for someone who switches often, which is who this app is for.
+   *
+   * The fallback matters: the node shim has no layout, so clientHeight is not a
+   * number there and the old constant is what those tests keep measuring
+   * against. The height question is a browser question and headless asks it.
+   */
+  function railBudget() {
+    var h = $('railSegs').clientHeight;
+    return (typeof h === 'number' && h > 40) ? h : RAIL_PX;
+  }
 
   /*
    * The rail learns about closed blocks from the server, which it asks once on
@@ -1736,28 +1818,28 @@
     host.innerHTML = '';
     if (!all.length) { $('railStart').textContent = ''; return; }
     var first = all[0].startMs;
-    var span = Math.max(now - first, 60000), px = RAIL_PX / span;
+    var span = Math.max(now - first, 60000);
     $('railStart').textContent = clock(first);
 
-    var prevEnd = null;
-    function seg(cls, h, name, dur, hex) {
-      var d = document.createElement('div');
-      d.className = cls;
-      d.style.height = h.toFixed(1) + 'px';
-      if (hex) d.style.background = hex;
-      d.innerHTML = '<span class="segName"></span><span class="segDur tnum"></span>';
-      d.querySelector('.segName').textContent = name;
-      d.querySelector('.segDur').textContent = dur;
-      host.appendChild(d);
+    /*
+     * Describe the day first, then decide how tall each piece may be.
+     *
+     * Heights cannot honestly be chosen one at a time: whether a 26px floor is
+     * affordable is a fact about how many pieces there are, and the old code
+     * decided per segment and discovered the total afterwards — by which point
+     * the rail was already off the screen.
+     */
+    var items = [], prevEnd = null;
+    function want(cls, ms, name, hex, floor) {
+      items.push({ cls: cls, ms: ms, name: name, hex: hex, floor: floor });
     }
     all.forEach(function (b) {
       if (prevEnd !== null && b.startMs - prevEnd > GAP_MS) {
-        seg('seg gap', Math.max((b.startMs - prevEnd) * px, 20), '', fmtEl(b.startMs - prevEnd));
+        want('seg gap', b.startMs - prevEnd, '', null, GAP_MIN);
       }
       var cat = catByKey[b.key];
-      seg('seg' + (b.open ? ' open' : ''), Math.max((b.endMs - b.startMs) * px, 26),
-          (cat ? faceOf(cat) : b.key).toUpperCase(), fmtEl(b.endMs - b.startMs),
-          cat ? cat.hex : '#616161');
+      want('seg' + (b.open ? ' open' : ''), b.endMs - b.startMs,
+           (cat ? faceOf(cat) : b.key).toUpperCase(), cat ? cat.hex : '#616161', RAIL_MIN);
       /*
        * How far the day has got to, not where the last block happened to end.
        * Blocks CAN overlap — a hand edit in Google Calendar makes one, and so
@@ -1771,8 +1853,34 @@
     });
     // Nothing running: the gap at the end of the day grows while you watch.
     if (!S.open && prevEnd !== null && now - prevEnd > 5000) {
-      seg('seg gap', Math.max((now - prevEnd) * px, 20), '', fmtEl(now - prevEnd));
+      want('seg gap', now - prevEnd, '', null, GAP_MIN);
     }
+
+    var budget = railBudget(), px = budget / span;
+    // The floor is what keeps a two-minute block visible, and it is only
+    // affordable while there is room for it. Past that, an equal share is the
+    // most any segment can be promised.
+    var share = budget / Math.max(1, items.length);
+    items.forEach(function (i) { i.h = Math.max(i.ms * px, Math.min(i.floor, share)); });
+    // Floors and proportions can still add up to more than the box. Scaling the
+    // lot keeps every segment's height in the same ratio to every other, which
+    // is the one property a rail drawn to scale has to keep.
+    var total = items.reduce(function (t, i) { return t + i.h; }, 0);
+    if (total > budget) {
+      var k = budget / total;
+      items.forEach(function (i) { i.h *= k; });
+    }
+
+    items.forEach(function (i) {
+      var d = document.createElement('div');
+      d.className = i.cls;
+      d.style.height = i.h.toFixed(1) + 'px';
+      if (i.hex) d.style.background = i.hex;
+      d.innerHTML = '<span class="segName"></span><span class="segDur tnum"></span>';
+      d.querySelector('.segName').textContent = i.name;
+      d.querySelector('.segDur').textContent = fmtEl(i.ms);
+      host.appendChild(d);
+    });
   }
 
   function tick() {
@@ -2061,6 +2169,12 @@
   $('nowPanel').addEventListener('click', function () { if (S.open) openSplit(); });
   // Anywhere on the ribbon is the way back, not just the chip.
   $('undo').addEventListener('click', takeUndo);
+  /* Enter and Space, the two keys a role="button" has to answer, and nothing
+     else — a handler that fired on any key would lose a block to a stray Tab.
+     The same pattern the category rows and the add row already use. */
+  $('undo').addEventListener('keydown', function (e) {
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); takeUndo(); }
+  });
 
   $('spClose').addEventListener('click', function () { $('sheetSplit').classList.add('hidden'); });
   $('spRange').addEventListener('input', renderSplit);

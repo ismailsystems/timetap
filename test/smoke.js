@@ -212,6 +212,34 @@
   });
   ok('every element carrying .tnum computes to tabular-nums', flat, flat.join(' '));
 
+  /* ── the guardrail is reachable without a pointer ────────────────
+   *
+   * The ribbon replaced arm-and-confirm, which WAS keyboard-operable. It
+   * shipped with no role, no tabindex, no key handler and no announcement — so
+   * a keyboard user traded a working guardrail for nothing, and a screen reader
+   * user was never told the guardrail had appeared, which for a control that
+   * expires in five seconds is the same as it not existing.
+   *
+   * Here rather than in tests.js because role, tabindex and aria-live are
+   * declared in the markup, and only a real parser can say whether they made
+   * it into the document. */
+  var ribbon = document.getElementById('undo');
+  var say = document.getElementById('undoSay');
+  ok('the undo ribbon declares itself a button and takes focus',
+    !!ribbon && ribbon.getAttribute('role') === 'button' &&
+    ribbon.getAttribute('tabindex') === '0',
+    ribbon ? (ribbon.getAttribute('role') + '/' + ribbon.getAttribute('tabindex'))
+           : 'no #undo in the document');
+  /* The announcer must be in the tree at rest. A live region that is
+     display:none until the moment it has something to say is not read at all,
+     which is the failure it exists to fix. */
+  ok('the undo announcer is a live region that is present and not hidden',
+    !!say && say.getAttribute('aria-live') === 'polite' &&
+    getComputedStyle(say).display !== 'none' &&
+    getComputedStyle(say).visibility !== 'hidden',
+    say ? (say.getAttribute('aria-live') + '/' + getComputedStyle(say).display)
+        : 'no #undoSay in the document');
+
   // ── touch targets and the safe area ─────────────────────────────
   var footRoom = window.innerHeight - (document.getElementById('postureRow')
     ? document.getElementById('postureRow').getBoundingClientRect().bottom : window.innerHeight);

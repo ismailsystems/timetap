@@ -700,6 +700,35 @@ chk('the rollup carries all ten', (function () {
 })());
 reset();
 
+console.log('\n27d. the Add row is last, and stays last');
+/* REVIEW-4's finding 15, and the human's ruling: follow the design.
+ *
+ * Round 1 put Add furthest from the thumb, and layoutCells() existed to keep it
+ * there. The redesign's list puts it at the end and layoutCells is never
+ * called, so the rule round 1 wrote down is now carried by the design instead.
+ * A rule nothing enforces is a rule that drifts, so it is pinned here — the
+ * position is the decision, and this is where the decision lives.
+ *
+ * Checked after a runtime add as well: buildGrid runs again there, and "last"
+ * is easy to get right once and lose the second time. */
+reset(); reboot();
+const rows27 = () => $('grid').children;
+chk('the last row in the list is the Add row',
+  rows27()[rows27().length - 1].dataset.add === '1',
+  rows27().map(c => c.dataset.key || 'ADD').join(','));
+chk('and every category comes before it',
+  rows27().slice(0, -1).every(c => !!c.dataset.key),
+  rows27().map(c => c.dataset.key || 'ADD').join(','));
+// The key is derived and truncated by the server, so it is read back rather
+// than guessed — a guess that missed would pass this check for the wrong reason.
+const added27 = addCategory('Reading room').categories.find(c => c.label === 'Reading room');
+reboot();
+chk('a category added at runtime goes above it, not below',
+  rows27()[rows27().length - 1].dataset.add === '1' &&
+  rows27().slice(0, -1).some(c => c.dataset.key === added27.key),
+  rows27().map(c => c.dataset.key || 'ADD').join(',') + ' wanted ' + added27.key);
+reset();
+
 console.log('\n28. the category list puts each thing where it belongs');
 /* REDESIGNED — this was a two-column tile grid filled from the bottom up, so
  * that the categories sat nearest the thumb and the add box sat furthest from
@@ -4647,6 +4676,59 @@ H.setOnline(true); advance(120000); settle(); settle();
 chk('the network coming back leaves one open block and one open SIT',
   openEvents().length === 1 && openSits().length === 1,
   A().map(show).join(' | ') + ' // ' + S().map(show).join(' | '));
+reset();
+
+console.log('\n66m. the ribbon is a control, not a picture of one');
+/* REVIEW-4's finding 13. The ribbon had no role, no tabindex, no keyboard
+ * handler and no announcement. It is not merely undecorated: the arm-and-confirm
+ * it replaced WAS keyboard-operable, and the handoff says to preserve the
+ * accessibility patterns already present. A keyboard user traded a working
+ * guardrail for nothing, and a screen reader user was never told the guardrail
+ * had appeared at all — which for a control that expires in five seconds is the
+ * same as it not existing. */
+reset(); reboot();
+/* el(), not $(): the shim only makes a node once the client has asked for it,
+   and a client that never announces anything has never asked for this one —
+   which is exactly the state worth asserting about.
+   role, tabindex and aria-live are declared in the markup, and this shim does
+   not parse markup — smoke.js checks those three against a real accessibility
+   tree, which is where a parser question belongs. What is here is behaviour. */
+chk('at rest it announces nothing', el('undoSay').textContent === '',
+  el('undoSay').textContent);
+tap('DW'); settle(); wait(40);
+tap('MTG'); settle();
+chk('with a name that says what it will do',
+  /undo/i.test($('undo').getAttribute('aria-label') || '') &&
+  /MEETINGS/.test($('undo').getAttribute('aria-label') || ''),
+  String($('undo').getAttribute('aria-label')));
+chk('and a screen reader is told it appeared, and what it undoes',
+  /MEETINGS/.test($('undoSay').textContent) && /undo/i.test($('undoSay').textContent),
+  $('undoSay').textContent);
+
+/* Enter takes it. */
+$('undo').fire('keydown', { key: 'Enter', preventDefault: function () {} });
+settle();
+chk('Enter takes the undo', activeKey() === 'DW', String(activeKey()));
+chk('and the announcement is withdrawn with the ribbon',
+  $('undoSay').textContent === '', $('undoSay').textContent);
+
+/* Space takes it too, because a div with role=button has to answer both. */
+reset(); reboot();
+tap('DW'); settle(); wait(40);
+tap('MTG'); settle();
+$('undo').fire('keydown', { key: ' ', preventDefault: function () {} });
+settle();
+chk('Space takes the undo as well', activeKey() === 'DW', String(activeKey()));
+
+/* And a key that means neither does nothing. A handler that fired on any key
+   would pass both checks above and lose a block to a stray Tab. */
+reset(); reboot();
+tap('DW'); settle(); wait(40);
+tap('MTG'); settle();
+$('undo').fire('keydown', { key: 'Tab', preventDefault: function () {} });
+settle();
+chk('any other key leaves it alone', activeKey() === 'MTG' && !$('undo').hidden,
+  String(activeKey()) + ' ' + $('undo').className);
 reset();
 
 console.log('\n66g. undo works while the write is still travelling');
