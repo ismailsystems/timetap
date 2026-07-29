@@ -1128,6 +1128,21 @@
 
   /** Remove ops by id if they have not gone yet. Returns how many were found. */
   function dropOps(ids) {
+    /*
+     * Not while a flush is in flight, for the same reason mutatePendingOpen
+     * says no: the server was handed the queue as it was and is applying it
+     * now. An op removed here in the meantime is one the success handler was
+     * going to drop anyway — so the queue empties, the header reads SYNCED, and
+     * takeUndo reads "both found" as "the calendar never saw this" and sends no
+     * compensating op. The calendar keeps the mistake and a reload brings it
+     * back.
+     *
+     * Finding nothing is the honest answer, and it is the right one: the caller
+     * compensates instead, which is exactly what an op that has already gone
+     * needs. Round 2 wrote this guard into mutatePendingOpen and named the
+     * hazard; this function was written without it. REVIEW-4's B1.
+     */
+    if (flushing) return 0;
     var want = {}, hit = 0;
     ids.forEach(function (i) { if (i) want[i] = 1; });
     var q = queue().filter(function (o) {

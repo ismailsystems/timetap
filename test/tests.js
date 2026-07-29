@@ -4295,6 +4295,45 @@ chk('taking it back returns to MEETINGS, not to DEEP WORK',
 chk('and DW stays closed where it was', A()[0].t === 'DW: =', A().map(show).join(' | '));
 reset();
 
+console.log('\n66g. undo works while the write is still travelling');
+/* REVIEW-4's B1, and the successor to the deleted 52k.
+ *
+ * dropOps removed the queue entries by id with no flushing guard, so a switch
+ * taken back mid-flight read as "the calendar never saw this" — while the
+ * server was applying both halves. The screen said undone, the queue emptied,
+ * the header said SYNCED, and the calendar kept the mistake until a reload
+ * brought it back. This is round 2's addition 4 repeated: the guard exists in
+ * mutatePendingOpen, and the new function was written without it.
+ *
+ * Apps Script round trips take 0.5-2.5s, so this is the ordinary window and not
+ * a rare one. Every lag below is a real one; only an impossible 0ms escaped. */
+[100, 600, 1200, 2500].forEach(function (lag) {
+  reset(); reboot();
+  H.setCallLag('applyOps', lag);
+  const t = H.nowMs();
+  tap('DW'); advance(lag + 50); settle();          // let the open land and settle
+  wait(40);
+  tap('MTG'); settle();                            // both writes now in flight
+  advance(Math.floor(lag / 2)); settle();          // and still travelling
+  chk(lag + 'ms: the flush really is in flight when UNDO is tapped',
+    A().some(e => /^MTG/.test(e.t)) && Q().length > 0,
+    'cal=' + A().map(show).join(' | ') + ' q=' + JSON.stringify(Q().map(o => o.type)));
+
+  $('undo').fire('click'); settle();
+  pump(() => Q().length === 0, 90);
+  chk(lag + 'ms: the calendar keeps the ORIGINAL block, open, from its own start',
+    A().length === 1 && A()[0].t === 'DW:' && A()[0].s === t && /#open/.test(A()[0].d),
+    A().map(show).join(' | '));
+  chk(lag + 'ms: and holds no trace of the block the mis-tap made',
+    !A().some(e => /^MTG/.test(e.t)), A().map(show).join(' | '));
+
+  H.setCallLag('applyOps', null);
+  reboot();
+  chk(lag + 'ms: the screen agrees with the calendar after a reboot',
+    activeKey() === 'DW', String(activeKey()));
+});
+reset();
+
 console.log('\n67. the rail shows the day, and shows the holes in it');
 /* The rail is the record made visible: today drawn to scale, with the time
  * nobody logged hatched rather than absent. */
