@@ -745,7 +745,14 @@ async function checkPostureRow(browser, view, page) {
       }
     }
 
-    // 4. Armed differs from resting in text AND in more than colour.
+    /* 4. STOP has one state. REDESIGNED for A5.
+     *
+     * This used to compare an armed STOP against a resting one and insist they
+     * differed in more than colour. STOP acts on the first tap now — the
+     * redesign replaces arm-and-confirm with undo, and leaving it on the
+     * control that ends the day left the pattern alive on the most destructive
+     * button in the app. So what is measured is the absence: one label, one
+     * shape, and nothing that appears after a tap and waits for a second one. */
     const resting = { text: g.stopText, style: g.stopStyle, rect: g.stopRect };
     /* Short timeout, and a failure to click is reported as a finding rather
        than thrown. Something covering the row makes Playwright wait 30s and
@@ -760,58 +767,32 @@ async function checkPostureRow(browser, view, page) {
         return false;
       }
     };
-    if (!await tapStop()) return problems;
-    await pg.waitForTimeout(30);
-    const g2 = await geom();
-    const armed = { text: g2.stopText, style: g2.stopStyle, rect: g2.stopRect };
     console.log('  STOP resting:    "' + resting.text + '" ' +
                 Math.round(resting.rect.w) + 'x' + Math.round(resting.rect.h) +
                 ' ' + resting.style.position);
-    console.log('  STOP armed:      "' + armed.text + '" ' +
-                Math.round(armed.rect.w) + 'x' + Math.round(armed.rect.h) +
-                ' ' + armed.style.position);
-    if (armed.text === resting.text) {
-      problems.push(label + ': armed STOP reads the same as resting STOP ("' + armed.text + '")');
+    if (resting.text !== 'STOP') {
+      problems.push(label + ': STOP reads "' + resting.text + '" at rest rather than STOP');
     }
-    /* Compared on properties the text cannot move on its own. Width and height
-       are deliberately NOT in here: a longer label makes an auto-width button
-       wider all by itself, so measuring the box would just re-detect the text
-       change and call it styling. This check is only worth having if it can
-       fail while the text still changes. */
-    const styleKeys = ['position', 'fontWeight', 'boxShadow', 'padding',
-                       'borderRadius', 'opacity', 'outline'];
-    const shapeChanged = styleKeys.some(k => armed.style[k] !== resting.style[k]);
-    if (!shapeChanged) {
-      problems.push(label + ': armed STOP differs from resting only in colour — ' +
-                    JSON.stringify(resting.style) + ' vs ' + JSON.stringify(armed.style) +
-                    '. Colour alone is one channel, and it is the one some people do not have.');
+    /* The posture toggle must be hittable at rest. Reaching for SITTING and
+       missing is the accident this row has always been about. */
+    if (g.postureHitTarget !== 'postureBtn') {
+      problems.push(label + ': a tap at the posture toggle\'s centre lands on ' +
+                    g.postureHitTarget + ' rather than the toggle');
     }
-    if (armed.rect && (armed.rect.w < TOUCH_TARGET || armed.rect.h < TOUCH_TARGET)) {
-      problems.push(label + ': armed STOP is under the touch target at ' +
-                    Math.round(armed.rect.w) + 'x' + Math.round(armed.rect.h));
-    }
-    // The armed label is the one that might not fit. Measure it, do not assume.
-    problems.push(...geometryProblems(g2, 'armed'));
-    if (g2.stopHitTarget !== 'stopBtn') {
-      problems.push(label + ': armed STOP is not hittable — the element at its centre is ' +
-                    g2.stopHitTarget);
-    }
-    /* The posture toggle must survive the armed state. Reaching for SITTING and
-       missing is how an accidental arm happens; tapping elsewhere is how people
-       cancel one. Those were the same tap, and it ended the day. */
-    ['resting', 'armed'].forEach((state, i) => {
-      const got = (i ? g2 : g).postureHitTarget;
-      if (got !== 'postureBtn') {
-        problems.push(label + ': with STOP ' + state + ', a tap at the posture toggle\'s ' +
-                      'centre lands on ' + got + ' rather than the toggle');
-      }
-    });
 
-    // 5. Confirm, which ends the day and raises the strip over the row; then a
-    //    tap that is not a mark must give the row — and STOP — back.
+    // 5. One tap ends the day and raises the strip over the row; then a tap
+    //    that is not a mark must give the row — and the posture control — back.
     if (!await tapStop()) return problems;
     await pg.waitForTimeout(30);
     const g3 = await geom();
+    /* Measured after the one tap that acts: a build that reintroduced a waiting
+       state would still be showing a running block here, and every check below
+       would report on the wrong screen. */
+    if (g3.stopText !== null && g3.stopText !== 'STOP' && g3.stopText !== '') {
+      problems.push(label + ': after one tap STOP reads "' + g3.stopText +
+                    '", so a second state survives on the control the redesign ' +
+                    'exists to simplify');
+    }
     if (g3.stripHidden !== false) {
       problems.push(label + ': ending a 40-minute block with STOP did not raise the mark strip ' +
                     '(strip hidden=' + g3.stripHidden + '), so criterion 5 could not be tested');
@@ -854,10 +835,6 @@ async function checkPostureRow(browser, view, page) {
       if (g4.postureHitTarget !== 'postureBtn') {
         problems.push(label + ': the posture control is not hittable after the strip is ' +
                       'dismissed — the element at its centre is ' + g4.postureHitTarget);
-      }
-      if (false) {
-        problems.push(label + ': STOP is visible but not hittable after the strip is dismissed — ' +
-                      'the element at its centre is ' + g4.stopHitTarget);
       }
     }
 

@@ -72,9 +72,10 @@ alone: `C++ and 5 - 3` is stored exactly as typed.
 
 `STOP` sits at the right of the posture row. It closes the running block and
 any open sitting block at that instant, and opens nothing — the only control in
-the app that ends without starting something else. It arms on the first tap and
-acts on the second, and says `TAP AGAIN TO STOP` in between; ignore it and it
-forgets after four seconds. With nothing running it is dimmed and harmless.
+the app that ends without starting something else. One tap does it, and the
+undo ribbon then offers `STOPPED — NOW UNLOGGED` for five seconds; taking it
+puts the block and the sitting back. With nothing running it is dimmed and
+harmless.
 
 Ending the day is what stops the app guessing overnight. Without it, the block
 you left running is bounded by the app the next morning, marked `?`, and the

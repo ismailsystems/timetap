@@ -380,8 +380,9 @@ const posture = k => {
   if (litPosture() !== k) { $('postureBtn').fire('click'); settle(); }
 };
 const tapSit = () => posture('sit');
-// One tap arms, the second ends the day. Deliberately NOT a helper that does
-// both: every criterion about STOP is about which of the two taps acts.
+// One tap ends the day, and the ribbon is the way back. It used to arm and
+// confirm; stopArmedNow survives that change deliberately, so a test can assert
+// the armed state is not merely unused but unreachable.
 const tapStop = () => { $('stopBtn').fire('click'); settle(); };
 const stopArmedNow = () => $('stopBtn')._cls.has('arming');
 const stopLabel = () => $('stopBtn').textContent;

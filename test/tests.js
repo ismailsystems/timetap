@@ -2352,14 +2352,16 @@ const openEvents = () => A().filter(e => /#open/.test(e.d));
 const openSits = () => S().filter(e => /#open/.test(e.d));
 
 console.log('\n43. STOP closes the block and the SIT, and opens nothing');
+/* REDESIGNED for A5. STOP used to arm and confirm; the redesign exists to
+ * replace arm-and-confirm with undo, and leaving it on the one control that
+ * ends the day left the pattern alive on the most destructive control in the
+ * app. STOP acts on the first tap now, and the ribbon is the way back. */
 reset(); reboot();
 tapSit(); wait(10); tap('DW'); wait(40); settle();
 const before43 = { a: A().length, s: S().length };
-tapStop();
-chk('one tap only arms it', stopArmedNow(), stopLabel());
-chk('and nothing has been written yet', A().length === before43.a && S().length === before43.s,
-  'A ' + A().length + ' S ' + S().length);
 tapStop(); settle();
+chk('one tap ends the day — nothing is armed and nothing waits',
+  !stopArmedNow() && stopLabel() === 'STOP', stopLabel() + ' arming=' + stopArmedNow());
 chk('ACTUAL holds exactly one event', A().length === 1, A().map(show).join(' | '));
 chk('SITTING holds exactly one event', S().length === 1, S().map(show).join(' | '));
 chk('neither calendar gained an event',
@@ -2375,8 +2377,6 @@ chk('and the grid shows the idle state', activeKey() === null && $('grid')._cls.
 console.log('\n43b. a running block and no SIT leaves SITTING untouched');
 reset(); reboot();
 tap('DW'); wait(30); settle();
-tapStop();
-chk('one tap leaves the block open', openEvents().length === 1, A().map(show).join(' | '));
 tapStop(); settle();
 chk('the block closed', A().length === 1 && openEvents().length === 0, A().map(show).join(' | '));
 chk('the SITTING calendar is untouched', S().length === 0, S().map(show).join(' | '));
@@ -2384,35 +2384,38 @@ chk('the SITTING calendar is untouched', S().length === 0, S().map(show).join(' 
 console.log('\n43c. an open SIT and no block leaves ACTUAL untouched');
 reset(); reboot();
 tapSit(); wait(30); settle();
-tapStop();
-chk('one tap leaves the SIT open', openSits().length === 1, S().map(show).join(' | '));
 tapStop(); settle();
 chk('the SIT closed', S().length === 1 && openSits().length === 0, S().map(show).join(' | '));
 chk('the ACTUAL calendar is untouched', A().length === 0, A().map(show).join(' | '));
 chk('and the posture button says so', litPosture() === 'stand', String(litPosture()));
 
-console.log('\n43d. an armed STOP that is never confirmed does nothing');
+console.log('\n43d. STOP has no armed state to leave behind');
+/* REDESIGNED for A5, and the successor to "an armed STOP that is never
+ * confirmed does nothing". That section pinned a waiting state; the property
+ * worth keeping is that no such state is reachable at all, because a state that
+ * cannot exist cannot be left behind on the screen or acted on by a later tap.
+ * The way back is the ribbon, which 66d holds. */
 reset(); reboot();
 tap('DW'); wait(30); settle();
-tapStop();
-chk('armed', stopArmedNow(), stopLabel());
+chk('the button says STOP before the tap', stopLabel() === 'STOP', stopLabel());
+tapStop(); settle();
+chk('and says STOP after it', stopLabel() === 'STOP', stopLabel());
+chk('it never looks armed', !stopArmedNow(), $('stopBtn').className);
+chk('the day really did end on that one tap', openEvents().length === 0,
+  A().map(show).join(' | '));
+/* Nothing is scheduled to change the button's mind later. A confirm timeout was
+ * the one thing that used to. */
 advance(CONFIRM_TIMEOUT_MS + 100); settle();
-chk('it forgets', !stopArmedNow(), stopLabel());
-chk('and returns to its resting label', stopLabel() === 'STOP', stopLabel());
-chk('the block is still open', openEvents().length === 1, A().map(show).join(' | '));
-/* Reads the queue, not the calendar. A calendar assertion is true of a build
- * that queued a spurious op and had not flushed it yet. */
-chk('and the queue is empty', JSON.parse(H.STORE['tt.queue.v1'] || '[]').length === 0,
-  H.STORE['tt.queue.v1'] || '[]');
+chk('and nothing repaints it into another state a few seconds later',
+  stopLabel() === 'STOP' && !stopArmedNow(), stopLabel() + ' ' + $('stopBtn').className);
+chk('the queue holds the close and nothing else',
+  JSON.parse(H.STORE['tt.queue.v1'] || '[]').length === 0, H.STORE['tt.queue.v1'] || '[]');
 
 console.log('\n43e. with nothing to end, STOP writes nothing and complains about nothing');
 reset(); reboot();
 chk('it is visibly inert to begin with', $('stopBtn')._cls.has('inert'));
-tapStop();
-chk('arming it writes nothing', JSON.parse(H.STORE['tt.queue.v1'] || '[]').length === 0,
-  H.STORE['tt.queue.v1'] || '[]');
 tapStop(); settle();
-chk('and confirming it queues no op',
+chk('tapping it queues no op',
   JSON.parse(H.STORE['tt.queue.v1'] || '[]').length === 0, H.STORE['tt.queue.v1'] || '[]');
 chk('no event on ACTUAL', A().length === 0, A().map(show).join(' | '));
 chk('no event on SITTING', S().length === 0, S().map(show).join(' | '));
@@ -2422,9 +2425,6 @@ chk('and no error banner', $('err').hidden !== false || $('err')._cls.has('hidde
 console.log('\n43f. ending a long enough block shows the mark strip, as a transition does');
 reset(); reboot();
 tap('DW'); wait(40); settle();
-tapStop();
-chk('one tap shows no strip and closes nothing',
-  $('strip').hidden && openEvents().length === 1, A().map(show).join(' | '));
 tapStop(); settle();
 chk('the strip is visible', !$('strip').hidden);
 chk('and names the block and its duration',
@@ -2435,8 +2435,6 @@ chk('and the mark it offers still lands', A()[0].t === 'DW: +', A()[0].t);
 console.log('\n43g. ending a short block shows no strip and applies no mark');
 reset(); reboot();
 tap('DW'); wait(5); settle();
-tapStop();
-chk('one tap writes nothing', openEvents().length === 1, A().map(show).join(' | '));
 tapStop(); settle();
 chk('no strip', $('strip').hidden);
 /* The closed-ness is asserted first. "DW:" is equally true of a block that is
@@ -2448,7 +2446,7 @@ chk('and carries no mark', A()[0].t === 'DW:', A()[0].t);
 console.log('\n43h. a day closed by STOP is still closed after a reload');
 reset(); reboot();
 tapSit(); wait(5); tap('DW'); wait(45); settle();
-tapStop(); tapStop(); settle(); settle();
+tapStop(); settle(); settle();
 reboot();
 chk('nothing renders as running', activeKey() === null, String(activeKey()));
 chk('getState finds no open block on ACTUAL', openEvents().length === 0, A().map(show).join(' | '));
@@ -2466,7 +2464,7 @@ console.log('\n43i. STOP is a write like any other and does not bypass the queue
 reset(); reboot();
 tapSit(); wait(5); tap('DW'); wait(30); settle();
 H.setServerReject('nope');
-tapStop(); tapStop(); settle();
+tapStop(); settle();
 chk('the UI shows nothing running immediately', activeKey() === null, String(activeKey()));
 chk('and no SIT either', litPosture() === 'stand', String(litPosture()));
 const q43 = JSON.parse(H.STORE['tt.queue.v1'] || '[]');
@@ -2482,55 +2480,54 @@ chk('and neither of them opens anything',
   JSON.stringify(q43.map(o => o.type)));
 H.setServerReject(null);
 
-console.log('\n43j. confirming twice in quick succession queues exactly one close');
+console.log('\n43j. tapping STOP twice in quick succession queues exactly one close');
+/* The second tap has nothing left to end. It used to be the confirming half of
+ * a pair; it is now a tap on an ended day, which is the more likely accident of
+ * the two and must still cost nothing. */
 reset(); reboot();
 tap('DW'); wait(30); settle();
 H.setServerReject('nope');
-tapStop(); tapStop();                       // armed, then confirmed
-tapStop(); tapStop();                       // armed, then confirmed again
+tapStop(); tapStop(); tapStop(); tapStop();
 settle();
 const q43j = JSON.parse(H.STORE['tt.queue.v1'] || '[]');
 chk('exactly one close is queued',
   q43j.filter(o => o.type === 'closeActual').length === 1,
   JSON.stringify(q43j.map(o => o.type)));
+/* And the way back survives the extra taps. A ribbon cleared by the second tap
+ * would take the undo away at exactly the moment the user needed it. */
+chk('the ribbon still offers the way back', !$('undo').hidden, $('undo').className);
+chk('and still names the stop', $('undoLabel').textContent === 'STOPPED — NOW UNLOGGED',
+  $('undoLabel').textContent);
 H.setServerReject(null);
 reset();
 
-console.log('\n43k. an armed STOP that gets disarmed stops looking armed');
-/* Found by the checker. tapCategory disarms STOP, and the re-tap-the-lit-block
- * branch returns without rendering — and disarming has already cancelled the
- * timer whose repaint would have fixed it. The button was left reading
- * TAP AGAIN TO STOP forever, and because the armed state takes the whole
- * posture row, it sat on top of the posture toggle and the sit clock: a black
- * bar promising to end the day, that did nothing when tapped. */
+console.log('\n43k. nothing but STOP ends the day');
+/* REDESIGNED for A5, and the successor to "an armed STOP that gets disarmed
+ * stops looking armed". That section existed because an armed STOP survived
+ * three other interactions and sat on the screen promising to end the day.
+ * Nothing arms now, so the residue is gone — but the property those three cases
+ * were really protecting is that none of them ends the day, and that property
+ * still has to hold. */
 reset(); reboot();
 tap('DW'); advance(10000); settle();
-tapStop();
-chk('armed', stopArmedNow(), stopLabel());
 tap('DW');                                   // re-tap the lit block
-chk('re-tapping the lit block disarms it', !stopArmedNow(), stopLabel());
-chk('and it says STOP again', stopLabel() === 'STOP', stopLabel());
-advance(60000); settle();
-chk('and it is still saying STOP a minute later', stopLabel() === 'STOP', stopLabel());
-chk('the block was never closed by any of that',
+chk('re-tapping the lit block does not end the day',
   openEvents().length === 1, A().map(show).join(' | '));
+chk('and STOP still reads as itself', stopLabel() === 'STOP' && !stopArmedNow(),
+  stopLabel() + ' ' + $('stopBtn').className);
 
-/* The other branch of the same return: past the mis-tap window, re-tapping the
- * lit block opens SPLIT rather than falling through. */
 reset(); reboot();
 tap('DW'); wait(5); settle();
-tapStop();
-chk('armed again', stopArmedNow(), stopLabel());
 tap('DW');
-chk('opening SPLIT also disarms it', !stopArmedNow(), stopLabel());
+chk('opening SPLIT does not end the day', openEvents().length === 1,
+  A().map(show).join(' | '));
 chk('and SPLIT did open', splitOpen());
 
-/* Tapping a different category disarms it too. */
 reset(); reboot();
 tap('DW'); wait(5); settle();
-tapStop();
 tap('MTG'); settle();
-chk('switching category disarms it', !stopArmedNow(), stopLabel());
+chk('switching category does not end the day either',
+  openEvents().length === 1 && activeKey() === 'MTG', A().map(show).join(' | '));
 
 console.log('\n43l. a server answer older than the STOP does not undo it');
 /* Also found by the checker, and the risk HANDOFF-2.md names for this task.
@@ -2550,7 +2547,7 @@ H.setCallLag('getState', 400);
 H.setNow(H.nowMs() + 11 * 60000);            // makes refreshOnReturn count it overdue
 H.fireVisible();
 // STOP now, and let its own round trip finish first.
-$('stopBtn').fire('click'); $('stopBtn').fire('click');
+$('stopBtn').fire('click');
 advance(60); settle();
 const endedAt = A()[0] && A()[0].e;
 chk('the day ended', activeKey() === null && openEvents().length === 0,
@@ -4025,9 +4022,9 @@ console.log('\n60. a day that was ended stays ended');
 reset(); reboot();
 const t60 = H.nowMs();
 tap('DW'); settle(); wait(60);
-tapStop(); tapStop(); settle();
+tapStop(); settle();
 const end60 = A()[0].e;
-chk('the day is closed at the moment STOP was confirmed',
+chk('the day is closed at the moment STOP was tapped',
   A().length === 1 && !/#open/.test(A()[0].d) && near(A()[0].e, t60 + 3600000),
   show(A()[0]));
 const ref60 = /#ref:([A-Za-z0-9]+)/.exec(A()[0].d)[1];
@@ -4136,24 +4133,28 @@ tap('MTG'); settle();                            // re-tap the running row: SPLI
 chk('SPLIT opened', splitOpen());
 chk('and the ribbon is gone', $('undo').hidden, $('undo').className);
 
-console.log('\n63. the posture toggle cancels an armed STOP rather than confirming it');
-/* Round 2's review, finding 8: the armed state used to cover the whole row, so
- * reaching for SITTING while STOP was armed ended the day. */
+console.log('\n63. reaching for the posture toggle does not end the day');
+/* REDESIGNED for A5, and the successor to "the posture toggle cancels an armed
+ * STOP rather than confirming it". Round 2's review, finding 8: the armed state
+ * covered the whole row, so reaching for SITTING while STOP was armed ended the
+ * day. Nothing arms now and nothing covers the row — so the hazard is gone by
+ * construction, and what is left to hold is the plain claim it was hiding: the
+ * posture toggle toggles posture, and touches the block not at all. */
 reset(); reboot();
 tap('DW'); settle(); wait(30);
 tapSit(); settle();
 chk('a block is running and the user is sitting',
   activeKey() === 'DW' && litPosture() === 'sit', activeKey() + '/' + litPosture());
-tapStop();                                       // armed, not confirmed
-chk('STOP is armed', $('stopBtn')._cls.has('arming'), $('stopBtn').className);
-posture('stand');                                // reaching for the posture toggle
-chk('the arm is cancelled', !$('stopBtn')._cls.has('arming'), $('stopBtn').className);
+chk('nothing on the row is armed or covered',
+  !$('stopBtn')._cls.has('arming') && $('stopBtn').textContent === 'STOP',
+  $('stopBtn').className + ' "' + $('stopBtn').textContent + '"');
+posture('stand');
 chk('the day did NOT end — the block is still running',
   activeKey() === 'DW' && /#open/.test(A()[0].d), A().map(show).join(' | '));
-chk('and the posture did not toggle either — the tap only cancelled',
-  litPosture() === 'sit', String(litPosture()));
-chk('a second tap on the toggle now works normally',
-  (posture('stand'), litPosture() === 'stand'), String(litPosture()));
+chk('and the posture toggled, because that is all that tap does',
+  litPosture() === 'stand', String(litPosture()));
+chk('a tap back the other way works normally',
+  (posture('sit'), litPosture() === 'sit'), String(litPosture()));
 
 console.log('\n64. the banner says how many writes are on the shelf');
 /* Round 2's review, cosmetic: it said "one write" however many there were. */
@@ -4259,7 +4260,7 @@ console.log('\n66d. STOP can be taken back too');
 reset(); reboot();
 const t66d = H.nowMs();
 tap('DW'); settle(); wait(40);
-tapStop(); tapStop(); settle();
+tapStop(); settle();
 chk('the day ended', A().length === 1 && !/#open/.test(A()[0].d), A().map(show).join(' | '));
 chk('and the ribbon says so',
   $('undoLabel').textContent === 'STOPPED — NOW UNLOGGED', $('undoLabel').textContent);
@@ -4356,7 +4357,7 @@ chk('only the running one is outlined',
 console.log('\n67b. time nobody logged is drawn as a hole');
 reset(); reboot();
 tap('DW'); settle(); wait(30);
-tapStop(); tapStop(); settle();
+tapStop(); settle();
 wait(40);                                        // forty minutes of nothing
 chk('the day ends with a gap that grows',
   segKinds().join(',') === 'DEEP WORK,gap', segKinds().join(','));

@@ -212,11 +212,6 @@
   #stopBtn { flex: none; border: 2px solid var(--rule2); color: var(--accent-on);
              font: 800 12px var(--font); letter-spacing: .1em; padding: 10px 14px;
              min-height: 44px; min-width: 44px; }
-  /* Armed, it fills — the same solid accent the undo ribbon and APPLY use for
-     "this commits". Two channels: the text changes and so does the fill, so it
-     does not rest on colour alone. */
-  #stopBtn.arming { background: var(--accent); border-color: var(--accent); color: #fff;
-                    letter-spacing: .06em; box-shadow: inset 0 0 0 2px #fff; }
   /* STOP shows only while there is something to end. Ending a day that has not
      started is not a thing to offer. */
   #stopBtn.inert { display: none; }
@@ -403,7 +398,6 @@
   var S = { open: null, sit: null, lastTapMs: 0 };
   var strip = null;          // {ref, key, durMs, hintMs, timer}
   var armed = null;          // {key, timer} — a tap waiting to be confirmed
-  var stopArmed = null;      // {timer} — a STOP waiting to be confirmed
   var CELL = {};             // key -> {box, note, el}, so the lit one is O(1)
   var flushing = false, retryTimer = null, retryDelay = 4000, lastStateMs = 0;
   /*
@@ -1022,9 +1016,6 @@
    */
   function tapCategory(key) {
     var now = Date.now();
-    // A STOP left armed while the user carries on working would end the day on
-    // a single later tap, which is not what that tap would look like.
-    if (disarmStop()) render();
 
     if (S.open && S.open.key === key) {
       // The running row is the way into SPLIT, exactly as the NOW panel is.
@@ -1197,13 +1188,6 @@
    * calendar like everything else.
    */
   function toggleSit() {
-    /*
-     * A tap here while STOP is armed cancels the arm and does nothing else.
-     * Tapping something else is how people undo a control they armed by
-     * accident, and this is the something else nearest to it — it used to sit
-     * underneath the armed state and confirm it, which ended the day.
-     */
-    if (disarmStop()) { render(); return; }
     var now = Date.now();
     if (S.sit) {
       closeSit(now);
@@ -1225,35 +1209,22 @@
    * for. This is the one control that closes without opening.
    *
    * It needs no new server op: closeActual and closeSit already work standalone.
+   *
+   * ONE TAP, and the ribbon is the way back.
+   *
+   * STOP arrived in round 2 with arm-and-confirm, and kept it through the
+   * redesign — which left the pattern the redesign exists to remove alive on
+   * the most destructive control in the app. Two guardrails on one button is
+   * also what stops the ribbon reading as furniture: if some taps need a second
+   * tap and some need an undo, the user has to know which control they are
+   * touching before they know what a tap costs.
+   *
+   * So STOP acts like every other tap now, and is taken back the same way.
+   * armUndo below restores the block AND the sitting, which is what makes one
+   * tap safe rather than merely quick. REVIEW-4's B5, and the human's ruling.
    */
 
   var STOP_LABEL = 'STOP';
-  var STOP_ARMED = 'TAP AGAIN TO STOP';
-
-  /* Returns true if it actually disarmed something, so a caller that is about
-     to return without rendering knows it owes the button a repaint. Clearing
-     the timer also cancels the repaint that timer would have done. */
-  function disarmStop() {
-    if (!stopArmed) return false;
-    if (stopArmed.timer) clearTimeout(stopArmed.timer);
-    stopArmed = null;
-    return true;
-  }
-
-  /** First press arms, second press ends the day. Mirrors armDead. */
-  function armStop() {
-    if (stopArmed) {
-      disarmStop();
-      endDay();
-      return;
-    }
-    disarm();                 // an armed category and an armed STOP at once is a trap
-    // Repaint when it forgets, or the button keeps offering a confirmation it is
-    // no longer holding — the same reason arm() repaints.
-    stopArmed = { timer: setTimeout(function () { disarmStop(); render(); },
-                                    CFG.confirmTimeoutMs) };
-    render();
-  }
 
   function endDay() {
     var now = Date.now();
@@ -1464,16 +1435,12 @@
     $('sitEdit').classList.toggle('off', !S.sit);
     $('sitEl').textContent = S.sit ? fmtEl(now - S.sit.startMs) : '';
 
-    // The armed label states what the next tap will do, and stops there. The
-    // aria-label tracks it, or a screen reader announces "end the day" in both
-    // states and the whole arm/confirm distinction is inaudible.
-    $('stopBtn').classList.toggle('arming', !!stopArmed);
-    $('stopBtn').textContent = stopArmed ? STOP_ARMED : STOP_LABEL;
-    $('stopBtn').setAttribute('aria-label',
-      stopArmed ? 'tap again to end the day' : 'end the day');
-    // Nothing open and nothing sitting means nothing to end. Still dimmed while
-    // armed, so arming over an already-ended day does not look like it is about
-    // to do something.
+    // One label, because there is one thing the button does. It is repainted
+    // rather than left to the markup so that a build which reintroduces a
+    // second state has to reintroduce it here, where 43d is looking.
+    $('stopBtn').textContent = STOP_LABEL;
+    $('stopBtn').setAttribute('aria-label', 'end the day');
+    // Nothing open and nothing sitting means nothing to end.
     $('stopBtn').classList.toggle('inert', !S.open && !S.sit);
 
     $('grid').classList.toggle('idle', !S.open);
@@ -1848,7 +1815,7 @@
     hideStrip();
   });
 
-  $('stopBtn').addEventListener('click', armStop);
+  $('stopBtn').addEventListener('click', endDay);
   $('postureBtn').addEventListener('click', toggleSit);
   $('sitEdit').addEventListener('click', openSitEdit);
 
