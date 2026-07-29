@@ -1341,3 +1341,57 @@ function, and undo correct in both clean cases. The drift is small in surface
 area. The faults are not small.
 
 Nothing is deployed. Version 30 on the phone is the pre-redesign build.
+
+---
+
+## The FIXES-4 pass — 2026-07-28
+
+Twenty-four items across six groups, worked one at a time: criterion written
+first, watched fail, fixed, watched pass, committed. Nine commits.
+
+**970 -> 1101 assertions, green twice under all four contracted timezones.**
+Lint clear on 20 rules — one retired, one added. Headless ok at both viewports,
+26 smoke checks each, with three new phases: the guardrails at 6/7/8/10
+categories, the rail at 6/20/40 blocks, and the dead zone under the ribbon.
+`appsscript.json` and `test/fixtures/rollup-golden.json` byte-identical to
+`a256bdf`, as they have been all round.
+
+**Three decisions went to the human before anything was built.** STOP follows
+the handoff and acts on one tap. The mis-tap merge stays out, to be judged in
+use. The Add row follows the design and sits at the end of the list. All three
+were the recommendation; none was assumed.
+
+**The four blocking reproductions were re-run by hand at the end**, not merely
+covered by tests, and printed in the same shape REVIEW-4 printed them. The
+mid-flight undo now leaves the original block open and a reload agrees. Undo
+puts the sitting back on both paths. Body-and-sitting-at-once is unreachable.
+STOP has no armed state. The fifth — the ribbon leaving the screen at seven
+categories — is a layout fault and is held by the headless phase, which
+reproduced the review's exact numbers before the fix and reports 56 of 56 px
+with the ribbon under the tap at every count after it.
+
+**What this pass added to the review's list, and why.** Four things, each
+because leaving them would have made a fix dishonest rather than merely
+incomplete:
+
+- `S.lastTapMs`, written in five places and read in none once `willRetitle`
+  went. Dead state that a reader would take as evidence the mis-tap window is
+  still there.
+- the headless C2 phase, which wrote `TAP AGAIN TO RETITLE` into a span the
+  client never fills and measured whether it fit. It had stopped measuring
+  anything and was reporting on that non-event every run.
+- `INIT_CLS` reading the markup instead of mirroring it — pulled forward from
+  E3 because a criterion of A3's passed vacuously without it.
+- the docs rule, extended to the undo ribbon. It pinned STOP but not the control
+  the redesign turns on, which is the same gap it was written for, one round
+  later and one control along.
+
+**Three checks I wrote could not fail, and I caught all three by trying to
+break the thing they watched.** Two read a drawer string for a year the drawer
+never prints; one compared the rail's segments to a box that grows with them.
+The habit that found them is the only reason they are not still in the file:
+after every fix, revert it and watch the criterion go red. A criterion that
+stays green through the revert is not a criterion.
+
+**What is NOT done, and is the human's call:** deploying. Version 30 on the
+phone is still the pre-redesign build. Nothing here has been pushed.

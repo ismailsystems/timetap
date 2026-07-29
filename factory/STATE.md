@@ -1,11 +1,56 @@
 # Factory State
 project: timetap
 stage: 6
-stage_name: The Day Rail redesign is built and reviewed — it does not ship yet
-last_updated: 2026-07-28 (redesign reviewed, FIX FIRST)
-next_action: "WORK THROUGH factory/FIXES-4.md, in a fresh session. Read factory/REVIEW-4.md first — it holds the reproductions. Three reviewers returned BROKEN, NOT DONE and MINOR DRIFT on the redesign; five faults block, and three of them break the redesign's own central claim that nothing is lost to one tap. Three decisions are open and are listed at the end of REVIEW-4; the STOP one should be settled before it is built. THE LIVE APP IS NOT AFFECTED: deployed version 30 is the pre-redesign build, and the redesign has never been pushed or deployed. The round-2 work below is complete and was accepted."
+stage_name: The Day Rail redesign is fixed and green — the human accepts and deploys
+last_updated: 2026-07-28 (FIXES-4 worked through, all 24 items)
+next_action: "THE HUMAN ACCEPTS AND DEPLOYS. All 24 items in factory/FIXES-4.md are done, each written criterion-first and verified by running it; nine commits on main, nothing pushed. 1101 assertions green TWICE under all four contracted timezones, lint clear on 20 rules, headless ok at both viewports with three new phases. REVIEW-4's four blocking reproductions were re-run BY HAND at the end and printed gone — the record is in factory/log-2.md under 'The FIXES-4 pass'. Three decisions were put to the human before anything was built and all three were answered: STOP acts on one tap and the ribbon is the way back; the mis-tap merge stays out, to be judged in use; the Add row follows the design and sits at the end of the list. BEFORE DEPLOYING, read the spreadsheet-formulas note below — it still holds, because this pass changed no column. Optional and still not done: the proof video (auto-loom-proof) and the plain-language explainer (factory-explain, which also owes GUIDE.md Part 2 a correction carried over from round 1). A FIFTH REVIEW IS WORTH IT: this pass touched the undo path, the server op, the layout in three places and the lint rules, and no independent eye has seen any of it."
+old_next_action_2: "WORK THROUGH factory/FIXES-4.md, in a fresh session. Read factory/REVIEW-4.md first — it holds the reproductions. Three reviewers returned BROKEN, NOT DONE and MINOR DRIFT on the redesign; five faults block, and three of them break the redesign's own central claim that nothing is lost to one tap. Three decisions are open and are listed at the end of REVIEW-4; the STOP one should be settled before it is built. THE LIVE APP IS NOT AFFECTED: deployed version 30 is the pre-redesign build, and the redesign has never been pushed or deployed. The round-2 work below is complete and was accepted."
 old_next_action: "THE HUMAN ACCEPTS AND DEPLOYS. The work is 25 commits on factory/honest-record; main is untouched at a256bdf and nothing has been pushed. Read factory/REVIEW-3.md, above all its 'Decisions for you' — all five are answered and the answers are in progress-2.md. Then merge, deploy, and CHECK YOUR OWN SPREADSHEET FORMULAS: D1 added a rollup key, which moved 13 of the 22 columns the daily tab had. SETUP.md says which, and shows a formula that survives the next change. Optional and offered, not done: the proof video (auto-loom-proof) and the plain-language explainer (factory-explain, which also owes GUIDE.md Part 2 a correction carried over from round 1)."
 notes: |
+  THE FIX PASS IS DONE — factory/FIXES-4.md, all 24 items, 2026-07-28.
+
+  970 -> 1101 assertions, green twice under all four contracted timezones. Lint
+  clear on 20 rules (one retired, one added). Headless ok at both viewports, 26
+  smoke checks each, three new phases: the guardrails at 6/7/8/10 categories,
+  the rail at 6/20/40 blocks, and the dead zone under the ribbon.
+  appsscript.json and test/fixtures/rollup-golden.json still byte-identical to
+  a256bdf.
+
+  THE FIVE THAT BLOCKED ARE GONE, and were re-run by hand rather than trusted
+  to the suite. The mid-flight undo leaves the original block open and a reload
+  agrees. The ribbon and all three mark buttons are on screen and under the tap
+  at every category count to MAX_CATEGORIES. Undo puts back the sitting it
+  closed, on the switch path and the STOP path. Body-and-sitting-at-once is
+  unreachable. STOP acts on one tap and has no armed state.
+
+  WHAT THE HUMAN RULED, before anything was built:
+    1. STOP follows the handoff — one tap, and the ribbon is the way back.
+    2. The mis-tap merge stays out. See whether it hurts in use.
+    3. The Add row follows the design and sits at the end of the list.
+
+  FOUR THINGS THIS PASS ADDED TO THE REVIEW'S LIST, each because leaving it
+  would have made a fix dishonest rather than merely incomplete: S.lastTapMs
+  (dead state, read nowhere); the headless C2 phase (measuring a span the
+  client never fills); INIT_CLS reading the markup rather than mirroring it
+  (pulled forward from E3, because a criterion of A3's passed vacuously without
+  it); and the docs rule extended to the undo ribbon (it pinned STOP but not
+  the control the redesign turns on).
+
+  THREE CHECKS THIS PASS WROTE COULD NOT FAIL and were caught by reverting the
+  fix and watching the criterion stay green. Two read a drawer string for a
+  year the drawer never prints; one compared the rail's segments to a box that
+  grows with them. Reverting after every fix is what found them.
+
+  NOT DONE, and the human's call: DEPLOY. Version 30 on the phone is still the
+  pre-redesign build and nothing has been pushed.
+
+  WORTH DOING: a fifth review. This pass touched the undo path, one server op,
+  the layout in three places and the lint rules, and no independent eye has
+  seen any of it.
+
+  ---
+  WHAT FOLLOWS IS THE RECORD AS IT STOOD WHEN THE REDESIGN WAS REVIEWED.
+  ---
   THE DAY RAIL REDESIGN — built 2026-07-28, reviewed the same day, NOT SHIPPED.
 
   Design 2a from ~/Downloads/design_handoff_dayrail_redesign/ (README plus an
