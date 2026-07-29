@@ -22,7 +22,8 @@ console.log('\n2. ADM, 52m, DW -> strip, ignore 6s -> "ADM: ="');
 reset(); reboot();
 tap('ADM'); wait(52); tap('DW');
 chk('strip visible', !$('strip').hidden);
-chk('strip head "ADM closed · 52m"', $('stripHead').textContent === 'ADM closed · 52m', $('stripHead').textContent);
+chk('strip head "ADM · 52m — MARK IT"',
+  $('stripHead').textContent === 'ADM · 52m — MARK IT', $('stripHead').textContent);
 advance(6000); settle();
 chk('strip auto-dismissed', $('strip').hidden);
 chk('ADM titled "ADM: ="', A()[0].t === 'ADM: =', A()[0].t);
@@ -314,15 +315,21 @@ chk('closing it leaves the block alone', A().length === 1 && /#open/.test(A()[0]
 chk('an unlit category still switches, it does not split',
   (tap('MTG'), settle(), A().length === 2 && !splitOpen()), A().map(show).join(' | '));
 
-console.log('\n15b. the mark strip takes the posture row, not a row of its own');
+console.log('\n15b. the mark strip hides nothing');
+/* REDESIGNED — the strip used to be an overlay on the footer, so for its six
+ * seconds it hid the posture control and STOP. It now sits at the bottom of
+ * the category column, which is the row it belongs to, and covers nothing.
+ * The old assertions pinned the overlay; these pin what replaced it. */
 reset(); reboot();
 tap('ADM'); wait(40);
-chk('posture pill visible before', !$('posture').hidden);
+chk('the posture control is there before', !$('postureBtn').hidden);
 tap('DW'); settle();
 chk('strip up', !$('strip').hidden);
-chk('and the posture pill is what it replaced', $('posture').hidden);
+chk('and the posture control is still there', !$('postureBtn').hidden);
+chk('so the footer is not what the strip replaced', !$('postureBtn').hidden,
+  $('postureBtn').className);
 tapMark('+');
-chk('choosing a mark gives posture straight back', $('strip').hidden && !$('posture').hidden);
+chk('choosing a mark dismisses the strip', $('strip').hidden);
 chk('the mark still landed', A()[0].t === 'ADM: +', A()[0].t);
 
 console.log('\n16. DST spring forward produces no negative durations');
@@ -599,34 +606,40 @@ tap('DW'); settle();
 chk('re-tapping the lit button still opens SPLIT', splitOpen());
 chk('without arming it', armedKey() === null, String(armedKey()));
 
-console.log('\n26. the note and the clock live in the lit box');
+console.log('\n26. the note belongs to the block that is running');
+/* REDESIGNED — there used to be a note box inside every category tile, of which
+ * only the lit one was live. There is one box now, in the NOW panel, and it
+ * belongs to whatever is running. The clock is in two places on purpose: the
+ * panel says it big, and the running row says it small. */
 reset(); reboot();
 const cellOf = k => $('grid').children.find(c => c.dataset.key === k);
 const catCells = () => $('grid').children.filter(c => c.dataset.key);
 chk('an idle grid shows no clock anywhere',
   catCells().every(c => c.querySelector('.ge').textContent === ''));
+chk('and the panel says nothing is running',
+  $('nowEl').textContent === '—' && /NOTHING RUNNING/.test($('nowKick').textContent),
+  $('nowKick').textContent + ' / ' + $('nowEl').textContent);
 
 tap('DW'); wait(12);
-chk('the lit box carries the clock', /1[123]m/.test(elapsedBox()), elapsedBox());
-chk('and no unlit box does',
+chk('the running row carries the clock', /1[123]m/.test(elapsedBox()), elapsedBox());
+chk('the panel carries it too', /1[123]m/.test($('nowEl').textContent), $('nowEl').textContent);
+chk('the panel names the block and when it started',
+  $('nowName').textContent === 'Deep work' && /NOW · SINCE/.test($('nowKick').textContent),
+  $('nowName').textContent + ' / ' + $('nowKick').textContent);
+chk('and no unlit row shows a clock',
   catCells().filter(c => c.dataset.key !== 'DW')
     .every(c => c.querySelector('.ge').textContent === ''));
 
 noteBox().value = 'memo drafting'; noteBox().fire('input');
 advance(1000); settle();
-chk('typing in the lit box titles the block', A()[0].t === 'DW: memo drafting', A()[0].t);
+chk('typing in the panel titles the running block', A()[0].t === 'DW: memo drafting', A()[0].t);
 
-wait(30); tap('MTG'); tap('MTG'); settle();
+wait(30); tap('MTG'); settle();
 chk('the note stayed with the block it described', A()[0].t === 'DW: memo drafting =', A()[0].t);
-chk('the newly lit box offers an empty note', noteBox().value === '', noteBox().value);
-chk('the box that went dark drops its note',
-  cellOf('DW').querySelector('.gn').value === '', cellOf('DW').querySelector('.gn').value);
-chk('and its clock', cellOf('DW').querySelector('.ge').textContent === '');
-
-const stale = cellOf('FRAG').querySelector('.gn');
-stale.value = 'typed into the wrong box'; stale.fire('input');
-advance(1000); settle();
-chk('an unlit box cannot write a note', A()[1].t === 'MTG:', A()[1].t);
+chk('and the panel offers an empty note for the new block',
+  noteBox().value === '', noteBox().value);
+chk('the row that went dark drops its clock',
+  cellOf('DW').querySelector('.ge').textContent === '');
 
 console.log('\n26b. a long block flags itself in place');
 reset(); reboot();
@@ -694,36 +707,34 @@ chk('the rollup carries all ten', (function () {
 })());
 reset();
 
-console.log('\n28. the grid puts each thing where it belongs');
+console.log('\n28. the category list puts each thing where it belongs');
+/* REDESIGNED — this was a two-column tile grid filled from the bottom up, so
+ * that the categories sat nearest the thumb and the add box sat furthest from
+ * it. It is a single-column ruled list now, in config order, with Add at the
+ * end. Two things that cost the old grid real bugs are gone by construction:
+ * there is no column count to get wrong, and there are no empty slots — the
+ * ghost box beside the add box cannot come back, because nothing pads a list. */
 reset(); reboot();
 const kidsOf = () => $('grid').children;
 const shape = () => kidsOf().map(c => c.dataset.key || (c.dataset.add ? '+' : '_')).join(' ');
 
-chk('always two columns', kidsOf().length % 2 === 0, String(kidsOf().length));
-chk('no box ever spans a row', kidsOf().every(c => !c.style.gridColumn), shape());
-chk('the add box is in the top row, furthest from the thumb',
-  kidsOf()[0].dataset.add === '1', shape());
-chk('the bottom row is two categories, not one and a button',
-  kidsOf()[kidsOf().length - 2].dataset.key === 'DW' &&
-  kidsOf()[kidsOf().length - 1].dataset.key === 'MTG', shape());
-// Bottom row first, left to right within a row: DW MTG ADM BODY REL FRAG.
-chk('categories run in config order up the grid',
-  shape() === '+ _ REL FRAG ADM BODY DW MTG', shape());
-chk('an odd count leaves one empty cell, also in the top row',
-  kidsOf().filter(c => !c.dataset.key && c.dataset.add !== '1').length === 1 &&
-  kidsOf().findIndex(c => !c.dataset.key && c.dataset.add !== '1') < 2, shape());
+chk('one row per category, in config order, then Add',
+  shape() === 'DW MTG ADM BODY REL FRAG +', shape());
+chk('every row is a category or the add row — no empty slots',
+  kidsOf().every(c => c.dataset.key || c.dataset.add === '1'), shape());
+chk('the add row is last', kidsOf()[kidsOf().length - 1].dataset.add === '1', shape());
+chk('and nothing is laid out in columns',
+  kidsOf().every(c => !c.style.gridColumn), shape());
 
-console.log('\n28b. a full grid has no add box and no gap');
+console.log('\n28b. a full list has no add row');
 reset();
 for (let i = 0; clientConfig_().categories.length < 10; i++) addCategory('Extra ' + i);
 reboot();
-chk('ten cells exactly', kidsOf().length === 10, String(kidsOf().length));
-chk('no add box', kidsOf().every(c => c.dataset.add !== '1'));
-chk('every cell is a category', kidsOf().every(c => !!c.dataset.key), shape());
-chk('and nothing spans', kidsOf().every(c => !c.style.gridColumn));
-chk('the first two categories still hold the bottom row',
-  kidsOf()[kidsOf().length - 2].dataset.key === 'DW' &&
-  kidsOf()[kidsOf().length - 1].dataset.key === 'MTG', shape());
+chk('ten rows exactly', kidsOf().length === 10, String(kidsOf().length));
+chk('no add row', kidsOf().every(c => c.dataset.add !== '1'));
+chk('every row is a category', kidsOf().every(c => !!c.dataset.key), shape());
+chk('and the first configured category is still first',
+  kidsOf()[0].dataset.key === 'DW', shape());
 reset();
 
 console.log('\n29. the rollup reports keys, not whatever had a colon in it');
@@ -935,31 +946,35 @@ chk('and flips it when sitting', el31('postureBtn').getAttribute('aria-pressed')
 console.log('\n31b. the mark strip is always one tap from gone');
 reset(); reboot();
 tap('ADM'); wait(40); tap('DW'); settle();
-chk('strip up, posture row covered', !$('strip').hidden && $('posture').hidden);
+chk('strip up', !$('strip').hidden);
 $('strip').fire('click', { target: { closest: function () { return null; } } });
 settle();
-chk('tapping the strip itself dismisses it', $('strip').hidden && !$('posture').hidden);
+chk('tapping the strip itself dismisses it', $('strip').hidden);
 chk('and the default mark still stands', A()[0].t === 'ADM: =', A()[0].t);
 posture('sit'); settle();
 chk('so the posture row is usable again', litPosture() === 'sit');
 reset();
 
-console.log('\n32. the label is sized for the column it gets');
+console.log('\n32. a long category name stays on one line');
+/* REDESIGNED — the label used to shrink from 26px to 19px when the tile grid
+ * went to three columns. A list row has the full width, so the size is fixed
+ * and a long name is ellipsized instead. */
 reset(); reboot();
-const faceSize = k => $('grid').children.find(c => c.dataset.key === k).querySelector('.k').style.fontSize;
-chk('two columns give the label full size', faceSize('DW') === '26px', faceSize('DW'));
+const faceOfRow = k => $('grid').children.find(c => c.dataset.key === k).querySelector('.k');
+chk('the name has no inline size — the stylesheet owns it',
+  !faceOfRow('DW').style.fontSize, String(faceOfRow('DW').style.fontSize));
 
 const real32 = CATEGORIES.slice();
 for (let i = CATEGORIES.length; i < 11; i++)
   CATEGORIES.push({ key: 'X' + i, label: 'Extra ' + i, color: String((i % 11) + 1), autoMark: null });
 reboot();
-chk('eleven categories move to three columns',
-  $('grid').style.gridTemplateColumns === 'repeat(3, 1fr)', $('grid').style.gridTemplateColumns);
-chk('and the label shrinks to fit a narrower cell', faceSize('DW') === '19px', faceSize('DW'));
+chk('eleven categories are eleven rows',
+  $('grid').children.filter(c => c.dataset.key).length === 11,
+  String($('grid').children.length));
 chk('every configured category is still on screen',
   CATEGORIES.every(c => $('grid').children.some(x => x.dataset.key === c.key)));
-chk('the first two still hold the bottom row',
-  $('grid').children[$('grid').children.length - 3].dataset.key === 'DW',
+chk('and the first is still first',
+  $('grid').children[0].dataset.key === 'DW',
   $('grid').children.map(c => c.dataset.key || '_').join(' '));
 CATEGORIES.length = 0; real32.forEach(c => CATEGORIES.push(c));
 reset(); reboot();
@@ -2449,7 +2464,7 @@ chk('one tap shows no strip and closes nothing',
 tapStop(); settle();
 chk('the strip is visible', !$('strip').hidden);
 chk('and names the block and its duration',
-  $('stripHead').textContent === 'DW closed · 40m', $('stripHead').textContent);
+  $('stripHead').textContent === 'DW · 40m — MARK IT', $('stripHead').textContent);
 tapMark('+');
 chk('and the mark it offers still lands', A()[0].t === 'DW: +', A()[0].t);
 

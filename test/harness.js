@@ -391,10 +391,10 @@ const armedText = () => {
   const cf = b && b.querySelector('.cf');
   return cf ? cf.textContent : '';
 };
-const noteBox = () => {
-  const b = $('grid').children.find(c => c._cls.has('active'));
-  return b ? b.querySelector('.gn') : null;
-};
+/* The note belongs to the block that is running, and the block that is running
+   is named in the NOW panel — so the note lives there too, one box rather than
+   one per category. It used to sit inside the lit cell. */
+const noteBox = () => NODES['note'] || null;
 const elapsedBox = () => {
   const b = $('grid').children.find(c => c._cls.has('active'));
   return b ? b.querySelector('.ge').textContent : '';

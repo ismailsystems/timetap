@@ -654,7 +654,7 @@ function mondayStartMs_(refMs, offsetWeeks) {
  * ═══════════════════════════════════════════════════════════════════ */
 
 function getState() {
-  var out = { nowMs: Date.now(), tz: tz_(), open: null, sit: null, notes: [] };
+  var out = { nowMs: Date.now(), tz: tz_(), open: null, sit: null, notes: [], today: [] };
 
   var ca = calActual_();
   var evA = findOpen_(ca);
@@ -672,6 +672,23 @@ function getState() {
       startMs: evA.getStartTime().getTime()
     };
   }
+
+  /*
+   * Today's closed blocks, for the day rail. The client draws the day as a
+   * timeline, and a timeline of one block is not a timeline — it needs the
+   * blocks that came before the open one, which it has no other way to know.
+   *
+   * Read-only, tolerant, and clipped to the local day. The open block is NOT
+   * in here: the client appends that itself, because only the client knows
+   * what it believes is running while a write is still in the queue.
+   */
+  var dayLo = localMidnightMs_(Date.now());
+  readCal_(calId_('CAL_ACTUAL'), dayLo, addLocalDaysMs_(dayLo, 1)).forEach(function (e) {
+    var q = parseTitle_(e.title);
+    if (q && q.key === 'UNLOGGED') return;      // a gap is drawn as a gap, not a block
+    if (evA && e.start === evA.getStartTime().getTime()) return;          // the open one
+    out.today.push({ key: q ? q.key : UNFILED_KEY, startMs: e.start, endMs: e.end });
+  });
 
   var cs = calSitting_();
   var evS = findOpen_(cs);

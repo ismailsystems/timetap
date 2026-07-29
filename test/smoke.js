@@ -47,11 +47,18 @@
       var k = c.querySelector('.k');
       return k && k.textContent.trim();
     }), cats.length + ' cells');
-  ok('every category cell has its note field',
-    cats.every(function (c) { return !!c.querySelector('.gn'); }),
+  /* The note is one box, in the NOW panel, belonging to whatever is running —
+     it used to be one box per category. Still worth checking it survived the
+     parser: an <input> written into a <button> is silently dropped, and that
+     is the bug this check has always been about. */
+  ok('the NOW panel has its note field',
+    !!document.getElementById('note') &&
+    document.getElementById('note').tagName === 'INPUT',
     'a <button> would have had the <input> stripped');
-  ok('every category cell has its clock',
+  ok('every category row has its clock',
     cats.every(function (c) { return !!c.querySelector('.ge'); }));
+  ok('every category row has its colour swatch',
+    cats.every(function (c) { return !!c.querySelector('.sw'); }));
 
   // ── viewport ────────────────────────────────────────────────────
   var h = app ? app.getBoundingClientRect().height : 0;
@@ -69,19 +76,28 @@
     var e = document.getElementById(id);
     return e && getComputedStyle(e).display !== 'none';
   };
-  ok('exactly one posture figure is visible',
-    (vis('icSit') ? 1 : 0) + (vis('icStand') ? 1 : 0) === 1,
-    'sit=' + vis('icSit') + ' stand=' + vis('icStand'));
+  /* The two posture figures were dropped: the footer says the state in words
+     with a dot beside it. Two channels still, so it does not rest on colour —
+     the label changes as well as the dot. */
+  var pdot = document.getElementById('postureDot');
+  var plab = document.getElementById('postureLabel');
+  ok('the posture state is shown as a dot and a word',
+    !!pdot && !!plab && vis('postureDot') &&
+    /SITTING/.test(plab.textContent),
+    'dot=' + vis('postureDot') + ' label="' + (plab ? plab.textContent : '') + '"');
 
   /* STOP is the only control that ends the day. A day that cannot be ended is
      a phantom block every night, so "it rendered" is worth checking on its own
      — reachable, hittable, and named for a screen reader. */
   var stopBtn = document.getElementById('stopBtn');
   var stopRect = stopBtn ? stopBtn.getBoundingClientRect() : null;
+  /* STOP shows only while a block runs — ending a day that has not started is
+     not a thing to offer. So this checks that it exists and is named, and that
+     WHEN it is displayed it is big enough to hit. */
+  var stopShown = !!stopBtn && getComputedStyle(stopBtn).display !== 'none';
   ok('the STOP control exists, is reachable and carries a label',
     !!stopBtn && stopBtn.tagName === 'BUTTON' &&
-    getComputedStyle(stopBtn).display !== 'none' &&
-    stopRect.width >= 44 && stopRect.height >= 44 &&
+    (!stopShown || (stopRect.width >= 44 && stopRect.height >= 44)) &&
     !!(stopBtn.getAttribute('aria-label') || stopBtn.textContent.trim()),
     stopBtn ? (stopBtn.tagName + ' ' + Math.round(stopRect.width) + 'x' +
                Math.round(stopRect.height) + ' label="' +
@@ -105,17 +121,19 @@
 
   // ── geometry ────────────────────────────────────────────────────
   var widths = {};
-  cells.forEach(function (c) { widths[px(c.getBoundingClientRect().width)] = 1; });
-  ok('every cell is the same width', Object.keys(widths).length === 1,
+  cats.forEach(function (c) { widths[px(c.getBoundingClientRect().width)] = 1; });
+  ok('every category row is the same width', Object.keys(widths).length === 1,
     Object.keys(widths).join(' / '));
   var heights = {};
-  cells.forEach(function (c) { heights[px(c.getBoundingClientRect().height)] = 1; });
-  ok('every cell is the same height regardless of state',
+  cats.forEach(function (c) { heights[px(c.getBoundingClientRect().height)] = 1; });
+  ok('every category row is the same height regardless of state',
     Object.keys(heights).length === 1, Object.keys(heights).join(' / '));
-  // Derived, not hardcoded: the column count changes above ten categories, and
-  // a check that assumes two would fail on a grid that is perfectly correct.
-  var cols = getComputedStyle(grid).gridTemplateColumns.split(' ').length;
-  ok('every row is full', cells.length % cols === 0, cells.length + ' cells / ' + cols + ' cols');
+  /* One column, so there is no column count to get wrong and no slot to leave
+     empty. The tile grid had both, and both cost real bugs. */
+  ok('the categories are one column',
+    cats.every(function (c) {
+      return Math.abs(c.getBoundingClientRect().left - cats[0].getBoundingClientRect().left) < 1;
+    }), 'rows must share a left edge');
   /* Wrapping is not overflow, so the width check above passes happily while a
      word is being sliced in half. "Fragments" rendering as "Fragmen ts" is the
      shape of this bug. A label may use as many lines as it has words, no more. */

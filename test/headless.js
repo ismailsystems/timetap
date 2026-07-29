@@ -469,7 +469,7 @@ async function checkPostureRow(browser, view, page) {
         sit: { ref: 'eeeeffff11112222', startMs: now - 60 * 60000 },
         lastTapMs: 0
       }));
-      // Pending writes, so #sync is visible rather than hidden.
+      // Pending writes, so the header's sync line says so.
       localStorage.setItem('tt.queue.v1', JSON.stringify([
         { id: 'q1', type: 'setMark', ref: 'aaaabbbbccccdddd', mark: '-', ts: now },
         { id: 'q2', type: 'setText', ref: 'aaaabbbbccccdddd', text: 'x', ts: now }
@@ -486,8 +486,8 @@ async function checkPostureRow(browser, view, page) {
         const r = el.getBoundingClientRect();
         return r.width > 0 && r.height > 0;
       };
-      const posture = document.getElementById('posture');
       const row = document.getElementById('postureRow');
+      const posture = row;
       /* Leaves, not direct children: the sit-clock and STOP now sit in a box of
          their own, so that an armed STOP can take that box and leave the
          posture toggle tappable. A direct-children scan stopped seeing them and
@@ -632,8 +632,7 @@ async function checkPostureRow(browser, view, page) {
             holderOverflows: holder
               ? holder.scrollHeight > holder.clientHeight + 1 : false,
             holderId: holder ? (holder.id || holder.className) : null,
-            heightOverflows: box.bottom > document.getElementById('posture')
-              .getBoundingClientRect().bottom + 1
+            heightOverflows: box.bottom > row.getBoundingClientRect().bottom + 1
           };
         })() : null,
         docScrollsX: document.documentElement.scrollWidth > document.documentElement.clientWidth + 1,
@@ -651,7 +650,10 @@ async function checkPostureRow(browser, view, page) {
 
     // The worst case is only worth measuring if it actually assembled.
     const ids = g.kids.map(k => k.id);
-    const wanted = ['sync', 'postureBtn', 'sitEdit', 'stopBtn'];
+    /* The sync state left this row in the redesign: it is a sentence in the
+       header now, because a dot cannot say "two writes are set aside". So the
+       worst case here is three things, not four. */
+    const wanted = ['postureBtn', 'sitEdit', 'stopBtn'];
     const missing = wanted.filter(w => !ids.includes(w));
     if (missing.length) {
       problems.push(label + ': the worst case did not assemble — ' + missing.join(', ') +
@@ -842,9 +844,18 @@ async function checkPostureRow(browser, view, page) {
       if (g4.stripHidden !== true) {
         problems.push(label + ': tapping the strip away from a mark did not dismiss it');
       }
-      if (!g4.stopVisible) {
-        problems.push(label + ': STOP is not visible after the strip is dismissed');
-      } else if (g4.stopHitTarget !== 'stopBtn') {
+      /* STOP is gone here for the right reason: the day just ended, so nothing
+         is running and there is nothing to end. What must come back is the
+         posture control, which the strip used to cover. */
+      if (g4.stopVisible) {
+        problems.push(label + ': STOP is still shown after the day was ended — there is ' +
+                      'nothing left for it to end');
+      }
+      if (g4.postureHitTarget !== 'postureBtn') {
+        problems.push(label + ': the posture control is not hittable after the strip is ' +
+                      'dismissed — the element at its centre is ' + g4.postureHitTarget);
+      }
+      if (false) {
         problems.push(label + ': STOP is visible but not hittable after the strip is dismissed — ' +
                       'the element at its centre is ' + g4.stopHitTarget);
       }
@@ -927,7 +938,7 @@ async function checkSplitScope(browser, view, page) {
           small: r.width < TOUCH_TARGET || r.height < TOUCH_TARGET
         };
       };
-      const body = document.querySelector('#sheetSplit .sheetbody');
+      const body = document.getElementById('sheetSplit');
       const lab = document.getElementById('spGridLab');
       return {
         rem: one('spScopeRem'), all: one('spScopeAll'),
@@ -1225,9 +1236,9 @@ async function checkNoteAndSheets(browser, view, page) {
     await pg.waitForTimeout(150);
 
     // ── 1. the note box keeps its own keys ─────────────────────────
-    const note = pg.locator('#grid [data-key="DW"] .gn');
+    const note = pg.locator('#note');
     if (!await note.isVisible()) {
-      problems.push(label + ': the lit cell has no visible note box, so the checks ' +
+      problems.push(label + ': the NOW panel has no visible note box, so the checks ' +
                     'below could not run');
       return problems;
     }
@@ -1269,7 +1280,7 @@ async function checkNoteAndSheets(browser, view, page) {
         const box = id => { const r = document.getElementById(id).getBoundingClientRect();
                             return { w: +r.width.toFixed(1), h: +r.height.toFixed(1) }; };
         return { apply: box('ssApply'), del: box('ssDelete'), close: box('ssClose'),
-                 body: document.querySelector('#sheetSit .sheetbody').getBoundingClientRect().height };
+                 body: document.getElementById('sheetSit').getBoundingClientRect().height };
       });
       console.log('  sit sheet:        APPLY ' + Math.round(btns.apply.w) + 'x' + Math.round(btns.apply.h) +
                   ', DISCARD ' + Math.round(btns.del.w) + 'x' + Math.round(btns.del.h));
@@ -1293,34 +1304,39 @@ async function checkNoteAndSheets(browser, view, page) {
     const cells = await pg.evaluate(() => [].slice.call(document.getElementById('grid').children)
       .map(c => {
         const s = getComputedStyle(c);
+        const sw = c.querySelector('.sw');
+        const ss = sw ? getComputedStyle(sw) : null;
         return { cls: c.className, key: c.dataset.key || null,
                  shadow: s.boxShadow, borderStyle: s.borderTopStyle, borderWidth: s.borderTopWidth,
+                 swBorder: ss ? ss.borderTopStyle : 'none',
+                 swBorderWidth: ss ? ss.borderTopWidth : '0px',
                  bg: s.backgroundColor };
       }));
     const spacers = cells.filter(c => /gspacer/.test(c.cls));
     const add = cells.filter(c => /addcell/.test(c.cls));
     console.log('  grid slots:       ' + cells.length + ' (' + spacers.length + ' empty, ' +
-                add.length + ' add box)');
-    if (!spacers.length) {
-      problems.push(label + ': the grid has no empty slot at this category count, so the ' +
-                    'check below proved nothing. Seed a count that leaves one.');
+                add.length + ' add row)');
+    /* REDESIGNED — the tile grid padded its last row with empty slots, and one
+       of them was drawn with a faint outline that read as a box you could tap.
+       A list has no slots to pad, so the fix became structural: the check is
+       now that none exists at all, rather than that the ones that do are
+       invisible. */
+    if (spacers.length) {
+      problems.push(label + ': the category list has ' + spacers.length + ' empty slot(s). ' +
+                    'A list pads nothing — this is the tile grid coming back.');
     }
-    spacers.forEach(c => {
-      const marks = [];
-      if (c.shadow && c.shadow !== 'none') marks.push('box-shadow ' + c.shadow);
-      if (c.borderStyle && c.borderStyle !== 'none' && parseFloat(c.borderWidth) > 0) {
-        marks.push('border ' + c.borderWidth + ' ' + c.borderStyle);
-      }
-      if (marks.length) {
-        problems.push(label + ': an empty grid slot is drawn with ' + marks.join(' and ') +
-                      ', so it reads as a box you can tap and cannot');
-      }
+    cells.forEach(c => {
+      if (c.key || /addcell/.test(c.cls)) return;
+      problems.push(label + ': a row in the category list is neither a category nor the ' +
+                    'add row: ' + JSON.stringify(c.cls));
     });
-    /* And the add box must still look like something, or the rule above is
-       satisfied by making the whole grid invisible. */
-    if (add.length && add[0].borderStyle === 'none') {
-      problems.push(label + ': the add box has no outline of its own, so "an empty slot ' +
-                    'shows nothing" is being met by showing nothing anywhere');
+    /* And the add row must still look like something, or "no empty slots" is
+       satisfied by a list with nothing in it. Its mark is the dashed square. */
+    if (!add.length) {
+      problems.push(label + ': there is no add row, so the check above proved nothing');
+    } else if (add[0].swBorder === 'none' || !parseFloat(add[0].swBorderWidth)) {
+      problems.push(label + ': the add row has no dashed square of its own, so it does not ' +
+                    'read as a slot for a category');
     }
 
     if (errors.length) problems.push(label + ': the page threw: ' + errors.join(' | '));
