@@ -1129,6 +1129,18 @@
     var now = Date.now();
 
     if (S.open && S.open.key === key) {
+      /*
+       * Round 1 taught a double tap: the first armed a change and the second
+       * confirmed it. Here the first already switched, so that reflex lands on
+       * the row which has just become current, opens SPLIT and clears the undo
+       * ribbon. The old habit silently removed the new guardrail.
+       *
+       * Only this route waits. The NOW panel still opens SPLIT immediately,
+       * which is the deliberate new intention openSplit's clearUndo describes.
+       * Once the ribbon expires, the running row is the ordinary route again.
+       * FIXES-5 B3, the human's ruling.
+       */
+      if (undo) return;
       // The running row is the way into SPLIT, exactly as the NOW panel is.
       openSplit();
       return;

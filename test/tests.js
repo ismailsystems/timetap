@@ -319,10 +319,11 @@ tap('DW'); advance(10000); settle();
 const before15 = A().map(e => e.t + e.s + e.e).join('|');
 tap('DW'); settle();
 /* REDESIGNED — there used to be a window in which re-tapping the running row
- * did nothing, because below it nothing about the block was settled. There is
- * no window now: the running row is the way into SPLIT, whenever you tap it,
- * and SPLIT writes nothing until a category is picked. */
-chk('re-tapping it opens SPLIT even seconds in',
+ * did nothing, because below it nothing about the block was settled. The only
+ * window now belongs to UNDO: section 62 pins that a reflex second tap cannot
+ * throw the way back away. Once those five seconds end, the running row is the
+ * way into SPLIT, and SPLIT writes nothing until a category is picked. */
+chk('re-tapping it opens SPLIT after UNDO expires',
   splitOpen() && A().length === 1 && A().map(e => e.t + e.s + e.e).join('|') === before15,
   'sheet=' + splitOpen() + ' ' + A().map(show).join(' | '));
 $('spClose').fire('click'); settle();
@@ -4240,17 +4241,29 @@ chk('the app noticed the SIT ended elsewhere', litPosture() === 'stand',
 chk('and the sheet aimed at it closed too', !sitSheetOpen(), 'open=' + sitSheetOpen());
 
 console.log('\n62. the undo ribbon does not survive into SPLIT');
-/* REDESIGNED — this pinned an armed category keeping its TAP AGAIN label behind
- * the sheet. Nothing arms now. What can outlive its moment is the undo ribbon,
- * so that is what is checked: opening SPLIT is a new intention, and a way back
- * to the previous one has no business sitting under it. */
+/*
+ * FIXES-5 B3, and the human's ruling. Round 1 taught a double tap: one tap armed
+ * the change and the second confirmed it. The redesign acts on the first tap,
+ * so the same reflex sends its second tap to the row that has just become
+ * current. That row normally opens SPLIT, and openSplit clears UNDO — the old
+ * habit silently destroyed the new guardrail.
+ *
+ * During the ribbon's five seconds, that one route is inert. The NOW panel is
+ * still the deliberate, immediate route into SPLIT, and opening it still clears
+ * the ribbon because it is a new intention. Once the ribbon expires, the row
+ * re-tap opens SPLIT normally again.
+ */
 reset(); reboot();
 tap('DW'); settle(); advance(30000); settle();
 tap('MTG'); settle();
 chk('the ribbon is up after a switch', !$('undo').hidden, $('undo').className);
-tap('MTG'); settle();                            // re-tap the running row: SPLIT
-chk('SPLIT opened', splitOpen());
-chk('and the ribbon is gone', $('undo').hidden, $('undo').className);
+tap('MTG'); settle();                            // the reflex second tap
+chk('a same-row re-tap during UNDO does not open SPLIT', !splitOpen());
+chk('and it leaves the way back in place', !$('undo').hidden, $('undo').className);
+$('nowPanel').fire('click'); settle();           // the explicit route still means SPLIT
+chk('the NOW panel still opens SPLIT immediately', splitOpen());
+chk('and that deliberate new intention clears the ribbon',
+  $('undo').hidden, $('undo').className);
 
 console.log('\n63. reaching for the posture toggle does not end the day');
 /* REDESIGNED for A5, and the successor to "the posture toggle cancels an armed
