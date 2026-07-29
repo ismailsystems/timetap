@@ -414,7 +414,7 @@
 </div>
 
 <!-- ── set-aside writes ─────────────────────────────────────────── -->
-<div id="sheetDead" class="view hidden">
+<div id="sheetDead" class="view hidden" role="dialog" aria-modal="true" aria-labelledby="dgTitle">
   <div class="vhead">
     <div class="vtitle" id="dgTitle">SET ASIDE</div>
     <button id="dgClose" class="fbtn">DONE</button>
@@ -424,7 +424,7 @@
 </div>
 
 <!-- ── split ────────────────────────────────────────────────────── -->
-<div id="sheetSplit" class="view hidden">
+<div id="sheetSplit" class="view hidden" role="dialog" aria-modal="true" aria-label="SPLIT">
   <div class="vhead">
     <div class="vtitle">SPLIT</div>
     <button id="spClose" class="fbtn">DONE</button>
@@ -445,7 +445,7 @@
 </div>
 
 <!-- ── sit start ────────────────────────────────────────────────── -->
-<div id="sheetSit" class="view hidden">
+<div id="sheetSit" class="view hidden" role="dialog" aria-modal="true" aria-label="SITTING START">
   <div class="vhead">
     <div class="vtitle">SITTING START</div>
     <button id="ssClose" class="fbtn">DONE</button>
@@ -497,7 +497,8 @@
   var localGen = 0;
   var noteTimer = null;
   var unreadableShown = false;
-  var split = { atMs: 0, startMs: 0, nowMs: 0, whole: false };
+  // `ref` is which block this sheet is about. doSplit refuses to act on any other.
+  var split = { atMs: 0, startMs: 0, nowMs: 0, whole: false, ref: null };
   var sitEdit = { lo: 0, hi: 0, atMs: 0 };
 
   var $ = function (id) { return document.getElementById(id); };
@@ -951,12 +952,12 @@
   function openDead() {
     if (!deadCount()) return;
     renderDead();
-    $('sheetDead').classList.remove('hidden');
+    showSheet('sheetDead');
   }
 
   function closeDead() {
     disarmDead();
-    $('sheetDead').classList.add('hidden');
+    hideSheet('sheetDead');
     $('deadList').innerHTML = '';
   }
 
@@ -1119,6 +1120,16 @@
       openSplit();
       return;
     }
+
+    /*
+     * The block in hand is about to change, so any sheet naming the old one stops
+     * being about anything. This is the invariant doSplit's comment stated for two
+     * rounds while nothing enforced it — closeBlockSheets was reached only from
+     * quarantine and adoptServerState. doSplit's ref guard is what makes a stale
+     * write impossible; this is what stops the sheet lying on screen in the
+     * meantime. REVIEW-5's C3.
+     */
+    closeBlockSheets();
 
     var prev = S.open ? { ref: S.open.ref, key: S.open.key, text: S.open.text || '',
                           startMs: S.open.startMs } : null;
@@ -1466,6 +1477,8 @@
 
   function endDay() {
     var now = Date.now();
+    // Nothing will be in hand after this, so no sheet can be about anything.
+    closeBlockSheets();
     var prev = null, closeId = null, pending = null;
 
     // A close is a close: the mark strip appears here exactly as it does on a
@@ -1906,6 +1919,7 @@
     clearUndo();
     render();
     setSplitScope(false);            // every opening starts on the safer of the two
+    split.ref = S.open.ref;          // which block this sheet is about
     split.startMs = S.open.startMs;
     split.nowMs = Date.now();
     var span = Math.max(1, Math.round((split.nowMs - split.startMs) / MS_MIN));
@@ -1916,7 +1930,7 @@
     $('spStart').textContent = clock(split.startMs);
     $('spNow').textContent = clock(split.nowMs);
     renderSplit();
-    $('sheetSplit').classList.remove('hidden');
+    showSheet('sheetSplit');
   }
 
   function renderSplit() {
@@ -1949,11 +1963,27 @@
   }
 
   function doSplit(key) {
-    if (!S.open) { $('sheetSplit').classList.add('hidden'); return; }
-    /* A closed sheet acts on nothing. The sheet closes when the block it names
-       stops being the one in hand, and in a browser its buttons go with it —
-       but "unreachable" is not something this should be trusting the CSS for,
-       and the block underneath is a different one by then. */
+    /*
+     * This sheet acts on the block it named, or on nothing.
+     *
+     * The comment that used to be here said the sheet closes when the block it
+     * names stops being the one in hand — and nothing enforced it. tapCategory,
+     * endDay and toggleSit never closed a sheet, and closeBlockSheets was reached
+     * only from quarantine and adoptServerState. So the sheet went on naming DEEP
+     * WORK and holding DEEP WORK's start while MEETINGS was in hand, and picking a
+     * remainder wrote splitActual against the NEW ref with the OLD cut time — an
+     * atMs before the block it names began. opSplitActual_ accepts a backwards cut
+     * and endEventAt_ clamps it, so it landed with no error: DW 09:00-09:43 with
+     * ADM 09:22-09:43 inside it, twenty-one minutes billed twice.
+     *
+     * The sheets close on a switch and on STOP now, and are modal besides. This is
+     * the guard that does not care: it compares refs, so the corruption is
+     * unreachable whether or not some future path remembers to close anything, and
+     * without trusting the stylesheet with the record. REVIEW-5's C3.
+     */
+    if (!S.open || S.open.ref !== split.ref) { hideSheet('sheetSplit'); return; }
+    // And a closed sheet acts on nothing, for the same reason: "unreachable" is
+    // not something this should be trusting the CSS for.
     if ($('sheetSplit').classList.contains('hidden')) return;
     if (split.whole) { recatWhole(key); return; }
     var at = split.atMs, now = Date.now();
@@ -1970,7 +2000,7 @@
     // No posture write here. Choosing what the remainder was is a statement about
     // the record, not about the user's body — see tapCategory.
     hideStrip();
-    $('sheetSplit').classList.add('hidden');
+    hideSheet('sheetSplit');
     saveState(); render(); flush();
   }
 
@@ -1994,7 +2024,7 @@
       // And no posture write here either, as a tap does not make one.
     }
     hideStrip();
-    $('sheetSplit').classList.add('hidden');
+    hideSheet('sheetSplit');
     saveState(); render(); flush();
   }
 
@@ -2012,7 +2042,7 @@
     $('ssLo').textContent = clock(sitEdit.lo);
     $('ssHi').textContent = clock(sitEdit.hi);
     renderSitEdit();
-    $('sheetSit').classList.remove('hidden');
+    showSheet('sheetSit');
   }
 
   function renderSitEdit() {
@@ -2040,9 +2070,67 @@
     var shut = false;
     ['sheetSplit', 'sheetSit'].forEach(function (id) {
       var el = $(id);
-      if (el && !el.classList.contains('hidden')) { el.classList.add('hidden'); shut = true; }
+      if (el && !el.classList.contains('hidden')) { hideSheet(id); shut = true; }
     });
     return shut;
+  }
+
+  /* ── the sheets are modals ──────────────────────────────────────
+   *
+   * They are opaque and full-screen, and for two rounds that was all they were.
+   * No role, no aria-modal, the app behind them never made unreachable, focus
+   * never moved in and never came back, and Escape closed nothing. So the ten
+   * controls behind SPLIT came FIRST in the tab order — the tenth Tab was STOP —
+   * and a keyboard or VoiceOver user drove an app they could not see, on top of a
+   * sheet still naming a block that had moved on. REVIEW-5's C3.
+   *
+   * `inert` on #app is the whole of the first obligation, in one attribute: every
+   * control behind the sheet leaves the tab order AND the accessibility tree.
+   * Doing it by hand would mean a tabindex on every control and an aria-hidden
+   * besides, which is a list that goes stale the next time one is added.
+   *
+   * Mind the collision: `.inert` is also a CSS class, on #stopBtn, meaning
+   * display:none. This is the HTML attribute, which is a different thing with a
+   * different meaning, and the two never appear on the same element.
+   *
+   * role="dialog" and aria-modal="true" are in the markup rather than set here.
+   * They are true whenever the element exists, so they belong where a parser can
+   * be held to them — smoke.js checks them, as it does the ribbon's role.
+   */
+  var SHEET_IDS = ['sheetDead', 'sheetSplit', 'sheetSit'];
+  var SHEET_DONE = { sheetDead: 'dgClose', sheetSplit: 'spClose', sheetSit: 'ssClose' };
+  var sheetReturn = null;
+
+  function anySheetOpen() {
+    for (var i = 0; i < SHEET_IDS.length; i++) {
+      if (!$(SHEET_IDS[i]).classList.contains('hidden')) return true;
+    }
+    return false;
+  }
+
+  function showSheet(id) {
+    // Remembered before the app goes inert, because an inert ancestor drops focus.
+    if (!anySheetOpen()) sheetReturn = document.activeElement || null;
+    $(id).classList.remove('hidden');
+    $('app').setAttribute('inert', '');
+    /*
+     * Focus lands on DONE — the way out — rather than on the first control that
+     * changes something. A sheet that opens with the slider focused is one where
+     * a stray arrow key moves a cut time the user has not looked at yet.
+     */
+    var done = $(SHEET_DONE[id]);
+    if (done && typeof done.focus === 'function') done.focus();
+  }
+
+  function hideSheet(id) {
+    $(id).classList.add('hidden');
+    if (anySheetOpen()) return;                 // something else is still over it
+    $('app').removeAttribute('inert');
+    /* Back where it came from. Without this the next Tab starts at the top of the
+       document, which is a different place from the control that opened the
+       sheet, and on a long list that is most of a screen away. */
+    if (sheetReturn && typeof sheetReturn.focus === 'function') sheetReturn.focus();
+    sheetReturn = null;
   }
 
   function adoptServerState(st, gen) {
@@ -2166,12 +2254,12 @@
     if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); takeUndo(); }
   });
 
-  $('spClose').addEventListener('click', function () { $('sheetSplit').classList.add('hidden'); });
+  $('spClose').addEventListener('click', function () { hideSheet('sheetSplit'); });
   $('spRange').addEventListener('input', renderSplit);
   $('spScopeRem').addEventListener('click', function () { setSplitScope(false); });
   $('spScopeAll').addEventListener('click', function () { setSplitScope(true); });
 
-  $('ssClose').addEventListener('click', function () { $('sheetSit').classList.add('hidden'); });
+  $('ssClose').addEventListener('click', function () { hideSheet('sheetSit'); });
   $('ssRange').addEventListener('input', renderSitEdit);
   $('ssApply').addEventListener('click', function () {
     if (S.sit) {
@@ -2179,7 +2267,7 @@
       enqueue({ type: 'setSitStart', ref: S.sit.ref, startMs: sitEdit.atMs });
       saveState(); render(); flush();
     }
-    $('sheetSit').classList.add('hidden');
+    hideSheet('sheetSit');
   });
   $('ssDelete').addEventListener('click', function () {
     if (S.sit) {
@@ -2187,7 +2275,30 @@
       S.sit = null;
       saveState(); render(); flush();
     }
-    $('sheetSit').classList.add('hidden');
+    hideSheet('sheetSit');
+  });
+
+  /*
+   * The way out of a modal that is not a pointer.
+   *
+   * DONE is focused when a sheet opens, so a keyboard user always has one Tab-free
+   * way out — but Escape is the one every other application has taught them, and a
+   * modal that ignores it is a modal they have to hunt their way out of. The
+   * sheets write nothing on their own, so leaving one always costs a re-open and
+   * never costs a record.
+   *
+   * Topmost first. Only one can be open at a time now that opening makes the app
+   * inert, and the order says which one would win if that ever stopped being true.
+   */
+  document.addEventListener('keydown', function (e) {
+    if (e.key !== 'Escape') return;
+    for (var i = 0; i < SHEET_IDS.length; i++) {
+      if (!$(SHEET_IDS[i]).classList.contains('hidden')) {
+        if (SHEET_IDS[i] === 'sheetDead') closeDead(); else hideSheet(SHEET_IDS[i]);
+        if (e.preventDefault) e.preventDefault();
+        return;
+      }
+    }
   });
 
   window.addEventListener('online', function () { retryDelay = 4000; flush(); });

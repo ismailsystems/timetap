@@ -311,13 +311,23 @@ const MARKUP_IDS = new Set(
     .map(m => m.slice(4, -1))
 );
 const VIS = [];
+/*
+ * Document-level handlers by type, and not only visibilitychange.
+ *
+ * This used to keep visibilitychange and DROP everything else on the floor. The
+ * client puts a keydown on the document — Escape, the way out of a modal sheet —
+ * and a shim that silently discarded it would let every assertion about that key
+ * pass while nothing at all was listening. The same shape as the ids that used to
+ * resolve to invented nodes: a shim that answers politely hides the bug.
+ */
+const DOC_H = { visibilitychange: VIS };
 global.document = {
   getElementById: id => {
     if (!MARKUP_IDS.has(id)) return null;
     return NODES[id] || (NODES[id] = mkNode(id));
   },
   createElement: t => new El(t),
-  addEventListener(t, fn) { if (t === 'visibilitychange') VIS.push(fn); },
+  addEventListener(t, fn) { (DOC_H[t] || (DOC_H[t] = [])).push(fn); },
   hidden: false,
   activeElement: null
 };
@@ -475,19 +485,26 @@ function reboot() {
      it repaints on the way out — and it showed up as a running row belonging to
      a block two sections earlier. */
   timers = [];
-  /* And its visibilitychange handler, for the same reason. A real reload
-     replaces the page; this shim keeps one DOM and runs a second copy of the
-     client over it, so without this every reboot left another instance
-     listening. fireVisible() then woke all of them, each holding its own S and
-     each rendering into the shared DOM — a zombie could undo what the live
-     instance had just done, and the failure looked exactly like a product bug. */
-  VIS.length = 0;
+  /* And its document handlers, for the same reason. A real reload replaces the
+     page; this shim keeps one DOM and runs a second copy of the client over it,
+     so without this every reboot left another instance listening. fireVisible()
+     then woke all of them, each holding its own S and each rendering into the
+     shared DOM — a zombie could undo what the live instance had just done, and
+     the failure looked exactly like a product bug. Every type, not only
+     visibilitychange: a zombie Escape handler closes a sheet the live instance
+     opened. */
+  Object.keys(DOC_H).forEach(k => { DOC_H[k].length = 0; });
   Object.keys(NODES).forEach(k => delete NODES[k]);
   vm.runInThisContext(script(), { filename: 'Index.html' });
   settle();
 }
 
-module.exports = { LOGGED, fireVisible: () => VIS.forEach(f => f()), chk, skip, near, reset, reboot, META_ALLOWED, SCRIPT_PROPS, SHEETS, TRIGGERS,
+module.exports = { LOGGED, fireVisible: () => VIS.forEach(f => f()),
+  // A key the document is listening for, delivered the way the browser delivers
+  // it. Returns how many handlers heard it, so a test can refuse to pass on a
+  // build where nothing is listening.
+  fireDoc: (t, ev) => { const h = DOC_H[t] || []; h.forEach(f => f(ev || {})); return h.length; },
+  chk, skip, near, reset, reboot, META_ALLOWED, SCRIPT_PROPS, SHEETS, TRIGGERS,
   posture, activeKey, litPosture, noteBox, elapsedBox, nowElapsed, addCell,
   clearPropCache: () => { global.PROPS_ = null; }, tap, tapSit, tapMark, tapStop, stopArmedNow, stopLabel, armedText,
   wait, advance, settle, A, S, show, hhmm, $,

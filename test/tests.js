@@ -5364,6 +5364,133 @@ chk('a reload draws the same rail', segKinds().join(',') === drawn67d,
   segKinds().join(',') + ' vs ' + drawn67d);
 reset();
 
+console.log('\n77. a sheet acts on the block it named, and on nothing else');
+/* REVIEW-5's C3, the write half.
+ *
+ * doSplit states the invariant it relies on in its own comment — "the sheet
+ * closes when the block it names stops being the one in hand" — and nothing
+ * enforced it. tapCategory, endDay and toggleSit never closed a sheet, and
+ * closeBlockSheets was reached only from quarantine and adoptServerState.
+ *
+ * So the sheet could go on naming DEEP WORK, holding DEEP WORK's start, while
+ * MEETINGS was the block in hand. Picking a remainder then wrote splitActual
+ * against the NEW block's ref with the OLD block's cut time — an atMs twenty-one
+ * minutes before the block it names began. opSplitActual_ accepts a backwards cut
+ * and endEventAt_ clamps it, so it landed with zero errors: DW 09:00-09:43 with
+ * ADM 09:22-09:43 inside it, twenty-one minutes billed to two categories.
+ *
+ * Two things are checked here, and the second is the one that matters. Closing
+ * the sheet makes the comment true. REFUSING A STALE WRITE makes the corruption
+ * impossible whatever the sheet is doing — not reachable by touch, not reachable
+ * by keyboard, not reachable if a future path forgets to close it, and not
+ * dependent on the CSS having covered anything. A guard that needs a sheet to be
+ * hidden is a guard that trusts the stylesheet with the record. */
+reset(); reboot();
+tap('DW'); settle(); wait(43);
+tap('DW'); settle();                             // re-tap the running row: SPLIT
+chk('SPLIT is open and names the running block', !H.NODES['sheetSplit'].hidden &&
+  $('spLab').textContent === 'OPEN BLOCK · DEEP WORK', $('spLab').textContent);
+const dwStart77 = A()[0].s;
+tap('MTG'); settle();                            // the block in hand changes
+chk('a switch closes the sheet, which is what doSplit says happens',
+  H.NODES['sheetSplit'].hidden, $('sheetSplit').className);
+chk('and the switch itself was ordinary', activeKey() === 'MTG' && A().length === 2,
+  A().map(show).join(' | '));
+
+/* Now the guard, with the sheet forced back up — which is the state a keyboard
+   user reached for real, because the sheet was never closed for them at all. */
+H.NODES['sheetSplit']._cls.delete('hidden');
+/* Offline, so the queue can be read. Online it drains before the assertion, and
+   "no splitActual is queued" then passes on a build that wrote one. */
+H.setOnline(false);
+splitPick('ADM');
+chk('and no split op was queued',
+  !Q().some(o => o.type === 'splitActual'), JSON.stringify(Q().map(o => o.type)));
+H.setOnline(true); advance(60000); settle();
+chk('picking a remainder in a stale sheet writes nothing',
+  A().length === 2 && !A().some(e => /^ADM/.test(e.t)), A().map(show).join(' | '));
+chk('the block in hand is untouched', activeKey() === 'MTG', String(activeKey()));
+chk('and it closed the sheet rather than leaving it lying',
+  H.NODES['sheetSplit'].hidden, $('sheetSplit').className);
+chk('nothing overlaps: DEEP WORK still ends where MEETINGS begins',
+  A()[0].s === dwStart77 && A()[0].e === A()[1].s,
+  A().map(show).join(' | '));
+
+/* The whole-block scope reaches recatWhole instead, and needs the same guard. */
+reset(); reboot();
+tap('DW'); settle(); wait(43);
+tap('DW'); settle();
+pickWhole();
+tap('MTG'); settle();
+H.NODES['sheetSplit']._cls.delete('hidden');
+H.setOnline(false);
+splitPick('ADM');
+chk('recategorising a whole block in a stale sheet queues nothing',
+  !Q().some(o => o.type === 'recategorize' || o.type === 'splitActual'),
+  JSON.stringify(Q().map(o => o.type)));
+H.setOnline(true); advance(60000); settle();
+chk('and writes nothing', !A().some(e => /^ADM/.test(e.t)), A().map(show).join(' | '));
+
+/* STOP is the other way the block in hand stops existing. */
+reset(); reboot();
+tap('DW'); settle(); wait(43);
+tap('DW'); settle();
+tapStop(); settle();
+chk('STOP closes the sheet too', H.NODES['sheetSplit'].hidden, $('sheetSplit').className);
+chk('and the day really ended', activeKey() === null && openEvents().length === 0,
+  A().map(show).join(' | '));
+H.NODES['sheetSplit']._cls.delete('hidden');
+splitPick('ADM');
+chk('and with nothing in hand the sheet writes nothing',
+  A().length === 1 && !Q().some(o => o.type === 'splitActual'),
+  A().map(show).join(' | ') + ' // ' + JSON.stringify(Q().map(o => o.type)));
+
+console.log('\n77b. every sheet is a modal, and Escape is the way out of one');
+/* The other half of C3. The sheets are opaque and full-screen and were not
+ * modal: no role, no aria-modal, the app behind them never made inert, focus
+ * never moved in and never came back, and Escape closed nothing. So the ten
+ * controls behind SPLIT came FIRST in the tab order — the tenth Tab was STOP —
+ * and a keyboard or VoiceOver user operated an app they could not see.
+ *
+ * What a real parser and a real accessibility tree say about it belongs in
+ * smoke.js, and what a real Tab does belongs in headless.js. What is here is the
+ * behaviour: the attribute goes on, Escape takes it off again, and the app is
+ * only inert while something is over it. */
+['sheetSplit', 'sheetSit', 'sheetDead'].forEach(function (id) {
+  reset(); reboot();
+  if (id === 'sheetSplit') { tap('DW'); wait(43); settle(); tap('DW'); settle(); }
+  if (id === 'sheetSit') { tapSit(); wait(20); settle(); $('sitEdit').fire('click'); settle(); }
+  if (id === 'sheetDead') {
+    H.setServerReject('no');
+    tap('DW');
+    pump(() => DEAD().length > 0);
+    H.setServerReject(null);
+    $('err').fire('click'); settle();
+  }
+  chk(id + ' opened', !H.NODES[id].hidden, $(id).className);
+  /* role="dialog" and aria-modal="true" are declared in the markup, and this shim
+     borrows only `class` from it — so smoke.js checks those two against a real
+     parser and a real accessibility tree, exactly as it does for the ribbon's
+     role and tabindex in 66m. What is here is behaviour. */
+  chk(id + ': and the app behind it is inert',
+    el('app').getAttribute('inert') === '', String(el('app').getAttribute('inert')));
+  const heard = H.fireDoc('keydown', { key: 'Escape', preventDefault: function () {} });
+  settle();
+  chk(id + ': something is actually listening for a key', heard > 0, String(heard));
+  chk(id + ': Escape closes it', H.NODES[id].hidden, $(id).className);
+  chk(id + ': and the app is reachable again', el('app').getAttribute('inert') === null,
+    String(el('app').getAttribute('inert')));
+});
+/* And at rest, with nothing over it, the app is never inert — or the whole app is
+   unreachable and every check above passes anyway. */
+reset(); reboot();
+chk('at rest the app is not inert', el('app').getAttribute('inert') === null,
+  String(el('app').getAttribute('inert')));
+tap('DW'); settle();
+chk('and an ordinary tap does not make it inert', el('app').getAttribute('inert') === null,
+  String(el('app').getAttribute('inert')));
+reset();
+
 console.log('\n────────────────────────────────────────');
 console.log(H.pass + ' passed, ' + H.fail + ' failed' +
             (H.skipped.length ? ', ' + H.skipped.length + ' skipped' : ''));

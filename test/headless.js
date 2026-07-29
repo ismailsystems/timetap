@@ -1666,6 +1666,179 @@ async function checkReach(browser, view, page, n) {
  * ═══════════════════════════════════════════════════════════════════ */
 const RAIL_ORIGIN = 'http://timetap-rail.invalid/';
 
+/* ═══════════════════════════════════════════════════════════════════
+ * C3: a sheet is a modal, and Tab knows it
+ *
+ * REVIEW-5's C3. The three sheets are opaque and full-screen, and that was all
+ * they were. No role, no aria-modal, nothing taking the app behind them out of
+ * the tab order — so with SPLIT open the ten controls BEHIND it came first, the
+ * tenth Tab was STOP, and a keyboard or VoiceOver user drove an app they could
+ * not see. Tabbing to a category row switched the block; the sheet went on naming
+ * the old one and holding its cut time; picking a remainder then wrote
+ * ADM 09:22-09:43 inside DW 09:00-09:43, twenty-one minutes billed twice, with no
+ * error anywhere.
+ *
+ * The suite pins that the inert attribute goes on and comes off, and that Escape
+ * closes a sheet. smoke.js pins that a real parser kept role and aria-modal. What
+ * neither can pin is the property the whole fix is bought for: THAT TAB ACTUALLY
+ * STAYS INSIDE. `inert` is one attribute doing a great deal of work, and this is
+ * the check that says the engine honours it rather than the code asking politely.
+ *
+ * The walk is longer than one cycle on purpose. A sheet whose last control leads
+ * back out shows up only after the wrap.
+ * ═══════════════════════════════════════════════════════════════════ */
+async function checkSheetModality(browser, view, page) {
+  const problems = [];
+  const label = view.name + ' ' + view.width + 'px, sheet modality';
+  const ctx = await browser.newContext({
+    viewport: { width: view.width, height: view.height },
+    isMobile: !!view.isMobile, hasTouch: !!view.isMobile,
+    deviceScaleFactor: view.isMobile ? 3 : 1
+  });
+  const pg = await ctx.newPage();
+  const errors = [];
+  pg.on('pageerror', e => errors.push(String((e && e.message) || e)));
+  try {
+    await pg.route(RAIL_ORIGIN, r =>
+      r.fulfill({ status: 200, contentType: 'text/html; charset=utf-8', body: documentFor(page, true) }));
+    /* A block that has been running long enough for SPLIT to have a range to
+       offer, seeded through getState the way checkRail does. */
+    await pg.addInitScript(() => {
+      const now = Date.now();
+      const state = { nowMs: now, tz: 'local', notes: [], today: [], sit: null,
+                      open: { ref: 'aaaabbbbccccdddd', key: 'DW', text: '',
+                              startMs: now - 43 * 60000 } };
+      const mk = () => {
+        const b = {
+          withSuccessHandler: f => { b._ok = f; return b; },
+          withFailureHandler: () => b,
+          applyOps: () => {},
+          getState: () => { setTimeout(() => b._ok && b._ok(state), 5); },
+          addCategory: () => {}
+        };
+        return b;
+      };
+      window.google = { script: { run: new Proxy({}, { get: (_, k) => (...a) => mk()[k](...a) }) } };
+    });
+    await pg.goto(RAIL_ORIGIN, { waitUntil: 'load' });
+    await pg.waitForTimeout(200);
+
+    const lit = await pg.evaluate(() => {
+      const a = document.querySelector('#grid .active');
+      return a ? a.dataset.key : null;
+    });
+    if (lit !== 'DW') {
+      problems.push(label + ': nothing was running before the re-tap (lit=' + lit +
+                    '), so this was never the screen the checks below are about');
+      return problems;
+    }
+    /* Re-tapping the running row is the way into SPLIT.
+       A real click rather than el.click(): a programmatic one never moves focus,
+       so there would be nothing for the sheet to hand back afterwards and the
+       check on that would pass against a build that lost focus entirely. */
+    await pg.locator('#grid [data-key="DW"]').click();
+    await pg.waitForTimeout(150);
+
+    const open = await pg.evaluate(() => {
+      const s = document.getElementById('sheetSplit');
+      const el = document.getElementById('stopBtn');
+      const r = el.getBoundingClientRect();
+      const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+      return {
+        up: !s.classList.contains('hidden'),
+        appInert: document.getElementById('app').hasAttribute('inert'),
+        role: s.getAttribute('role'),
+        modal: s.getAttribute('aria-modal'),
+        stopHit: hit ? (hit.id || hit.className) : null,
+        focused: document.activeElement ? (document.activeElement.id || document.activeElement.tagName) : null
+      };
+    });
+    if (!open.up) {
+      problems.push(label + ': re-tapping the running row did not open SPLIT');
+      return problems;
+    }
+    console.log('  SPLIT open:       app inert=' + open.appInert + ', role=' + open.role +
+                '/' + open.modal + ', focus on ' + open.focused +
+                ', a tap where STOP is hits ' + open.stopHit);
+    if (!open.appInert) {
+      problems.push(label + ': the app behind an open sheet is not inert, so every ' +
+                    'control on it is still in the tab order');
+    }
+    if (open.focused !== 'spClose') {
+      problems.push(label + ': opening the sheet left focus on ' + open.focused +
+                    ' rather than on its DONE button, so a keyboard user starts ' +
+                    'outside the thing that just opened');
+    }
+
+    /* The walk. Two full cycles' worth, so a sheet whose last control leads back
+       out is caught after the wrap rather than passing on the first pass. */
+    const walk = [];
+    for (let i = 0; i < 24; i++) {
+      await pg.keyboard.press('Tab');
+      walk.push(await pg.evaluate(() => {
+        const a = document.activeElement;
+        if (!a) return { name: 'none', inside: false };
+        return {
+          name: a.id || (a.dataset && a.dataset.key) || a.tagName,
+          /* BODY is where the browser parks focus at the end of a cycle. It is not
+             a control and it cannot act on anything, so it counts as inside. */
+          inside: a.tagName === 'BODY' || !!a.closest('.view')
+        };
+      }));
+    }
+    const escaped = walk.filter(w => !w.inside).map(w => w.name);
+    console.log('  24 Tabs reached:  ' + [...new Set(walk.map(w => w.name))].join(', '));
+    if (escaped.length) {
+      problems.push(label + ': ' + escaped.length + ' of 24 Tabs left the sheet and landed on ' +
+                    [...new Set(escaped)].join(', ') + ' — the app behind a modal is reachable');
+    }
+
+    /* And Escape is the way out, with the app reachable again afterwards. */
+    await pg.keyboard.press('Escape');
+    await pg.waitForTimeout(100);
+    const after = await pg.evaluate(() => ({
+      up: !document.getElementById('sheetSplit').classList.contains('hidden'),
+      appInert: document.getElementById('app').hasAttribute('inert'),
+      focused: document.activeElement
+        ? (document.activeElement.id || (document.activeElement.dataset &&
+           document.activeElement.dataset.key) || document.activeElement.tagName)
+        : 'none'
+    }));
+    console.log('  after Escape:     sheet up=' + after.up + ', app inert=' + after.appInert +
+                ', focus back on ' + after.focused);
+    if (after.up) problems.push(label + ': Escape did not close the sheet');
+    /* Back where it came from. A sheet that clears inert without restoring focus
+       leaves the next Tab starting at the top of the document, which on a
+       ten-category list is most of a screen away from the row that opened it. */
+    if (after.focused !== 'DW') {
+      problems.push(label + ': after Escape focus is on ' + after.focused +
+                    ' rather than back on the row that opened the sheet');
+    }
+    if (after.appInert) {
+      problems.push(label + ': the app is still inert after the last sheet closed, so ' +
+                    'nothing on it can be reached at all');
+    }
+    /* One Tab must now reach a real control again. Clearing inert without
+       restoring focus leaves the next Tab starting from the top of the document,
+       which is a different place from the control that opened the sheet. */
+    await pg.keyboard.press('Tab');
+    const back = await pg.evaluate(() => {
+      const a = document.activeElement;
+      return a ? { name: a.id || (a.dataset && a.dataset.key) || a.tagName,
+                   inApp: !!(a.closest && a.closest('#app')) } : { name: 'none', inApp: false };
+    });
+    console.log('  one Tab later:    ' + back.name + (back.inApp ? ' (inside the app)' : ''));
+    if (!back.inApp) {
+      problems.push(label + ': after Escape, a Tab reaches ' + back.name +
+                    ' rather than anything on the app');
+    }
+    if (errors.length) problems.push(label + ': page errors — ' + errors.join(' | '));
+  } finally {
+    await ctx.close();
+  }
+  return problems;
+}
+
 async function checkRail(browser, view, page, blocks) {
   const problems = [];
   const label = view.name + ' ' + view.width + 'px, ' + blocks + ' blocks';
@@ -1881,6 +2054,13 @@ async function main() {
     console.log('\nthe rail\'s box (phone 390px)');
     for (const n of [6, 20, 40]) {
       problems = problems.concat(await checkRail(browser, VIEWS[0], page, n));
+    }
+    /* C3: a sheet is a modal and Tab knows it. Both widths, because the tab order
+       is not a function of the viewport and a phone-only check would have said
+       nothing about the desktop the same markup serves. */
+    for (const view of [VIEWS[0], VIEWS[1]]) {
+      console.log('\nsheet modality (' + view.name + ' ' + view.width + 'px)');
+      problems = problems.concat(await checkSheetModality(browser, view, page));
     }
   } finally {
     await browser.close();

@@ -249,6 +249,44 @@
     rail ? (rail.getAttribute('role') + ' "' + rail.getAttribute('aria-label') + '"')
          : 'no #rail in the document');
 
+  /* ── the sheets are modals, and the parser agrees ────────────────
+   *
+   * They are opaque and full-screen, and for two rounds that was all they were: no
+   * role, no aria-modal, and nothing taking the app behind them out of the tree.
+   * A keyboard or VoiceOver user walked the ten controls behind SPLIT FIRST — the
+   * tenth Tab was STOP — and drove an app they could not see, on top of a sheet
+   * still naming a block that had moved on. Twenty-one minutes ended up billed to
+   * two categories that way. REVIEW-5's C3.
+   *
+   * Here rather than in tests.js because role, aria-modal and the label are
+   * declared in the markup, and the suite's shim borrows only `class` from it —
+   * so only a real parser can say whether they reached the document, exactly as
+   * for the ribbon's role above.
+   *
+   * Every sheet, by a list read off the document rather than written out here: a
+   * fourth sheet added later is checked by existing. */
+  var sheets = [].slice.call(document.querySelectorAll('.view'));
+  ok('there are sheets in this document to check', sheets.length > 0, String(sheets.length));
+  var notModal = sheets.filter(function (v) {
+    return v.getAttribute('role') !== 'dialog' || v.getAttribute('aria-modal') !== 'true';
+  }).map(function (v) {
+    return (v.id || '?') + '=' + v.getAttribute('role') + '/' + v.getAttribute('aria-modal');
+  });
+  ok('every sheet declares itself a modal dialog', notModal, notModal.join(' '));
+  /* And a name, or a screen reader announces "dialog" and stops. */
+  var unnamed = sheets.filter(function (v) {
+    return !v.getAttribute('aria-label') && !v.getAttribute('aria-labelledby');
+  }).map(function (v) { return v.id || '?'; });
+  ok('and every sheet says which dialog it is', unnamed, unnamed.join(' '));
+  /* The app is reachable while nothing is over it. `inert` is added when a sheet
+     opens and removed when the last one closes; left on, the whole app is dead to
+     a keyboard and every check above would pass anyway. */
+  var appEl = document.getElementById('app');
+  ok('with no sheet open the app is not inert',
+    !!appEl && !appEl.hasAttribute('inert') &&
+    sheets.every(function (v) { return getComputedStyle(v).display === 'none'; }),
+    appEl ? ('inert=' + appEl.hasAttribute('inert')) : 'no #app in the document');
+
   // ── touch targets and the safe area ─────────────────────────────
   var footRoom = window.innerHeight - (document.getElementById('postureRow')
     ? document.getElementById('postureRow').getBoundingClientRect().bottom : window.innerHeight);
