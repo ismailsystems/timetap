@@ -278,7 +278,9 @@
 <div id="app">
   <div id="hdr">
     <span id="hdrName">TIMETAP</span>
-    <span id="sync" class="s-synced">GOOGLE CALENDAR · SYNCED<span id="syncN" class="hidden"></span></span>
+    <!-- The sentence goes in its own span. Writing textContent on #sync itself
+         would delete #syncN, which is nested inside it. -->
+    <span id="sync" class="s-synced"><span id="syncText">GOOGLE CALENDAR · SYNCED</span><span id="syncN" class="hidden"></span></span>
   </div>
 
   <div id="scroll">
@@ -466,6 +468,7 @@
     var q = queue();
     q.push(op);
     setQueue(q);
+    return op.id;
   }
 
   /**
@@ -570,10 +573,23 @@
     enqueue({ type: 'setText', ref: ref, text: text, hintMs: hintMs });
   }
 
-  function setSync(cls) { $('sync').className = 's-' + cls; paintSync(); }
-  /** A grey dot in a corner is invisible. The unsent count is not. */
+  var syncCls = 'synced';
+  function setSync(cls) { syncCls = cls; paintSync(); }
+  /**
+   * The sync state, in words, in the header.
+   *
+   * It used to be a coloured dot with a count beside it. A dot cannot say
+   * "two writes are set aside and are being retried", and that is the state
+   * that actually matters — the one where the record and the calendar have
+   * come apart. So it says it.
+   */
   function paintSync() {
-    var n = queue().length;
+    var n = queue().length, dead = deadCount(), el = $('sync');
+    var failed = dead > 0;
+    $('syncText').textContent = failed
+      ? dead + ' SET ASIDE · RETRYING'
+      : (n ? 'SYNCING · ' + n : 'GOOGLE CALENDAR · SYNCED');
+    el.className = failed ? 's-failed' : ('s-' + syncCls);
     $('syncN').textContent = n ? String(n) : '';
   }
 
@@ -774,7 +790,7 @@
 
   function deadMsg() {
     var n = deadCount();
-    return n + (n === 1 ? ' write was' : ' writes were') + ' set aside after repeated failures';
+    return n + (n === 1 ? ' write was' : ' writes were') + ' set aside after repeated failures ›';
   }
 
   /** The banner is a door only when there is something behind it. */
@@ -989,65 +1005,137 @@
     armed = null;
   }
 
+  /*
+   * A tap acts at once, and for five seconds afterwards the whole ribbon is a
+   * way back.
+   *
+   * This replaces arm-and-confirm. The old design asked before acting: a tap
+   * landing soon after the last one lit the button and waited for a second
+   * tap, and inside a shorter window a confirmed tap RETITLED the block you
+   * were in rather than starting a new one. It was safe and it was slow, and
+   * the correction window was itself a trap — what you were fixing was
+   * sometimes what it destroyed.
+   *
+   * Undo is the same guarantee bought differently: nothing is lost to one tap,
+   * because every switch can be walked back for five seconds — including off
+   * the calendar, when the write has already landed.
+   */
   function tapCategory(key) {
     var now = Date.now();
     // A STOP left armed while the user carries on working would end the day on
-    // a single later tap, which is not what that tap would look like. The
-    // repaint is not optional: the branch below returns without rendering, and
-    // disarming has already cancelled the timer that would have repainted.
+    // a single later tap, which is not what that tap would look like.
     if (disarmStop()) render();
+
     if (S.open && S.open.key === key) {
-      // The lit button is the open block, so re-tapping it means "correct
-      // this", exactly as re-tapping the lit SITTING half means "correct when
-      // that started". Below the mis-tap window nothing about the block is
-      // settled yet and there is nothing worth cutting, so it stays a no-op.
-      // Re-tapping the lit button opens SPLIT, which writes nothing, so it
-      // needs no confirming.
-      if (now - S.open.startMs >= CFG.mistapSeconds * 1000) openSplit();
-      return;                                                        // 6.1
-    }
-
-    // Ask before acting on a tap that lands on the heels of the last one.
-    if (S.lastTapMs && (now - S.lastTapMs) < CFG.confirmWithinSeconds * 1000 &&
-        !(armed && armed.key === key)) {
-      arm(key);
-      return;
-    }
-    disarm();
-
-    // The same predicate the armed label was rendered from, so the two cannot
-    // disagree about what this tap is.
-    var mistap = willRetitle();
-
-    if (mistap) {                                                    // 6.3 correction
-      S.open.key = key;
-      S.lastTapMs = now;
-      if (!mutatePendingOpen(S.open.ref, key)) {
-        enqueue({ type: 'recategorize', ref: S.open.ref, key: key, hintMs: S.open.startMs });
-      }
-      if (key === CFG.bodyKey) closeSit(now);
-      saveState(); render(); flush();
+      // The running row is the way into SPLIT, exactly as the NOW panel is.
+      openSplit();
       return;
     }
 
-    var pending = null;
-    if (S.open) {
-      var dur = now - S.open.startMs;
-      var m = markFor(S.open.key, dur);
-      enqueue({ type: 'closeActual', ref: S.open.ref, key: S.open.key, endMs: now,
-                mark: m.mark, text: S.open.text || '' });
-      if (m.strip) pending = { ref: S.open.ref, key: S.open.key, durMs: dur, hintMs: S.open.startMs };
+    var prev = S.open ? { ref: S.open.ref, key: S.open.key, text: S.open.text || '',
+                          startMs: S.open.startMs } : null;
+    var pending = null, closeId = null, openId = null;
+    if (prev) {
+      var dur = now - prev.startMs;
+      var m = markFor(prev.key, dur);
+      closeId = enqueue({ type: 'closeActual', ref: prev.ref, key: prev.key, endMs: now,
+                          mark: m.mark, text: prev.text });
+      if (m.strip) pending = { ref: prev.ref, key: prev.key, durMs: dur, hintMs: prev.startMs };
+      railClosed(prev, now);
     }
 
     var ref = uid();
     S.open = { ref: ref, key: key, text: '', startMs: now };
     S.lastTapMs = now;
-    enqueue({ type: 'openActual', ref: ref, key: key, startMs: now });
+    openId = enqueue({ type: 'openActual', ref: ref, key: key, startMs: now });
 
     if (key === CFG.bodyKey) closeSit(now);                          // 8.2 the only coupling
 
     if (pending) showStrip(pending); else hideStrip();
+    armUndo({ prev: prev, newRef: ref, atMs: now, closeId: closeId, openId: openId,
+              label: 'SWITCHED TO ' + labelFor(key).toUpperCase() });
     saveState(); render(); flush();
+  }
+
+  function labelFor(key) {
+    var c = catByKey[key];
+    return c ? faceOf(c) : key;
+  }
+
+  /* ── undo ──────────────────────────────────────────────────────
+   *
+   * The ribbon holds one switch — the last — for CFG.undoSeconds. Taking it
+   * back has two shapes, and which applies is decided by whether the writes are
+   * still in the queue:
+   *
+   *   still queued : drop them. The calendar never hears about any of it, so a
+   *                  switch you took back leaves no trace, which is what undo
+   *                  ought to mean.
+   *   already sent : one compensating op. The block the switch opened is
+   *                  deleted and the one it closed is put back to running.
+   */
+  var undo = null;
+
+  function armUndo(u) {
+    clearUndo();
+    u.until = Date.now() + CFG.undoSeconds * 1000;
+    u.timer = setTimeout(function () { clearUndo(); render(); }, CFG.undoSeconds * 1000);
+    u.tick = setInterval(paintUndo, 250);
+    undo = u;
+    paintUndo();
+  }
+
+  function clearUndo() {
+    if (undo && undo.timer) clearTimeout(undo.timer);
+    if (undo && undo.tick) clearInterval(undo.tick);
+    undo = null;
+    $('undo').classList.add('hidden');
+  }
+
+  function paintUndo() {
+    if (!undo) { $('undo').classList.add('hidden'); return; }
+    var left = Math.max(1, Math.ceil((undo.until - Date.now()) / 1000));
+    $('undo').classList.remove('hidden');
+    $('undoLabel').textContent = undo.label;
+    $('undoChip').textContent = 'UNDO · ' + left;
+  }
+
+  function takeUndo() {
+    if (!undo) return;
+    var u = undo, now = Date.now();
+    clearUndo();
+
+    // Drop whichever of the two writes is still waiting. dropOps says how many
+    // it found, which is how we know whether the calendar ever saw this.
+    var dropped = dropOps([u.closeId, u.openId]);
+    if (dropped < 2) {
+      // At least one landed. One op puts both halves back.
+      enqueue({ type: 'undoSwitch', newRef: u.newRef, atMs: u.atMs,
+                prevRef: u.prev ? u.prev.ref : null,
+                prevKey: u.prev ? u.prev.key : null,
+                prevText: u.prev ? u.prev.text : '',
+                prevStartMs: u.prev ? u.prev.startMs : null,
+                nowMs: now });
+    }
+
+    if (u.prev) railReopen(u.prev.ref);
+    S.open = u.prev ? { ref: u.prev.ref, key: u.prev.key, text: u.prev.text,
+                        startMs: u.prev.startMs } : null;
+    S.lastTapMs = 0;
+    hideStrip();
+    saveState(); render(); flush();
+  }
+
+  /** Remove ops by id if they have not gone yet. Returns how many were found. */
+  function dropOps(ids) {
+    var want = {}, hit = 0;
+    ids.forEach(function (i) { if (i) want[i] = 1; });
+    var q = queue().filter(function (o) {
+      if (want[o.id]) { hit++; return false; }
+      return true;
+    });
+    if (hit) setQueue(q);
+    return hit;
   }
 
   /* ── the mark ──────────────────────────────────────────────── */
@@ -1158,15 +1246,22 @@
     // A close is a close: the mark strip appears here exactly as it does on a
     // transition, and markFor's threshold applies unchanged.
     if (S.open) {
-      var dur = now - S.open.startMs;
-      var m = markFor(S.open.key, dur);
-      enqueue({ type: 'closeActual', ref: S.open.ref, key: S.open.key, endMs: now,
-                mark: m.mark, text: S.open.text || '' });
+      var prev = { ref: S.open.ref, key: S.open.key, text: S.open.text || '',
+                   startMs: S.open.startMs };
+      var dur = now - prev.startMs;
+      var m = markFor(prev.key, dur);
+      var closeId = enqueue({ type: 'closeActual', ref: prev.ref, key: prev.key, endMs: now,
+                              mark: m.mark, text: prev.text });
+      railClosed(prev, now);
       var pending = m.strip
-        ? { ref: S.open.ref, key: S.open.key, durMs: dur, hintMs: S.open.startMs }
+        ? { ref: prev.ref, key: prev.key, durMs: dur, hintMs: prev.startMs }
         : null;
       S.open = null;
       if (pending) showStrip(pending); else hideStrip();
+      // Ending the day is the one tap with nothing after it to notice a mistake
+      // by, so it is the one that most needs a way back.
+      armUndo({ prev: prev, newRef: null, atMs: now, closeId: closeId, openId: null,
+                label: 'STOPPED — NOW UNLOGGED' });
     }
 
     // Same instant, and closeSit is already a no-op when nothing is open.
@@ -1420,6 +1515,23 @@
    */
   var RAIL_PX = 340, GAP_MS = 90000;
 
+  /*
+   * The rail learns about closed blocks from the server, which it asks once on
+   * load. So a block the client has only just closed was missing from it until
+   * the next read — and the rail drew a hatched gap where the work had actually
+   * been, which is the one thing this rail exists not to do. The client knows;
+   * it says so.
+   */
+  function railClosed(prev, endMs) {
+    S.today = (S.today || []).concat([
+      { ref: prev.ref, key: prev.key, startMs: prev.startMs, endMs: endMs }]);
+  }
+
+  /** And takes it off again when the switch that made it is undone. */
+  function railReopen(ref) {
+    S.today = (S.today || []).filter(function (b) { return b.ref !== ref; });
+  }
+
   function railBlocks(now) {
     var out = (S.today || []).slice();
     if (S.open) out.push({ key: S.open.key, startMs: S.open.startMs, endMs: now, open: true });
@@ -1490,7 +1602,13 @@
        repainting, and disarming already cancelled the timer whose repaint would
        have cleaned the cell up. Round 1 left an armed STOP looking armed the
        same way. */
-    disarm(); render();
+    disarm();
+    /* And the way back to the last switch goes with it. Opening this sheet is
+       a new intention; a ribbon offering to undo the previous one has no
+       business sitting underneath it, and would be acting on a block the
+       sheet is no longer about. */
+    clearUndo();
+    render();
     setSplitScope(false);            // every opening starts on the safer of the two
     split.startMs = S.open.startMs;
     split.nowMs = Date.now();
@@ -1738,6 +1856,8 @@
   });
   // The whole panel is the way into SPLIT, as the lit row is.
   $('nowPanel').addEventListener('click', function () { if (S.open) openSplit(); });
+  // Anywhere on the ribbon is the way back, not just the chip.
+  $('undo').addEventListener('click', takeUndo);
 
   $('spClose').addEventListener('click', function () { $('sheetSplit').classList.add('hidden'); });
   $('spRange').addEventListener('input', renderSplit);

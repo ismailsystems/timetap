@@ -7,6 +7,7 @@ const armedKey = () => {
   return b ? b.dataset.key : null;
 };
 const splitOpen = () => { const n = H.NODES['sheetSplit']; return !!n && !n.hidden; };
+const CFG_UNDO_MS = clientConfig_().undoSeconds * 1000;
 const D = (y, m, d, hh, mm) => new Date(y, m - 1, d, hh, mm, 0, 0).getTime();
 
 console.log('\n1. cold open, no open block');
@@ -36,27 +37,6 @@ reset(); reboot();
 tap('FRAG'); wait(20); tap('DW');
 chk('no strip', $('strip').hidden);
 chk('FRAG autoMarked "-"', A()[0].t === 'FRAG: -', A()[0].t);
-
-console.log('\n4. DW then MTG 10s later -> one event, MTG, original start');
-/* C1 nested the correction window inside the confirm window, so this is 10s
-   rather than the 30s it used to be. 30s is now a transition, which section
-   50 asserts directly. The behaviour under test — a correction retitles the
-   block you are in — is unchanged. */
-reset(); reboot();
-const t4 = H.nowMs();
-tap('DW'); advance(10000); settle(); tap('MTG'); tap('MTG');
-chk('exactly one event', A().length === 1, A().map(show).join(' | '));
-chk('category MTG', A()[0].t === 'MTG:', A()[0].t);
-chk('start preserved', A()[0].s === t4, show(A()[0]));
-chk('still open', /#open/.test(A()[0].d));
-
-console.log('\n4b. mis-tap after the queue already flushed');
-reset(); reboot();
-const t4b = H.nowMs();
-tap('DW'); settle(); settle();
-advance(10000); settle(); tap('ADM'); tap('ADM');
-chk('exactly one event', A().length === 1, A().map(show).join(' | '));
-chk('category ADM, start preserved', A()[0].t === 'ADM:' && A()[0].s === t4b, show(A()[0]));
 
 console.log('\n5. MTG, 8m, ADM -> no strip, no mark');
 reset(); reboot();
@@ -298,9 +278,14 @@ reset(); reboot();
 tap('DW'); advance(10000); settle();
 const before15 = A().map(e => e.t + e.s + e.e).join('|');
 tap('DW'); settle();
-chk('inside the mis-tap window it does nothing at all',
-  !splitOpen() && A().length === 1 && A().map(e => e.t + e.s + e.e).join('|') === before15,
+/* REDESIGNED — there used to be a window in which re-tapping the running row
+ * did nothing, because below it nothing about the block was settled. There is
+ * no window now: the running row is the way into SPLIT, whenever you tap it,
+ * and SPLIT writes nothing until a category is picked. */
+chk('re-tapping it opens SPLIT even seconds in',
+  splitOpen() && A().length === 1 && A().map(e => e.t + e.s + e.e).join('|') === before15,
   'sheet=' + splitOpen() + ' ' + A().map(show).join(' | '));
+$('spClose').fire('click'); settle();
 
 wait(30);
 const before15b = A().map(e => e.t + e.s + e.e).join('|');
@@ -457,10 +442,12 @@ chk('closing a block does not disturb its colour', sameAsButton(A()[0], 'DW'));
 
 reset(); reboot();
 tap('DW'); settle(); settle();
-advance(10000); settle(); tap('BODY'); tap('BODY'); settle();
-chk('a mis-tap correction recolours the surviving event',
-  A().length === 1 && sameAsButton(A()[0], 'BODY'),
-  'n=' + A().length + ' colour=' + evColour(A()[0]));
+advance(10000); settle(); tap('BODY'); settle();
+chk('a switch colours the block it opens',
+  A().length === 2 && sameAsButton(A()[1], 'BODY'),
+  'n=' + A().length + ' colour=' + evColour(A()[A().length - 1]));
+chk('and leaves the one it closed its own colour', sameAsButton(A()[0], 'DW'),
+  'colour=' + evColour(A()[0]));
 
 reset(); reboot();
 tap('MTG'); settle(); wait(120);
@@ -555,56 +542,27 @@ tap('DW'); settle();
 chk('noon is 12 PM, never 0', /^12:/.test($('spStart').textContent) && / PM$/.test($('spStart').textContent),
   $('spStart').textContent);
 
-console.log('\n25. a tap on the heels of the last one asks first');
-reset(); reboot();
-tap('DW'); settle();
-chk('the first tap needs no confirming', A().length === 1, A().map(show).join(' | '));
-
-advance(10000); settle();
-const q25 = JSON.parse(H.STORE['tt.queue.v1'] || '[]').length;
-tap('MTG'); settle();
-chk('a tap 10s later writes nothing yet', A().length === 1 && A()[0].t === 'DW:',
-  A().map(show).join(' | '));
-chk('nothing queued either', JSON.parse(H.STORE['tt.queue.v1'] || '[]').length === q25,
-  'queue grew');
-chk('the button it landed on is armed', armedKey() === 'MTG', String(armedKey()));
-
-tap('MTG'); settle();
-chk('the second tap commits', A().length === 1 && A()[0].t === 'MTG:', A().map(show).join(' | '));
-chk('and disarms', armedKey() === null, String(armedKey()));
-
-console.log('\n25b. ignoring the question is the safe outcome');
-reset(); reboot();
-tap('DW'); settle(); advance(20000); settle();
-tap('FRAG'); settle();
-chk('armed', armedKey() === 'FRAG');
-advance(5000); settle();
-chk('it forgets on its own', armedKey() === null, String(armedKey()));
-chk('and never wrote anything', A().length === 1 && A()[0].t === 'DW:', A().map(show).join(' | '));
-
-console.log('\n25c. arming a different box moves the question');
-reset(); reboot();
-tap('DW'); settle(); advance(10000); settle();
-tap('MTG'); settle();
-tap('ADM'); settle();
-chk('only the newest is armed', armedKey() === 'ADM', String(armedKey()));
-chk('still nothing written', A().length === 1, A().map(show).join(' | '));
-tap('ADM'); settle();
-chk('confirming that one commits it', A()[0].t === 'ADM:', A().map(show).join(' | '));
-
-console.log('\n25d. past the window it just acts');
+console.log('\n25d. a tap acts, and it acts once');
+/* REDESIGNED — there used to be a gate here: a tap landing soon after the last
+ * one armed the button and waited for a second tap. Undo replaced it, so one
+ * tap is one switch, whenever it lands. */
 reset(); reboot();
 tap('DW'); settle(); wait(3);
 tap('MTG'); settle();
-chk('a tap 3 minutes later needs no confirming', A().length === 2, A().map(show).join(' | '));
-chk('and arms nothing', armedKey() === null, String(armedKey()));
+chk('a tap 3 minutes later switches', A().length === 2, A().map(show).join(' | '));
+reset(); reboot();
+tap('DW'); settle(); advance(1200); settle();
+tap('MTG'); settle();
+chk('and so does one 1.2 seconds later — no gate, no arming',
+  A().length === 2 && A()[1].t === 'MTG:', A().map(show).join(' | '));
 
-console.log('\n25e. the gate never blocks SPLIT, which writes nothing');
+console.log('\n25e. the running row opens SPLIT, which writes nothing');
 reset(); reboot();
 tap('DW'); settle(); wait(30);
+const before25e = A().map(show).join(' | ');
 tap('DW'); settle();
-chk('re-tapping the lit button still opens SPLIT', splitOpen());
-chk('without arming it', armedKey() === null, String(armedKey()));
+chk('re-tapping the running row opens SPLIT', splitOpen());
+chk('and writes nothing', A().map(show).join(' | ') === before25e, A().map(show).join(' | '));
 
 console.log('\n26. the note belongs to the block that is running');
 /* REDESIGNED — there used to be a note box inside every category tile, of which
@@ -647,7 +605,13 @@ tap('ADM'); wait(30);
 chk('not flagged at 30m', !cellOf('ADM')._cls.has('long'));
 wait(70);
 chk('flagged past 90m', cellOf('ADM')._cls.has('long'));
-chk('the clock is what carries it', /1h(39|40|41)/.test(elapsedBox()), elapsedBox());
+chk('the row clock carries it', /1h(39|40|41)/.test(elapsedBox()),
+  'elapsedBox=' + JSON.stringify(elapsedBox()) +
+  ' rowGe=' + JSON.stringify(cellOf('ADM').querySelector('.ge').textContent) +
+  ' active=' + $('grid').children.filter(c => c._cls.has('active')).map(c => c.dataset.key).join(','));
+chk('and the panel says the same thing, larger',
+  /1h(39|40|41)/.test($('nowEl').textContent) && $('nowEl')._cls.has('long'),
+  $('nowEl').textContent + ' ' + $('nowEl').className);
 
 console.log('\n27. the add box makes a category');
 reset(); reboot();
@@ -1262,7 +1226,7 @@ seedTwoDead();
 chk('both writes were set aside', DEAD().length === 2, JSON.stringify(DEAD().map(d => d.op.type)));
 chk('the banner is visible after a load that succeeded', !$('err').hidden, $('err').textContent);
 chk('and it counts them in a sentence that parses',
-  $('err').textContent === '2 writes were set aside after repeated failures',
+  $('err').textContent === '2 writes were set aside after repeated failures ›',
   $('err').textContent);
 chk('it announces itself as a door',
   $('err').getAttribute('role') === 'button' && $('err').getAttribute('tabindex') === '0',
@@ -1339,7 +1303,7 @@ H.STORE['tt.dead.v1'] = JSON.stringify([
 ]);
 reboot();
 chk('the count agrees with its verb',
-  $('err').textContent === '1 write was set aside after repeated failures',
+  $('err').textContent === '1 write was set aside after repeated failures ›',
   $('err').textContent);
 reset();
 
@@ -1373,7 +1337,7 @@ chk('one row remains', uiRows().length === 1, String(uiRows().length));
 chk('and it is the one not discarded', rowText(uiRows()[0]) === keptText, rowText(uiRows()[0]));
 chk('the dead list in storage holds one', DEAD().length === 1, JSON.stringify(DEAD()));
 chk('the drawer stays open', !$('sheetDead').hidden);
-chk('and the banner now counts one', $('err').textContent === '1 write was set aside after repeated failures',
+chk('and the banner now counts one', $('err').textContent === '1 write was set aside after repeated failures ›',
   $('err').textContent);
 
 console.log('\n37b. discarding the last one closes the drawer and clears the banner');
@@ -3163,214 +3127,6 @@ reset(); H.clearPropCache();
  * window now sits well inside the confirm window, which makes every
  * destructive path confirmed by construction rather than by luck. */
 
-console.log('\n50. the correction window sits inside the confirm window');
-chk('MISTAP_SECONDS is below CONFIRM_WITHIN_SECONDS',
-  MISTAP_SECONDS < CONFIRM_WITHIN_SECONDS,
-  MISTAP_SECONDS + ' vs ' + CONFIRM_WITHIN_SECONDS);
-chk('and both are positive numbers',
-  MISTAP_SECONDS > 0 && CONFIRM_WITHIN_SECONDS > 0,
-  MISTAP_SECONDS + ' / ' + CONFIRM_WITHIN_SECONDS);
-chk('the client is told the same two values',
-  clientConfig_().mistapSeconds === MISTAP_SECONDS &&
-  clientConfig_().confirmWithinSeconds === CONFIRM_WITHIN_SECONDS,
-  JSON.stringify([clientConfig_().mistapSeconds, clientConfig_().confirmWithinSeconds]));
-
-console.log('\n50b. a 45-second block is recordable for the first time');
-/* At 90 seconds there was no way to log a deliberate short block: the tap that
- * ended it was treated as a correction and ate it. */
-reset(); reboot();
-const t50 = H.nowMs();
-tap('DW'); advance(45000); settle();
-tap('MTG'); tap('MTG'); settle();
-chk('two blocks exist', A().length === 2, A().map(show).join(' | '));
-chk('the first is still DW', A()[0].t === 'DW:', A()[0].t);
-chk('it ran 45 seconds', near(A()[0].e - A()[0].s, 45000, 1500),
-  String((A()[0].e - A()[0].s) / 1000) + 's');
-chk('and MTG is open from where it ended',
-  /#open/.test(A()[1].d) && A()[1].s === A()[0].e, A().map(show).join(' | '));
-
-console.log('\n50c. inside the correction window a confirmed tap still corrects');
-reset(); reboot();
-const t50c = H.nowMs();
-tap('DW'); advance(10000); settle();
-tap('MTG'); tap('MTG'); settle();
-chk('one block exists', A().length === 1, A().map(show).join(' | '));
-chk('keyed MTG', A()[0].t === 'MTG:', A()[0].t);
-chk('with the original start time', A()[0].s === t50c, show(A()[0]));
-
-console.log('\n50d. an unconfirmed tap at 45 seconds does nothing at all');
-reset(); reboot();
-tap('DW'); advance(45000); settle();
-tap('MTG');
-chk('it armed rather than acting', armedKey() === 'MTG', String(armedKey()));
-advance(CONFIRM_TIMEOUT_MS + 100); settle();
-chk('and forgot', armedKey() === null, String(armedKey()));
-chk('nothing was queued', JSON.parse(H.STORE['tt.queue.v1'] || '[]').length === 0,
-  H.STORE['tt.queue.v1'] || '[]');
-chk('DW is still the open block', A().length === 1 && A()[0].t === 'DW:' &&
-  /#open/.test(A()[0].d), A().map(show).join(' | '));
-
-console.log('\n50e. past the confirm window a tap is still just a tap');
-reset(); reboot();
-tap('DW'); wait(5); settle();
-tap('MTG'); settle();
-chk('it acted on one tap', A().length === 2, A().map(show).join(' | '));
-chk('DW closed and still keyed DW, MTG open',
-  A()[0].t === 'DW:' && !/#open/.test(A()[0].d) && /#open/.test(A()[1].d),
-  A().map(show).join(' | '));
-
-console.log('\n50f. THE SWEEP — no elapsed time lets one tap change a block\'s key');
-/* Contract 28, and the criterion that matters most in this task.
- *
- * Every individual window test above would pass against a build where the two
- * constants were merely different from each other. Only this proves there is no
- * reachable gap: second by second across the whole span, a single unconfirmed
- * tap on a different category must never change an existing block's key.
- *
- * It sweeps past both windows deliberately — a gap could open on either side of
- * either boundary, and the two configured values are not what is being tested. */
-const gaps50 = [];
-for (let secs = 0; secs <= 120; secs++) {
-  reset(); reboot();
-  tap('DW');
-  if (secs) advance(secs * 1000);
-  settle();
-  const keysBefore = A().map(e => (parseTitle_(e.t) || {}).key);
-  tap('MTG');                                   // exactly one tap, never confirmed
-  settle();
-  const keysAfter = A().map(e => (parseTitle_(e.t) || {}).key);
-  // Every block that existed before must still carry the key it had.
-  for (let i = 0; i < keysBefore.length; i++) {
-    if (keysBefore[i] !== keysAfter[i]) {
-      gaps50.push(secs + 's: block ' + i + ' went ' + keysBefore[i] + ' -> ' + keysAfter[i]);
-    }
-  }
-}
-chk('no single tap at any second from 0 to 120 changed an existing block\'s key',
-  gaps50.length === 0, gaps50.slice(0, 8).join(' | '));
-chk('and the sweep really ran across both windows',
-  MISTAP_SECONDS <= 120 && CONFIRM_WITHIN_SECONDS <= 120,
-  'swept 0..120 against ' + MISTAP_SECONDS + ' and ' + CONFIRM_WITHIN_SECONDS);
-
-console.log('\n50g. the one coupling survives the window change');
-/* Tapping BODY closes an open SIT. That is the app's only coupling, and it has
- * to hold on the correction branch as well as the transition one. */
-reset(); reboot();
-tapSit(); settle();
-tap('DW'); advance(10000); settle();
-chk('a SIT is open before the correction', S().length === 1 && /#open/.test(S()[0].d),
-  S().map(show).join(' | '));
-tap('BODY'); tap('BODY'); settle();
-chk('the tap landed as a correction', A().length === 1 && A()[0].t === 'BODY:',
-  A().map(show).join(' | '));
-chk('and the SIT still closed', S().length === 1 && !/#open/.test(S()[0].d),
-  S().map(show).join(' | '));
-reset();
-
-/* ── C2: the armed button says which of the two things it will do ──
- *
- * "TAP AGAIN" did not disclose whether confirming would retitle the block you
- * are in or start a new one. Same rule round 1 settled on for
- * TAP AGAIN TO DISCARD: state what the next tap will do, and stop. */
-
-const armedText = H.armedText;
-
-console.log('\n51. inside the correction window it offers to retitle');
-reset(); reboot();
-tap('DW'); advance(10000); settle();
-tap('MTG'); settle();
-chk('the cell is armed', armedKey() === 'MTG', String(armedKey()));
-chk('and it reads TAP AGAIN TO RETITLE', armedText() === 'TAP AGAIN TO RETITLE',
-  JSON.stringify(armedText()));
-
-console.log('\n51b. outside it, it offers to switch');
-reset(); reboot();
-tap('DW'); advance(45000); settle();
-tap('MTG'); settle();
-chk('the cell is armed', armedKey() === 'MTG', String(armedKey()));
-chk('and it reads TAP AGAIN TO SWITCH', armedText() === 'TAP AGAIN TO SWITCH',
-  JSON.stringify(armedText()));
-
-console.log('\n51c. a forgotten confirmation leaves no text and no styling');
-['10', '45'].forEach(secs => {
-  reset(); reboot();
-  tap('DW'); advance(Number(secs) * 1000); settle();
-  tap('MTG'); settle();
-  chk('armed at ' + secs + 's', armedKey() === 'MTG' && armedText() !== '',
-    armedKey() + ' ' + JSON.stringify(armedText()));
-  advance(CONFIRM_TIMEOUT_MS + 100); settle();
-  chk('at ' + secs + 's the arming style is gone', armedKey() === null, String(armedKey()));
-  chk('at ' + secs + 's the text is empty', armedText() === '', JSON.stringify(armedText()));
-});
-
-console.log('\n51d. the label always names the action that actually happens');
-/* Read the label, then confirm, then check WHICH of the two outcomes occurred.
- * Asserted for both windows rather than assumed from the wording. */
-[[10, 'TAP AGAIN TO RETITLE', 1], [45, 'TAP AGAIN TO SWITCH', 2]].forEach(([secs, want, blocks]) => {
-  reset(); reboot();
-  const t51 = H.nowMs();
-  tap('DW'); advance(secs * 1000); settle();
-  tap('MTG'); settle();
-  const said = armedText();
-  chk('at ' + secs + 's it said ' + want, said === want, JSON.stringify(said));
-  tap('MTG'); settle();
-  chk('at ' + secs + 's it did what it said — ' + blocks + ' block(s)',
-    A().length === blocks, A().map(show).join(' | '));
-  if (blocks === 1) {
-    chk('at ' + secs + 's the retitle kept the original start',
-      A()[0].t === 'MTG:' && A()[0].s === t51, show(A()[0]));
-  } else {
-    chk('at ' + secs + 's the switch left the first block alone',
-      A()[0].t === 'DW:' && A()[1].t === 'MTG:', A().map(show).join(' | '));
-  }
-});
-
-console.log('\n51e. a label cannot promise an action the tap will not take');
-/* THE criterion this task exists for. Arm just inside the correction window,
- * let the clock cross it before the second tap, and the old design would have
- * confirmed a RETITLE it had already stopped being able to do.
- *
- * Two things make it hold. The label and the action read one predicate, so they
- * cannot be kept out of step. And arming schedules a repaint at the exact
- * moment the window closes, so the label changes when the action does. */
-reset(); reboot();
-tap('DW'); advance((MISTAP_SECONDS - 3) * 1000); settle();
-tap('MTG'); settle();
-chk('armed just inside the window, it offers to retitle',
-  armedText() === 'TAP AGAIN TO RETITLE', JSON.stringify(armedText()));
-advance(3200); settle();                       // cross the correction boundary
-chk('once the window closes the label changes on its own',
-  armedText() === 'TAP AGAIN TO SWITCH', JSON.stringify(armedText()));
-chk('and it is still armed, so the change is visible rather than a dismissal',
-  armedKey() === 'MTG', String(armedKey()));
-tap('MTG'); settle();
-chk('confirming now switches, exactly as the label said',
-  A().length === 2 && A()[0].t === 'DW:' && A()[1].t === 'MTG:',
-  A().map(show).join(' | '));
-
-/* And the sweep's cousin: at every second across the window, whatever the label
- * says must be what confirming does. */
-const liars51 = [];
-for (let secs = 0; secs <= 40; secs++) {
-  reset(); reboot();
-  tap('DW');
-  if (secs) advance(secs * 1000);
-  settle();
-  tap('MTG'); settle();
-  if (armedKey() !== 'MTG') continue;          // past the confirm window, no label to check
-  const said = armedText();
-  tap('MTG'); settle();
-  const retitled = A().length === 1;
-  const promised = (said === 'TAP AGAIN TO RETITLE');
-  if (promised !== retitled) {
-    liars51.push(secs + 's: said ' + JSON.stringify(said) + ' but ' +
-                 (retitled ? 'retitled' : 'switched'));
-  }
-}
-chk('at every second from 0 to 40, the label matched what confirming did',
-  liars51.length === 0, liars51.slice(0, 6).join(' | '));
-reset();
-
 console.log('\n52. a whole block can be recategorised, not just its remainder');
 /* Past the correction window a misfiled block had no fix: a different category
  * starts a new one, and re-tapping the lit one reassigns only the remainder.
@@ -3553,9 +3309,7 @@ tap('DW'); settle();
 pickWhole(); splitPick('MTG');
 const cut52h = H.nowMs();
 tap('REL'); settle();
-chk('a tap on another category acts at once, without arming',
-  armedKey() === null, String(armedKey()));
-chk('and starts a new block instead of retitling the old one',
+chk('and a tap on another category starts a new block rather than retitling',
   A().length === 2 && A()[0].t === 'MTG: =' && A()[0].s === t52h && A()[1].t === 'REL:',
   A().map(show).join(' | '));
 /* And the end, which cannot be read off an open block: the renamed block is the
@@ -3587,20 +3341,6 @@ chk('and the calendar ends up carrying it too',
   A().length === 1 && A()[0].t === 'MTG:' && A()[0].s === t52j, A().map(show).join(' | '));
 chk('with nothing left unsent', JSON.parse(H.STORE['tt.queue.v1'] || '[]').length === 0,
   H.STORE['tt.queue.v1'] || '[]');
-
-console.log('\n52k. and the mis-tap correction it inherits that from is safe too');
-reset(); reboot();
-H.setCallLag('applyOps', 30000);
-const t52k = H.nowMs();
-tap('DW'); settle();
-advance(10000); settle();
-tap('MTG'); settle();                            // arms
-tap('MTG'); settle();                            // confirms, inside the mis-tap window
-chk('the client shows the corrected category', activeKey() === 'MTG', String(activeKey()));
-H.setCallLag('applyOps', null);
-advance(120000); settle(); settle();
-chk('and the calendar carries one MTG block from the original start',
-  A().length === 1 && A()[0].t === 'MTG:' && A()[0].s === t52k, A().map(show).join(' | '));
 
 console.log('\n52i. with nothing open, the whole-block option is out of reach');
 reset(); reboot();
@@ -4036,7 +3776,7 @@ tap('MTG'); settle();
 chk('three writes are stacked up and MTG is the block in hand',
   Q().length === 3 && activeKey() === 'MTG', JSON.stringify(Q().map(o => o.type)));
 H.setOnline(true); H.setServerReject('calendar said no');
-pump(() => DEAD().length > 0);
+pump(() => DEAD().length > 0, 800);
 chk('the first block\'s open was the one set aside',
   DEAD().length === 1 && DEAD()[0].op.type === 'openActual' && DEAD()[0].key === 'DW',
   JSON.stringify(DEAD().map(d => d.op.type + '/' + d.key)));
@@ -4383,18 +4123,18 @@ chk('the app noticed the SIT ended elsewhere', litPosture() === 'stand',
   String(litPosture()));
 chk('and the sheet aimed at it closed too', !sitSheetOpen(), 'open=' + sitSheetOpen());
 
-console.log('\n62. an armed category does not survive into SPLIT');
-/* Q13. It kept its label — TAP AGAIN TO SWITCH — on a button that, from inside
- * the sheet, opens the sheet again. */
+console.log('\n62. the undo ribbon does not survive into SPLIT');
+/* REDESIGNED — this pinned an armed category keeping its TAP AGAIN label behind
+ * the sheet. Nothing arms now. What can outlive its moment is the undo ribbon,
+ * so that is what is checked: opening SPLIT is a new intention, and a way back
+ * to the previous one has no business sitting under it. */
 reset(); reboot();
-tap('DW'); advance(30000); settle();             // past MISTAP, inside CONFIRM
+tap('DW'); settle(); advance(30000); settle();
 tap('MTG'); settle();
-chk('MTG is armed', armedKey() === 'MTG', String(armedKey()));
-tap('DW'); settle();                             // re-tap the lit one: SPLIT
+chk('the ribbon is up after a switch', !$('undo').hidden, $('undo').className);
+tap('MTG'); settle();                            // re-tap the running row: SPLIT
 chk('SPLIT opened', splitOpen());
-chk('and nothing is armed behind it', armedKey() === null, String(armedKey()));
-chk('nor is any label left promising an action', armedText() === '',
-  JSON.stringify(armedText()));
+chk('and the ribbon is gone', $('undo').hidden, $('undo').className);
 
 console.log('\n63. the posture toggle cancels an armed STOP rather than confirming it');
 /* Round 2's review, finding 8: the armed state used to cover the whole row, so
@@ -4449,6 +4189,152 @@ chk('closing it clears the message', $('err').hidden || !/cannot read/.test($('e
   $('err').textContent);
 chk('and the block closed correctly', A().length === 2 && /^UNFILED:/.test(A()[0].t),
   A().map(show).join(' | '));
+reset();
+
+console.log('\n66. a switch can be taken back');
+/* Undo is what replaced arm-and-confirm. The old design asked before acting;
+ * this one acts and then offers a way back for CFG.undoSeconds. Every
+ * assertion the arm/confirm sections used to make is now made here, about the
+ * property that actually matters: no single tap can cost you a block. */
+reset(); reboot();
+const t66 = H.nowMs();
+tap('DW'); settle(); wait(40);
+tap('MTG'); settle();
+chk('the switch happened at once — two blocks, no confirming',
+  A().length === 2 && A()[0].t === 'DW: =' && A()[1].t === 'MTG:',
+  A().map(show).join(' | '));
+chk('and the ribbon offers the way back', !$('undo').hidden, $('undo').className);
+chk('naming what it will undo',
+  $('undoLabel').textContent === 'SWITCHED TO MEETINGS', $('undoLabel').textContent);
+chk('with a countdown', /^UNDO · [1-5]$/.test($('undoChip').textContent),
+  $('undoChip').textContent);
+
+$('undo').fire('click'); settle();
+chk('taking it back restores the block that was running',
+  activeKey() === 'DW', String(activeKey()));
+chk('with its original start time',
+  JSON.parse(H.STORE['tt.state.v1']).open.startMs === t66,
+  JSON.stringify(JSON.parse(H.STORE['tt.state.v1']).open));
+chk('and the ribbon is gone', $('undo').hidden, $('undo').className);
+chk('the calendar is back to one open DW block',
+  A().length === 1 && A()[0].t === 'DW:' && /#open/.test(A()[0].d),
+  A().map(show).join(' | '));
+chk('and nothing is left queued', Q().length === 0, JSON.stringify(Q().map(o => o.type)));
+
+console.log('\n66b. a switch still queued is dropped, not compensated');
+/* The two shapes of undo. Offline, both writes are still in the queue, so
+ * taking the switch back leaves no trace at all — the calendar never hears
+ * about it. */
+reset(); reboot();
+H.setOnline(false);
+tap('DW'); settle(); wait(40);
+tap('MTG'); settle();
+chk('three writes are waiting', Q().length === 3, JSON.stringify(Q().map(o => o.type)));
+$('undo').fire('click'); settle();
+chk('the two the switch made are gone again',
+  Q().length === 1 && Q()[0].type === 'openActual' && Q()[0].key === 'DW',
+  JSON.stringify(Q().map(o => o.type + ':' + (o.key || ''))));
+chk('no compensating op was needed',
+  !Q().some(o => o.type === 'undoSwitch'), JSON.stringify(Q().map(o => o.type)));
+H.setOnline(true); advance(120000); settle(); settle();
+chk('and the network coming back writes one DW block, still open',
+  A().length === 1 && A()[0].t === 'DW:' && /#open/.test(A()[0].d),
+  A().map(show).join(' | '));
+
+console.log('\n66c. a switch that already landed is walked back on the calendar');
+reset(); reboot();
+const t66c = H.nowMs();
+tap('DW'); settle(); wait(40);
+tap('MTG'); settle();
+chk('both writes reached the calendar', A().length === 2, A().map(show).join(' | '));
+$('undo').fire('click'); settle();
+chk('one compensating op did it', A().length === 1, A().map(show).join(' | '));
+chk('the MTG block was removed', !A().some(e => /^MTG/.test(e.t)), A().map(show).join(' | '));
+chk('and DW is open again, from its original start',
+  A()[0].t === 'DW:' && A()[0].s === t66c && /#open/.test(A()[0].d), show(A()[0]));
+chk('with the mark the close applied taken off again',
+  !parseTitle_(A()[0].t).mark, A()[0].t);
+
+console.log('\n66d. STOP can be taken back too');
+reset(); reboot();
+const t66d = H.nowMs();
+tap('DW'); settle(); wait(40);
+tapStop(); tapStop(); settle();
+chk('the day ended', A().length === 1 && !/#open/.test(A()[0].d), A().map(show).join(' | '));
+chk('and the ribbon says so',
+  $('undoLabel').textContent === 'STOPPED — NOW UNLOGGED', $('undoLabel').textContent);
+$('undo').fire('click'); settle();
+chk('taking it back puts the day back',
+  activeKey() === 'DW' && /#open/.test(A()[0].d), A().map(show).join(' | '));
+chk('from the same start time', A()[0].s === t66d, show(A()[0]));
+
+console.log('\n66e. the ribbon forgets, and forgetting is safe');
+reset(); reboot();
+tap('DW'); settle(); wait(40);
+tap('MTG'); settle();
+chk('the ribbon is up', !$('undo').hidden);
+advance(CFG_UNDO_MS + 500); settle();
+chk('it goes away on its own', $('undo').hidden, $('undo').className);
+chk('and the switch stands', A().length === 2 && /#open/.test(A()[1].d),
+  A().map(show).join(' | '));
+$('undo').fire('click'); settle();
+chk('a tap on a ribbon that has gone does nothing',
+  A().length === 2 && /#open/.test(A()[1].d), A().map(show).join(' | '));
+
+console.log('\n66f. only the last switch is on offer');
+reset(); reboot();
+tap('DW'); settle(); wait(20);
+tap('MTG'); settle(); wait(20);
+tap('ADM'); settle();
+chk('three blocks', A().length === 3, A().map(show).join(' | '));
+chk('and the ribbon names the last switch',
+  $('undoLabel').textContent === 'SWITCHED TO ADMIN', $('undoLabel').textContent);
+$('undo').fire('click'); settle();
+chk('taking it back returns to MEETINGS, not to DEEP WORK',
+  activeKey() === 'MTG', String(activeKey()));
+chk('and DW stays closed where it was', A()[0].t === 'DW: =', A().map(show).join(' | '));
+reset();
+
+console.log('\n67. the rail shows the day, and shows the holes in it');
+/* The rail is the record made visible: today drawn to scale, with the time
+ * nobody logged hatched rather than absent. */
+reset(); reboot();
+const segs = () => H.NODES['railSegs'].children;
+const segKinds = () => segs().map(d => d._cls.has('gap') ? 'gap' : d.querySelector('.segName').textContent);
+chk('an empty day draws nothing', segs().length === 0, String(segs().length));
+
+tap('DW'); settle(); wait(40);
+chk('one running block is one segment', segKinds().join(',') === 'DEEP WORK', segKinds().join(','));
+chk('and it is marked as the open one', segs()[0]._cls.has('open'), segs()[0].className);
+
+tap('MTG'); settle(); wait(20);
+chk('a switch leaves the closed block on the rail, with no gap between them',
+  segKinds().join(',') === 'DEEP WORK,MEETINGS', segKinds().join(','));
+chk('only the running one is outlined',
+  !segs()[0]._cls.has('open') && segs()[1]._cls.has('open'),
+  segs().map(d => d.className).join(' | '));
+
+console.log('\n67b. time nobody logged is drawn as a hole');
+reset(); reboot();
+tap('DW'); settle(); wait(30);
+tapStop(); tapStop(); settle();
+wait(40);                                        // forty minutes of nothing
+chk('the day ends with a gap that grows',
+  segKinds().join(',') === 'DEEP WORK,gap', segKinds().join(','));
+chk('and the gap says how long it has been',
+  /^(39|40|41)m$/.test(segs()[1].querySelector('.segDur').textContent),
+  segs()[1].querySelector('.segDur').textContent);
+
+console.log('\n67c. undo takes the block off the rail again');
+reset(); reboot();
+tap('DW'); settle(); wait(40);
+tap('MTG'); settle();
+chk('two segments after the switch', segKinds().join(',') === 'DEEP WORK,MEETINGS',
+  segKinds().join(','));
+$('undo').fire('click'); settle();
+chk('and one again after taking it back', segKinds().join(',') === 'DEEP WORK',
+  segKinds().join(','));
+chk('which is the open one', segs()[0]._cls.has('open'), segs()[0].className);
 reset();
 
 console.log('\n────────────────────────────────────────');

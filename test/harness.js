@@ -399,6 +399,7 @@ const elapsedBox = () => {
   const b = $('grid').children.find(c => c._cls.has('active'));
   return b ? b.querySelector('.ge').textContent : '';
 };
+const nowElapsed = () => (NODES['nowEl'] ? NODES['nowEl'].textContent : '');
 const addCell = () => $('grid').children.find(c => c.dataset.add === '1') || null;
 const activeKey = () => {
   const b = $('grid').children.find(c => c._cls.has('active'));
@@ -446,7 +447,13 @@ function reset(atMs) {
   Object.keys(SCRIPT_PROPS).forEach(k => delete SCRIPT_PROPS[k]);
 }
 function reboot() {
-  timers = timers.filter(t => !t.iv);          // drop the tick interval from the old instance
+  /* Every timer the old instance set, not only its intervals. A real reload
+     discards the lot; this shim keeps one DOM and runs a second copy of the
+     client over it, so a one-shot left behind fires later holding the OLD S and
+     paints it into the shared DOM. The undo ribbon's expiry is one of those —
+     it repaints on the way out — and it showed up as a running row belonging to
+     a block two sections earlier. */
+  timers = [];
   /* And its visibilitychange handler, for the same reason. A real reload
      replaces the page; this shim keeps one DOM and runs a second copy of the
      client over it, so without this every reboot left another instance
@@ -460,7 +467,7 @@ function reboot() {
 }
 
 module.exports = { LOGGED, fireVisible: () => VIS.forEach(f => f()), chk, skip, near, reset, reboot, META_ALLOWED, SCRIPT_PROPS, SHEETS, TRIGGERS,
-  posture, activeKey, litPosture, noteBox, elapsedBox, addCell,
+  posture, activeKey, litPosture, noteBox, elapsedBox, nowElapsed, addCell,
   clearPropCache: () => { global.PROPS_ = null; }, tap, tapSit, tapMark, tapStop, stopArmedNow, stopLabel, armedText,
   wait, advance, settle, A, S, show, hhmm, $,
   CALS, NODES, STORE, desc,

@@ -94,6 +94,17 @@ var STALE_OPEN_HOURS = 5;
 var MARK_TIMEOUT_MS = 6000;
 
 /**
+ * How long a switch can be taken back.
+ *
+ * This is the guardrail that replaced arm-and-confirm. Five seconds is long
+ * enough to notice a wrong tap and short enough that the ribbon is gone before
+ * it becomes furniture. Nothing is written differently because of it: undo
+ * either drops writes that have not gone yet, or sends one op that walks the
+ * calendar back.
+ */
+var UNDO_SECONDS = 5;
+
+/**
  * The one and only coupling in the app: tapping this category closes an open
  * SITTING block. Definitional, not inference. Set to '' to remove the coupling.
  */
@@ -243,6 +254,7 @@ function clientConfig_() {
     confirmTimeoutMs: CONFIRM_TIMEOUT_MS,
     staleOpenHours: STALE_OPEN_HOURS,
     markTimeoutMs: MARK_TIMEOUT_MS,
+    undoSeconds: UNDO_SECONDS,
     longBlockMinutes: LONG_BLOCK_MINUTES,
     maxCategories: MAX_CATEGORIES,
     maxOpTries: MAX_OP_TRIES,
@@ -842,6 +854,7 @@ function applyOp_(op) {
     case 'setMark':      return opSetMark_(op);
     case 'setText':      return opSetText_(op);
     case 'splitActual':  return opSplitActual_(op);
+    case 'undoSwitch':   return opUndoSwitch_(op);
     case 'openSit':      return opOpenSit_(op);
     case 'closeSit':     return opCloseSit_(op);
     case 'setSitStart':  return opSetSitStart_(op);
@@ -907,6 +920,48 @@ function opRecategorize_(op) {
   var p = parseTitle_(ev.getTitle()) || { key: op.key, text: '', mark: null };
   ev.setTitle(buildTitle_(op.key, p.text, p.mark));
   applyCatColor_(ev, op.key);
+}
+
+/**
+ * Put back the block a switch closed, and remove the one it opened.
+ *
+ * The redesign replaces arm-and-confirm with undo: a tap acts at once, and for
+ * five seconds afterwards the whole ribbon is a way back. When the switch is
+ * still sitting in the queue the client drops both ops and nothing ever reaches
+ * the calendar. When it has already landed — which is the ordinary case, since
+ * the queue flushes immediately — the calendar has to be walked back, and that
+ * is what this does.
+ *
+ * Deliberately narrow, and idempotent like every other op here:
+ *
+ *   - it deletes newRef ONLY if that block is still open and still starts where
+ *     the switch put it. A block someone has since closed, split or renamed is
+ *     not the block this undo was about, and is left alone.
+ *   - it reopens prevRef by restoring the open marker and the end time the
+ *     block had while it was running. If prevRef is gone, the delete still
+ *     happens: half an undo is better than a phantom block.
+ *   - replayed, it finds nothing to do and returns.
+ */
+function opUndoSwitch_(op) {
+  var cal = calActual_();
+
+  var ne = op.newRef ? findByRef_(cal, op.newRef, op.atMs) : null;
+  if (ne && isOpenEvent_(ne) && ne.getStartTime().getTime() === op.atMs) {
+    try { ne.deleteEvent(); } catch (e) {}
+  }
+
+  if (!op.prevRef) return;
+  var pe = findByRef_(cal, op.prevRef, op.prevStartMs);
+  if (!pe || isOpenEvent_(pe)) return;                  // already open: replay
+  // Only the block this undo closed. One whose end has since moved is somebody
+  // else's edit, and undo does not reach across it.
+  if (pe.getEndTime().getTime() !== op.atMs) return;
+  var p = parseTitle_(pe.getTitle()) ||
+          { key: op.prevKey || UNFILED_KEY, text: pe.getTitle(), mark: null };
+  // The mark went on at the close. It comes off with it.
+  pe.setTitle(buildTitle_(p.key, typeof op.prevText === 'string' ? op.prevText : p.text, null));
+  endEventAt_(pe, Math.max(op.prevStartMs + MS_MIN, op.nowMs || Date.now()));
+  writeDesc_(pe, op.prevRef, true);
 }
 
 function opSetMark_(op) {
