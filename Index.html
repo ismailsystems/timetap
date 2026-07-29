@@ -723,6 +723,17 @@
         var done = {};
         (res.applied || []).forEach(function (id) { done[id] = 1; });
         setQueue(queue().filter(function (o) { return !done[o.id]; }));
+        /*
+         * An applied undoSwitch can mean "the server heard it and declined the
+         * whole undo", because another device has already moved or closed the
+         * new block. The optimistic screen has already put the previous block
+         * back in hand, so applied is not enough to make that picture true.
+         * Re-read after this one op lands; adoptServerState still refuses the
+         * answer if a later local write is waiting or happened in flight.
+         */
+        if (q.some(function (o) { return o.type === 'undoSwitch' && done[o.id]; })) {
+          loadServerState();
+        }
         if (res.dropped && res.dropped.length) {
           showErr('discarded ' + res.dropped.length + ' malformed write' +
                   (res.dropped.length > 1 ? 's' : ''));

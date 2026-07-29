@@ -4560,6 +4560,18 @@ chk('closed: the calendar never holds two open blocks', nOpen() <= 1,
   A().map(show).join(' | '));
 chk('closed: the day that other device ended stays ended', nOpen() === 0,
   A().map(show).join(' | '));
+/*
+ * FIXES-5 A1. The server declining the undo is a successful round trip: the op
+ * is valid, but another device has already ended the block it names. The client
+ * used to take "applied" to mean "the optimistic picture was right", clear the
+ * queue, print SYNCED and keep DW running on screen against a calendar with
+ * nothing open. That claim then survived until a ten-minute visibility refresh.
+ *
+ * settle() carries the undo response and one state read. If the screen still
+ * claims DW after it, the write queue has learned the truth and the UI has not.
+ */
+chk('closed: one undo round trip makes the screen agree that the day ended',
+  activeKey() === null, String(activeKey()) + ' against ' + A().map(show).join(' | '));
 
 /* and the ordinary case still works, or the guard above has simply broken undo */
 reset(); reboot();
