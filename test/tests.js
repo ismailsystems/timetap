@@ -5363,6 +5363,36 @@ chk('120 offline switches leave the stored state under 2KB', bytes70 < 2048,
   bytes70 + ' bytes');
 H.setOnline(true);
 
+console.log('\n70b. a reload with queued writes rebuilds the rail after they drain');
+/*
+ * FIXES-5 E1. The rail is deliberately not persistent; after an offline reload
+ * it can draw only the saved open block until the queued writes reach the
+ * calendar. The retry path used to drain them without reading that calendar
+ * again, so the rail stayed at one segment for the rest of the session while
+ * the calendar held four.
+ */
+reset(); reboot();
+tap('DW'); settle(); wait(20);                 // this first open reaches the calendar
+H.setOnline(false);
+tap('MTG'); settle(); wait(20);
+tap('ADM'); settle(); wait(20);
+tap('BODY'); settle();
+chk('four segments are in hand before the offline reload',
+  segKinds().length === 4, segKinds().join(','));
+chk('the later switches are still queued',
+  Q().length > 0, JSON.stringify(Q().map(o => o.type)));
+reboot(); settle();
+chk('without the calendar, reload can draw only the saved open block',
+  segKinds().join(',') === 'BODY', segKinds().join(','));
+H.setOnline(true);
+advance(120000); settle(); settle();
+chk('the queued writes drain after the network returns',
+  Q().length === 0 && A().length === 4,
+  JSON.stringify(Q().map(o => o.type)) + ' // ' + A().map(show).join(' | '));
+chk('and the rail is rebuilt from the calendar they made',
+  segKinds().join(',') === 'DEEP WORK,MEETINGS,ADMIN,BODY',
+  segKinds().join(','));
+
 /* And it is a picture of TODAY. Left open across midnight without a reload, the
    list kept yesterday for ever — which is what "grows without bound" means once
    the store is no longer the thing holding it. */

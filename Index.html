@@ -500,6 +500,8 @@
   var strip = null;          // {ref, key, durMs, hintMs, timer}
   var CELL = {};             // key -> {box, note, el}, so the lit one is O(1)
   var flushing = false, retryTimer = null, retryDelay = 4000, lastStateMs = 0;
+  // A boot queue owns history the non-persistent rail can recover only after drain.
+  var stateAfterBootDrain = false;
   /*
    * Bumped by every local write. getState takes no server lock and applyOps
    * does, so the two run concurrently and can finish in either order: a
@@ -733,7 +735,14 @@
   function flush() {
     if (flushing || !hasRun) return;
     var q = queue();
-    if (!q.length) { setSync('synced'); return; }
+    if (!q.length) {
+      setSync('synced');
+      if (stateAfterBootDrain) {
+        stateAfterBootDrain = false;
+        loadServerState();
+      }
+      return;
+    }
     flushing = true;
     setSync('pending');
     google.script.run
@@ -764,7 +773,22 @@
         } else {
           hideErr();
           retryDelay = 4000;
-          if (queue().length) flush(); else setSync('synced');
+          if (queue().length) {
+            flush();
+          } else {
+            setSync('synced');
+            /*
+             * A reload deliberately restores no rail history from storage. If
+             * its boot queue first failed offline, this retry path is the first
+             * time the calendar holds that history. Read it now; otherwise the
+             * rail keeps only the saved open block although the queue is empty
+             * and the calendar is complete. FIXES-5 E1.
+             */
+            if (stateAfterBootDrain) {
+              stateAfterBootDrain = false;
+              loadServerState();
+            }
+          }
         }
       })
       .withFailureHandler(function () {
@@ -2300,6 +2324,7 @@
     // Drain first so the calendar reflects everything before we read it.
     var q = queue();
     if (q.length) {
+      stateAfterBootDrain = true;
       setSync('pending');
       google.script.run
         .withSuccessHandler(function (res) {
@@ -2307,7 +2332,11 @@
           (res.applied || []).forEach(function (id) { done[id] = 1; });
           setQueue(queue().filter(function (o) { return !done[o.id]; }));
           if (queue().length) { setSync('failed'); scheduleRetry(); }
-          else { setSync('synced'); loadServerState(); }
+          else {
+            stateAfterBootDrain = false;
+            setSync('synced');
+            loadServerState();
+          }
         })
         .withFailureHandler(function () { setSync('failed'); scheduleRetry(); })
         .applyOps(q.slice(0, 40));

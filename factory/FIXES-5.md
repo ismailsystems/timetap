@@ -86,7 +86,7 @@ they were not counted against it — but they are live.
 
 | # | Fix |
 |---|---|
-| E1 | A reload with an undrained queue empties the rail: four segments before, one after, and coming back online does not restore it, because `flush()` success never re-reads state. Fixing A1 may fix this too. |
+| E1 | **Fixed.** A page that boots with queued writes now remembers that the non-persistent rail needs a calendar read after those writes drain, including through offline retries and batches. Section 70b pins four segments before reload, one while offline, and four again after drain. |
 | E2 | `opCloseSit_` has no already-closed guard, unlike `opCloseActual_`. Once the screen has diverged, standing up stretches a closed SIT block — `09:00-09:50` became `09:00-12:50`. |
 
 ## F. The record
