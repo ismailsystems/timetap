@@ -94,7 +94,7 @@ they were not counted against it — but they are live.
 | # | Fix |
 |---|---|
 | F1 | **Fixed.** `factory/GUIDE.md` Part 2 now tells the round-1 shelf double-tap in the past tense; Part 3 keeps the shipped arm-then-act repair. The lint rule fails if Part 2 again claims the bug is live. |
-| F2 | `test/smoke.js` gained eight checks across the Day Rail rounds and has never been pasted into a phone console since. Two of the three bug classes it exists for only ever appeared on the handset. |
+| F2 | **Fixed.** Phone Chrome ran `test/smoke.js` (via a temporary `?smoke=1` runner, then removed): first `30/1` exposed Day Rail drift — the lit row uses an inset 4px accent edge, not an outer ring; smoke now pins that. Re-run `29/0` with two lit-row skips when idle. Headless remains the cold-load path. |
 
 ---
 

@@ -1514,3 +1514,24 @@ of it makes the *screen* wrong for up to ten minutes after another device
 intervenes, and all three reviewers found it independently.
 
 Nothing is deployed. Version 30 on the phone is the pre-redesign build.
+
+## [2026-07-29] FIXES-5 | F1 and F2 close the record items; the pass is done
+
+F1: `factory/GUIDE.md` Part 2 rewritten into the past tense for the round-1 shelf
+double-tap; lint rule pins the three present-tense claims that made the old
+markers necessary. Commit on main with F1.
+
+F2: `test/smoke.js` was pasted on a real iPhone (Chrome), after a temporary
+`?smoke=1` in-app runner because Safari cannot load `/exec` and Chrome iOS has
+no Web Inspector. First run: 30 passed, 1 failed — the lit-row check forbade
+`inset` while Day Rail uses `box-shadow: inset 4px 0 0 var(--accent)`. Smoke
+updated to pin that edge. Second run: 29 passed, 0 failed, 2 skipped (idle, no
+block). The inset criterion is also pinned by the first run's computed
+`… 4px 0px 0px 0px inset` detail. Temporary runner removed from the tree before
+commit; phone still needs one redeploy so Apps Script drops the old `Smoke`
+wiring.
+
+FIXES-5 list: A–F closed (decision items that were open mid-pass were answered
+during the pass). Suite baseline at handoff of this note: lint clear (21 rules),
+goldens byte-identical to `a256bdf`. Human call next: sixth review and/or
+keeping the redesign deploy they already cut for F2.

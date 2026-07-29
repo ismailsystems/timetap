@@ -118,14 +118,22 @@
   if (lit) {
     var ring = getComputedStyle(lit).boxShadow;
     ok('the lit ring is not the colour of the page', ring.indexOf(pageBg) < 0, ring);
-    ok('the lit ring sits outside the box, not inset', ring.indexOf('inset') < 0, ring);
+    /*
+     * Day Rail: the running row takes an inset 4px accent edge
+     * (`.gbtn.active { box-shadow: inset 4px 0 0 var(--accent) }`), not an
+     * outer glow. The old check forbade `inset` because the pre-redesign ring
+     * sat outside the box; FIXES-5 F2's phone paste is what found the drift.
+     * Computed order varies (`… 4px 0px 0px 0px inset`), so pin inset + 4px.
+     */
+    ok('the lit row takes a 4px inset accent edge',
+      /\binset\b/.test(ring) && /\b4px\b/.test(ring), ring);
   } else {
     // Not "a check that passed": a check that did not run. Reporting it as a
     // pass is the vacuous-assertion bug this file's own header warns about, and
     // it makes the total underivable — you cannot tell a skipped check from a
     // real one once both are counted the same way.
     skip('the lit ring is not the colour of the page', 'no block running');
-    skip('the lit ring sits outside the box, not inset', 'no block running');
+    skip('the lit row takes a 4px inset accent edge', 'no block running');
   }
 
   // ── geometry ────────────────────────────────────────────────────
