@@ -77,7 +77,7 @@ and **9** are closed by the documentation pass that produced this file.
 | D6 | **Fixed.** The rail start now says `TODAY · …`, while the NOW panel continues to say `SINCE …`. Section 67h pins the shorter today-only rail beside the longer full-block timer across midnight. |
 | D7 | **Fixed.** The error banner now sits above the flexible scrolling area. It takes space from the top instead of moving the bottom-pinned undo ribbon. The phone-browser reach criterion shows and hides the banner during an active undo and pins the ribbon coordinate. |
 | D8 | **Fixed.** Natural undo expiry now returns focus from the disappearing ribbon to the running row, or to the posture control after STOP. Other `clearUndo` callers keep their own focus behavior. The phone-browser reach criterion waits for the real expiry and pins the running row. |
-| D9 | The Add row is clipped out of the scrolling grid while the mark strip is up, and returns when the strip dismisses. |
+| D9 | **Fixed.** Showing the mark strip now scrolls only enough to reveal the Add row; hiding it returns the list to the running row. The phone-browser reach criterion pins Add inside the grid while the strip is visible. |
 
 ## E. Older than this round, recorded so they are not found again as new
 

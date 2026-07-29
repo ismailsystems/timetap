@@ -1564,6 +1564,15 @@ async function checkReach(browser, view, page, n) {
         vh, docScrollsY: document.documentElement.scrollHeight > vh + 1,
         undo: look(document.getElementById('undo')),
         strip: look(document.getElementById('strip')),
+        addInGrid: (() => {
+          const grid = document.getElementById('grid');
+          const add = grid && grid.querySelector('.addcell');
+          if (!grid || !add) return null;
+          const gr = grid.getBoundingClientRect(), ar = add.getBoundingClientRect();
+          return { gridTop: +gr.top.toFixed(1), gridBottom: +gr.bottom.toFixed(1),
+                   addTop: +ar.top.toFixed(1), addBottom: +ar.bottom.toFixed(1),
+                   visible: ar.top >= gr.top - 0.5 && ar.bottom <= gr.bottom + 0.5 };
+        })(),
         // The label, and whether the box it was given can hold it. `clipped` is
         // the honest measure: scrollWidth is what the text needs, clientWidth is
         // what it got.
@@ -1628,6 +1637,17 @@ async function checkReach(browser, view, page, n) {
       if (Math.abs(bannerShift.moved) > 0.5) {
         problems.push(label + ': showing the error banner moves the undo ribbon ' +
                       bannerShift.moved + 'px, so the target changes under the user\'s thumb');
+      }
+
+      /*
+       * FIXES-5 D9. The strip takes height from the list for a few seconds. Add
+       * used to stay at the old scroll position and be clipped by the new box.
+       */
+      if (!g.addInGrid || !g.addInGrid.visible) {
+        problems.push(label + ': while the mark strip is open, the Add row is at ' +
+                      (g.addInGrid ? g.addInGrid.addTop + '..' + g.addInGrid.addBottom : 'missing') +
+                      ' outside the visible grid ' +
+                      (g.addInGrid ? g.addInGrid.gridTop + '..' + g.addInGrid.gridBottom : 'missing'));
       }
     }
 
