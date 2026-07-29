@@ -219,8 +219,11 @@ vm.runInThisContext(code, { filename: 'Code.gs' });
  * real stop-at-first-failure ordering in play. */
 const realApplyOp_ = global.applyOp_;
 let REJECT = null;
+let REJECT_TYPE = null;
 global.applyOp_ = function () {
-  if (REJECT !== null) throw new Error(REJECT);
+  if (REJECT !== null && (!REJECT_TYPE || (arguments[0] && arguments[0].type === REJECT_TYPE))) {
+    throw new Error(REJECT);
+  }
   return realApplyOp_.apply(this, arguments);
 };
 
@@ -470,7 +473,7 @@ function reset(atMs) {
   Object.keys(STORE).forEach(k => delete STORE[k]);
   NOW = atMs !== undefined ? atMs : new Date(2026, 6, 20, 9, 0, 0, 0).getTime();
   ONLINE = true;
-  REJECT = null;
+  REJECT = null; REJECT_TYPE = null;
   LOGGED.length = 0;
   global.PROPS_ = null;
   SHEETS.book.sheets = [];
@@ -516,6 +519,15 @@ module.exports = { LOGGED, fireVisible: () => VIS.forEach(f => f()),
   // default 5ms compute-on-delivery behaviour.
   setCallLag: (name, ms) => { if (ms === null) delete CALL_LAG[name]; else CALL_LAG[name] = ms; },
   // Pass a message to make every server call reject with it; pass null to stop.
-  setServerReject: m => { REJECT = (m === null || m === undefined || m === false) ? null : String(m); },
+  setServerReject: m => {
+    REJECT = (m === null || m === undefined || m === false) ? null : String(m);
+    REJECT_TYPE = null;
+  },
+  // Reject one op shape and let the ones before it apply. applyOps stops there,
+  // which is how a close can land while the open behind it stays in the queue.
+  setServerRejectType: (type, message) => {
+    REJECT_TYPE = type ? String(type) : null;
+    REJECT = REJECT_TYPE ? String(message || 'rejected ' + REJECT_TYPE) : null;
+  },
   nowMs: () => NOW,
   setNow: v => { NOW = v; } };

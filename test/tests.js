@@ -5030,6 +5030,37 @@ console.log('\n66g. undo works while the write is still travelling');
 });
 reset();
 
+console.log('\n66p. undo compensates when only half the switch is still queued');
+/*
+ * FIXES-5 A3. applyOps stops at the first op that fails. A close can therefore
+ * land while the open behind it stays queued: one half of the switch is on the
+ * calendar and one half is still in localStorage. dropOps must remove all of
+ * the action or none of it, because removing the queued half and treating that
+ * as a complete drop leaves the original block closed and sends no compensation.
+ *
+ * This drives that state through applyOps rather than constructing the queue.
+ * The targeted rejection is cleared before UNDO, so the only question below is
+ * whether the client recognises that one missing id means the action landed.
+ */
+reset(); reboot();
+const t66p = H.nowMs();
+tap('DW'); settle(); wait(40);
+H.setServerRejectType('openActual', 'open refused once');
+tap('MTG'); settle();
+H.setServerRejectType(null);
+chk('the close landed while only the open stayed queued',
+  A().length === 1 && !/#open/.test(A()[0].d) &&
+  Q().length === 1 && Q()[0].type === 'openActual',
+  'cal=' + A().map(show).join(' | ') + ' q=' + JSON.stringify(Q().map(o => o.type)));
+$('undo').fire('click'); settle();
+chk('the half-landed switch is compensated, not half-dropped',
+  Q().length === 0 && A().length === 1 && A()[0].t === 'DW:' &&
+  A()[0].s === t66p && /#open/.test(A()[0].d),
+  'cal=' + A().map(show).join(' | ') + ' q=' + JSON.stringify(Q().map(o => o.type)));
+chk('and the screen agrees that the original block is running',
+  activeKey() === 'DW', String(activeKey()));
+reset();
+
 console.log('\n67. the rail shows the day, and shows the holes in it');
 /* The rail is the record made visible: today drawn to scale, with the time
  * nobody logged hatched rather than absent. */
