@@ -1130,6 +1130,22 @@
       // two open SIT blocks is a state nothing downstream can read.
       if (S.sit && S.sit.ref !== u.sit.ref) closeSit(now);
       S.sit = { ref: u.sit.ref, startMs: u.sit.startMs };
+    } else if (S.open && S.open.key === CFG.bodyKey) {
+      /*
+       * 8.2, the one coupling, on the one path the handoff names that nothing
+       * checked: "opening Body (by tap, split remainder, OR UNDO) closes any
+       * open SIT block."
+       *
+       * Reached only when this undo closed no sitting of its own. If it did,
+       * the branch above has already put back the exact SIT that was open
+       * alongside Body a moment ago — restoring a state is not opening Body,
+       * and closing it again would take back half of what the user asked for.
+       *
+       * The sitting closed here is one the user opened AFTER the switch, so it
+       * is not part of what is being restored. REVIEW-4's B4, and the successor
+       * to the deleted 50g.
+       */
+      closeSit(now);
     }
     S.lastTapMs = 0;
     hideStrip();

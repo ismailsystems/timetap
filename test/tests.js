@@ -8,6 +8,9 @@ const armedKey = () => {
 };
 const splitOpen = () => { const n = H.NODES['sheetSplit']; return !!n && !n.hidden; };
 const CFG_UNDO_MS = clientConfig_().undoSeconds * 1000;
+// The one coupling names a category by key, so the tests read it from the same
+// place the client does rather than spelling 'BODY' out and drifting from it.
+const CFG_BODY = clientConfig_().bodyKey;
 const D = (y, m, d, hh, mm) => new Date(y, m - 1, d, hh, mm, 0, 0).getTime();
 
 console.log('\n1. cold open, no open block');
@@ -4301,6 +4304,74 @@ $('undo').fire('click'); settle();
 chk('taking it back returns to MEETINGS, not to DEEP WORK',
   activeKey() === 'MTG', String(activeKey()));
 chk('and DW stays closed where it was', A()[0].t === 'DW: =', A().map(show).join(' | '));
+reset();
+
+console.log('\n68. opening Body closes an open SIT, by every path there is');
+/* REVIEW-4's B4, and the successor to the deleted 50g.
+ *
+ * The handoff names the paths explicitly: "opening Body (by tap, split
+ * remainder, or undo) closes any open SIT block." 50g existed to prove the
+ * coupling survives whatever replaces the tap — it was deleted with
+ * arm-and-confirm, no successor was written, and the successor path was broken.
+ * Undo into BODY left BODY open and a SIT open at the same time, which is a
+ * state the model forbids.
+ *
+ * All four paths are here rather than only the broken one, because the failure
+ * was not "undo is wrong", it was "one path was added and nothing checked the
+ * rule against it". A per-path list is what makes the next added path visible. */
+const bothOpen = () => (activeKey() === CFG_BODY) && openSits().length > 0;
+
+/* by tap */
+reset(); reboot();
+tapSit(); wait(20);
+tap('BODY'); settle();
+chk('tap: BODY is open and no SIT is', activeKey() === CFG_BODY && openSits().length === 0,
+  activeKey() + ' // ' + S().map(show).join(' | '));
+
+/* by split remainder */
+reset(); reboot();
+tap('DW'); settle(); wait(120);
+tapSit(); settle();
+tap('DW'); settle();                             // re-tap the running row: SPLIT
+$('spRange').value = '60'; $('spRange').fire('input');
+splitPick('BODY');
+chk('split remainder: BODY is open and no SIT is',
+  activeKey() === CFG_BODY && openSits().length === 0,
+  activeKey() + ' // ' + S().map(show).join(' | '));
+
+/* by recategorising the whole block — 52d holds this too, kept here so the list
+   is the whole list rather than most of it */
+reset(); reboot();
+tap('DW'); settle(); wait(120);
+tapSit(); settle();
+tap('DW'); settle();
+pickWhole(); splitPick('BODY');
+chk('whole-block recategorise: BODY is open and no SIT is',
+  activeKey() === CFG_BODY && openSits().length === 0,
+  activeKey() + ' // ' + S().map(show).join(' | '));
+
+/* by undo — the path that was broken */
+reset(); reboot();
+tap('BODY'); settle(); wait(30);
+chk('BODY is running and nothing is sitting',
+  activeKey() === CFG_BODY && openSits().length === 0, activeKey());
+tap('DW'); settle();                             // switch away
+tapSit(); settle();                              // and sit down
+chk('DW is running and the user is sitting',
+  activeKey() === 'DW' && openSits().length === 1,
+  activeKey() + ' // ' + S().map(show).join(' | '));
+$('undo').fire('click'); settle();
+chk('undo: BODY is open again', activeKey() === CFG_BODY, String(activeKey()));
+chk('and the SIT it walked into is closed', openSits().length === 0,
+  S().map(show).join(' | '));
+chk('the footer says so too', litPosture() === 'stand', String(litPosture()));
+chk('so the forbidden state is not reachable by any of the four', !bothOpen(),
+  activeKey() + ' // ' + S().map(show).join(' | '));
+/* And the calendar agrees, not only the screen. */
+reboot();
+chk('a reload finds BODY open and no SIT open',
+  activeKey() === CFG_BODY && openSits().length === 0,
+  A().map(show).join(' | ') + ' // ' + S().map(show).join(' | '));
 reset();
 
 console.log('\n66h. undo puts the sitting back too');
