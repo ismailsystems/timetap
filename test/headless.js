@@ -1733,6 +1733,27 @@ async function checkReach(browser, view, page, n) {
         }
       });
     }
+
+    /*
+     * FIXES-5 D8. Only the six-category pass waits for the real expiry; the
+     * focus rule is not a function of list length. Hiding the focused ribbon
+     * used to make Chromium park focus on BODY.
+     */
+    if (n === 6) {
+      await pg.locator('#undo').focus();
+      await pg.waitForFunction(() =>
+        document.getElementById('undo').classList.contains('hidden'), null,
+        { timeout: 6000 });
+      const afterExpiry = await pg.evaluate(() => {
+        const a = document.activeElement;
+        return a ? (a.dataset && a.dataset.key) || a.id || a.tagName : 'none';
+      });
+      console.log('    focus after expiry: ' + afterExpiry);
+      if (afterExpiry !== to) {
+        problems.push(label + ': when the focused undo ribbon expires, focus lands on ' +
+                      afterExpiry + ' rather than the running ' + to + ' row');
+      }
+    }
     if (errors.length) problems.push(label + ': page errors — ' + errors.join(' | '));
   } finally {
     await ctx.close();

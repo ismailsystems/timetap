@@ -1243,7 +1243,7 @@
   function armUndo(u) {
     clearUndo();
     u.until = Date.now() + CFG.undoSeconds * 1000;
-    u.timer = setTimeout(function () { clearUndo(); render(); }, CFG.undoSeconds * 1000);
+    u.timer = setTimeout(function () { clearUndo(true); render(); }, CFG.undoSeconds * 1000);
     u.tick = setInterval(paintUndo, 250);
     undo = u;
     paintUndo();
@@ -1256,7 +1256,8 @@
                                CFG.undoSeconds + ' seconds';
   }
 
-  function clearUndo() {
+  function clearUndo(returnFocus) {
+    var heldFocus = document.activeElement === $('undo');
     if (undo && undo.timer) clearTimeout(undo.timer);
     if (undo && undo.tick) clearInterval(undo.tick);
     undo = null;
@@ -1264,6 +1265,18 @@
     // The offer has gone, so the announcement of it goes too. Leaving it would
     // have a screen reader describe a guardrail that is no longer there.
     $('undoSay').textContent = '';
+    /*
+     * Only natural expiry returns focus. Hiding the focused ribbon used to
+     * leave Chromium on BODY; the next Tab then restarted from the top. The
+     * running row is the stable control the expired offer was about. After a
+     * STOP there is no such row, so the posture control is the safe fallback.
+     * Other callers are starting a new intention and keep their own focus.
+     * FIXES-5 D8.
+     */
+    if (returnFocus && heldFocus) {
+      var back = S.open && CELL[S.open.key] ? CELL[S.open.key].box : $('postureBtn');
+      if (back && typeof back.focus === 'function') back.focus();
+    }
   }
 
   function paintUndo() {
