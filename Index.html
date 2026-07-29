@@ -122,7 +122,22 @@
   .segDur  { font: 600 8.5px var(--font); opacity: .8; flex: none; }
 
   #right { flex: 1; min-width: 0; display: flex; flex-direction: column; }
-  #grid { display: flex; flex-direction: column; }
+  /*
+   * The list scrolls inside its own column. The two guardrails below it do not.
+   *
+   * The whole column used to be one unbroken run, so the category rows pushed
+   * the mark strip and the undo ribbon down as the list grew — and #bodyRow is
+   * min-height:0 inside the scroller, so what was pushed past the bottom was
+   * clipped rather than scrolled to. Measured at 390x844: at seven categories a
+   * tap where the ribbon appears landed on the sitting toggle and wrote a
+   * block; at ten — MAX_CATEGORIES, which the Add row invites the user towards
+   * — the ribbon and all three mark buttons were off the screen.
+   *
+   * A guardrail that leaves the screen as the list grows is worse than no
+   * guardrail, because the user learns to rely on it first. So the list gives
+   * way and the guardrails do not. REVIEW-4's B2.
+   */
+  #grid { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; }
 
   /* A category is a row, not a tile. The name is the thing you aim at, and it
      sits on a rule with everything else — flush left, one line, no box. */
@@ -161,7 +176,9 @@
   .addcell.busy { opacity: .5; }
 
   /* ── the bottom of the right column ──────────────────────────── */
-  #bottom { margin-top: auto; }
+  /* flex: none, not margin-top: auto. The list above it is what gives way when
+     the column runs short; these two never do. */
+  #bottom { flex: none; }
 
   /* The mark strip. It no longer covers the footer: it sits above the undo
      ribbon, in the column it belongs to, so STOP is never hidden by it. */

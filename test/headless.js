@@ -1446,6 +1446,187 @@ async function checkInjectionMatters(browser, view, page) {
   return [];
 }
 
+/* ═══════════════════════════════════════════════════════════════════
+ * A2: the guardrail has to be reachable at every category count
+ *
+ * REVIEW-4's B2, measured in Chromium at 390x844 after a switch:
+ *
+ *   categories=6    ribbon visible 56 of 56 px   a tap at its centre hits: undo
+ *   categories=7    ribbon visible 56 of 56 px   a tap at its centre hits: postureBtn
+ *   categories=8    ribbon visible 45 of 56 px   a tap hits nothing
+ *   categories=10   ribbon visible  0 of 56 px   the ribbon is off the screen
+ *
+ * At seven a tap where the ribbon appears TOGGLES SITTING and writes a block.
+ * At ten — MAX_CATEGORIES, which the Add row invites the user towards — the
+ * undo is gone entirely, and so are the mark buttons.
+ *
+ * The whole claim of the redesign is that nothing is lost to one tap, because
+ * every switch can be undone for five seconds. A guardrail that leaves the
+ * screen as the list grows is worse than no guardrail: the user learns to rely
+ * on it and then it is not there.
+ *
+ * Driven rather than faked. The category list is server-provided and baked into
+ * the page at doGet time, so the count is changed by rewriting that bootstrap —
+ * which is exactly what a phone whose owner has tapped Add receives — and the
+ * switch is made by really tapping a row.
+ * ═══════════════════════════════════════════════════════════════════ */
+const REACH_ORIGIN = 'http://timetap-reach.invalid/';
+
+/** The served document, with `n` categories in its bootstrap. */
+function documentWithCategories(page, n) {
+  const doc = documentFor(page, true);
+  const m = /var CFG = (\{[\s\S]*?\});\n/.exec(doc);
+  if (!m) throw new Error('could not find the bootstrap in the served page');
+  const cfg = JSON.parse(m[1]);
+  const SPARE = [['C7', 'Reading', '#7986cb'], ['C8', 'Errands', '#33b679'],
+                 ['C9', 'Practice', '#f6bf26'], ['C10', 'Correspondence', '#039be5']];
+  if (n < cfg.categories.length) cfg.categories = cfg.categories.slice(0, n);
+  while (cfg.categories.length < n) {
+    const s = SPARE[cfg.categories.length - 6];
+    if (!s) throw new Error('no spare category defined for count ' + n);
+    cfg.categories.push({ key: s[0], label: s[1], color: '9', hex: s[2], autoMark: null });
+  }
+  return doc.slice(0, m.index) + 'var CFG = ' + JSON.stringify(cfg) + ';\n' +
+         doc.slice(m.index + m[0].length);
+}
+
+async function checkReach(browser, view, page, n) {
+  const problems = [];
+  const label = view.name + ' ' + view.width + 'px, ' + n + ' categories';
+  const ctx = await browser.newContext({
+    viewport: { width: view.width, height: view.height },
+    isMobile: !!view.isMobile, hasTouch: !!view.isMobile,
+    deviceScaleFactor: view.isMobile ? 3 : 1
+  });
+  const pg = await ctx.newPage();
+  const errors = [];
+  pg.on('pageerror', e => errors.push(String((e && e.message) || e)));
+  try {
+    await pg.route(REACH_ORIGIN, r => r.fulfill({
+      status: 200, contentType: 'text/html; charset=utf-8',
+      body: documentWithCategories(page, n) }));
+    await pg.addInitScript(stallingServerStub);
+    await pg.addInitScript(() => {
+      // A block that has run 40 minutes, so the switch below is over
+      // MIN_MARK_MINUTES and raises the mark strip as well as the ribbon.
+      const now = Date.now();
+      localStorage.setItem('tt.state.v1', JSON.stringify({
+        open: { ref: 'aaaabbbbccccdddd', key: 'DW', text: '', startMs: now - 40 * 60000 },
+        sit: null, lastTapMs: 0
+      }));
+    });
+    await pg.goto(REACH_ORIGIN, { waitUntil: 'load' });
+    await pg.waitForTimeout(120);
+
+    const built = await pg.locator('#grid [data-key]').count();
+    if (built !== n) {
+      problems.push(label + ': the grid built ' + built + ' rows, so this count was ' +
+                    'never really on screen and every check below would be about ' +
+                    'a different screen');
+      return problems;
+    }
+
+    // Switch, for real, to the second category — which raises both guardrails.
+    const second = await pg.locator('#grid [data-key]').nth(1).getAttribute('data-key');
+    await pg.click('#grid [data-key="' + second + '"]', { timeout: 2000 });
+    await pg.waitForTimeout(60);
+
+    const g = await pg.evaluate(() => {
+      const vh = window.innerHeight, vw = window.innerWidth;
+      const look = el => {
+        if (!el) return null;
+        const s = getComputedStyle(el);
+        const r = el.getBoundingClientRect();
+        const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+        const at = (cx >= 0 && cx < vw && cy >= 0 && cy < vh)
+          ? document.elementFromPoint(cx, cy) : null;
+        const owner = at && at.closest('button, a, [role="button"], #undo, #strip');
+        return {
+          hidden: el.classList.contains('hidden'),
+          display: s.display,
+          w: +r.width.toFixed(1), h: +r.height.toFixed(1),
+          top: +r.top.toFixed(1), bottom: +r.bottom.toFixed(1),
+          // How much of it is inside the viewport, vertically.
+          visibleH: +Math.max(0, Math.min(r.bottom, vh) - Math.max(r.top, 0)).toFixed(1),
+          // The control that would receive the tap, named the way the user
+          // would name it: a mark button by its mark, everything else by id.
+          hit: owner
+            ? (owner.dataset && owner.dataset.mark
+                 ? 'mark ' + owner.dataset.mark
+                 : (owner.id || owner.tagName + '.' + owner.className))
+            : (at ? (at.id || at.tagName) : null)
+        };
+      };
+      return {
+        vh, docScrollsY: document.documentElement.scrollHeight > vh + 1,
+        undo: look(document.getElementById('undo')),
+        strip: look(document.getElementById('strip')),
+        // `mark` is what the user reads on the button; `want` is what the app
+        // calls it. They differ for minus: the glyph is U+2212, the value '-'.
+        marks: [].slice.call(document.querySelectorAll('#strip .strip-marks button'))
+          .map(b => Object.assign({ mark: b.textContent.trim(), want: b.dataset.mark }, look(b)))
+      };
+    });
+
+    console.log('  ' + n + ' categories:  ribbon ' + (g.undo ? g.undo.visibleH + ' of ' +
+                g.undo.h + 'px, hit=' + g.undo.hit : 'NOT IN THE DOCUMENT') +
+                ' · marks hit=' + g.marks.map(m => m.hit).join(','));
+
+    if (!g.undo || g.undo.hidden) {
+      problems.push(label + ': the undo ribbon is not showing after a switch, so the ' +
+                    'reach checks below could not run');
+      return problems;
+    }
+    if (g.undo.visibleH < g.undo.h - 0.5) {
+      problems.push(label + ': the undo ribbon is ' + g.undo.visibleH + ' of ' + g.undo.h +
+                    'px on screen — it runs off the bottom, so the way back is ' +
+                    'partly or wholly unreachable');
+    }
+    if (g.undo.h < TOUCH_TARGET) {
+      problems.push(label + ': the undo ribbon is ' + g.undo.h + 'px tall, under the ' +
+                    TOUCH_TARGET + 'px floor every other control here keeps');
+    }
+    if (g.undo.hit !== 'undo') {
+      problems.push(label + ': a tap at the undo ribbon\'s centre lands on ' + g.undo.hit +
+                    ' rather than the ribbon' +
+                    (g.undo.hit === 'postureBtn' ? ' — which toggles sitting and writes a block'
+                                                 : ''));
+    }
+    if (!g.strip || g.strip.hidden) {
+      problems.push(label + ': the mark strip is not showing after a 40-minute block was ' +
+                    'closed, so its buttons could not be checked');
+    } else {
+      if (g.strip.visibleH < g.strip.h - 0.5) {
+        problems.push(label + ': the mark strip is ' + g.strip.visibleH + ' of ' + g.strip.h +
+                      'px on screen');
+      }
+      if (g.marks.length !== 3) {
+        problems.push(label + ': found ' + g.marks.length + ' mark buttons, not three');
+      }
+      g.marks.forEach(m => {
+        if (m.visibleH < m.h - 0.5) {
+          problems.push(label + ': the "' + m.mark + '" mark button is ' + m.visibleH +
+                        ' of ' + m.h + 'px on screen');
+        }
+        if (m.w < TOUCH_TARGET || m.h < TOUCH_TARGET) {
+          problems.push(label + ': the "' + m.mark + '" mark button is ' + m.w + 'x' + m.h +
+                        ', under the ' + TOUCH_TARGET + 'px floor');
+        }
+        // Named by its own mark, so a tap that lands on the NEIGHBOURING mark
+        // button is a finding too. "some button" would pass that.
+        if (m.hit !== 'mark ' + m.want) {
+          problems.push(label + ': a tap at the "' + m.mark + '" mark button\'s centre ' +
+                        'lands on ' + m.hit);
+        }
+      });
+    }
+    if (errors.length) problems.push(label + ': page errors — ' + errors.join(' | '));
+  } finally {
+    await ctx.close();
+  }
+  return problems;
+}
+
 async function main() {
   const { chromium } = loadPlaywright();
   const page = served();
@@ -1486,6 +1667,13 @@ async function main() {
          shorter of the two, so a sheet that needs scrolling would show up there
          first, and a phone-only check would have missed it. */
       problems = problems.concat(await checkSplitScope(browser, view, page));
+    }
+    /* A2: the guardrails at every category count the app allows, on the phone,
+       which is the short viewport and therefore the one that fails first. 10 is
+       MAX_CATEGORIES; the Add row invites the user all the way there. */
+    console.log('\nreach of the guardrails (phone 390px)');
+    for (const n of [6, 7, 8, 10]) {
+      problems = problems.concat(await checkReach(browser, VIEWS[0], page, n));
     }
   } finally {
     await browser.close();
