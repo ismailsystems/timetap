@@ -1607,6 +1607,28 @@ async function checkReach(browser, view, page, n) {
                         'name the block in #stripHead: ' + JSON.stringify(snap));
         }
       }
+
+      /*
+       * FIXES-5 D7. A set-aside banner can appear while a five-second undo is
+       * under the user's thumb. It must not move that target to make room.
+       */
+      const bannerShift = await pg.evaluate(() => {
+        const undo = document.getElementById('undo');
+        const err = document.getElementById('err');
+        const before = undo.getBoundingClientRect().top;
+        err.textContent = '1 write was set aside after repeated failures ›';
+        err.classList.remove('hidden');
+        const after = undo.getBoundingClientRect().top;
+        err.classList.add('hidden');
+        return { before: +before.toFixed(1), after: +after.toFixed(1),
+                 moved: +(after - before).toFixed(1) };
+      });
+      console.log('    banner moves ribbon: ' + bannerShift.before + ' -> ' +
+                  bannerShift.after + ' (' + bannerShift.moved + 'px)');
+      if (Math.abs(bannerShift.moved) > 0.5) {
+        problems.push(label + ': showing the error banner moves the undo ribbon ' +
+                      bannerShift.moved + 'px, so the target changes under the user\'s thumb');
+      }
     }
 
     if (!g.undo || g.undo.hidden) {

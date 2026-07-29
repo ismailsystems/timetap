@@ -75,7 +75,7 @@ and **9** are closed by the documentation pass that produced this file.
 | D4 | **Fixed.** `setSplitScope` now keeps the markup's action phrase, `REMAINDER BECOMES`. Section 52 pins it on first open, after returning from whole-block mode, and after reopening the sheet. |
 | D5 | **Fixed.** The note input now has a 44px minimum height, like the other touch controls. The shared browser smoke criterion measures its rendered box in both viewports. |
 | D6 | **Fixed.** The rail start now says `TODAY · …`, while the NOW panel continues to say `SINCE …`. Section 67h pins the shorter today-only rail beside the longer full-block timer across midnight. |
-| D7 | The undo ribbon moves 38px up when the error banner is present, so where UNDO appears depends on whether writes are set aside. |
+| D7 | **Fixed.** The error banner now sits above the flexible scrolling area. It takes space from the top instead of moving the bottom-pinned undo ribbon. The phone-browser reach criterion shows and hides the banner during an active undo and pins the ribbon coordinate. |
 | D8 | Focus drops to `BODY` when the ribbon expires under it. One Tab recovers. |
 | D9 | The Add row is clipped out of the scrolling grid while the mark strip is up, and returns when the strip dismisses. |
 

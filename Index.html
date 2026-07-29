@@ -352,6 +352,15 @@
     <span id="sync" class="s-synced"><span id="syncText">GOOGLE CALENDAR · SYNCED</span></span>
   </div>
 
+  <!--
+    Above the flexible middle, not below it. When this row used to appear
+    between #scroll and the footer it shortened the middle from the bottom and
+    moved an active UNDO ribbon 38px under a thumb already aiming at it. Here it
+    takes the same space from the top and leaves that bottom edge fixed.
+    FIXES-5 D7.
+  -->
+  <div id="err" class="hidden"></div>
+
   <div id="scroll">
     <!-- The whole panel is a tap target: tapping it splits the open block. -->
     <div id="nowPanel">
@@ -410,8 +419,6 @@
     arms rather than on every tick of the countdown.
   -->
   <div id="undoSay" class="sr" aria-live="polite" aria-atomic="true"></div>
-
-  <div id="err" class="hidden"></div>
 
   <div id="postureRow">
     <button id="postureBtn" aria-pressed="false" aria-label="sitting">
