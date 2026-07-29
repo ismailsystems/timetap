@@ -4649,6 +4649,48 @@ chk('untouched: undo still walks the switch back completely',
   A().length === 1 && A()[0].t === 'DW:' && A()[0].s === t69 && nOpen() === 1,
   A().map(show).join(' | '));
 
+console.log('\n69b. a declined undo survives a local write during its corrective read');
+/*
+ * FIXES-6 A1. A declined undo asks for the calendar again, but that answer can
+ * be computed before a local write and delivered after it. Refusing the stale
+ * answer is correct. Forgetting that the corrective read is still owed is not:
+ * the screen then keeps the optimistic pre-undo block until a later visibility
+ * change. Drive both a posture write and a second category write through that
+ * round trip. The first makes the lie visible; the second proves the retry does
+ * not overwrite a newer category choice.
+ */
+chk('a refused state answer does not advance the fresh-state clock',
+  /if \(adoptServerState\(st, gen\)\) \{\s*lastStateMs = Date\.now\(\)/.test(H.indexSource),
+  (H.indexSource.match(/function loadServerState\(\)[\s\S]{0,400}/) ||
+    ['loadServerState not found'])[0]);
+
+const declinedUndoRace = (label, interleave, expectedKey) => {
+  reset(); reboot();
+  tap('DW'); settle(); wait(40);
+  tap('MTG'); settle();
+  const moved = A().find(e => /^MTG/.test(e.t));
+  moved.d = moved.d.replace('#open', '');
+  moved.e = H.nowMs() + 10 * 60000;               // another device ended the day
+
+  H.setCallLag('getState', 800);
+  $('undo').fire('click');
+  advance(100);                                   // undo lands; stale read is in flight
+  interleave();
+  advance(700);                                   // first state answer is refused
+  advance(800); settle();                         // one corrective round trip
+
+  const open = A().filter(e => /#open/.test(e.d));
+  chk(label + ': after the write drains the screen agrees with the calendar',
+    activeKey() === expectedKey &&
+      open.length === (expectedKey === null ? 0 : 1) &&
+      (expectedKey === null || open[0].t.indexOf(expectedKey + ':') === 0),
+    String(activeKey()) + ' against ' + A().map(show).join(' | '));
+  H.setCallLag('getState', null);
+};
+
+declinedUndoRace('posture write', () => tapSit(), null);
+declinedUndoRace('category write', () => tap('ADM'), 'ADM');
+
 console.log('\n68. a category tap and the sitting are independent, by every path that used to couple them');
 /* The successor to "opening Body closes an open SIT, by every path there is",
  * which was itself REVIEW-4's B4 and the successor to the deleted 50g.

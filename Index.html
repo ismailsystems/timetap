@@ -502,6 +502,8 @@
   var flushing = false, retryTimer = null, retryDelay = 4000, lastStateMs = 0;
   // A boot queue owns history the non-persistent rail can recover only after drain.
   var stateAfterBootDrain = false;
+  // A declined undo owns a corrective read until one survives every newer write.
+  var stateAfterCorrectiveDrain = false;
   /*
    * Bumped by every local write. getState takes no server lock and applyOps
    * does, so the two run concurrently and can finish in either order: a
@@ -732,6 +734,15 @@
     el.className = failed ? 's-failed' : ('s-' + syncCls);
   }
 
+  function loadCorrectiveState() {
+    if (flushing || queue().length) {
+      stateAfterCorrectiveDrain = true;
+      return;
+    }
+    stateAfterCorrectiveDrain = false;
+    loadServerState(true);
+  }
+
   function flush() {
     if (flushing || !hasRun) return;
     var q = queue();
@@ -741,6 +752,7 @@
         stateAfterBootDrain = false;
         loadServerState();
       }
+      if (stateAfterCorrectiveDrain) loadCorrectiveState();
       return;
     }
     flushing = true;
@@ -760,7 +772,7 @@
          * answer if a later local write is waiting or happened in flight.
          */
         if (q.some(function (o) { return o.type === 'undoSwitch' && done[o.id]; })) {
-          loadServerState();
+          loadCorrectiveState();
         }
         if (res.dropped && res.dropped.length) {
           showErr('discarded ' + res.dropped.length + ' malformed write' +
@@ -788,6 +800,7 @@
               stateAfterBootDrain = false;
               loadServerState();
             }
+            if (stateAfterCorrectiveDrain) loadCorrectiveState();
           }
         }
       })
@@ -2290,22 +2303,22 @@
     // A read that was already in flight when the user wrote something describes
     // a moment that has passed. The queue-length check below cannot see it: by
     // the time the answer lands the write has applied and the queue is empty.
-    if (gen !== localGen) return;
+    if (gen !== localGen || queue().length) return false;
     // Anything the user did while the round trip was in flight wins.
-    if (!queue().length) {
-      var wasRef = S.open && S.open.ref, wasSit = S.sit && S.sit.ref;
-      S.open = st.open ? { ref: st.open.ref, key: st.open.key, text: st.open.text || '', startMs: st.open.startMs } : null;
-      S.sit = st.sit ? { ref: st.sit.ref, startMs: st.sit.startMs } : null;
-      // Today's closed blocks, for the rail. Not persisted: it is a picture of
-      // the calendar, and the calendar is the thing that is true.
-      S.today = st.today || [];
-      if (wasRef !== (S.open && S.open.ref) || wasSit !== (S.sit && S.sit.ref)) {
-        closeBlockSheets();
-      }
-      render();
-      revealOpenRow();
-      saveState();
+    hideErr();
+    var wasRef = S.open && S.open.ref, wasSit = S.sit && S.sit.ref;
+    S.open = st.open ? { ref: st.open.ref, key: st.open.key, text: st.open.text || '', startMs: st.open.startMs } : null;
+    S.sit = st.sit ? { ref: st.sit.ref, startMs: st.sit.startMs } : null;
+    // Today's closed blocks, for the rail. Not persisted: it is a picture of
+    // the calendar, and the calendar is the thing that is true.
+    S.today = st.today || [];
+    if (wasRef !== (S.open && S.open.ref) || wasSit !== (S.sit && S.sit.ref)) {
+      closeBlockSheets();
     }
+    render();
+    revealOpenRow();
+    saveState();
+    return true;
   }
 
   function boot() {
@@ -2345,13 +2358,15 @@
     }
   }
 
-  function loadServerState() {
+  function loadServerState(corrective) {
     var gen = localGen;
     google.script.run
       .withSuccessHandler(function (st) {
-        lastStateMs = Date.now();
-        hideErr();
-        adoptServerState(st, gen);
+        if (adoptServerState(st, gen)) {
+          lastStateMs = Date.now();
+        } else if (corrective) {
+          loadCorrectiveState();
+        }
       })
       .withFailureHandler(function (e) { showErr(String((e && e.message) || e)); })
       .getState();
