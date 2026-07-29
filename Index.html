@@ -2025,7 +2025,12 @@
     $('spScopeAll').classList.toggle('on', split.whole);
     $('spScopeRem').setAttribute('aria-pressed', String(!split.whole));
     $('spScopeAll').setAttribute('aria-pressed', String(split.whole));
-    $('spGridLab').textContent = split.whole ? 'THE WHOLE BLOCK BECOMES' : 'REMAINDER IS';
+    /*
+     * Both labels name what the next category tap will make the selected part
+     * become. The markup already said BECOMES; this repaint used to overwrite
+     * the remainder with the less useful statement "REMAINDER IS". FIXES-5 D4.
+     */
+    $('spGridLab').textContent = split.whole ? 'THE WHOLE BLOCK BECOMES' : 'REMAINDER BECOMES';
     // The split time is not used when the whole block is being recategorised,
     // so the sheet stops presenting it as though it were.
     $('spCard').classList.toggle('dim', split.whole);

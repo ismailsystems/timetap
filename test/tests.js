@@ -3250,7 +3250,7 @@ tap('DW'); settle(); wait(180);                          // three hours in
 tap('DW'); settle();                                     // re-tap the lit one
 chk('SPLIT opens on the lit block', splitOpen());
 chk('and opens on the remainder, the safer of the two',
-  gridLab() === 'REMAINDER IS', gridLab());
+  gridLab() === 'REMAINDER BECOMES', gridLab());
 const ends52 = A()[0].s + '/' + A()[0].e;
 chk('and says which option is chosen to something that cannot see the colour',
   $('spScopeRem').getAttribute('aria-pressed') === 'true' &&
@@ -3300,7 +3300,7 @@ pickWhole();
 chk('the slider stops offering a time that will not be used',
   $('spRange').disabled === true, String($('spRange').disabled));
 $('spScopeRem').fire('click');
-chk('going back restores the label', gridLab() === 'REMAINDER IS',
+chk('going back restores the label', gridLab() === 'REMAINDER BECOMES',
   gridLab());
 chk('and the slider is live again', $('spRange').disabled === false,
   String($('spRange').disabled));
@@ -3390,7 +3390,7 @@ chk('the sheet closed without writing', A().length === 1 && A()[0].t === 'DW:',
   A().map(show).join(' | '));
 tap('DW'); settle();
 chk('and re-opening it is back on the remainder',
-  splitOpen() && gridLab() === 'REMAINDER IS', gridLab());
+  splitOpen() && gridLab() === 'REMAINDER BECOMES', gridLab());
 chk('with the slider live again', $('spRange').disabled === false,
   String($('spRange').disabled));
 
