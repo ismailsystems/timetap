@@ -923,14 +923,18 @@ function opRecategorize_(op) {
 }
 
 /**
- * Put back the block a switch closed, and remove the one it opened.
+ * Put back what a switch or a STOP closed, and remove what it opened.
  *
  * The redesign replaces arm-and-confirm with undo: a tap acts at once, and for
- * five seconds afterwards the whole ribbon is a way back. When the switch is
- * still sitting in the queue the client drops both ops and nothing ever reaches
- * the calendar. When it has already landed — which is the ordinary case, since
- * the queue flushes immediately — the calendar has to be walked back, and that
- * is what this does.
+ * five seconds afterwards the whole ribbon is a way back. When the writes are
+ * still sitting in the queue the client drops them all and nothing ever reaches
+ * the calendar. When they have already landed — which is the ordinary case,
+ * since the queue flushes immediately — the calendar has to be walked back, and
+ * that is what this does.
+ *
+ * Three halves, each optional and each guarded on its own, because one tap can
+ * touch a block, its successor and the sitting: a mis-tap on Body closes the
+ * SIT as well, and STOP closes everything.
  *
  * Deliberately narrow, and idempotent like every other op here:
  *
@@ -940,6 +944,8 @@ function opRecategorize_(op) {
  *   - it reopens prevRef by restoring the open marker and the end time the
  *     block had while it was running. If prevRef is gone, the delete still
  *     happens: half an undo is better than a phantom block.
+ *   - it reopens sitRef on the same terms, and only if that SIT still ends
+ *     exactly where this undo closed it.
  *   - replayed, it finds nothing to do and returns.
  */
 function opUndoSwitch_(op) {
@@ -950,18 +956,37 @@ function opUndoSwitch_(op) {
     try { ne.deleteEvent(); } catch (e) {}
   }
 
-  if (!op.prevRef) return;
-  var pe = findByRef_(cal, op.prevRef, op.prevStartMs);
-  if (!pe || isOpenEvent_(pe)) return;                  // already open: replay
-  // Only the block this undo closed. One whose end has since moved is somebody
-  // else's edit, and undo does not reach across it.
-  if (pe.getEndTime().getTime() !== op.atMs) return;
-  var p = parseTitle_(pe.getTitle()) ||
-          { key: op.prevKey || UNFILED_KEY, text: pe.getTitle(), mark: null };
-  // The mark went on at the close. It comes off with it.
-  pe.setTitle(buildTitle_(p.key, typeof op.prevText === 'string' ? op.prevText : p.text, null));
-  endEventAt_(pe, Math.max(op.prevStartMs + MS_MIN, op.nowMs || Date.now()));
-  writeDesc_(pe, op.prevRef, true);
+  if (op.prevRef) {
+    var pe = findByRef_(cal, op.prevRef, op.prevStartMs);
+    // Skipped when it is already open, which is a replay; and when its end has
+    // moved, which is somebody else's edit that undo does not reach across.
+    if (pe && !isOpenEvent_(pe) && pe.getEndTime().getTime() === op.atMs) {
+      var p = parseTitle_(pe.getTitle()) ||
+              { key: op.prevKey || UNFILED_KEY, text: pe.getTitle(), mark: null };
+      // The mark went on at the close. It comes off with it.
+      pe.setTitle(buildTitle_(p.key, typeof op.prevText === 'string' ? op.prevText : p.text, null));
+      endEventAt_(pe, Math.max(op.prevStartMs + MS_MIN, op.nowMs || Date.now()));
+      writeDesc_(pe, op.prevRef, true);
+    }
+  }
+
+  /*
+   * The sitting half. Every path into Body closes an open SIT, and so does
+   * STOP — so an undo that put the work block back and left the sitting closed
+   * had restored half of what it took, while looking complete. The footer said
+   * NOT SITTING to a person who could see they were sitting down.
+   *
+   * Posture carries no title and no mark, so this only has to move the end back
+   * and set the open marker again.
+   */
+  if (op.sitRef) {
+    var sc = calSitting_();
+    var se = findByRef_(sc, op.sitRef, op.sitStartMs);
+    if (se && !isOpenEvent_(se) && se.getEndTime().getTime() === op.atMs) {
+      endEventAt_(se, Math.max(op.sitStartMs + MS_MIN, op.nowMs || Date.now()));
+      writeDesc_(se, op.sitRef, true);
+    }
+  }
 }
 
 function opSetMark_(op) {

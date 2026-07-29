@@ -1040,11 +1040,14 @@
     S.lastTapMs = now;
     openId = enqueue({ type: 'openActual', ref: ref, key: key, startMs: now });
 
-    if (key === CFG.bodyKey) closeSit(now);                          // 8.2 the only coupling
+    var sit = key === CFG.bodyKey ? closeSit(now) : null;            // 8.2 the only coupling
 
     if (pending) showStrip(pending); else hideStrip();
+    // `sit` rides along: a tap that closed the sitting has to offer that back
+    // too, or the undo puts the work block back and leaves the record saying
+    // the user stood up.
     armUndo({ prev: prev, newRef: ref, atMs: now, closeId: closeId, openId: openId,
-              label: 'SWITCHED TO ' + labelFor(key).toUpperCase() });
+              sit: sit, label: 'SWITCHED TO ' + labelFor(key).toUpperCase() });
     saveState(); render(); flush();
   }
 
@@ -1096,35 +1099,60 @@
     var u = undo, now = Date.now();
     clearUndo();
 
-    // Drop whichever of the two writes is still waiting. dropOps says how many
-    // it found, which is how we know whether the calendar ever saw this.
-    var dropped = dropOps([u.closeId, u.openId]);
-    if (dropped < 2) {
-      // At least one landed. One op puts both halves back.
+    // Every write this action made. dropOps takes them all or none, which is
+    // how we know whether the calendar ever saw any of it.
+    var ids = [u.closeId, u.openId];
+    if (u.sit) ids.push(u.sit.closeId);
+    if (!dropOps(ids)) {
+      // At least one landed. One op puts every half back.
       enqueue({ type: 'undoSwitch', newRef: u.newRef, atMs: u.atMs,
                 prevRef: u.prev ? u.prev.ref : null,
                 prevKey: u.prev ? u.prev.key : null,
                 prevText: u.prev ? u.prev.text : '',
                 prevStartMs: u.prev ? u.prev.startMs : null,
+                sitRef: u.sit ? u.sit.ref : null,
+                sitStartMs: u.sit ? u.sit.startMs : null,
                 nowMs: now });
     }
 
     if (u.prev) railReopen(u.prev.ref);
     S.open = u.prev ? { ref: u.prev.ref, key: u.prev.key, text: u.prev.text,
                         startMs: u.prev.startMs } : null;
+    /*
+     * And the sitting this action closed. tapCategory closes it on the way into
+     * BODY and endDay closes it outright; an undo that restored only the work
+     * block left the footer saying NOT SITTING to a person who could see they
+     * were sitting down. Half an undo is worse than none, because it looks
+     * complete. REVIEW-4's B3.
+     */
+    if (u.sit) {
+      // A sitting block opened since is not the one this is putting back, and
+      // two open SIT blocks is a state nothing downstream can read.
+      if (S.sit && S.sit.ref !== u.sit.ref) closeSit(now);
+      S.sit = { ref: u.sit.ref, startMs: u.sit.startMs };
+    }
     S.lastTapMs = 0;
     hideStrip();
     saveState(); render(); flush();
   }
 
-  /** Remove ops by id if they have not gone yet. Returns how many were found. */
+  /**
+   * Remove ops by id, but only if every one of them is still waiting. Returns
+   * true if it dropped them.
+   *
+   * All or nothing, because the caller has exactly two outcomes to tell apart:
+   * the calendar never saw any of this, or it saw some of it and one
+   * compensating op walks the whole action back. A partial drop is neither — it
+   * leaves half the action on the wire and half described by an op written on
+   * the assumption that it is not.
+   */
   function dropOps(ids) {
     /*
      * Not while a flush is in flight, for the same reason mutatePendingOpen
      * says no: the server was handed the queue as it was and is applying it
      * now. An op removed here in the meantime is one the success handler was
      * going to drop anyway — so the queue empties, the header reads SYNCED, and
-     * takeUndo reads "both found" as "the calendar never saw this" and sends no
+     * takeUndo reads "all found" as "the calendar never saw this" and sends no
      * compensating op. The calendar keeps the mistake and a reload brings it
      * back.
      *
@@ -1133,15 +1161,15 @@
      * needs. Round 2 wrote this guard into mutatePendingOpen and named the
      * hazard; this function was written without it. REVIEW-4's B1.
      */
-    if (flushing) return 0;
-    var want = {}, hit = 0;
-    ids.forEach(function (i) { if (i) want[i] = 1; });
-    var q = queue().filter(function (o) {
-      if (want[o.id]) { hit++; return false; }
-      return true;
-    });
-    if (hit) setQueue(q);
-    return hit;
+    if (flushing) return false;
+    var want = {}, n = 0;
+    ids.forEach(function (i) { if (i && !want[i]) { want[i] = 1; n++; } });
+    if (!n) return false;
+    var q = queue(), hit = 0;
+    q.forEach(function (o) { if (want[o.id]) hit++; });
+    if (hit < n) return false;
+    setQueue(q.filter(function (o) { return !want[o.id]; }));
+    return true;
   }
 
   /* ── the mark ──────────────────────────────────────────────── */
@@ -1175,10 +1203,19 @@
 
   /* ── sitting ───────────────────────────────────────────────── */
 
+  /**
+   * Close the open SIT, and say what was closed so the caller can offer it back.
+   *
+   * Returns {ref, startMs, closeId} or null. A caller that arms an undo needs
+   * all three: the first two to put the block back where it was, the third to
+   * drop the write if it has not gone yet.
+   */
   function closeSit(atMs) {
-    if (!S.sit) return;
-    enqueue({ type: 'closeSit', ref: S.sit.ref, endMs: atMs });
+    if (!S.sit) return null;
+    var was = { ref: S.sit.ref, startMs: S.sit.startMs };
+    was.closeId = enqueue({ type: 'closeSit', ref: was.ref, endMs: atMs });
     S.sit = null;
+    return was;
   }
 
   /**
@@ -1228,30 +1265,41 @@
 
   function endDay() {
     var now = Date.now();
+    var prev = null, closeId = null, pending = null;
 
     // A close is a close: the mark strip appears here exactly as it does on a
     // transition, and markFor's threshold applies unchanged.
     if (S.open) {
-      var prev = { ref: S.open.ref, key: S.open.key, text: S.open.text || '',
-                   startMs: S.open.startMs };
+      prev = { ref: S.open.ref, key: S.open.key, text: S.open.text || '',
+               startMs: S.open.startMs };
       var dur = now - prev.startMs;
       var m = markFor(prev.key, dur);
-      var closeId = enqueue({ type: 'closeActual', ref: prev.ref, key: prev.key, endMs: now,
-                              mark: m.mark, text: prev.text });
+      closeId = enqueue({ type: 'closeActual', ref: prev.ref, key: prev.key, endMs: now,
+                          mark: m.mark, text: prev.text });
       railClosed(prev, now);
-      var pending = m.strip
+      pending = m.strip
         ? { ref: prev.ref, key: prev.key, durMs: dur, hintMs: prev.startMs }
         : null;
       S.open = null;
       if (pending) showStrip(pending); else hideStrip();
-      // Ending the day is the one tap with nothing after it to notice a mistake
-      // by, so it is the one that most needs a way back.
-      armUndo({ prev: prev, newRef: null, atMs: now, closeId: closeId, openId: null,
-                label: 'STOPPED — NOW UNLOGGED' });
     }
 
     // Same instant, and closeSit is already a no-op when nothing is open.
-    closeSit(now);
+    var sit = closeSit(now);
+
+    /*
+     * Ending the day is the one tap with nothing after it to notice a mistake
+     * by, so it is the one that most needs a way back.
+     *
+     * Armed for EITHER half. This used to sit inside the branch above, so a day
+     * on which the user had sat down but logged nothing was ended with no undo
+     * at all — the case where the tap is most likely to be a mistake, because
+     * there is no running block on the screen to make anyone think twice.
+     */
+    if (prev || sit) {
+      armUndo({ prev: prev, newRef: null, atMs: now, closeId: closeId, openId: null,
+                sit: sit, label: 'STOPPED — NOW UNLOGGED' });
+    }
 
     saveState(); render(); flush();
   }

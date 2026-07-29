@@ -18,6 +18,13 @@ chk('plus an add box', !!addCell());
 chk('nothing lit in the grid', activeKey() === null, String(activeKey()));
 chk('no events written', A().length === 0);
 chk('strip hidden', $('strip').hidden);
+/* E3. Nothing has been switched, so there is nothing to take back — a ribbon up
+ * on load would be offering to undo a block the user has not made. It read as
+ * visible to every test in this file until the harness stopped mirroring the
+ * markup's initial classes by hand and started reading them. */
+chk('the undo ribbon is hidden', $('undo').hidden, $('undo').className);
+chk('and so is the SPLIT hint, because nothing is running',
+  $('nowHint').hidden, $('nowHint').className);
 
 console.log('\n2. ADM, 52m, DW -> strip, ignore 6s -> "ADM: ="');
 reset(); reboot();
@@ -4294,6 +4301,91 @@ $('undo').fire('click'); settle();
 chk('taking it back returns to MEETINGS, not to DEEP WORK',
   activeKey() === 'MTG', String(activeKey()));
 chk('and DW stays closed where it was', A()[0].t === 'DW: =', A().map(show).join(' | '));
+reset();
+
+console.log('\n66h. undo puts the sitting back too');
+/* REVIEW-4's B3. tapCategory and endDay both close an open SIT; takeUndo had no
+ * sitting branch at all. So an undo put the work block back and left the record
+ * saying the user was standing while they sat — and the footer said NOT SITTING
+ * to a person who could see they were sitting down. Half an undo is worse than
+ * none, because it looks complete. */
+reset(); reboot();
+tapSit(); wait(10);
+tap('MTG'); wait(30); settle();
+const sitStart66h = S()[0].s;
+chk('a work block is running and a SIT is open',
+  openEvents().length === 1 && openSits().length === 1,
+  A().map(show).join(' | ') + ' // ' + S().map(show).join(' | '));
+tap('BODY'); settle();                           // the one coupling: BODY closes the SIT
+chk('the mis-tap on BODY closed the sitting',
+  openSits().length === 0 && litPosture() === 'stand', S().map(show).join(' | '));
+$('undo').fire('click'); settle();
+chk('undo restores the work block', activeKey() === 'MTG', String(activeKey()));
+chk('and the SIT is open again', openSits().length === 1, S().map(show).join(' | '));
+chk('from its original start', S()[0].s === sitStart66h,
+  S().map(show).join(' | ') + ' wanted ' + H.hhmm(sitStart66h));
+chk('and the footer says SITTING', litPosture() === 'sit', String(litPosture()));
+chk('exactly one SIT block exists, not two', S().length === 1, S().map(show).join(' | '));
+reboot();
+chk('and a reload agrees', litPosture() === 'sit' && activeKey() === 'MTG',
+  litPosture() + '/' + activeKey());
+
+console.log('\n66i. and on the STOP path, which is where it matters most');
+reset(); reboot();
+tapSit(); wait(10);
+tap('DW'); wait(40); settle();
+const sitStart66i = S()[0].s, blockStart66i = A()[0].s;
+tapStop(); settle();
+chk('STOP closed both', openEvents().length === 0 && openSits().length === 0,
+  A().map(show).join(' | ') + ' // ' + S().map(show).join(' | '));
+chk('and the ribbon says so', $('undoLabel').textContent === 'STOPPED — NOW UNLOGGED',
+  $('undoLabel').textContent);
+$('undo').fire('click'); settle();
+chk('undo puts the block back', activeKey() === 'DW' && A()[0].s === blockStart66i,
+  A().map(show).join(' | '));
+chk('and puts the sitting back', openSits().length === 1 && S()[0].s === sitStart66i,
+  S().map(show).join(' | '));
+chk('the footer says SITTING', litPosture() === 'sit', String(litPosture()));
+chk('and neither calendar gained an event',
+  A().length === 1 && S().length === 1,
+  A().map(show).join(' | ') + ' // ' + S().map(show).join(' | '));
+
+console.log('\n66j. STOP with nothing but a SIT open can still be taken back');
+/* endDay used to arm the undo only inside its `if (S.open)` branch, so ending a
+ * day on which the user had sat but logged nothing offered no way back at all
+ * — the one case where the tap is most likely to be a mistake, because there is
+ * no running block on the screen to make the user think twice. */
+reset(); reboot();
+tapSit(); wait(25); settle();
+const sitStart66j = S()[0].s;
+tapStop(); settle();
+chk('the SIT closed', openSits().length === 0, S().map(show).join(' | '));
+chk('and the ribbon appeared anyway', !$('undo').hidden, $('undo').className);
+$('undo').fire('click'); settle();
+chk('taking it back reopens the SIT', openSits().length === 1 && S()[0].s === sitStart66j,
+  S().map(show).join(' | '));
+chk('with nothing invented on ACTUAL', A().length === 0, A().map(show).join(' | '));
+chk('and the footer says SITTING', litPosture() === 'sit', String(litPosture()));
+
+console.log('\n66k. offline, the sitting close is dropped rather than compensated');
+reset(); reboot();
+H.setOnline(false);
+tapSit(); wait(10);
+tap('DW'); wait(30); settle();
+tapStop(); settle();
+chk('two opens and two closes are waiting',
+  Q().map(o => o.type).join(',') === 'openSit,openActual,closeActual,closeSit',
+  JSON.stringify(Q().map(o => o.type)));
+$('undo').fire('click'); settle();
+chk('the two closes STOP made are gone from the queue',
+  !Q().some(o => o.type === 'closeActual') && !Q().some(o => o.type === 'closeSit'),
+  JSON.stringify(Q().map(o => o.type)));
+chk('and no compensating op was needed',
+  !Q().some(o => o.type === 'undoSwitch'), JSON.stringify(Q().map(o => o.type)));
+H.setOnline(true); advance(120000); settle(); settle();
+chk('the network coming back leaves one open block and one open SIT',
+  openEvents().length === 1 && openSits().length === 1,
+  A().map(show).join(' | ') + ' // ' + S().map(show).join(' | '));
 reset();
 
 console.log('\n66g. undo works while the write is still travelling');

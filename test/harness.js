@@ -272,14 +272,34 @@ class El {
   get hidden() { return this._cls.has('hidden'); }
 }
 const NODES = {};
-const INIT_CLS = { strip:'hidden', err:'hidden', week:'hidden', sheetSplit:'hidden',
-                   sheetSit:'hidden', sheetDead:'hidden', sitAdj:'hidden',
-                   nowbar:'idle', sync:'s-synced' };
+/*
+ * The class each element starts with, read out of the markup rather than
+ * mirrored by hand.
+ *
+ * It used to be a literal, and it drifted: the redesign added #undo declaring
+ * class="hidden" and this list was not updated, so after every reboot() the
+ * shim handed back a ribbon that read as VISIBLE. No assertion could catch a
+ * ribbon left up on load, and one criterion about STOP passed for that reason
+ * alone rather than because the product was right. Round 2 lost #nowHint and
+ * #syncN the same way. The mirror is the defect; reading the markup removes the
+ * whole class of it. REVIEW-4's E3.
+ *
+ * The shim does not parse markup, so this is the one thing it borrows from it.
+ */
+const INIT_CLS = (() => {
+  const src = fs.readFileSync(SRC + 'Index.html', 'utf8');
+  const out = {};
+  const put = (id, cls) => { if (!(id in out)) out[id] = cls; };
+  let m;
+  const idFirst = /id="([A-Za-z0-9_-]+)"[^>]*?\sclass="([^"]*)"/g;
+  while ((m = idFirst.exec(src))) put(m[1], m[2]);
+  const clsFirst = /class="([^"]*)"[^>]*?\sid="([A-Za-z0-9_-]+)"/g;
+  while ((m = clsFirst.exec(src))) put(m[2], m[1]);
+  return out;
+})();
 function mkNode(id) {
   const e = new El('div');
   if (INIT_CLS[id]) e.className = INIT_CLS[id];
-  // The shim does not parse markup, so anything the HTML declares statically
-  // has to be mirrored here. #posture is three buttons the client never builds.
   return e;
 }
 // Only ids the markup actually declares may resolve. The shim used to invent a
