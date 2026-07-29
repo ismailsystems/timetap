@@ -506,6 +506,7 @@ async function checkPostureRow(browser, view, page) {
       const hitPosture = hitAt(document.getElementById('postureBtn'));
       return {
         rowRect: row ? rect(row) : null,
+        rowCursor: row ? getComputedStyle(row).cursor : null,
         postureRect: posture ? rect(posture) : null,
         postureHidden: posture ? posture.classList.contains('hidden') : null,
         stripHidden: (() => { const s = document.getElementById('strip');
@@ -626,6 +627,15 @@ async function checkPostureRow(browser, view, page) {
                     ' not visible in the posture row. Present: ' + JSON.stringify(ids) +
                     '. Every check below would have passed vacuously.');
       return problems;                       // measuring the easy case proves nothing
+    }
+
+    /*
+     * FIXES-5 D3. The row itself has no click listener. A pointer over its
+     * padding promises an action that does not exist; only the buttons inside
+     * it are controls and may carry the pointer.
+     */
+    if (g.rowCursor === 'pointer') {
+      problems.push(label + ': the posture row has a pointer cursor but no row action');
     }
 
     // 1. Hit boxes.

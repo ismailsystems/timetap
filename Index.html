@@ -238,7 +238,12 @@
   #postureRow {
     flex: 0 0 auto; border-top: 2px solid var(--rule2);
     display: flex; align-items: center; gap: 12px;
-    padding: 0 var(--gx); min-height: 64px; cursor: pointer;
+    /*
+     * The row is a box around three separate controls, not a control itself.
+     * A pointer here promised a row action that had never been wired; the
+     * buttons keep their own pointer cursors. FIXES-5 D3.
+     */
+    padding: 0 var(--gx); min-height: 64px;
   }
   #postureDot { width: 12px; height: 12px; flex: none; background: var(--rule2); }
   #postureBtn.on #postureDot { background: var(--accent); }

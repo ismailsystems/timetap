@@ -71,7 +71,7 @@ and **9** are closed by the documentation pass that produced this file.
 |---|---|
 | D1 | **Closed by decision.** `1` is the last actionable second. At expiry the ribbon disappears; it does not show `0` beside an undo that is no longer available. The floor is stated beside `paintUndo` and section 66e pins both the source and the boundary. |
 | D2 | **Fixed.** `validOp_` now permits `null` explicitly as an absent optional reference, while requiring every present reference to already be a string. Section 66q pins both sides of that rule. |
-| D3 | `#postureRow` carries `cursor: pointer` and has no click listener. The design's *"Row tap toggles sitting"* is not implemented — safer than the alternative, but the cursor is a lie. |
+| D3 | **Fixed.** `#postureRow` no longer carries a pointer cursor. It is a box around three separate controls, not a fourth control; the real buttons keep their own pointer cursors. The real-browser posture criterion pins the row's computed cursor. |
 | D4 | `#spGridLab` renders `REMAINDER IS`; the handoff says `REMAINDER BECOMES`. The markup has it right and `setSplitScope` overwrites it. |
 | D5 | The note box is 354×38 — six pixels under the 44px floor, and the only control that is. |
 | D6 | Past midnight the same block reads `2h30` in the NOW panel and `1h30` on the rail. Both are correct; nothing explains the pair. |
