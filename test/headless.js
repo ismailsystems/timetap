@@ -1857,8 +1857,10 @@ async function checkRail(browser, view, page, blocks) {
      * The page's clock is pinned to nine in the evening, local, before anything
      * loads.
      *
-     * The fixture lays `blocks` fifteen-minute slots BACKWARDS from now, so forty
-     * of them reach ten and a quarter hours into the past. railBlocks correctly
+     * The fixture lays alternating five- and twenty-five-minute slots BACKWARDS
+     * from now, so forty of them still reach ten and a quarter hours into the
+     * past. The unequal slots make the floor and the total scale independently
+     * observable; equal slots let either half cover for the other. railBlocks correctly
      * drops every block that ended before local midnight — that is F4's midnight
      * fix — so before about 10:15 in the morning most of the fixture fell on
      * yesterday and vanished. The phase then could not assemble the screen it
@@ -1888,10 +1890,11 @@ async function checkRail(browser, view, page, blocks) {
       const now = Date.now();
       const KEYS = ['DW', 'MTG', 'ADM', 'BODY', 'REL', 'FRAG'];
       const today = [];
-      for (let i = 0; i < n; i++) {
-        today.push({ key: KEYS[i % KEYS.length],
-                     startMs: now - (n - i + 1) * 15 * 60000,
-                     endMs:   now - (n - i) * 15 * 60000 });
+      let endMs = now - 15 * 60000;             // the open block owns the last slot
+      for (let i = n - 1; i >= 0; i--) {
+        const startMs = endMs - (i % 2 ? 25 : 5) * 60000;
+        today.unshift({ key: KEYS[i % KEYS.length], startMs, endMs });
+        endMs = startMs;
       }
       const state = { nowMs: now, tz: 'local', notes: [], today: today, sit: null,
                       open: { ref: 'aaaabbbbccccdddd', key: 'DW', text: '',
@@ -1923,6 +1926,7 @@ async function checkRail(browser, view, page, blocks) {
       return {
         vh, vw,
         count: segs.length,
+        heights: segs.map(s => box(s).h),
         last: segs.length ? box(segs[segs.length - 1]) : null,
         railNow: box(document.getElementById('railNow')),
         railSegs: box(document.getElementById('railSegs')),
@@ -1958,6 +1962,32 @@ async function checkRail(browser, view, page, blocks) {
                     ' blocks plus the open one, so this was never the screen the check below ' +
                     'is about');
       return problems;
+    }
+    /*
+     * It must fill the box as well as fit inside it. Returning the old 340px
+     * constant from railBudget leaves almost two hundred pixels unused in this
+     * column and still passes every overflow check below.
+     */
+    if (g.last && Math.abs(g.last.bottom - g.railSegs.bottom) > 3) {
+      problems.push(label + ': the segments end at ' + g.last.bottom +
+                    ' but their column ends at ' + g.railSegs.bottom +
+                    ' — the rail fits but does not fill the box it was given');
+    }
+    /*
+     * On the forty-block fixture, the five-minute floor is no longer affordable.
+     * The equal-share cap lets twenty-five-minute blocks stay visibly longer.
+     * Removing that cap makes the later total scale flatten every block to the
+     * same height, which still fits and fills the column.
+     */
+    if (blocks === 40) {
+      const short = g.heights.slice(0, blocks).filter((_, i) => i % 2 === 0);
+      const long = g.heights.slice(0, blocks).filter((_, i) => i % 2 === 1);
+      const avg = xs => xs.reduce((a, b) => a + b, 0) / xs.length;
+      if (!(avg(long) > avg(short) * 1.4)) {
+        problems.push(label + ': twenty-five-minute blocks average ' +
+                      avg(long).toFixed(1) + 'px beside ' + avg(short).toFixed(1) +
+                      'px five-minute blocks — the share cap no longer preserves their difference');
+      }
     }
     if (g.last && g.last.bottom > g.vh + 0.5) {
       problems.push(label + ': the rail\'s last segment ends at ' + g.last.bottom +
