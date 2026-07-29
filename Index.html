@@ -371,9 +371,9 @@
           <div id="strip" class="hidden">
             <div id="stripHead"></div>
             <div class="strip-marks">
-              <button data-mark="+">+</button>
-              <button data-mark="=">=</button>
-              <button data-mark="-">−</button>
+              <button id="markPlus" data-mark="+" aria-labelledby="stripHead markPlus">+</button>
+              <button id="markEqual" data-mark="=" aria-labelledby="stripHead markEqual">=</button>
+              <button id="markMinus" data-mark="-" aria-labelledby="stripHead markMinus">−</button>
             </div>
           </div>
           <!-- A div rather than a button, for the same reason the category
@@ -408,7 +408,7 @@
       <span id="postureDot"></span>
       <span id="postureLabel">NOT SITTING</span>
     </button>
-    <button id="sitEdit" class="off tnum" aria-label="adjust when sitting started"><span id="sitEl"></span></button>
+    <button id="sitEdit" class="off tnum"><span id="sitEl"></span></button>
     <button id="stopBtn" class="inert" aria-label="end the day">STOP</button>
   </div>
 </div>
@@ -432,7 +432,8 @@
   <div id="spCard">
     <div class="lab" id="spLab">OPEN BLOCK</div>
     <div class="big tnum" id="spAt">--:--</div>
-    <input type="range" id="spRange" min="0" max="1" value="0" step="1">
+    <input type="range" id="spRange" min="0" max="1" value="0" step="1"
+           aria-label="split at">
     <div class="ends tnum"><span id="spStart"></span><span id="spNow">NOW</span></div>
     <div class="sub" id="spSub"></div>
   </div>
@@ -452,7 +453,8 @@
   </div>
   <div class="lab">STARTED AT</div>
   <div class="big tnum" id="ssAt">--:--</div>
-  <input type="range" id="ssRange" min="0" max="1" value="0" step="1">
+  <input type="range" id="ssRange" min="0" max="1" value="0" step="1"
+         aria-label="sitting started at">
   <div class="ends tnum"><span id="ssLo"></span><span id="ssHi">NOW</span></div>
   <div class="sub" id="ssSub"></div>
   <button id="ssApply">APPLY</button>
@@ -1699,7 +1701,16 @@
     $('postureLabel').textContent = S.sit ? 'SITTING' : 'NOT SITTING';
     // Only sitting has a duration, because only sitting is written down.
     $('sitEdit').classList.toggle('off', !S.sit);
-    $('sitEl').textContent = S.sit ? fmtEl(now - S.sit.startMs) : '';
+    var sitDur = S.sit ? fmtEl(now - S.sit.startMs) : '';
+    $('sitEl').textContent = sitDur;
+    if (S.sit) {
+      // The old fixed label replaced the duration inside the button in the
+      // accessibility tree. The chip moved on screen and said no duration.
+      $('sitEdit').setAttribute('aria-label',
+        'adjust when sitting started, sitting for ' + sitDur);
+    } else {
+      $('sitEdit').removeAttribute('aria-label');
+    }
 
     // One label, because there is one thing the button does. It is repainted
     // rather than left to the markup so that a build which reintroduces a
@@ -1913,7 +1924,12 @@
         CELL[S.open.key].box.classList.toggle('long', long);
       }
     }
-    if (S.sit) $('sitEl').textContent = fmtEl(now - S.sit.startMs);
+    if (S.sit) {
+      var sitDur = fmtEl(now - S.sit.startMs);
+      $('sitEl').textContent = sitDur;
+      $('sitEdit').setAttribute('aria-label',
+        'adjust when sitting started, sitting for ' + sitDur);
+    }
     // The rail is a picture of the clock, so it moves with it.
     paintRail(now);
   }
@@ -1948,6 +1964,12 @@
     var mins = parseInt($('spRange').value, 10) || 1;
     split.atMs = split.startMs + mins * MS_MIN;
     $('spAt').textContent = clock(split.atMs);
+    // A range's numeric value is minutes from an internal lower bound. The
+    // clock beside it is the value a person chose, so that is what it speaks.
+    // Chromium ignores aria-valuetext on a native range, so the name carries
+    // the clock too; engines which honour valuetext get the same value there.
+    $('spRange').setAttribute('aria-label', 'split at ' + clock(split.atMs));
+    $('spRange').setAttribute('aria-valuetext', clock(split.atMs));
     // What each half becomes, named the way the user names it. The arrow points
     // at the list underneath, which is where the second half is chosen.
     $('spSub').textContent = fmtDur(split.atMs - split.startMs) + ' stays ' +
@@ -2060,6 +2082,9 @@
     var mins = parseInt($('ssRange').value, 10) || 0;
     sitEdit.atMs = Math.min(sitEdit.lo + mins * MS_MIN, sitEdit.hi - MS_MIN);
     $('ssAt').textContent = clock(sitEdit.atMs);
+    $('ssRange').setAttribute('aria-label',
+      'sitting started at ' + clock(sitEdit.atMs));
+    $('ssRange').setAttribute('aria-valuetext', clock(sitEdit.atMs));
     // A consequence, not a measurement: this is what the record will say if the
     // user taps APPLY. Nothing has been written yet.
     $('ssSub').textContent = 'sitting for ' + fmtDur(Date.now() - sitEdit.atMs) + ' if applied';

@@ -1211,14 +1211,35 @@ async function checkNoteAndSheets(browser, view, page) {
                     'still holds focus, which enterkeyhint="done" promises it will not');
     }
 
+    // ── B1. the accessibility tree says names and human values ────
+    const sitChipA11y = await pg.locator('#sitEdit').ariaSnapshot();
+    if (!/button "[^"]*1h00[^"]*"/i.test(sitChipA11y)) {
+      problems.push(label + ': the sitting chip accessibility node omits its 1h00 duration: ' +
+                    JSON.stringify(sitChipA11y));
+    }
+    await pg.click('#grid [data-key="DW"]');
+    await pg.waitForTimeout(80);
+    const splitSliderA11y = await pg.locator('#spRange').ariaSnapshot();
+    if (!/slider "split at [^"]+"/i.test(splitSliderA11y) ||
+        !/\b(?:AM|PM)\b/.test(splitSliderA11y)) {
+      problems.push(label + ': the SPLIT slider accessibility node has no name or clock value: ' +
+                    JSON.stringify(splitSliderA11y));
+    }
+
     // ── 2. a button in a sheet body is a control, not a panel ───────
-    await pg.evaluate(() => document.getElementById('sheetSplit').classList.add('hidden'));
+    await pg.click('#spClose');
     await pg.click('#sitEdit');
     await pg.waitForTimeout(120);
     if (!await pg.locator('#sheetSit').isVisible()) {
       problems.push(label + ': the sit-start sheet did not open, so its buttons were ' +
                     'not measured');
     } else {
+      const sitSliderA11y = await pg.locator('#ssRange').ariaSnapshot();
+      if (!/slider "sitting started at [^"]+"/i.test(sitSliderA11y) ||
+          !/\b(?:AM|PM)\b/.test(sitSliderA11y)) {
+        problems.push(label + ': the SITTING START slider accessibility node has no name ' +
+                      'or clock value: ' + JSON.stringify(sitSliderA11y));
+      }
       const btns = await pg.evaluate(() => {
         const box = id => { const r = document.getElementById(id).getBoundingClientRect();
                             return { w: +r.width.toFixed(1), h: +r.height.toFixed(1) }; };
@@ -1543,6 +1564,18 @@ async function checkReach(browser, view, page, n) {
     console.log('  ' + n + ' categories:  ribbon ' + (g.undo ? g.undo.visibleH + ' of ' +
                 g.undo.h + 'px, hit=' + g.undo.hit : 'NOT IN THE DOCUMENT') +
                 ' · marks hit=' + g.marks.map(m => m.hit).join(','));
+
+    if (n === 6) {
+      const markNodes = pg.locator('#strip .strip-marks button');
+      for (let i = 0; i < await markNodes.count(); i++) {
+        const snap = await markNodes.nth(i).ariaSnapshot();
+        const mark = g.marks[i] && g.marks[i].mark;
+        if (!g.head || snap.indexOf(g.head.text) < 0 || snap.indexOf(mark) < 0) {
+          problems.push(label + ': the "' + mark + '" mark accessibility node does not ' +
+                        'name the block in #stripHead: ' + JSON.stringify(snap));
+        }
+      }
+    }
 
     if (!g.undo || g.undo.hidden) {
       problems.push(label + ': the undo ribbon is not showing after a switch, so the ' +
