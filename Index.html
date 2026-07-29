@@ -1284,8 +1284,6 @@
     u.tick = setInterval(paintUndo, 250);
     undo = u;
     paintUndo();
-    // showStrip runs first on a switch; UNDO changes the grid height again.
-    if (strip) revealAddRow();
     /*
      * Said once, when the offer appears. Not on every tick: the countdown
      * changes four times a second and a polite region that busy is one a
@@ -1482,17 +1480,6 @@
 
   /* ── the mark ──────────────────────────────────────────────── */
 
-  function revealAddRow() {
-    var grid = $('grid'), add = grid.querySelector('.addcell');
-    if (add && typeof add.getBoundingClientRect === 'function' &&
-        typeof grid.getBoundingClientRect === 'function') {
-      var over = add.getBoundingClientRect().bottom - grid.getBoundingClientRect().bottom;
-      if (over > 0) grid.scrollTop += Math.ceil(over);
-    } else if (add && typeof add.scrollIntoView === 'function') {
-      add.scrollIntoView({ block: 'nearest' });
-    }
-  }
-
   /*
    * The strip sits at the bottom of the category column, above the undo
    * ribbon. It used to be an overlay on the footer, which meant it hid STOP
@@ -1508,12 +1495,11 @@
                                  fmtEl(p.durMs) + ' — MARK IT';
     $('strip').classList.remove('hidden');
     /*
-     * The strip shortens the list from below. At the stock six categories that
-     * clipped the last 16px of Add until the strip left, even though the list
-     * is scrollable. Reveal only enough of the last row to keep the action in
-     * the box; hideStrip returns the list to the running row. FIXES-5 D9.
+     * The strip shortens the list from below, and Add can clip until it leaves.
+     * Do not scroll it into view here: that moved the category rows 78–190px
+     * under a reflex second tap and switched or marked the wrong block.
+     * FIXES-6 A2, option 1; this deliberately retires FIXES-5 D9.
      */
-    revealAddRow();
     strip.timer = setTimeout(hideStrip, CFG.markTimeoutMs);          // "=" already written
   }
 

@@ -1466,6 +1466,92 @@ function documentWithCategories(page, n) {
              (a, b) => (b.label || b.key).length - (a.label || a.key).length)[0] };
 }
 
+/*
+ * FIXES-6 A2. The DOM shim cannot express this fault: showing the mark strip
+ * shortens the real list, and D9 then scrolls Add into view under a finger that
+ * is already coming down again. Drive the gesture at one fixed screen point.
+ * Option 1 deliberately retires D9's temporary Add-visible claim so the list
+ * and its target stay still instead.
+ */
+async function checkReflexDoubleTap(browser, view, page) {
+  const problems = [];
+  const label = view.name + ' ' + view.width + 'px, 7-category reflex double tap';
+  const ctx = await browser.newContext({
+    viewport: { width: view.width, height: view.height },
+    isMobile: true, hasTouch: true, deviceScaleFactor: 3
+  });
+  const pg = await ctx.newPage();
+  const errors = [];
+  pg.on('pageerror', e => errors.push(String((e && e.message) || e)));
+  try {
+    const built = documentWithCategories(page, 7);
+    await pg.route(REACH_ORIGIN, r => r.fulfill({
+      status: 200, contentType: 'text/html; charset=utf-8', body: built.html }));
+    await pg.addInitScript(stallingServerStub);
+    await pg.addInitScript(() => {
+      const now = Date.now();
+      localStorage.setItem('tt.state.v1', JSON.stringify({
+        open: { ref: 'aaaabbbbccccdddd', key: 'DW', text: '', startMs: now - 40 * 60000 },
+        sit: null, lastTapMs: 0
+      }));
+    });
+    await pg.goto(REACH_ORIGIN, { waitUntil: 'load' });
+    await pg.waitForTimeout(120);
+    await pg.evaluate(() => {
+      window.__markClicks = 0;
+      document.querySelectorAll('#strip [data-mark]').forEach(
+        b => b.addEventListener('click', () => { window.__markClicks++; }));
+    });
+
+    const box = await pg.locator('#grid [data-key="MTG"]').boundingBox();
+    if (!box) {
+      problems.push(label + ': MEETINGS has no box, so the gesture never ran');
+      return problems;
+    }
+    const x = box.x + box.width / 2, y = box.y + box.height / 2;
+    const before = await pg.locator('#grid').evaluate(g => g.scrollTop);
+    await pg.touchscreen.tap(x, y);
+    await pg.waitForTimeout(100);
+    const first = await pg.evaluate(({ x, y }) => {
+      const hit = document.elementFromPoint(x, y);
+      const row = hit && hit.closest('#grid [data-key]');
+      const active = document.querySelector('#grid .active');
+      return { active: active && active.dataset.key, hit: row && row.dataset.key,
+               scrollTop: document.getElementById('grid').scrollTop };
+    }, { x, y });
+    await pg.touchscreen.tap(x, y);
+    await pg.waitForTimeout(60);
+    const second = await pg.evaluate(() => {
+      const active = document.querySelector('#grid .active');
+      const q = JSON.parse(localStorage.getItem('tt.queue.v1') || '[]');
+      return { active: active && active.dataset.key, marks: window.__markClicks,
+               queuedMarks: q.filter(o => o.type === 'setMark').length };
+    });
+
+    console.log('  target MTG at ' + x.toFixed(1) + ',' + y.toFixed(1) +
+                ': scroll ' + before + ' -> ' + first.scrollTop +
+                ', same point hits ' + first.hit + ', final active=' + second.active +
+                ', mark taps=' + second.marks);
+    if (first.active !== 'MTG') {
+      problems.push(label + ': the first tap did not switch to MTG, so the premise failed');
+    }
+    if (Math.abs(first.scrollTop - before) > 0.5 || first.hit !== 'MTG') {
+      problems.push(label + ': the first tap moved the list from scrollTop ' + before +
+                    ' to ' + first.scrollTop + ', and the same point now hits ' + first.hit);
+    }
+    if (second.active !== 'MTG') {
+      problems.push(label + ': the second tap switched again to ' + second.active);
+    }
+    if (second.marks || second.queuedMarks) {
+      problems.push(label + ': the second tap applied a mark to the closed block');
+    }
+    if (errors.length) problems.push(label + ': page errors — ' + errors.join(' | '));
+  } finally {
+    await ctx.close();
+  }
+  return problems;
+}
+
 async function checkReach(browser, view, page, n) {
   const problems = [];
   const label = view.name + ' ' + view.width + 'px, ' + n + ' categories';
@@ -1640,15 +1726,11 @@ async function checkReach(browser, view, page, n) {
       }
 
       /*
-       * FIXES-5 D9. The strip takes height from the list for a few seconds. Add
-       * used to stay at the old scroll position and be clipped by the new box.
+       * FIXES-5 D9's Add-visible assertion has no successor. FIXES-6 A2 option 1
+       * deliberately lets Add clip while the strip is open: scrolling it into
+       * view moved the rows under a reflex second tap. checkReflexDoubleTap pins
+       * the safety property that replaced it.
        */
-      if (!g.addInGrid || !g.addInGrid.visible) {
-        problems.push(label + ': while the mark strip is open, the Add row is at ' +
-                      (g.addInGrid ? g.addInGrid.addTop + '..' + g.addInGrid.addBottom : 'missing') +
-                      ' outside the visible grid ' +
-                      (g.addInGrid ? g.addInGrid.gridTop + '..' + g.addInGrid.gridBottom : 'missing'));
-      }
     }
 
     if (!g.undo || g.undo.hidden) {
@@ -2206,6 +2288,8 @@ async function main() {
     /* A2: the guardrails at every category count the app allows, on the phone,
        which is the short viewport and therefore the one that fails first. 10 is
        MAX_CATEGORIES; the Add row invites the user all the way there. */
+    console.log('\nreflex double tap (phone 390px)');
+    problems = problems.concat(await checkReflexDoubleTap(browser, VIEWS[0], page));
     console.log('\nreach of the guardrails (phone 390px)');
     for (const n of [6, 7, 8, 10]) {
       problems = problems.concat(await checkReach(browser, VIEWS[0], page, n));
