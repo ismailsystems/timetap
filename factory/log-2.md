@@ -1395,3 +1395,122 @@ stays green through the revert is not a criterion.
 
 **What is NOT done, and is the human's call:** deploying. Version 30 on the
 phone is still the pre-redesign build. Nothing here has been pushed.
+
+---
+
+## Review 5, and the three that blocked — 2026-07-29
+
+Three independent reviewers, one per angle, none given the builder's reasoning and
+none given each other's findings. Every finding was then reproduced a second time
+by hand in a fourth clean clone, and every one that looked like a regression was
+re-run against `2a15553` to prove the FIXES-4 pass had caused it rather than
+merely coincided with it. All three returned **SHOULD NOT SHIP**.
+
+The pass under review was good work. Twenty-two of its twenty-four items closed
+exactly against their written criteria, all five of REVIEW-4's blocking faults
+were genuinely gone, and each fix was held by a mutation. What blocked was three
+things, and two of them were the pass's own repairs going one step too far or one
+step not far enough.
+
+**C1 — the repair that lost data.** The fix for A3 taught the undo to put back the
+sitting a mis-tap had closed. It did, and then a sitting the user started in
+between broke it: its `openSit` was still in the queue, and `opOpenSit_` heals an
+already-open SIT by closing it, so the block the undo had just restored was closed
+again on the way past the server by a write the undo itself had left behind. The
+footer claimed SITTING for the rest of the session against a calendar with no open
+SIT, and a reload discarded the claim. Fifty minutes recorded of the hundred and
+seventy the app was claiming. `2a15553` got this right by having no sitting branch
+at all, which is the sharpest kind of regression: the fix was correct about the
+case it was written for and wrong about the one next to it.
+
+**C2 — the gate that could not assemble its own premise.** The new D2 phase lays a
+forty-block day backwards from now, ten and a quarter hours of it, and
+`railBlocks` correctly drops whatever ended before local midnight — F4's own
+midnight fix. So before about 10:15 in the morning most of the fixture fell on
+yesterday, the phase could not build the screen it exists to measure, said so
+honestly through its guard, and the run exited non-zero. Red for the first ten
+hours of every day and green for the rest, with `deploy.sh` refusing to deploy in
+the mornings and D2 unverified exactly when it was. Nothing was wrong with the
+rail. The builder ran the suite in the evening and saw it pass, wrote "headless ok
+at both viewports" in the record, and both of those were true at the time.
+
+**C3 — the comment that described a rule nothing enforced.** `doSplit` said, in
+its own comment, that the sheet closes when the block it names stops being the one
+in hand. Nothing closed it. `tapCategory`, `endDay` and `toggleSit` never touched a
+sheet, and `closeBlockSheets` was reached only from `quarantine` and
+`adoptServerState`. So the sheet went on naming DEEP WORK and holding DEEP WORK's
+start while MEETINGS was in hand, and picking a remainder wrote `splitActual`
+against the new ref with the old cut time: `ADM 09:22-09:43` inside
+`DW 09:00-09:43`, twenty-one minutes billed to two categories, accepted and
+clamped and landed with no error anywhere. It needed a keyboard to reach, and the
+sheets turned out not to be modal at all — no role, no `aria-modal`, the app behind
+them never made unreachable, `Escape` closing nothing — so twenty-four Tabs with
+SPLIT open reached the ten controls behind it and the tenth Tab was STOP. This one
+predates the pass; D1's `tabindex` is what first invited a keyboard into that
+surface.
+
+**Five claims in the record did not hold**, and the review compares them against
+what it measured in a section of its own. Most instructive: `test/lint.js`'s
+retire comment said the rule it removed "cannot fail". Run against the tree it was
+retired from, it fails loudly — it reads both constants out of `Code.gs` and
+reports a missing one as a fault. The retirement was right and the reason recorded
+for it was not, which is the same class of error as C3's comment and was found the
+same way: by running the thing the prose described.
+
+### What the human ruled, and what it deleted
+
+C1 first: join the two sittings rather than leave a seam. Then, having seen where
+the fault lived, a second ruling that removed the ground it stood on — **a
+category tap has no implications for the posture**. The Body-closes-sitting
+coupling is gone on all four paths the handoff named, and `BODY_KEY` with it. That
+answered REVIEW-5's should-fix 2 by deletion: the same machinery had been closing
+sittings that predated the switch and had nothing to do with the tap being taken
+back, while its comment claimed it only closed ones opened afterwards.
+
+It deviates from a design contract the human accepted. The handoff lists the Body
+coupling under "Preserve, do not rewrite", and `FIXES-4`'s item A4 is now
+deliberately inverted. Recorded where a reader meets it rather than only here.
+
+STOP kept its coupling — it ends the day, and ending the day ends the sitting —
+which is why C1's machinery is live code rather than dead. The cost is stated
+rather than hidden: a day ended at nine in the evening leaves the sitting running,
+and `staleGuard_` bounds it at midnight, so the day reports sitting hours nobody
+sat. Tap the footer as well.
+
+### What the fixes cost, and what pins them
+
+Sixteen assertions became forty-six in section 66o, then twenty-three of those
+went again when the coupling's removal made the scenario unreachable — recorded in
+the file, per the habit E4 established, rather than left as an unexplained fall in
+the count. Section 68 kept its per-path list and inverted every claim in it,
+because the failure it was written for was never "undo is wrong" but "a path was
+added and nothing checked the rule against it".
+
+Every removal was put back one at a time. The Body tap eight failures, the split
+remainder two, the whole-block recategorise four, undo into Body five. The
+`split.ref` guard six, and the corrupt calendar returning verbatim. The `inert`
+attribute three, and the headless walk escaping to exactly the controls the review
+had named. Two mutations to the rail phase, one reproducing REVIEW-4's finding 14
+to the pixel — 1335.6px on an 844px screen.
+
+Two of the fixes needed the harness to stop being polite. `document.addEventListener`
+kept `visibilitychange` and dropped every other type on the floor, so the `Escape`
+handler would have been discarded silently while every assertion about that key
+passed — the same shape as the ids that used to resolve to invented nodes.
+`H.fireDoc` returns how many handlers heard the key, so a test can refuse to pass
+when the answer is none.
+
+### Where it stands
+
+1162 assertions green twice under all four contracted zones. Lint clear on twenty
+rules. Headless ok at both viewports and now at **every hour of the day**, which
+it was not before. `appsscript.json` and `test/fixtures/rollup-golden.json` still
+byte-identical to `a256bdf`.
+
+What is left is `factory/FIXES-5.md`: nine should-fix, eleven cosmetic, two items
+older than this round, two the record owes, and five open decisions. Nothing on
+that list makes the record wrong in a way a user meets by touch alone. The worst
+of it makes the *screen* wrong for up to ten minutes after another device
+intervenes, and all three reviewers found it independently.
+
+Nothing is deployed. Version 30 on the phone is the pre-redesign build.

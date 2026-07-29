@@ -1,12 +1,74 @@
 # Factory State
 project: timetap
 stage: 6
-stage_name: The Day Rail redesign is fixed and green — the human accepts and deploys
-last_updated: 2026-07-28 (FIXES-4 worked through, all 24 items)
-next_action: "THE HUMAN ACCEPTS AND DEPLOYS. All 24 items in factory/FIXES-4.md are done, each written criterion-first and verified by running it; nine commits on main, nothing pushed. 1101 assertions green TWICE under all four contracted timezones, lint clear on 20 rules, headless ok at both viewports with three new phases. REVIEW-4's four blocking reproductions were re-run BY HAND at the end and printed gone — the record is in factory/log-2.md under 'The FIXES-4 pass'. Three decisions were put to the human before anything was built and all three were answered: STOP acts on one tap and the ribbon is the way back; the mis-tap merge stays out, to be judged in use; the Add row follows the design and sits at the end of the list. BEFORE DEPLOYING, read the spreadsheet-formulas note below — it still holds, because this pass changed no column. Optional and still not done: the proof video (auto-loom-proof) and the plain-language explainer (factory-explain, which also owes GUIDE.md Part 2 a correction carried over from round 1). A FIFTH REVIEW IS WORTH IT: this pass touched the undo path, the server op, the layout in three places and the lint rules, and no independent eye has seen any of it."
+stage_name: Reviewed a fifth time; the three faults that blocked are fixed, the rest is a list
+last_updated: 2026-07-29 (review 5 run, C1/C2/C3 fixed, FIXES-5 compiled)
+next_action: "WORK THROUGH factory/FIXES-5.md, in a fresh session. Read factory/REVIEW-5.md first — it holds the reproductions, and every one was reproduced twice before it was written down. THE THREE BLOCKING FAULTS ARE ALREADY FIXED AND COMMITTED (23dcc6e, 7c63226, 8253299) and FIXES-5 lists them so its letters make sense; what is left is nine should-fix and eleven cosmetic, grouped A to F, plus two items older than this round and two the record owes. FIVE DECISIONS ARE OPEN and they are marked *Decision first* in FIXES-5: the reflex double tap (B3), the undo chip (D1), and the three the review lists at its end. THE LIVE APP IS NOT AFFECTED: deployed version 30 is the pre-redesign build, and nothing since has been pushed. State: 1162 assertions green twice in all four contracted zones, lint clear on 20 rules, headless ok at both viewports and now at EVERY HOUR of the day, which it was not before. Optional and still not done: the proof video (auto-loom-proof) and the plain-language explainer (factory-explain, which also owes GUIDE.md Part 2 a correction carried over from round 1). BEFORE DEPLOYING, read the spreadsheet-formulas note below — it still holds, because nothing since has moved a column."
+old_next_action_3: "THE HUMAN ACCEPTS AND DEPLOYS. All 24 items in factory/FIXES-4.md are done, each written criterion-first and verified by running it; nine commits on main, nothing pushed. 1101 assertions green TWICE under all four contracted timezones, lint clear on 20 rules, headless ok at both viewports with three new phases. REVIEW-4's four blocking reproductions were re-run BY HAND at the end and printed gone — the record is in factory/log-2.md under 'The FIXES-4 pass'. Three decisions were put to the human before anything was built and all three were answered: STOP acts on one tap and the ribbon is the way back; the mis-tap merge stays out, to be judged in use; the Add row follows the design and sits at the end of the list. BEFORE DEPLOYING, read the spreadsheet-formulas note below — it still holds, because this pass changed no column. Optional and still not done: the proof video (auto-loom-proof) and the plain-language explainer (factory-explain, which also owes GUIDE.md Part 2 a correction carried over from round 1). A FIFTH REVIEW IS WORTH IT: this pass touched the undo path, the server op, the layout in three places and the lint rules, and no independent eye has seen any of it."
 old_next_action_2: "WORK THROUGH factory/FIXES-4.md, in a fresh session. Read factory/REVIEW-4.md first — it holds the reproductions. Three reviewers returned BROKEN, NOT DONE and MINOR DRIFT on the redesign; five faults block, and three of them break the redesign's own central claim that nothing is lost to one tap. Three decisions are open and are listed at the end of REVIEW-4; the STOP one should be settled before it is built. THE LIVE APP IS NOT AFFECTED: deployed version 30 is the pre-redesign build, and the redesign has never been pushed or deployed. The round-2 work below is complete and was accepted."
 old_next_action: "THE HUMAN ACCEPTS AND DEPLOYS. The work is 25 commits on factory/honest-record; main is untouched at a256bdf and nothing has been pushed. Read factory/REVIEW-3.md, above all its 'Decisions for you' — all five are answered and the answers are in progress-2.md. Then merge, deploy, and CHECK YOUR OWN SPREADSHEET FORMULAS: D1 added a rollup key, which moved 13 of the 22 columns the daily tab had. SETUP.md says which, and shows a formula that survives the next change. Optional and offered, not done: the proof video (auto-loom-proof) and the plain-language explainer (factory-explain, which also owes GUIDE.md Part 2 a correction carried over from round 1)."
 notes: |
+  REVIEWED A FIFTH TIME, AND THREE FAULTS BLOCKED — 2026-07-29.
+
+  factory/REVIEW-5.md. Three independent reviewers, one per angle, none given the
+  builder's reasoning and none given each other's findings. Every finding was then
+  reproduced a second time by hand in a fourth clean clone, and every finding that
+  looked like a regression was re-run against 2a15553 to prove the FIXES-4 pass
+  had caused it. All three returned SHOULD NOT SHIP.
+
+  Twenty-two of the twenty-four FIXES-4 items closed exactly against their written
+  criteria, and all five of REVIEW-4's blocking faults were genuinely gone — each
+  one re-reproduced from the review's own description rather than from the suite,
+  and each held by a mutation. What blocked was three things:
+
+    C1  an undo that threw the sitting away when the writes were still queued,
+        then claimed SITTING for the rest of the session. A regression.
+    C2  node test/headless.js red for the first ten hours of every local day,
+        with deploy.sh refusing to deploy behind it and D2 unverified when it was.
+    C3  a sheet acting on a block it was not about — 21 minutes billed to two
+        categories, zero errors — reachable because the sheets were not modal.
+
+  ALL THREE ARE NOW FIXED, verified, and committed: 23dcc6e, 7c63226, 8253299.
+  Criteria written first and watched fail in every case; each removal then put
+  back one at a time to prove a test bites.
+
+  FIVE CLAIMS IN THE OLD RECORD DID NOT HOLD, and the review says so in its own
+  section: "headless ok"; "Body-and-sitting-at-once is unreachable" (two taps
+  reached it, and it survived a reload); "one rule retired, one added" (21 to 20,
+  and nothing was added); "26 smoke checks each" (26 existed, 24 ran, 2 skipped);
+  "nine commits" (twelve of work). Nothing in the account hid a fault, but
+  "headless ok" is the claim the contract's Done means turns on.
+
+  WHAT THE HUMAN RULED THIS ROUND:
+    1. C1 joins the two sittings rather than leaving a seam in the record.
+    2. A CATEGORY TAP HAS NO IMPLICATIONS FOR THE POSTURE. The Body-closes-sitting
+       coupling is gone on all four paths the handoff named, and BODY_KEY with it.
+       This DEVIATES FROM A DESIGN CONTRACT the human accepted — the handoff lists
+       the coupling under "Preserve, do not rewrite" — deliberately, and it is
+       recorded where a reader meets it: Code.gs where BODY_KEY was, tests.js
+       section 68, README and SETUP. FIXES-4's item A4 is therefore INVERTED.
+       It also answered REVIEW-5's should-fix 2 by deletion.
+    3. STOP KEEPS ITS COUPLING. It ends the day, and ending the day ends the
+       sitting; the ribbon owes both halves back. That is an exception about the
+       day rather than about a category, which is why it survived a ruling that
+       removed every other one — and it is why C1's machinery is live code rather
+       than dead. The stated cost: a day ended at 21:00 leaves the sitting
+       running, and staleGuard_ bounds it at midnight, so the day reports sitting
+       hours nobody sat. Tap the footer as well. Section 43 says so.
+
+  WHAT IS LEFT: factory/FIXES-5.md. Nine should-fix, eleven cosmetic, two items
+  older than this round, two the record owes, and five open decisions. Nothing on
+  the list makes the record wrong in a way a user would meet by touch alone; the
+  worst of it — A1 — makes the SCREEN wrong for up to ten minutes after another
+  device intervenes.
+
+  NOT DONE, and the human's call: deploying, and whether a sixth review is worth
+  it. Version 30 on the phone is still the pre-redesign build and nothing has been
+  pushed.
+
+  ---
+  WHAT FOLLOWS IS THE RECORD AS IT STOOD AFTER THE FIXES-4 PASS.
+  ---
   THE FIX PASS IS DONE — factory/FIXES-4.md, all 24 items, 2026-07-28.
 
   970 -> 1101 assertions, green twice under all four contracted timezones. Lint

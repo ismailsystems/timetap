@@ -357,11 +357,25 @@ const NUMBER_WORDS = ['zero', 'one', 'two', 'three', 'four', 'five', 'six'];
  * left a band where a single unconfirmed tap silently retitled the block you
  * were in. The redesign replaced arm-and-confirm and the correction window with
  * one undo; CONFIRM_WITHIN_SECONDS no longer exists and the client is not sent
- * either value. A rule enforcing an ordering between a constant and a deleted
- * one cannot fail, and a rule that cannot fail is worse than no rule — it reads
- * like coverage. MISTAP_SECONDS survives for staleGuard_ and is still checked
- * by the SETUP.md constants rule below, which reads it out of Code.gs.
- * REVIEW-4's F2.
+ * either value.
+ *
+ * It went because THE RELATIONSHIP IT PINNED NO LONGER EXISTS. Left in place it
+ * would have failed on every run — it reads both numbers out of Code.gs and
+ * reports a missing one as a fault, so it said "could not read
+ * CONFIRM_WITHIN_SECONDS out of Code.gs" and went red for a reason that is not a
+ * fault. A rule that fails when nothing is wrong gets deleted or gets ignored,
+ * and either way it has stopped protecting anything.
+ *
+ * The first version of this comment said the opposite — that a rule ordering a
+ * constant against a deleted one "cannot fail" and therefore read like coverage.
+ * That is the right reason to retire a different rule and the wrong reason for
+ * this one, and REVIEW-5 caught it by running the retired rule against the tree
+ * it was retired from. Recorded rather than quietly corrected, because the whole
+ * point of this file is that a rule states why it exists.
+ *
+ * MISTAP_SECONDS survives for staleGuard_ and is still checked by the SETUP.md
+ * constants rule below, which reads it out of Code.gs. REVIEW-4's F2, and
+ * REVIEW-5's should-fix 9.
  */
 
 const PLAN_DOCS = ['SETUP.md', 'README.md'];

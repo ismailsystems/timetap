@@ -11,7 +11,7 @@ some of these bugs have ever appeared.
 
 ## `node test/tests.js`
 
-616 assertions against the real `Code.gs` and the real script out of
+1162 assertions against the real `Code.gs` and the real script out of
 `Index.html`, run in node behind a shim for `CalendarApp`, `SpreadsheetApp`,
 `PropertiesService`, `ScriptApp`, `HtmlService`, `LockService` and a small DOM.
 A virtual clock lets a test wait ninety minutes in a millisecond.
@@ -27,7 +27,8 @@ done
 Those four are the contracted zones, and section 39d compares both rollup grids
 against a golden captured per zone in `test/fixtures/rollup-golden.json`. In a
 fifth zone there is no golden to compare against, so 39d reports as **skipped**
-with the zone named and the run continues — 606 passed, 1 skipped. A skip is never
+with the zone named and the run continues — 1160 passed, 2 skipped, because section 46
+compares against the same golden. A skip is never
 counted in `passed`: a run that could not reach a section has to look different
 from one that ran everything. If the fixture itself is missing or unreadable the
 suite says so and stops, rather than throwing partway through.
@@ -35,6 +36,19 @@ suite says so and stops, rather than throwing partway through.
 The shim deliberately mirrors two things the real parser does, both of which hid
 a real bug before it did: an id that the markup never declares resolves to
 `null`, and interactive content written into a `<button>` is dropped.
+
+It borrows two things from the markup rather than inventing them. Initial
+classes, so no test can read a hidden element as visible — that is where the
+undo ribbon read as up on every cold load. And nothing else: `role`,
+`aria-modal`, `tabindex` and the rest are declared in the markup and are
+`smoke.js`'s business, because only a real parser can say whether they reached
+the document.
+
+Document-level handlers are kept **by type**. It used to keep
+`visibilitychange` and drop the rest on the floor, so the `Escape` handler that
+closes a sheet would have been discarded silently while every assertion about
+that key passed. `H.fireDoc(type, ev)` delivers one and returns how many
+handlers heard it, so a test can refuse to pass when the answer is none.
 
 ## `node test/lint.js`
 
@@ -48,17 +62,19 @@ properties of the file.
 | every id the stylesheet targets exists | dead rules that read as if they still work |
 | every `var(--x)` is defined | an undefined custom property computes to the initial value, not a fallback |
 | `100dvh` comes after `100vh` | the later declaration wins; reversed, the app is taller than the screen |
-| no interactive content inside a `<button>` | the parser drops it, so `querySelector` finds nothing and the builder throws |
+| no interactive content inside a `<button>` in the markup | the parser drops it, so `querySelector` finds nothing and the builder throws |
+| nor in a template a script assigns to a `<button>` | the same drop, one step later, where the markup rule cannot see it |
 | marks are ASCII | `parseTitle_` matches `+ = -` literally; a dash lookalike silently stops parsing |
 | no writable handle to PLAN | PLAN is read-only and must stay that way structurally |
 | the source files pull nothing in | Apps Script has no module loader; an import or CDN URL is a blank screen, not a build error |
-| the browser is a dev dependency, pinned exactly | nothing here is deployed, and a floating version makes "the pinned browser still launches" meaningless |
+| the headless browser is a dev dependency | nothing in `test/` is deployed, and a runtime dependency would be |
+| the browser version is pinned exactly | a floating version makes "the pinned browser still launches" meaningless |
 | both meta tag lists parse non-empty | a parser that quietly matched nothing would make the two rules below pass while comparing nothing |
 | neither list declares a tag twice | a duplicate name hides a difference behind whichever copy is read last |
 | `doGet` and `test/headless.js` inject the same meta tags | the headless run would render a document the phone never loads, and pass while doing it |
 | every meta tag name is one Apps Script permits | `addMetaTag` throws at request time for any other name — a crash you only see on the deployed URL |
 | no file in the repo contains a NUL byte | git calls the file binary, so `git diff` shows nothing and the file stops being reviewable |
-| the correction window nests inside the confirm window | inverted, there is a band where one unconfirmed tap silently retitles the block you are in. Reads both numbers out of `Code.gs`, so it pins the relationship rather than today's two values |
+| the docs describe the controls and marks a user will meet | a control nobody documented is one the user meets for the first time on their own phone. It reads the STOP label and the undo ribbon's own copy out of `Index.html`, so renaming either without touching `README.md` is what fails, and it refuses to run if it could not find them to compare |
 | the docs say how a PLAN event has to be titled, and show a real key | a plan written any other way counts toward nothing and the sheet cannot say why. The example key is checked against `CATEGORIES`, so the docs cannot drift into showing a key the app does not have |
 | every constant `SETUP.md` quotes has that value in `Code.gs` | C1 changed `MISTAP_SECONDS` from 90 to 20 and left the setup guide saying 90. Every documented constant is checked, and documenting one that `Code.gs` does not declare fails too |
 | every `.md` in the repo agrees with the manifest about scope counts | `README.md`'s manifest row disagreed with `appsscript.json` for long enough that a build contract quoted the wrong number as fact, and then two more docs quoted it from there |
@@ -129,6 +145,50 @@ makes that safe is arm/confirm, not a frozen layout, and this is the check that 
 it (contract assertion 24, amendment A4). Revert `armDead` to discard on the first tap
 and it fails naming the tap number and what the button said at the time.
 
+Three phases came out of the Day Rail rounds, and each of them measures something
+the suite above is structurally blind to because it has no layout.
+
+**The reach of the guardrails**, at 6, 7, 8 and 10 categories — 10 is
+`MAX_CATEGORIES`, and the Add row invites the user all the way there. It checks
+that the undo ribbon's hit box is fully on screen and at least 44px tall, that
+`elementFromPoint` at its centre returns the ribbon and not whatever is behind it,
+that each of the three mark buttons is 44×44 and hits itself, that the strip's
+label fits the width it is given, and that a tap a few pixels below the ribbon
+reaches no control at all. At seven categories a tap where the ribbon appeared
+used to toggle sitting and write a block; at ten the ribbon was off the screen
+entirely.
+
+**The rail's box**, at 6, 20 and 40 blocks. 6 is an ordinary day, 20 is where the
+old constant first overflowed, 40 is the criterion. It checks that the last
+segment and `NOW ▲` are on screen, that `NOW ▲` is still inside the *column* it
+labels rather than merely inside the window — `#railSegs` grows past its flex
+allocation, and that comparison fails one length of day earlier than the viewport
+one does — that the page scrolls in neither axis, and that the category column is
+still visible.
+
+Its fixture pins the page clock with `page.clock.setFixedTime` before anything
+loads. It lays the day backwards from now, and `railBlocks` correctly drops
+whatever ended before local midnight, so a real clock made the phase impossible to
+assemble before about 10:15 in the morning: the run was red for the first ten
+hours of every day and green for the rest, with `deploy.sh` refusing to deploy in
+the mornings. Pinning it keeps the premise real — a forty-block day is ten hours
+long — and makes the numbers identical at every hour, so a failure reproduces
+whenever it is convenient to look at it. The guard that catches a fixture which
+did not assemble counts `blocks + 1`, because the day is `blocks` closed segments
+plus the open one; it counted `blocks`, so a rail one segment short passed and was
+then measured as though it were the day it names.
+
+**Sheet modality**, at both viewports. The sheets are opaque and full-screen, and
+for two rounds that was all they were. This walks 24 Tabs with SPLIT open and
+checks every one of them lands inside the sheet, that `#app` carries the `inert`
+attribute while a sheet is up and loses it when the last one closes, that focus
+starts on DONE rather than on the slider, that `Escape` closes the sheet, and that
+focus returns to the control that opened it. Before it, the ten controls *behind*
+SPLIT came first in the tab order — the tenth Tab was STOP — and tabbing to a
+category row switched the block while the sheet went on naming the old one. `inert`
+is one attribute doing a great deal of work, and this is the check that says the
+engine honours it rather than the code asking politely.
+
 ```bash
 npm install          # once; installs the pinned headless browser
 node test/headless.js
@@ -162,7 +222,7 @@ Paste it into the browser console with the app open. It returns
 `{ pass, fail, failed, skipped }`. A skipped check is one the current state
 could not reach; it is never counted as a pass.
 
-This layer exists because the suite above is structurally blind to three classes,
+This layer exists because the suite above is structurally blind to four classes,
 each of which shipped a bug:
 
 | Class | What got through |
@@ -170,10 +230,28 @@ each of which shipped a bug:
 | CSS cascade | both posture figures visible at once; a black ring on a black page |
 | Viewport | `100vh` overriding `100dvh` — the app was taller than the screen |
 | HTML parsing | `<input>` inside `<button>`, silently dropped |
+| Declared ARIA | `role`, `aria-modal`, `aria-live` and `tabindex` live in the markup, and the suite's shim borrows only `class` from it — so nothing else could say whether they reached the document |
 
 None of those is reachable without a real engine, a real cascade and a real
 viewport. Every check in the file corresponds to a bug that actually shipped, so
 a failure names the regression rather than a symptom.
+
+There are 30 checks. Two of them skip on a cold load — the lit ring's colour and
+inset, which need a running block — so a clean run reads `28 passed, 0 failed`.
+`node test/headless.js` counts `pass + fail + skipped` against the number of
+`ok(` calls in the file, so a check that quietly stopped running is caught rather
+than absorbed into the total.
+
+Eight of the thirty came out of the Day Rail rounds. Four are the clocks and the
+guardrail: `font-variant-numeric` computed as `tabular-nums` on **every** element
+carrying `.tnum` — the class was applied correctly throughout and did almost
+nothing, because each rule then set the `font:` shorthand, which resets it — plus
+the undo ribbon's `role` and `tabindex`, its announcer being a live region that is
+present and unhidden at rest, and the rail carrying a role and a label so
+"hatched means unlogged" is not left to colour. Four more are the sheets:
+`role="dialog"`, `aria-modal="true"`, a name on each, and `#app` not being `inert`
+while nothing is over it. The sheets are found by querying `.view` rather than by
+a list written out here, so a fourth sheet is checked by existing.
 
 Run it on the phone, not just the laptop. Two of those three only showed up on
 the phone, and `node test/headless.js` does not change that — it runs these same
