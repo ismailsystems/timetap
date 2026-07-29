@@ -1535,3 +1535,40 @@ FIXES-5 list: A–F closed (decision items that were open mid-pass were answered
 during the pass). Suite baseline at handoff of this note: lint clear (21 rules),
 goldens byte-identical to `a256bdf`. Human call next: sixth review and/or
 keeping the redesign deploy they already cut for F2.
+
+## [2026-07-29] FIXES-6 | A1, A2 and B1 close; C1 and C2 stay parked
+
+Worked one item at a time, criterion first, and committed each alone.
+
+**A1 — `d92277d`.** A declined `undoSwitch` now owns a corrective state read
+until one answer survives every newer local write. A refused answer does not
+advance `lastStateMs`; if posture or category work lands during the 800ms read,
+the client re-reads after the queue drains. The posture reproduction went from
+DW on screen against zero open ACTUAL events to an idle screen matching the
+calendar. The category sibling kept the newer ADM block. Removing the after-drain
+retry failed the posture check; moving `lastStateMs` before adoption failed its
+named source check.
+
+**A2 — `cc30b65`.** The human chose option 1. `revealAddRow` and both calls are
+gone, deliberately retiring FIXES-5 D9's temporary Add-visible claim while the
+strip is up. The real-browser criterion uses Chromium touch at 390x844, seven
+categories, a restored 40-minute DW block and two taps 100ms apart at MTG's
+centre. Before the fix it measured `scrollTop 0 -> 78`, the same point changed
+from MTG to ADM, and the second tap switched again. After the fix it measures
+`0 -> 0`, MTG stays under the point, MTG remains active, and no mark button fires.
+Putting the Add reveal back reproduced both failures.
+
+**B1 — `6784731`.** The headless smoke cold-load now has a running DW block.
+Both lit-row checks run at phone and desktop widths: 31 passed, 0 failed, 0
+skipped per viewport. A guard rejects either lit check skipping. Reversing the
+inset assertion failed by name at both widths with the measured
+`rgb(236, 48, 19) 4px 0px 0px 0px inset`.
+
+Final gates: 1186 passed, 0 failed in America/New_York, Europe/London,
+Australia/Sydney and UTC; lint all clear on 21 rules; headless green at both
+viewports; `appsscript.json` and `test/fixtures/rollup-golden.json`
+byte-identical to `a256bdf`.
+
+C1 and C2 were not started. Both remain decision-gated, and the human asked for
+them only on a later explicit instruction. Nothing was deployed and no test
+touched a real calendar.

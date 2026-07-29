@@ -1,14 +1,36 @@
 # Factory State
 project: timetap
 stage: 6
-stage_name: Reviewed a fifth time; the three faults that blocked are fixed, the rest is a list
-last_updated: 2026-07-29 (FIXES-5 done; review 6 ready)
-next_action: "RUN REVIEW 6. Fresh chats, no builder context. Prompt: factory/REVIEW-6-PROMPT.md. Three angles, three models — (1) Claude Sonnet 5 thinking: did FIXES-5 fix what it claimed; (2) GPT-5.6 medium: what did the fixes break; (3) Claude Opus 5 thinking: how does it fail a user. None may be Composer. Assemble factory/REVIEW-6.md after a fourth hand re-reproduction of anything that would block. Redesign is LIVE on the phone. Goldens still match a256bdf. Never point tests at a real calendar."
+stage_name: FIXES-6 A1, A2 and B1 done; C1 and C2 wait on the human
+last_updated: 2026-07-29 (FIXES-6 authorised scope done)
+next_action: "THE HUMAN CHOOSES WHAT FOLLOWS. C1 and C2 are decision-gated and untouched; build either only if the human asks. Otherwise the next choices are review 7, the owed clean redeploy, daily use, proof video or explainer. Redesign is LIVE on the phone. Goldens still match a256bdf. Never point tests at a real calendar."
 old_next_action_4: "WORK THROUGH factory/FIXES-5.md, in a fresh session. Read factory/REVIEW-5.md first — it holds the reproductions, and every one was reproduced twice before it was written down. THE THREE BLOCKING FAULTS ARE ALREADY FIXED AND COMMITTED (23dcc6e, 7c63226, 8253299) and FIXES-5 lists them so its letters make sense; what is left is nine should-fix and eleven cosmetic, grouped A to F, plus two items older than this round and two the record owes. FIVE DECISIONS ARE OPEN and they are marked *Decision first* in FIXES-5: the reflex double tap (B3), the undo chip (D1), and the three the review lists at its end. THE LIVE APP IS NOT AFFECTED: deployed version 30 is the pre-redesign build, and nothing since has been pushed. State: 1162 assertions green twice in all four contracted zones, lint clear on 20 rules, headless ok at both viewports and now at EVERY HOUR of the day, which it was not before. Optional and still not done: the proof video (auto-loom-proof) and the plain-language explainer (factory-explain, which also owes GUIDE.md Part 2 a correction carried over from round 1). BEFORE DEPLOYING, read the spreadsheet-formulas note below — it still holds, because nothing since has moved a column."
 old_next_action_3: "THE HUMAN ACCEPTS AND DEPLOYS. All 24 items in factory/FIXES-4.md are done, each written criterion-first and verified by running it; nine commits on main, nothing pushed. 1101 assertions green TWICE under all four contracted timezones, lint clear on 20 rules, headless ok at both viewports with three new phases. REVIEW-4's four blocking reproductions were re-run BY HAND at the end and printed gone — the record is in factory/log-2.md under 'The FIXES-4 pass'. Three decisions were put to the human before anything was built and all three were answered: STOP acts on one tap and the ribbon is the way back; the mis-tap merge stays out, to be judged in use; the Add row follows the design and sits at the end of the list. BEFORE DEPLOYING, read the spreadsheet-formulas note below — it still holds, because this pass changed no column. Optional and still not done: the proof video (auto-loom-proof) and the plain-language explainer (factory-explain, which also owes GUIDE.md Part 2 a correction carried over from round 1). A FIFTH REVIEW IS WORTH IT: this pass touched the undo path, the server op, the layout in three places and the lint rules, and no independent eye has seen any of it."
 old_next_action_2: "WORK THROUGH factory/FIXES-4.md, in a fresh session. Read factory/REVIEW-4.md first — it holds the reproductions. Three reviewers returned BROKEN, NOT DONE and MINOR DRIFT on the redesign; five faults block, and three of them break the redesign's own central claim that nothing is lost to one tap. Three decisions are open and are listed at the end of REVIEW-4; the STOP one should be settled before it is built. THE LIVE APP IS NOT AFFECTED: deployed version 30 is the pre-redesign build, and the redesign has never been pushed or deployed. The round-2 work below is complete and was accepted."
 old_next_action: "THE HUMAN ACCEPTS AND DEPLOYS. The work is 25 commits on factory/honest-record; main is untouched at a256bdf and nothing has been pushed. Read factory/REVIEW-3.md, above all its 'Decisions for you' — all five are answered and the answers are in progress-2.md. Then merge, deploy, and CHECK YOUR OWN SPREADSHEET FORMULAS: D1 added a rollup key, which moved 13 of the 22 columns the daily tab had. SETUP.md says which, and shows a formula that survives the next change. Optional and offered, not done: the proof video (auto-loom-proof) and the plain-language explainer (factory-explain, which also owes GUIDE.md Part 2 a correction carried over from round 1)."
 notes: |
+  FIXES-6 AUTHORISED SCOPE IS DONE — 2026-07-29.
+
+  A1, A2 and B1 were each written criterion-first, watched fail, fixed, watched
+  pass, then mutated back to the fault and watched fail again. Commits:
+  d92277d, cc30b65, 6784731.
+
+  A1 keeps a declined undo's corrective state read owed through any local write,
+  and advances the fresh-state clock only when the answer is adopted. A2 used the
+  human's option 1: the list no longer scrolls to reveal Add while the mark strip
+  is up. At 390x844 and seven categories, two taps 100ms apart now leave scrollTop
+  at 0, keep MTG under the fixed point, switch once and apply no mark. FIXES-5 D9's
+  temporary Add-visible claim is deliberately retired. B1 seeds a running block
+  on the headless cold-load path, so both lit-row checks run at both viewports.
+
+  1186 assertions green under all four contracted zones; lint clear on 21 rules;
+  headless 31/0 with no skips at both viewports. appsscript.json and the rollup
+  golden remain byte-identical to a256bdf.
+
+  C1 and C2 are decision-gated and untouched, as instructed. Nothing was
+  deployed. The owed clean redeploy remains the human's call.
+
+  ---
   FIXES-5 IS DONE — 2026-07-29.
 
   Every letter in factory/FIXES-5.md is closed. F1 put GUIDE Part 2 into the past
