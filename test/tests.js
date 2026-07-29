@@ -4156,6 +4156,27 @@ chk('a later close does not stretch it',
 chk('and its hours are unchanged',
   near(A()[0].e - A()[0].s, 3600000), String((A()[0].e - A()[0].s) / 60000) + 'm');
 
+console.log('\n60c. a sitting another device ended stays ended');
+/*
+ * FIXES-5 E2. ACTUAL has this guard in section 60; SITTING did not. A stale
+ * close from a screen which still claimed SITTING must not stretch a block
+ * already ended by another screen.
+ */
+reset(); reboot();
+const t60c = H.nowMs();
+tapSit(); settle(); wait(50);
+posture('stand'); settle();
+const end60c = S()[0].e;
+const ref60c = /#ref:([A-Za-z0-9]+)/.exec(S()[0].d)[1];
+advance(3 * 3600000);
+applyOps([{ id: 'stalesit60c', type: 'closeSit', ref: ref60c, endMs: H.nowMs() }]);
+chk('a stale sitting close does not move the end another device chose',
+  S()[0].e === end60c,
+  show(S()[0]) + ' was ' + new Date(end60c).toTimeString().slice(0, 5));
+chk('and the sitting remains fifty minutes long',
+  near(S()[0].e - S()[0].s, 50 * 60000),
+  String((S()[0].e - S()[0].s) / 60000) + 'm from ' + new Date(t60c).toTimeString().slice(0, 5));
+
 console.log('\n60b. but a close still replaces an end the app only guessed');
 /* The exception that keeps the round's own repair path working: a '?' end is
  * the app's guess, and a real close arriving late is better evidence. */

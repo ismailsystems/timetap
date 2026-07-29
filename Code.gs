@@ -1099,6 +1099,13 @@ function opCloseSit_(op) {
   var cal = calSitting_();
   var ev = findByRef_(cal, op.ref, op.endMs);
   if (!ev) return;
+  /*
+   * A close from a stale screen cannot move an end another device already
+   * chose. ACTUAL has the same guard, with a '?' exception for its own guessed
+   * ends; SITTING has no guessed-end mark and therefore no exception.
+   * FIXES-5 E2.
+   */
+  if (!isOpenEvent_(ev)) return;
   ev.setTitle(SIT_TITLE);
   endEventAt_(ev, op.endMs);
   writeDesc_(ev, op.ref, false);
