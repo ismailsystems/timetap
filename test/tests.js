@@ -5071,6 +5071,35 @@ chk('and one again after taking it back', segKinds().join(',') === 'DEEP WORK',
   segKinds().join(','));
 chk('which is the open one', segs()[0]._cls.has('open'), segs()[0].className);
 
+console.log('\n67i. a state refresh inside the undo window does not duplicate the reopened block');
+/*
+ * FIXES-5 A2. getState's today rows deliberately carry no ref. If one of those
+ * rows replaces S.today after a switch lands but before UNDO, railReopen cannot
+ * find the previous block by ref. The optimistic rail then keeps its closed copy
+ * and appends the same block as open, drawing four segments for three events.
+ *
+ * The page has been warm for more than ten minutes before the switch, so the
+ * visibility change below really does start a state read. It lands while the
+ * ribbon is still up; this is the order that lost the ref, not a reload after
+ * the undo repaired itself.
+ */
+reset(); reboot();
+tap('DW'); wait(30);
+tap('MTG'); wait(30);
+tap('ADM'); settle();
+tap('REL'); settle();
+chk('the switch puts four calendar events and four segments in hand',
+  A().length === 4 && segs().length === 4,
+  A().length + ' events / ' + segs().length + ' segments: ' + segKinds().join(','));
+H.fireVisible(); settle();                       // replaces S.today with ref-less rows
+chk('the refresh landed while the undo was still available',
+  !$('undo').hidden && segs().length === 4,
+  $('undo').className + ' / ' + segKinds().join(','));
+$('undo').fire('click'); settle();
+chk('after undo the rail draws three segments for three calendar events',
+  A().length === 3 && segs().length === 3,
+  A().length + ' events / ' + segs().length + ' segments: ' + segKinds().join(','));
+
 console.log('\n74. THE SWEEP — no elapsed time lets one tap change a block that exists');
 /* The successor to the deleted 50f, and REVIEW-4's finding 19.
  *
