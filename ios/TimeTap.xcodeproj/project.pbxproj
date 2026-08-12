@@ -13,6 +13,7 @@
 		40D059EFA67A504708D25447 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = F480CE7080FAF633ABD17E01 /* Assets.xcassets */; };
 		674A0AB9AE587F11D9091E36 /* Format.swift in Sources */ = {isa = PBXBuildFile; fileRef = 92673D20F168B38B293C621F /* Format.swift */; };
 		8B9BCD03171BB47A1FDDA0B8 /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 979753C469BB46C427293E02 /* RootView.swift */; };
+		914F2F024204E4A3C015A6E0 /* AddCategorySheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 12EBD194878F4CB9EF4F68A4 /* AddCategorySheet.swift */; };
 		956E790A0753C11234383A9A /* DayRailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 49092CA9D4C73500509BB649 /* DayRailView.swift */; };
 		A517FED50BB45AFCAD67AC72 /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0947EED16A8B40C767B8FA0 /* Theme.swift */; };
 		B2AE2AF91FFF01C1135F2C7D /* TimetapAPI.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1D2F64E4CEB2DB279C547029 /* TimetapAPI.swift */; };
@@ -26,6 +27,7 @@
 
 /* Begin PBXFileReference section */
 		0C48DCFC2B8F43129B8031AB /* TimeTap.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = TimeTap.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		12EBD194878F4CB9EF4F68A4 /* AddCategorySheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddCategorySheet.swift; sourceTree = "<group>"; };
 		1D2F64E4CEB2DB279C547029 /* TimetapAPI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimetapAPI.swift; sourceTree = "<group>"; };
 		2D55675D4A21D2C2D804358B /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		47B9719A4D5ACAE3A65E08CB /* SplitSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SplitSheet.swift; sourceTree = "<group>"; };
@@ -87,6 +89,7 @@
 		CD89DEDEA4606A0558A58718 /* Views */ = {
 			isa = PBXGroup;
 			children = (
+				12EBD194878F4CB9EF4F68A4 /* AddCategorySheet.swift */,
 				749D803612D26E9D5D20E863 /* CaptureView.swift */,
 				49092CA9D4C73500509BB649 /* DayRailView.swift */,
 				67FE41A5E22FCCF25FC6FFDB /* DeadLetterSheet.swift */,
@@ -177,6 +180,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				914F2F024204E4A3C015A6E0 /* AddCategorySheet.swift in Sources */,
 				FAF11E3081864E2D33B11B77 /* CaptureView.swift in Sources */,
 				E8C1C00798C335C7959CA6B8 /* Credentials.swift in Sources */,
 				956E790A0753C11234383A9A /* DayRailView.swift in Sources */,

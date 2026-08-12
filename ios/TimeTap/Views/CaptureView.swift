@@ -1,9 +1,11 @@
 import SwiftUI
+import UIKit
 
 struct CaptureView: View {
     @EnvironmentObject private var store: TapStore
     @State private var noteDraft = ""
     @State private var tick = Date()
+    @State private var noteFocused = false
 
     private let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
 
@@ -14,6 +16,8 @@ struct CaptureView: View {
             HStack(spacing: 0) {
                 DayRailView(tick: tick)
                     .frame(width: 140)
+                    .accessibilityElement(children: .contain)
+                    .accessibilityLabel("Day rail")
                     .overlay(alignment: .trailing) {
                         Rectangle().fill(Theme.rule2).frame(width: 2)
                     }
@@ -25,7 +29,9 @@ struct CaptureView: View {
         .foregroundStyle(Theme.fg)
         .onReceive(timer) { tick = $0 }
         .onChange(of: store.open?.ref) { _, _ in
-            noteDraft = store.open?.text ?? ""
+            if !noteFocused {
+                noteDraft = store.open?.text ?? ""
+            }
         }
         .onAppear { noteDraft = store.open?.text ?? "" }
         .fullScreenCover(isPresented: Binding(
@@ -43,6 +49,9 @@ struct CaptureView: View {
         .fullScreenCover(isPresented: $store.showDead) {
             DeadLetterSheet().environmentObject(store)
         }
+        .sheet(isPresented: $store.showAddCategory) {
+            AddCategorySheet().environmentObject(store)
+        }
     }
 
     private var header: some View {
@@ -50,6 +59,7 @@ struct CaptureView: View {
             Text("TIMETAP")
                 .font(.system(size: 15, weight: .heavy))
                 .tracking(1.2)
+                .accessibilityAddTraits(.isHeader)
             Spacer()
             Button {
                 store.showSettings = true
@@ -60,6 +70,8 @@ struct CaptureView: View {
                     .foregroundStyle(store.syncFailed ? Theme.accentOn : Theme.dim)
                     .multilineTextAlignment(.trailing)
             }
+            .accessibilityLabel(store.syncLabel)
+            .accessibilityHint("Opens settings")
         }
         .padding(.horizontal, 18)
         .padding(.top, 8)
@@ -76,11 +88,13 @@ struct CaptureView: View {
             } label: {
                 VStack(alignment: .leading, spacing: 0) {
                     HStack {
-                        Text(store.open == nil ? "NOTHING RUNNING" : "NOW")
+                        Text(store.nowKick)
                             .font(.system(size: 10, weight: .bold))
-                            .tracking(1.4)
+                            .tracking(1.0)
                             .foregroundStyle(Theme.dim)
-                        Spacer()
+                            .lineLimit(2)
+                            .minimumScaleFactor(0.8)
+                        Spacer(minLength: 8)
                         if store.open != nil {
                             Text("TAP TO SPLIT")
                                 .font(.system(size: 9, weight: .bold))
@@ -88,10 +102,10 @@ struct CaptureView: View {
                                 .foregroundStyle(Theme.mute)
                         }
                     }
-                    Text(store.open.map { store.labelFor($0.key).uppercased() } ?? "—")
+                    Text(store.open.map { store.labelFor($0.key).uppercased() } ?? "NOTHING RUNNING")
                         .font(.system(size: 32, weight: .black))
                         .padding(.top, 8)
-                    Text(elapsedLabel)
+                    Text(store.open == nil ? "—" : elapsedLabel)
                         .font(.system(size: 48, weight: .heavy))
                         .foregroundStyle(isLong ? Theme.flag : Theme.accentOn)
                         .monospacedDigit()
@@ -101,6 +115,9 @@ struct CaptureView: View {
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
+            .accessibilityLabel(nowAccessibility)
+            .accessibilityHint(store.open == nil ? "" : "Opens split sheet")
+            .disabled(store.open == nil)
 
             TextField("note", text: $noteDraft, axis: .vertical)
                 .lineLimit(1...3)
@@ -113,6 +130,10 @@ struct CaptureView: View {
                 .onChange(of: noteDraft) { _, val in
                     store.noteChanged(val)
                 }
+                .onChange(of: store.open?.text) { _, text in
+                    if !noteFocused { noteDraft = text ?? "" }
+                }
+                .accessibilityLabel("Note for the running block")
         }
         .padding(16)
         .padding(.horizontal, 2)
@@ -122,33 +143,73 @@ struct CaptureView: View {
     }
 
     private var categoryList: some View {
-        ScrollView {
-            LazyVStack(spacing: 0) {
-                ForEach(store.categories) { cat in
-                    Button {
-                        store.tapCategory(cat.key)
-                    } label: {
-                        HStack(spacing: 12) {
-                            Rectangle()
-                                .fill(Theme.hex(cat.hex))
-                                .frame(width: 12, height: 28)
-                            Text(cat.face.uppercased())
-                                .font(.system(size: 18, weight: .bold))
-                                .tracking(0.6)
-                            Spacer()
-                            if store.open?.key == cat.key {
-                                Text(elapsedLabel)
-                                    .font(.system(size: 12, weight: .bold).monospacedDigit())
-                                    .foregroundStyle(isLong ? Theme.flag : Theme.accentOn)
+        ScrollViewReader { proxy in
+            ScrollView {
+                LazyVStack(spacing: 0) {
+                    ForEach(store.categories) { cat in
+                        Button {
+                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                            store.tapCategory(cat.key)
+                        } label: {
+                            HStack(spacing: 12) {
+                                Rectangle()
+                                    .fill(Theme.hex(cat.hex))
+                                    .frame(width: 12, height: 28)
+                                    .accessibilityHidden(true)
+                                Text(cat.face.uppercased())
+                                    .font(.system(size: 18, weight: .bold))
+                                    .tracking(0.6)
+                                Spacer()
+                                if store.open?.key == cat.key {
+                                    Text(elapsedLabel)
+                                        .font(.system(size: 12, weight: .bold).monospacedDigit())
+                                        .foregroundStyle(isLong ? Theme.flag : Theme.accentOn)
+                                }
                             }
+                            .padding(.horizontal, 18)
+                            .padding(.vertical, 14)
+                            .contentShape(Rectangle())
+                            .background(store.open?.key == cat.key ? Theme.panel : Color.clear)
                         }
-                        .padding(.horizontal, 18)
-                        .padding(.vertical, 14)
-                        .contentShape(Rectangle())
+                        .buttonStyle(.plain)
+                        .accessibilityLabel(cat.face)
+                        .accessibilityAddTraits(store.open?.key == cat.key ? [.isSelected] : [])
+                        .accessibilityValue(store.open?.key == cat.key ? elapsedLabel : "")
+                        .id(cat.key)
+
+                        Rectangle().fill(Theme.rule2.opacity(0.5)).frame(height: 1)
                     }
-                    .buttonStyle(.plain)
-                    Rectangle().fill(Theme.rule2.opacity(0.5)).frame(height: 1)
+
+                    if store.canAddCategory {
+                        Button {
+                            store.showAddCategory = true
+                        } label: {
+                            HStack(spacing: 12) {
+                                Rectangle()
+                                    .fill(Theme.rule2)
+                                    .frame(width: 12, height: 28)
+                                Text("ADD")
+                                    .font(.system(size: 18, weight: .bold))
+                                    .tracking(0.6)
+                                    .foregroundStyle(Theme.dim)
+                                Spacer()
+                            }
+                            .padding(.horizontal, 18)
+                            .padding(.vertical, 14)
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Add a category")
+                        .id("add")
+                    }
                 }
+            }
+            .onChange(of: store.scrollToKey) { _, key in
+                guard let key else { return }
+                withAnimation {
+                    proxy.scrollTo(key, anchor: .center)
+                }
+                store.scrollToKey = nil
             }
         }
     }
@@ -172,6 +233,8 @@ struct CaptureView: View {
                     .background(Theme.accent)
                 }
                 .buttonStyle(.plain)
+                .accessibilityLabel("Undo: \(label)")
+                .accessibilityHint("Available for \(store.undoSecondsLeft) seconds")
             }
 
             if store.markStrip != nil {
@@ -184,6 +247,7 @@ struct CaptureView: View {
                                 .padding(.vertical, 12)
                         }
                         .buttonStyle(.plain)
+                        .accessibilityLabel(markLabel(m))
                     }
                 }
                 .background(Theme.panel)
@@ -205,6 +269,7 @@ struct CaptureView: View {
                 }
                 .buttonStyle(.plain)
                 .disabled(store.deadCount == 0)
+                .accessibilityLabel(banner)
             }
 
             HStack(spacing: 0) {
@@ -221,8 +286,12 @@ struct CaptureView: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.horizontal, 18)
                     .padding(.vertical, 16)
+                    .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
+                .accessibilityLabel(store.sit == nil ? "Not sitting" : "Sitting")
+                .accessibilityHint("Toggles sitting posture")
+                .accessibilityAddTraits(.isButton)
 
                 if let sit = store.sit {
                     Button(action: store.openSitEdit) {
@@ -233,6 +302,9 @@ struct CaptureView: View {
                             .overlay(Rectangle().strokeBorder(Theme.rule2, lineWidth: 2))
                     }
                     .buttonStyle(.plain)
+                    .accessibilityLabel(
+                        "Adjust when sitting started, sitting for \(Format.elapsed(Date().timeIntervalSince1970 * 1000 - sit.startMs))"
+                    )
                     .padding(.trailing, 8)
                 }
 
@@ -247,6 +319,7 @@ struct CaptureView: View {
                             .overlay(Rectangle().strokeBorder(Theme.rule2, lineWidth: 2))
                     }
                     .buttonStyle(.plain)
+                    .accessibilityLabel("End the day")
                     .padding(.trailing, 12)
                 }
             }
@@ -266,5 +339,21 @@ struct CaptureView: View {
         guard let open = store.open else { return false }
         let ms = Date().timeIntervalSince1970 * 1000 - open.startMs
         return ms >= Double(store.config?.longBlockMinutes ?? 90) * 60_000
+    }
+
+    private var nowAccessibility: String {
+        if let open = store.open {
+            return "Now \(store.labelFor(open.key)), \(elapsedLabel), since \(Format.clock(open.startMs))"
+        }
+        return "Nothing running, time is unlogged"
+    }
+
+    private func markLabel(_ m: String) -> String {
+        switch m {
+        case "+": return "Mark good"
+        case "=": return "Mark neutral"
+        case "-": return "Mark poor"
+        default: return "Mark \(m)"
+        }
     }
 }

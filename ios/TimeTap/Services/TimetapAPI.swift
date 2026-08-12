@@ -46,7 +46,15 @@ final class TimetapAPI: NSObject, URLSessionTaskDelegate {
         try await post(action: "applyOps", ops: ops)
     }
 
-    private func post<T: Decodable>(action: String, ops: [Op]?) async throws -> T {
+    func addCategory(label: String) async throws -> ClientConfig {
+        try await post(action: "addCategory", ops: nil, label: label)
+    }
+
+    private func post<T: Decodable>(
+        action: String,
+        ops: [Op]?,
+        label: String? = nil
+    ) async throws -> T {
         guard Credentials.isConfigured else { throw TimetapAPIError.notConfigured }
         var urlString = Credentials.apiURL.trimmingCharacters(in: .whitespacesAndNewlines)
         if urlString.hasSuffix("/") { urlString.removeLast() }
@@ -59,6 +67,9 @@ final class TimetapAPI: NSObject, URLSessionTaskDelegate {
         if let ops {
             let data = try JSONEncoder().encode(ops)
             payload["ops"] = try JSONSerialization.jsonObject(with: data)
+        }
+        if let label {
+            payload["label"] = label
         }
         let body = try JSONSerialization.data(withJSONObject: payload)
 

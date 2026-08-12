@@ -15,6 +15,8 @@ final class TapStore: ObservableObject {
     @Published var banner: String?
     @Published var showSettings = false
     @Published var showDead = false
+    @Published var showAddCategory = false
+    @Published var addingCategory = false
 
     @Published var undoLabel: String?
     @Published var undoSecondsLeft: Int = 0
@@ -22,6 +24,8 @@ final class TapStore: ObservableObject {
 
     @Published var split: SplitState?
     @Published var sitEdit: SitEditState?
+    @Published var scrollToKey: String?
+    @Published var unreadableOpen = false
 
     struct MarkStrip: Equatable {
         var ref: String
@@ -85,6 +89,8 @@ final class TapStore: ObservableObject {
     private var localGen = 0
     private var lastStateAt = Date.distantPast
     private var retryDelay: TimeInterval = 4
+    private var stateAfterBootDrain = false
+    private var stateAfterCorrectiveDrain = false
     private var catByKey: [String: Category] = [:]
     private var blocks: [String: BlockMeta] = [:]
 
@@ -157,6 +163,8 @@ final class TapStore: ObservableObject {
             label: "SWITCHED TO \(labelFor(key).uppercased())",
             until: Date().addingTimeInterval(Double(config?.undoSeconds ?? 5))
         ))
+        unreadableOpen = false
+        scrollToKey = key
         persist()
         flush()
     }
@@ -193,6 +201,7 @@ final class TapStore: ObservableObject {
                 until: Date().addingTimeInterval(Double(config?.undoSeconds ?? 5))
             ))
         }
+        unreadableOpen = false
         persist()
         flush()
     }
@@ -246,6 +255,7 @@ final class TapStore: ObservableObject {
             sit = SitBlock(ref: s.ref, startMs: s.startMs)
         }
         hideMarkStrip()
+        refreshUnreadable()
         persist()
         flush()
     }
@@ -440,7 +450,7 @@ final class TapStore: ObservableObject {
 
         for b in blocks {
             if let pe = prevEnd, b.startMs - pe > gapMs {
-                raw.append(("GAP", b.startMs - pe, nil, true, false, 20))
+                raw.append(("UNLOGGED", b.startMs - pe, nil, true, false, 20))
             }
             let cat = catByKey[b.key]
             let ms = b.endMs - max(b.startMs, dayStart)
@@ -458,7 +468,7 @@ final class TapStore: ObservableObject {
             prevEnd = max(prevEnd ?? b.endMs, b.endMs)
         }
         if open == nil, let pe = prevEnd, now - pe > 5000 {
-            raw.append(("GAP", now - pe, nil, true, false, 20))
+            raw.append(("UNLOGGED", now - pe, nil, true, false, 20))
         }
 
         let px = budget / span
@@ -483,6 +493,54 @@ final class TapStore: ObservableObject {
     func colorFor(_ key: String) -> Color { Theme.hex(catByKey[key]?.hex ?? "#616161") }
     var categories: [Category] { config?.categories ?? [] }
     var deadCount: Int { dead.count }
+    var canAddCategory: Bool {
+        categories.count < (config?.maxCategories ?? 10)
+    }
+
+    var nowKick: String {
+        guard let open else { return "NOTHING RUNNING — TIME IS UNLOGGED" }
+        return "NOW · SINCE \(Format.clock(open.startMs).uppercased())"
+    }
+
+    func addCategory(label: String) {
+        let name = label
+            .replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !name.isEmpty else {
+            banner = "A category needs a name."
+            return
+        }
+        guard Credentials.isConfigured else {
+            banner = "cannot add a category while offline"
+            return
+        }
+        addingCategory = true
+        Task {
+            defer { addingCategory = false }
+            do {
+                let cfg = try await TimetapAPI.shared.addCategory(label: name)
+                applyConfig(cfg)
+                showAddCategory = false
+                if dead.isEmpty { banner = nil }
+                scrollToKey = cfg.categories.last?.key
+            } catch {
+                banner = error.localizedDescription
+            }
+        }
+    }
+
+    private func refreshUnreadable() {
+        let bad = open.map { catByKey[$0.key] == nil } ?? false
+        if bad {
+            let name = open?.text.isEmpty == false ? open!.text : (open?.key ?? "")
+            banner = "a block is running that this app cannot read: \(name). Tap any category to close it, or fix its title in Google Calendar."
+            unreadableOpen = true
+        } else if unreadableOpen {
+            unreadableOpen = false
+            if dead.isEmpty { banner = nil }
+            else { banner = deadMsg() }
+        }
+    }
 
     // MARK: - Boot / network
 
@@ -495,10 +553,12 @@ final class TapStore: ObservableObject {
         do {
             applyConfig(try await TimetapAPI.shared.config())
             if !queue.isEmpty {
+                stateAfterBootDrain = true
                 paintSync()
                 await flushAsync()
+            } else {
+                await loadServerState()
             }
-            await loadServerState()
             if !dead.isEmpty {
                 banner = deadMsg()
                 syncFailed = true
@@ -524,26 +584,47 @@ final class TapStore: ObservableObject {
         catByKey = Dictionary(uniqueKeysWithValues: cfg.categories.map { ($0.key, $0) })
     }
 
-    private func loadServerState() async {
+    private func loadServerState(corrective: Bool = false) async {
         let gen = localGen
         do {
             let st = try await TimetapAPI.shared.getState()
-            guard gen == localGen, queue.isEmpty else { return }
+            guard gen == localGen, queue.isEmpty else {
+                if corrective { await loadCorrectiveState() }
+                return
+            }
+            let wasRef = open?.ref
+            let wasSit = sit?.ref
             open = st.open.map {
                 OpenBlock(ref: $0.ref, key: $0.key, text: $0.text, startMs: $0.startMs)
             }
             sit = st.sit
             today = st.today ?? []
             lastStateAt = Date()
-            if dead.isEmpty {
-                banner = nil
-            } else {
-                banner = deadMsg()
+            if wasRef != open?.ref || wasSit != sit?.ref {
+                closeBlockSheets()
+            }
+            if let key = open?.key { scrollToKey = key }
+            refreshUnreadable()
+            if !unreadableOpen {
+                if dead.isEmpty { banner = nil }
+                else { banner = deadMsg() }
+            }
+            if let notes = st.notes, !notes.isEmpty, dead.isEmpty, !unreadableOpen {
+                banner = notes.joined(separator: " · ")
             }
             persist()
         } catch {
             banner = error.localizedDescription
         }
+    }
+
+    private func loadCorrectiveState() async {
+        if flushing || !queue.isEmpty {
+            stateAfterCorrectiveDrain = true
+            return
+        }
+        stateAfterCorrectiveDrain = false
+        await loadServerState(corrective: true)
     }
 
     func flush() {
@@ -569,8 +650,12 @@ final class TapStore: ObservableObject {
             queue = queue.filter { !done.contains($0.id) }
             saveQueue()
 
+            if let dropped = res.dropped, !dropped.isEmpty {
+                banner = "discarded \(dropped.count) malformed write\(dropped.count == 1 ? "" : "s")"
+            }
+
             if batch.contains(where: { $0.type == "undoSwitch" && done.contains($0.id) }) {
-                await loadServerState()
+                await loadCorrectiveState()
             }
 
             if let err = res.errors?.first {
@@ -581,10 +666,20 @@ final class TapStore: ObservableObject {
             } else {
                 retryDelay = 4
                 if queue.isEmpty {
-                    if dead.isEmpty { syncFailed = false; banner = nil }
-                    else { banner = deadMsg() }
+                    if dead.isEmpty { syncFailed = false }
+                    if !dead.isEmpty {
+                        banner = deadMsg()
+                    } else if banner?.contains("malformed") != true, !unreadableOpen {
+                        banner = nil
+                    }
                     paintSync()
-                    await loadServerState()
+                    if stateAfterBootDrain {
+                        stateAfterBootDrain = false
+                        await loadServerState()
+                    }
+                    if stateAfterCorrectiveDrain {
+                        await loadCorrectiveState()
+                    }
                 } else {
                     await flushAsync()
                 }

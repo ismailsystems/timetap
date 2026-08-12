@@ -1,15 +1,17 @@
 # timetap iOS (Path 2)
 
 SwiftUI capture client. The brain stays in `Code.gs`. The phone posts the same
-`getState` / `applyOps` / `config` contract the web client already uses, over
-HTTPS with a shared secret.
+ops the web client already uses, over HTTPS with a shared secret.
+
+This is a pure port of the capture surface. Rollup, PLAN editing, and category
+retirement stay on Apps Script / Sheets / Calendar — same as the web app.
 
 ## 1. Script property
 
 In the Apps Script project: **Project Settings → Script properties** → add:
 
-| Property   | Value                                      |
-|------------|--------------------------------------------|
+| Property    | Value                                       |
+|-------------|---------------------------------------------|
 | `API_TOKEN` | long random string (32+ chars). Keep private. |
 
 ```bash
@@ -31,8 +33,8 @@ Create another deployment of the same project:
 That URL is what the iOS app posts to. Anyone who has the URL still needs
 `API_TOKEN`. Anonymous `doGet` does not serve the capture HTML.
 
-Redeploy (**New version**) after pulling `doPost` changes, on **both**
-deployments if you want the HTML shell and the API on the same code revision.
+Redeploy (**New version**) after pulling API changes, on **both** deployments
+if you want the HTML shell and the API on the same code revision.
 
 ## 3. Build the app
 
@@ -49,6 +51,8 @@ On first launch, paste:
 - **Web app /exec URL** — the Anyone deployment URL
 - **API_TOKEN** — the script property value
 
+Use **Test connection** in Settings before you leave the sheet.
+
 ## 4. Wire contract
 
 `POST` JSON body:
@@ -57,29 +61,35 @@ On first launch, paste:
 { "token": "…", "action": "config" }
 { "token": "…", "action": "getState" }
 { "token": "…", "action": "applyOps", "ops": [ /* same shapes as Index.html */ ] }
+{ "token": "…", "action": "addCategory", "label": "Deep reading" }
 ```
 
 Success: `{ "ok": true, "result": … }`  
 Failure: `{ "ok": false, "error": "…" }`
 
-## 5. Client scope
+## 5. Ported surface (parity with Index.html)
 
-Shipped:
-
-- Categories, NOW + note, STOP, sitting toggle
-- Day rail
-- Split sheet (remainder + whole-block recategorize)
-- Sit-edit sheet (set start / delete)
+- Categories + Add category (server `addCategory`, max from config)
+- NOW panel (since clock, note, tap to split)
+- Day rail (UNLOGGED gaps, open outline, proportional heights)
+- Split sheet (remainder cut + whole-block recategorize)
+- Sitting toggle + sit-edit sheet (set start / delete)
+- STOP + undo ribbon
+- Mark strip (`+ = -`)
 - Dead-letter drawer with arm-to-discard
-- Undo ribbon, mark strip (`+ = -`)
-- Offline queue in `UserDefaults`, flush with redirect-safe POST
-- Settings for URL + token (token in Keychain)
+- Offline queue, redirect-safe POST, corrective getState after undo
+- Unreadable open-block banner
+- Settings (URL, token in Keychain, tz, connection probe)
 
-Still web-only:
+## 6. Deliberately not on the phone
 
-- Add-category from the grid
+Same as the web client — not missing, just not capture:
 
-## 6. Smoke check without the phone
+- Nightly rollup / Sheets UI (`dailyRollup`, `rollupStatus`)
+- PLAN calendar editing (hand-written on Sunday)
+- `removeCategory` (editor-only on purpose; no delete beside a log control)
+
+## 7. Smoke check without the phone
 
 ```bash
 TOKEN='…'

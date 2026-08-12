@@ -448,6 +448,22 @@ let applied = JSON.parse(H.postApi({
 chk('doPost applyOps opens a block',
   applied.ok === true && applied.result.applied.indexOf('apiop1') >= 0 && A().length === 1,
   JSON.stringify(applied) + ' | ' + A().map(show).join(' | '));
+let apiAdd = JSON.parse(H.postApi({
+  action: 'addCategory',
+  token: 'test-token-path2-0123456789ab',
+  label: 'Path Two'
+}).getContent());
+chk('doPost addCategory returns a config with the new label',
+  apiAdd.ok === true && apiAdd.result.categories.some(c => c.label === 'Path Two'),
+  JSON.stringify(apiAdd));
+let blankAdd = JSON.parse(H.postApi({
+  action: 'addCategory',
+  token: 'test-token-path2-0123456789ab',
+  label: '   '
+}).getContent());
+chk('doPost addCategory rejects a blank label',
+  blankAdd.ok === false && /name/i.test(blankAdd.error || ''),
+  JSON.stringify(blankAdd));
 delete H.SCRIPT_PROPS.API_TOKEN;
 H.clearPropCache();
 

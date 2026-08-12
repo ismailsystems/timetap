@@ -254,8 +254,10 @@ function doGet(e) {
  * HTTPS API for the native iOS client (Path 2).
  *
  * Body JSON:
- *   { "token": "<API_TOKEN script property>", "action": "config"|"getState"|"applyOps",
- *     "ops": [ ... ] }   // applyOps only
+ *   { "token": "<API_TOKEN script property>",
+ *     "action": "config"|"getState"|"applyOps"|"addCategory",
+ *     "ops": [ ... ],        // applyOps only
+ *     "label": "…" }         // addCategory only
  *
  * Deploy a second web-app deployment with access Anyone (including anonymous),
  * execute as you. Keep the existing MYSELF deployment for the HTML shell.
@@ -274,6 +276,9 @@ function doPost(e) {
     }
     if (action === 'applyOps') {
       return jsonOut_({ ok: true, result: applyOps(body.ops || []) });
+    }
+    if (action === 'addCategory') {
+      return jsonOut_({ ok: true, result: addCategory(body.label) });
     }
     return jsonOut_({ ok: false, error: 'unknown action' });
   } catch (err) {
