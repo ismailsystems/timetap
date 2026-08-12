@@ -256,6 +256,12 @@ so the icon can be cold-launched at any time and it will find the open block.
 If the launched app shows a Google sign-in loop, open the URL in the browser
 normally once, complete the sign-in, then use the icon again.
 
+### Native iOS client (optional)
+
+Path 2 keeps Calendar writes in Apps Script and puts a SwiftUI capture UI on
+the phone. It needs a script property `API_TOKEN` and a second web-app
+deployment with access **Anyone** (anonymous). Full steps: [ios/README.md](ios/README.md).
+
 ---
 
 ## 7. Required Google Calendar settings

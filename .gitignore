@@ -9,3 +9,8 @@ factory/proof/out/
 
 # holds your script id and is machine-specific; see SETUP.md section 10
 .clasp.json
+
+# Xcode user state for the Path 2 iOS client
+ios/**/xcuserdata/
+ios/**/*.xcuserstate
+ios/TimeTap.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/
