@@ -7,9 +7,13 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		02FC0D91E87A14D4F678123C /* SplitSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 47B9719A4D5ACAE3A65E08CB /* SplitSheet.swift */; };
 		155752CD3F60C3AC82969373 /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4E7744EE4EAB4173F4B3D188 /* Models.swift */; };
+		3BE07A0305050503BCA5CE8D /* SitEditSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = CF45FF913A460C9661EDF34B /* SitEditSheet.swift */; };
 		40D059EFA67A504708D25447 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = F480CE7080FAF633ABD17E01 /* Assets.xcassets */; };
+		674A0AB9AE587F11D9091E36 /* Format.swift in Sources */ = {isa = PBXBuildFile; fileRef = 92673D20F168B38B293C621F /* Format.swift */; };
 		8B9BCD03171BB47A1FDDA0B8 /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 979753C469BB46C427293E02 /* RootView.swift */; };
+		956E790A0753C11234383A9A /* DayRailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 49092CA9D4C73500509BB649 /* DayRailView.swift */; };
 		A517FED50BB45AFCAD67AC72 /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0947EED16A8B40C767B8FA0 /* Theme.swift */; };
 		B2AE2AF91FFF01C1135F2C7D /* TimetapAPI.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1D2F64E4CEB2DB279C547029 /* TimetapAPI.swift */; };
 		BBE466DE1345E22BC5700126 /* TapStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = C85019F7B88C8EE4DFBE85A0 /* TapStore.swift */; };
@@ -17,17 +21,23 @@
 		E8C1C00798C335C7959CA6B8 /* Credentials.swift in Sources */ = {isa = PBXBuildFile; fileRef = EC2416C4707736A43FD2ACF6 /* Credentials.swift */; };
 		F0D1D645E73776D17B15A756 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D55675D4A21D2C2D804358B /* SettingsView.swift */; };
 		FAF11E3081864E2D33B11B77 /* CaptureView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 749D803612D26E9D5D20E863 /* CaptureView.swift */; };
+		FE4C16B4DBEA5F7CCA79E6E5 /* DeadLetterSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 67FE41A5E22FCCF25FC6FFDB /* DeadLetterSheet.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
 		0C48DCFC2B8F43129B8031AB /* TimeTap.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = TimeTap.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		1D2F64E4CEB2DB279C547029 /* TimetapAPI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimetapAPI.swift; sourceTree = "<group>"; };
 		2D55675D4A21D2C2D804358B /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		47B9719A4D5ACAE3A65E08CB /* SplitSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SplitSheet.swift; sourceTree = "<group>"; };
+		49092CA9D4C73500509BB649 /* DayRailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DayRailView.swift; sourceTree = "<group>"; };
 		4E7744EE4EAB4173F4B3D188 /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
+		67FE41A5E22FCCF25FC6FFDB /* DeadLetterSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeadLetterSheet.swift; sourceTree = "<group>"; };
 		6DC9D8FAFE6CD1911BA1BA06 /* TimeTapApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimeTapApp.swift; sourceTree = "<group>"; };
 		749D803612D26E9D5D20E863 /* CaptureView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureView.swift; sourceTree = "<group>"; };
+		92673D20F168B38B293C621F /* Format.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Format.swift; sourceTree = "<group>"; };
 		979753C469BB46C427293E02 /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
 		C85019F7B88C8EE4DFBE85A0 /* TapStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TapStore.swift; sourceTree = "<group>"; };
+		CF45FF913A460C9661EDF34B /* SitEditSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SitEditSheet.swift; sourceTree = "<group>"; };
 		EC2416C4707736A43FD2ACF6 /* Credentials.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Credentials.swift; sourceTree = "<group>"; };
 		F0947EED16A8B40C767B8FA0 /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
 		F480CE7080FAF633ABD17E01 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
@@ -46,6 +56,7 @@
 			isa = PBXGroup;
 			children = (
 				F480CE7080FAF633ABD17E01 /* Assets.xcassets */,
+				92673D20F168B38B293C621F /* Format.swift */,
 				F0947EED16A8B40C767B8FA0 /* Theme.swift */,
 				6DC9D8FAFE6CD1911BA1BA06 /* TimeTapApp.swift */,
 				65661EEC756AF252C8C902EE /* Models */,
@@ -77,8 +88,12 @@
 			isa = PBXGroup;
 			children = (
 				749D803612D26E9D5D20E863 /* CaptureView.swift */,
+				49092CA9D4C73500509BB649 /* DayRailView.swift */,
+				67FE41A5E22FCCF25FC6FFDB /* DeadLetterSheet.swift */,
 				979753C469BB46C427293E02 /* RootView.swift */,
 				2D55675D4A21D2C2D804358B /* SettingsView.swift */,
+				CF45FF913A460C9661EDF34B /* SitEditSheet.swift */,
+				47B9719A4D5ACAE3A65E08CB /* SplitSheet.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -164,9 +179,14 @@
 			files = (
 				FAF11E3081864E2D33B11B77 /* CaptureView.swift in Sources */,
 				E8C1C00798C335C7959CA6B8 /* Credentials.swift in Sources */,
+				956E790A0753C11234383A9A /* DayRailView.swift in Sources */,
+				FE4C16B4DBEA5F7CCA79E6E5 /* DeadLetterSheet.swift in Sources */,
+				674A0AB9AE587F11D9091E36 /* Format.swift in Sources */,
 				155752CD3F60C3AC82969373 /* Models.swift in Sources */,
 				8B9BCD03171BB47A1FDDA0B8 /* RootView.swift in Sources */,
 				F0D1D645E73776D17B15A756 /* SettingsView.swift in Sources */,
+				3BE07A0305050503BCA5CE8D /* SitEditSheet.swift in Sources */,
+				02FC0D91E87A14D4F678123C /* SplitSheet.swift in Sources */,
 				BBE466DE1345E22BC5700126 /* TapStore.swift in Sources */,
 				A517FED50BB45AFCAD67AC72 /* Theme.swift in Sources */,
 				DC1D8DE48367B8E83C66452D /* TimeTapApp.swift in Sources */,

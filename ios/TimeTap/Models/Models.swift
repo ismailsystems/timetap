@@ -36,6 +36,14 @@ struct OpenBlock: Codable, Equatable {
         self.text = text
         self.startMs = startMs
     }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        ref = try c.decode(String.self, forKey: .ref)
+        key = try c.decode(String.self, forKey: .key)
+        text = try c.decodeIfPresent(String.self, forKey: .text) ?? ""
+        startMs = try c.decode(Double.self, forKey: .startMs)
+    }
 }
 
 struct SitBlock: Codable, Equatable {
@@ -44,9 +52,24 @@ struct SitBlock: Codable, Equatable {
 }
 
 struct TodayBlock: Codable, Equatable {
+    var ref: String? = nil
     var key: String
     var startMs: Double
     var endMs: Double
+}
+
+struct DeadEntry: Codable, Equatable, Identifiable {
+    var at: Double
+    var why: String
+    var op: Op
+    var key: String?
+    var startMs: Double?
+
+    var id: String { token }
+
+    var token: String {
+        "\(at)|\(op.id)|\(op.type)|\(op.ref ?? "")"
+    }
 }
 
 struct ServerState: Codable {

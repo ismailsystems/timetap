@@ -62,19 +62,21 @@ On first launch, paste:
 Success: `{ "ok": true, "result": … }`  
 Failure: `{ "ok": false, "error": "…" }`
 
-## 5. v1 scope
+## 5. Client scope
 
-Shipped in this pass:
+Shipped:
 
 - Categories, NOW + note, STOP, sitting toggle
+- Day rail
+- Split sheet (remainder + whole-block recategorize)
+- Sit-edit sheet (set start / delete)
+- Dead-letter drawer with arm-to-discard
 - Undo ribbon, mark strip (`+ = -`)
 - Offline queue in `UserDefaults`, flush with redirect-safe POST
 - Settings for URL + token (token in Keychain)
 
-Not yet (still on the web app):
+Still web-only:
 
-- Split sheet, sit-edit sheet, dead-letter drawer UI
-- Day rail
 - Add-category from the grid
 
 ## 6. Smoke check without the phone
