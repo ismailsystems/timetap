@@ -394,6 +394,7 @@ chk('toggle reads standing', litPosture() === 'stand', String(litPosture()));
 
 console.log('\n19. doGet serves the page');
 reset(); reboot();
+H.setActiveEmail('tester@example.com');
 let out = null, doGetErr = null;
 try { out = doGet(); } catch (e) { doGetErr = e; }
 chk('doGet does not throw', !doGetErr, doGetErr && doGetErr.message);
@@ -406,6 +407,49 @@ chk('bootstrap config injected', !!out && /"minMarkMinutes":15/.test(out.getCont
 chk('no unresolved template tags', !!out && !/<\?!?=/.test(out.getContent()),
   out && (out.getContent().match(/<\?!?=[^>]*>/g) || []).join(' '));
 chk('frame options set', !!out && out.xframe === 'ALLOWALL', out && out.xframe);
+
+console.log('\n19b. doGet refuses anonymous HTML; doPost is the native API');
+reset(); reboot();
+H.setActiveEmail('');
+let anon = doGet();
+chk('anonymous doGet is JSON, not HtmlOutput', !anon.title && typeof anon.getContent === 'function');
+let anonBody = JSON.parse(anon.getContent());
+chk('anonymous doGet explains the gate', anonBody.ok === false && /Native clients POST/.test(anonBody.error),
+  JSON.stringify(anonBody));
+let ping = doGet({ parameter: { api: 'ping' } });
+chk('api=ping answers without a session', JSON.parse(ping.getContent()).ok === true);
+
+H.setActiveEmail('tester@example.com');
+H.SCRIPT_PROPS.API_TOKEN = 'test-token-path2-0123456789ab';
+H.clearPropCache();
+let noTok = JSON.parse(H.postApi({ action: 'getState' }).getContent());
+chk('doPost without token is unauthorized', noTok.ok === false && noTok.error === 'unauthorized',
+  JSON.stringify(noTok));
+let badTok = JSON.parse(H.postApi({ action: 'getState', token: 'wrong' }).getContent());
+chk('doPost with wrong token is unauthorized', badTok.ok === false && badTok.error === 'unauthorized',
+  JSON.stringify(badTok));
+let cfg = JSON.parse(H.postApi({
+  action: 'config', token: 'test-token-path2-0123456789ab'
+}).getContent());
+chk('doPost config returns categories', cfg.ok === true && cfg.result.categories.length >= 6,
+  JSON.stringify(cfg));
+let st = JSON.parse(H.postApi({
+  action: 'getState', token: 'test-token-path2-0123456789ab'
+}).getContent());
+chk('doPost getState returns state shape',
+  st.ok === true && st.result && Array.isArray(st.result.today) && 'open' in st.result,
+  JSON.stringify(st));
+let refApi = 'apiref0011223344';
+let applied = JSON.parse(H.postApi({
+  action: 'applyOps',
+  token: 'test-token-path2-0123456789ab',
+  ops: [{ id: 'apiop1', type: 'openActual', ref: refApi, key: 'DW', startMs: H.nowMs() }]
+}).getContent());
+chk('doPost applyOps opens a block',
+  applied.ok === true && applied.result.applied.indexOf('apiop1') >= 0 && A().length === 1,
+  JSON.stringify(applied) + ' | ' + A().map(show).join(' | '));
+delete H.SCRIPT_PROPS.API_TOKEN;
+H.clearPropCache();
 
 console.log('\n20. calendar ids resolve from script properties');
 reset(); reboot();

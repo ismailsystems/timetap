@@ -59,7 +59,22 @@ global.CalendarApp = {
   EventColor: { PALE_BLUE:'1', PALE_GREEN:'2', MAUVE:'3', PALE_RED:'4', YELLOW:'5', ORANGE:'6', CYAN:'7', GRAY:'8', BLUE:'9', GREEN:'10', RED:'11' },
   getCalendarById: id => CALS[id] || null
 };
-global.Session = { getScriptTimeZone: () => process.env.TZ || 'America/New_York' };
+let ACTIVE_EMAIL = 'tester@example.com';
+global.Session = {
+  getScriptTimeZone: () => process.env.TZ || 'America/New_York',
+  // doGet serves HTML only when a signed-in user is present (Code.gs).
+  getActiveUser: () => ({ getEmail: () => ACTIVE_EMAIL }),
+  getEffectiveUser: () => ({ getEmail: () => ACTIVE_EMAIL || 'tester@example.com' })
+};
+class FTextOutput {
+  constructor(content) { this.content = content; this.mime = null; }
+  setMimeType(m) { this.mime = m; return this; }
+  getContent() { return this.content; }
+}
+global.ContentService = {
+  MimeType: { JSON: 'JSON', TEXT: 'TEXT' },
+  createTextOutput: c => new FTextOutput(String(c))
+};
 const LOGGED = [];
 global.Logger = { log: m => { LOGGED.push(String(m)); } };
 global.LockService = { getUserLock: () => ({ waitLock() {}, releaseLock() {} }) };
@@ -479,6 +494,7 @@ function reset(atMs) {
   SHEETS.book.sheets = [];
   TRIGGERS.length = 0;
   Object.keys(SCRIPT_PROPS).forEach(k => delete SCRIPT_PROPS[k]);
+  ACTIVE_EMAIL = 'tester@example.com';
 }
 function reboot() {
   /* Every timer the old instance set, not only its intervals. A real reload
@@ -508,6 +524,8 @@ module.exports = { LOGGED, fireVisible: () => VIS.forEach(f => f()),
   // build where nothing is listening.
   fireDoc: (t, ev) => { const h = DOC_H[t] || []; h.forEach(f => f(ev || {})); return h.length; },
   chk, skip, near, reset, reboot, META_ALLOWED, SCRIPT_PROPS, SHEETS, TRIGGERS,
+  setActiveEmail: v => { ACTIVE_EMAIL = v; },
+  postApi: (body) => doPost({ postData: { contents: JSON.stringify(body) } }),
   posture, activeKey, litPosture, noteBox, elapsedBox, nowElapsed, addCell,
   clearPropCache: () => { global.PROPS_ = null; }, tap, tapSit, tapMark, tapStop, stopArmedNow, stopLabel, armedText,
   wait, advance, settle, A, S, show, hhmm, $,

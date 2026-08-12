@@ -224,8 +224,22 @@ function contrast_(a, b) {
  * mobile-web-app-capable, google-site-verification. Anything else throws
  * "The meta tag you specified is not allowed in this context" at request time,
  * so this list is not the place to get creative.
+ *
+ * HTML is served only to a signed-in Google session. That keeps the capture UI
+ * on the MYSELF web deployment, and stops an ANYONE_ANONYMOUS API deployment
+ * from handing strangers a page that can call getState/applyOps via
+ * google.script.run. Native clients never use doGet for capture — they POST.
  */
-function doGet() {
+function doGet(e) {
+  if (e && e.parameter && e.parameter.api === 'ping') {
+    return jsonOut_({ ok: true, service: 'timetap' });
+  }
+  if (!signedInUser_()) {
+    return jsonOut_({
+      ok: false,
+      error: 'HTML shell requires a signed-in Google session on the MYSELF web deployment. Native clients POST with API_TOKEN.'
+    });
+  }
   var t = HtmlService.createTemplateFromFile('Index');
   t.bootstrap = JSON.stringify(clientConfig_());
   return t.evaluate()
@@ -234,6 +248,80 @@ function doGet() {
     .addMetaTag('apple-mobile-web-app-capable', 'yes')
     .addMetaTag('mobile-web-app-capable', 'yes')
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+}
+
+/**
+ * HTTPS API for the native iOS client (Path 2).
+ *
+ * Body JSON:
+ *   { "token": "<API_TOKEN script property>", "action": "config"|"getState"|"applyOps",
+ *     "ops": [ ... ] }   // applyOps only
+ *
+ * Deploy a second web-app deployment with access Anyone (including anonymous),
+ * execute as you. Keep the existing MYSELF deployment for the HTML shell.
+ * See ios/README.md.
+ */
+function doPost(e) {
+  try {
+    var body = parsePostBody_(e);
+    requireApiToken_(body.token);
+    var action = body.action;
+    if (action === 'config') {
+      return jsonOut_({ ok: true, result: clientConfig_() });
+    }
+    if (action === 'getState') {
+      return jsonOut_({ ok: true, result: getState() });
+    }
+    if (action === 'applyOps') {
+      return jsonOut_({ ok: true, result: applyOps(body.ops || []) });
+    }
+    return jsonOut_({ ok: false, error: 'unknown action' });
+  } catch (err) {
+    return jsonOut_({ ok: false, error: String((err && err.message) || err) });
+  }
+}
+
+function jsonOut_(obj) {
+  return ContentService
+    .createTextOutput(JSON.stringify(obj))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+
+function parsePostBody_(e) {
+  if (!e || !e.postData || typeof e.postData.contents !== 'string') {
+    throw new Error('expected JSON body');
+  }
+  var raw = e.postData.contents;
+  if (!raw) throw new Error('expected JSON body');
+  var body;
+  try { body = JSON.parse(raw); }
+  catch (err) { throw new Error('expected JSON body'); }
+  if (!body || typeof body !== 'object' || Array.isArray(body)) {
+    throw new Error('expected JSON object');
+  }
+  return body;
+}
+
+/** Constant-time compare against the API_TOKEN script property. */
+function requireApiToken_(token) {
+  var expected = prop_('API_TOKEN');
+  if (!expected) throw new Error('API_TOKEN is not set in script properties');
+  if (typeof token !== 'string' || !token) throw new Error('unauthorized');
+  if (token.length !== expected.length) throw new Error('unauthorized');
+  var diff = 0;
+  for (var i = 0; i < expected.length; i++) {
+    diff |= expected.charCodeAt(i) ^ token.charCodeAt(i);
+  }
+  if (diff !== 0) throw new Error('unauthorized');
+}
+
+function signedInUser_() {
+  try {
+    var u = Session.getActiveUser();
+    return !!(u && typeof u.getEmail === 'function' && u.getEmail());
+  } catch (err) {
+    return false;
+  }
 }
 
 /** Config the client needs. Touches no calendar, so it can never fail on a bad ID. */
