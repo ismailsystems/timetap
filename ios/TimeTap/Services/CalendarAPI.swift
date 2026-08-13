@@ -130,6 +130,18 @@ enum CalendarAPI {
             return Pick(list: list, planId: pre.plan, actualId: pre.actual, sittingId: pre.sitting)
         }
 
+        static func fromSaved(_ list: [CalendarSummary]) -> Pick {
+            if Credentials.hasCalendarIds {
+                return Pick(
+                    list: list,
+                    planId: Credentials.planId,
+                    actualId: Credentials.actualId,
+                    sittingId: Credentials.sittingId
+                )
+            }
+            return loaded(list)
+        }
+
         var canConfirm: Bool {
             CalendarAPI.canConfirm(plan: planId, actual: actualId, sitting: sittingId)
         }

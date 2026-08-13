@@ -116,6 +116,12 @@ final class TapStore: ObservableObject {
         }
     }
 
+    func signOut() {
+        GoogleAuth.signOut()
+        showSignIn = true
+        showSettings = false
+    }
+
     func boot() { Task { await bootAsync() } }
 
     func refreshOnReturn() {

@@ -13,6 +13,17 @@ struct SettingsView: View {
                         LabeledContent("Categories", value: "\(store.categories.count)")
                     }
                 }
+                Section("Calendars") {
+                    Button("Change PLAN, ACTUAL, SITTING") {
+                        store.showSettings = false
+                        store.showPicker = true
+                    }
+                }
+                Section {
+                    Button("Sign out", role: .destructive) {
+                        store.signOut()
+                    }
+                }
             }
             .navigationTitle("Settings")
             .navigationBarTitleDisplayMode(.inline)

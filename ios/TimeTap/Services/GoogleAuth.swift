@@ -62,6 +62,12 @@ enum GoogleAuth {
         didAttemptCalendarWrite = false
     }
 
+    static func signOut() {
+        testHasSession = false
+        testAccessToken = nil
+        GIDSignIn.sharedInstance.signOut()
+    }
+
     static func restore() {
         GIDSignIn.sharedInstance.restorePreviousSignIn { _, _ in }
     }

@@ -59,7 +59,7 @@ struct CalendarPickerView: View {
         loading = true
         defer { loading = false }
         do {
-            pick = .loaded(try await CalendarAPI.listCalendars())
+            pick = .fromSaved(try await CalendarAPI.listCalendars())
         } catch {
             errorText = error.localizedDescription
             pick = .loaded([])
