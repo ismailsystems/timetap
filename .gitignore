@@ -17,3 +17,6 @@ ios/TimeTap.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/
 
 # Local API URL + token for device testing — never commit
 ios/.secrets/
+
+# Generated from ios/.secrets/GOOGLE_IOS_CLIENT_ID — never commit the real client id
+ios/TimeTap/Config/Google.xcconfig

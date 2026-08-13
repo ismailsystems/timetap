@@ -5,6 +5,9 @@ enum Credentials {
     private static let service = "app.timetap.ios"
     private static let urlKey = "apiURL"
     private static let tokenAccount = "apiToken"
+    private static let planKey = "calendarPlanId"
+    private static let actualKey = "calendarActualId"
+    private static let sittingKey = "calendarSittingId"
 
     static var apiURL: String {
         get { UserDefaults.standard.string(forKey: urlKey) ?? "" }
@@ -38,9 +41,33 @@ enum Credentials {
         }
     }
 
+    static var planId: String {
+        get { UserDefaults.standard.string(forKey: planKey) ?? "" }
+        set { UserDefaults.standard.set(newValue, forKey: planKey) }
+    }
+
+    static var actualId: String {
+        get { UserDefaults.standard.string(forKey: actualKey) ?? "" }
+        set { UserDefaults.standard.set(newValue, forKey: actualKey) }
+    }
+
+    static var sittingId: String {
+        get { UserDefaults.standard.string(forKey: sittingKey) ?? "" }
+        set { UserDefaults.standard.set(newValue, forKey: sittingKey) }
+    }
+
     static var isConfigured: Bool {
-        !apiURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-            && !apiToken.isEmpty
+        GoogleAuth.hasSession
+            && !planId.isEmpty
+            && !actualId.isEmpty
+            && !sittingId.isEmpty
+    }
+
+    static func resetForTests() {
+        planId = ""
+        actualId = ""
+        sittingId = ""
+        GoogleAuth.resetForTests()
     }
 
     private static func writeKeychain(_ value: String) {

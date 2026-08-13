@@ -4,6 +4,11 @@ import SwiftUI
 struct TimeTapApp: App {
     @StateObject private var store = TapStore()
 
+    init() {
+        GoogleAuth.configure()
+        GoogleAuth.restore()
+    }
+
     var body: some Scene {
         WindowGroup {
             RootView()

@@ -11,7 +11,11 @@
 		155752CD3F60C3AC82969373 /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4E7744EE4EAB4173F4B3D188 /* Models.swift */; };
 		3BE07A0305050503BCA5CE8D /* SitEditSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = CF45FF913A460C9661EDF34B /* SitEditSheet.swift */; };
 		40D059EFA67A504708D25447 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = F480CE7080FAF633ABD17E01 /* Assets.xcassets */; };
+		46EAECF479D1F77CC70D37E8 /* GoogleAuth.swift in Sources */ = {isa = PBXBuildFile; fileRef = 39244103B3847640AAA55B11 /* GoogleAuth.swift */; };
+		58F7E0C393D62920F700C37E /* A1Tests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6C9E642DDAC8A5F6C60D9EF4 /* A1Tests.swift */; };
 		674A0AB9AE587F11D9091E36 /* Format.swift in Sources */ = {isa = PBXBuildFile; fileRef = 92673D20F168B38B293C621F /* Format.swift */; };
+		6815C88AE2DF31036A8B5A8B /* SignInView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6D7B42C20E98A8B8C2475C8B /* SignInView.swift */; };
+		81925425FD2759B8617E9D60 /* GoogleSignIn in Frameworks */ = {isa = PBXBuildFile; productRef = E2AC37527A1324DCA04213C6 /* GoogleSignIn */; };
 		8B9BCD03171BB47A1FDDA0B8 /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 979753C469BB46C427293E02 /* RootView.swift */; };
 		956E790A0753C11234383A9A /* DayRailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 49092CA9D4C73500509BB649 /* DayRailView.swift */; };
 		A517FED50BB45AFCAD67AC72 /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0947EED16A8B40C767B8FA0 /* Theme.swift */; };
@@ -24,26 +28,61 @@
 		FE4C16B4DBEA5F7CCA79E6E5 /* DeadLetterSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 67FE41A5E22FCCF25FC6FFDB /* DeadLetterSheet.swift */; };
 /* End PBXBuildFile section */
 
+/* Begin PBXContainerItemProxy section */
+		7528F1C1579D2BD55AB99BC7 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = F857DF8535F9DD23FF6EC550 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 7DD2CA63DA231E2830BEADAB;
+			remoteInfo = TimeTap;
+		};
+/* End PBXContainerItemProxy section */
+
 /* Begin PBXFileReference section */
 		0C48DCFC2B8F43129B8031AB /* TimeTap.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = TimeTap.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		1D2F64E4CEB2DB279C547029 /* TimetapAPI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimetapAPI.swift; sourceTree = "<group>"; };
+		202DBF96A0E63CD41E7A516D /* Google.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Google.xcconfig; sourceTree = "<group>"; };
 		2D55675D4A21D2C2D804358B /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		39244103B3847640AAA55B11 /* GoogleAuth.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoogleAuth.swift; sourceTree = "<group>"; };
 		47B9719A4D5ACAE3A65E08CB /* SplitSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SplitSheet.swift; sourceTree = "<group>"; };
 		49092CA9D4C73500509BB649 /* DayRailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DayRailView.swift; sourceTree = "<group>"; };
 		4E7744EE4EAB4173F4B3D188 /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
 		67FE41A5E22FCCF25FC6FFDB /* DeadLetterSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeadLetterSheet.swift; sourceTree = "<group>"; };
+		6C9E642DDAC8A5F6C60D9EF4 /* A1Tests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = A1Tests.swift; sourceTree = "<group>"; };
+		6D7B42C20E98A8B8C2475C8B /* SignInView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SignInView.swift; sourceTree = "<group>"; };
 		6DC9D8FAFE6CD1911BA1BA06 /* TimeTapApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimeTapApp.swift; sourceTree = "<group>"; };
 		749D803612D26E9D5D20E863 /* CaptureView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureView.swift; sourceTree = "<group>"; };
 		92673D20F168B38B293C621F /* Format.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Format.swift; sourceTree = "<group>"; };
 		979753C469BB46C427293E02 /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
+		B1FF4806EEB7A5DA1B512B3C /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		C85019F7B88C8EE4DFBE85A0 /* TapStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TapStore.swift; sourceTree = "<group>"; };
+		CAAA7DE9DBBAA54C77A78BD0 /* TimeTapTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = TimeTapTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		CF45FF913A460C9661EDF34B /* SitEditSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SitEditSheet.swift; sourceTree = "<group>"; };
 		EC2416C4707736A43FD2ACF6 /* Credentials.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Credentials.swift; sourceTree = "<group>"; };
 		F0947EED16A8B40C767B8FA0 /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
 		F480CE7080FAF633ABD17E01 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
+/* Begin PBXFrameworksBuildPhase section */
+		E66F054E9674E3374439E4DC /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				81925425FD2759B8617E9D60 /* GoogleSignIn in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
 /* Begin PBXGroup section */
+		3E6FC59B3A40708FC4EDF1D1 /* Config */ = {
+			isa = PBXGroup;
+			children = (
+				202DBF96A0E63CD41E7A516D /* Google.xcconfig */,
+			);
+			path = Config;
+			sourceTree = "<group>";
+		};
 		65661EEC756AF252C8C902EE /* Models */ = {
 			isa = PBXGroup;
 			children = (
@@ -57,8 +96,10 @@
 			children = (
 				F480CE7080FAF633ABD17E01 /* Assets.xcassets */,
 				92673D20F168B38B293C621F /* Format.swift */,
+				B1FF4806EEB7A5DA1B512B3C /* Info.plist */,
 				F0947EED16A8B40C767B8FA0 /* Theme.swift */,
 				6DC9D8FAFE6CD1911BA1BA06 /* TimeTapApp.swift */,
+				3E6FC59B3A40708FC4EDF1D1 /* Config */,
 				65661EEC756AF252C8C902EE /* Models */,
 				B4A439978C48A6D87AD9D481 /* Services */,
 				CD89DEDEA4606A0558A58718 /* Views */,
@@ -70,6 +111,7 @@
 			isa = PBXGroup;
 			children = (
 				EC2416C4707736A43FD2ACF6 /* Credentials.swift */,
+				39244103B3847640AAA55B11 /* GoogleAuth.swift */,
 				C85019F7B88C8EE4DFBE85A0 /* TapStore.swift */,
 				1D2F64E4CEB2DB279C547029 /* TimetapAPI.swift */,
 			);
@@ -80,8 +122,17 @@
 			isa = PBXGroup;
 			children = (
 				AB85A8E9997F93FEF628CDE1 /* TimeTap */,
+				B854C4CFD46444295D8ACE04 /* TimeTapTests */,
 				E6FD22C9DCD904BE6FEB037D /* Products */,
 			);
+			sourceTree = "<group>";
+		};
+		B854C4CFD46444295D8ACE04 /* TimeTapTests */ = {
+			isa = PBXGroup;
+			children = (
+				6C9E642DDAC8A5F6C60D9EF4 /* A1Tests.swift */,
+			);
+			path = TimeTapTests;
 			sourceTree = "<group>";
 		};
 		CD89DEDEA4606A0558A58718 /* Views */ = {
@@ -92,6 +143,7 @@
 				67FE41A5E22FCCF25FC6FFDB /* DeadLetterSheet.swift */,
 				979753C469BB46C427293E02 /* RootView.swift */,
 				2D55675D4A21D2C2D804358B /* SettingsView.swift */,
+				6D7B42C20E98A8B8C2475C8B /* SignInView.swift */,
 				CF45FF913A460C9661EDF34B /* SitEditSheet.swift */,
 				47B9719A4D5ACAE3A65E08CB /* SplitSheet.swift */,
 			);
@@ -102,6 +154,7 @@
 			isa = PBXGroup;
 			children = (
 				0C48DCFC2B8F43129B8031AB /* TimeTap.app */,
+				CAAA7DE9DBBAA54C77A78BD0 /* TimeTapTests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -109,12 +162,31 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
+		2FABA00A70E3E5F3EE9C003E /* TimeTapTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 3A0BF1D90697F777287CABD5 /* Build configuration list for PBXNativeTarget "TimeTapTests" */;
+			buildPhases = (
+				2AC55B306D7AADF5A1480BB1 /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				2575BCA25260533E8A620E39 /* PBXTargetDependency */,
+			);
+			name = TimeTapTests;
+			packageProductDependencies = (
+			);
+			productName = TimeTapTests;
+			productReference = CAAA7DE9DBBAA54C77A78BD0 /* TimeTapTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
 		7DD2CA63DA231E2830BEADAB /* TimeTap */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = D4AFCFCA5C9F8D7527F8F5A5 /* Build configuration list for PBXNativeTarget "TimeTap" */;
 			buildPhases = (
 				488A7E2840BC86FAA0E471FF /* Sources */,
 				35200B8D54A900C23603F4D9 /* Resources */,
+				E66F054E9674E3374439E4DC /* Frameworks */,
 			);
 			buildRules = (
 			);
@@ -122,6 +194,7 @@
 			);
 			name = TimeTap;
 			packageProductDependencies = (
+				E2AC37527A1324DCA04213C6 /* GoogleSignIn */,
 			);
 			productName = TimeTap;
 			productReference = 0C48DCFC2B8F43129B8031AB /* TimeTap.app */;
@@ -136,6 +209,10 @@
 				BuildIndependentTargetsInParallel = YES;
 				LastUpgradeCheck = 1600;
 				TargetAttributes = {
+					2FABA00A70E3E5F3EE9C003E = {
+						DevelopmentTeam = Y3NGT7263T;
+						ProvisioningStyle = Automatic;
+					};
 					7DD2CA63DA231E2830BEADAB = {
 						DevelopmentTeam = Y3NGT7263T;
 						ProvisioningStyle = Automatic;
@@ -151,12 +228,16 @@
 			);
 			mainGroup = B6C31230AC23D7C2FD05A374;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				5D1FFC1F0E7276BB3472F1ED /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = E6FD22C9DCD904BE6FEB037D /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
 				7DD2CA63DA231E2830BEADAB /* TimeTap */,
+				2FABA00A70E3E5F3EE9C003E /* TimeTapTests */,
 			);
 		};
 /* End PBXProject section */
@@ -173,6 +254,14 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
+		2AC55B306D7AADF5A1480BB1 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				58F7E0C393D62920F700C37E /* A1Tests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		488A7E2840BC86FAA0E471FF /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -182,9 +271,11 @@
 				956E790A0753C11234383A9A /* DayRailView.swift in Sources */,
 				FE4C16B4DBEA5F7CCA79E6E5 /* DeadLetterSheet.swift in Sources */,
 				674A0AB9AE587F11D9091E36 /* Format.swift in Sources */,
+				46EAECF479D1F77CC70D37E8 /* GoogleAuth.swift in Sources */,
 				155752CD3F60C3AC82969373 /* Models.swift in Sources */,
 				8B9BCD03171BB47A1FDDA0B8 /* RootView.swift in Sources */,
 				F0D1D645E73776D17B15A756 /* SettingsView.swift in Sources */,
+				6815C88AE2DF31036A8B5A8B /* SignInView.swift in Sources */,
 				3BE07A0305050503BCA5CE8D /* SitEditSheet.swift in Sources */,
 				02FC0D91E87A14D4F678123C /* SplitSheet.swift in Sources */,
 				BBE466DE1345E22BC5700126 /* TapStore.swift in Sources */,
@@ -195,6 +286,14 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		2575BCA25260533E8A620E39 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 7DD2CA63DA231E2830BEADAB /* TimeTap */;
+			targetProxy = 7528F1C1579D2BD55AB99BC7 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		1631CA3EABE939D926181E14 /* Release */ = {
@@ -264,12 +363,15 @@
 		};
 		969BBB051D97C896278011BB /* Release */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = 202DBF96A0E63CD41E7A516D /* Google.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
 				DEVELOPMENT_TEAM = Y3NGT7263T;
 				ENABLE_PREVIEWS = YES;
+				ENABLE_TESTABILITY = YES;
+				INFOPLIST_FILE = TimeTap/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -280,14 +382,36 @@
 			};
 			name = Release;
 		};
+		A32D03C9D7826D48AF175622 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = Y3NGT7263T;
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = app.timetap.ios.tests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/TimeTap.app/TimeTap";
+			};
+			name = Release;
+		};
 		D3B5B11C17A6687800CA4370 /* Debug */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = 202DBF96A0E63CD41E7A516D /* Google.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
 				DEVELOPMENT_TEAM = Y3NGT7263T;
 				ENABLE_PREVIEWS = YES;
+				ENABLE_TESTABILITY = YES;
+				INFOPLIST_FILE = TimeTap/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -295,6 +419,25 @@
 				PRODUCT_BUNDLE_IDENTIFIER = app.timetap.ios;
 				SDKROOT = iphoneos;
 				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		DC3B149A3A7D2402113670F2 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = Y3NGT7263T;
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = app.timetap.ios.tests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/TimeTap.app/TimeTap";
 			};
 			name = Debug;
 		};
@@ -373,6 +516,15 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
+		3A0BF1D90697F777287CABD5 /* Build configuration list for PBXNativeTarget "TimeTapTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				DC3B149A3A7D2402113670F2 /* Debug */,
+				A32D03C9D7826D48AF175622 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
 		D4AFCFCA5C9F8D7527F8F5A5 /* Build configuration list for PBXNativeTarget "TimeTap" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
@@ -392,6 +544,25 @@
 			defaultConfigurationName = Debug;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		5D1FFC1F0E7276BB3472F1ED /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/google/GoogleSignIn-iOS";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 8.0.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		E2AC37527A1324DCA04213C6 /* GoogleSignIn */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 5D1FFC1F0E7276BB3472F1ED /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */;
+			productName = GoogleSignIn;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = F857DF8535F9DD23FF6EC550 /* Project object */;
 }

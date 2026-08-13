@@ -13,9 +13,16 @@ struct RootView: View {
             SettingsView()
                 .environmentObject(store)
         }
+        .fullScreenCover(isPresented: $store.showSignIn) {
+            SignInView()
+                .environmentObject(store)
+        }
         .onAppear { store.boot() }
         .onChange(of: scenePhase) { _, phase in
             if phase == .active { store.refreshOnReturn() }
+        }
+        .onOpenURL { url in
+            _ = GoogleAuth.handleURL(url)
         }
     }
 }

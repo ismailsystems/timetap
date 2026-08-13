@@ -14,6 +14,7 @@ final class TapStore: ObservableObject {
     @Published var syncFailed = false
     @Published var banner: String?
     @Published var showSettings = false
+    @Published var showSignIn = false
     @Published var showDead = false
     @Published var addingCategory = false
 
@@ -103,8 +104,8 @@ final class TapStore: ObservableObject {
 
     init() {
         loadPersisted()
-        if !Credentials.isConfigured {
-            showSettings = true
+        if !GoogleAuth.hasSession {
+            showSignIn = true
         }
     }
 
@@ -123,6 +124,7 @@ final class TapStore: ObservableObject {
     // MARK: - Capture actions
 
     func tapCategory(_ key: String) {
+        guard Credentials.isConfigured else { return }
         let now = Date().timeIntervalSince1970 * 1000
         if let open, open.key == key {
             if undo != nil { return }
@@ -548,11 +550,11 @@ final class TapStore: ObservableObject {
     // MARK: - Boot / network
 
     private func bootAsync() async {
-        guard Credentials.isConfigured else {
-            showSettings = true
-            banner = "Add the API URL and token to start"
+        if !GoogleAuth.hasSession {
+            showSignIn = true
             return
         }
+        guard Credentials.isConfigured else { return }
         do {
             applyConfig(try await TimetapAPI.shared.config())
             if !queue.isEmpty {
@@ -572,14 +574,6 @@ final class TapStore: ObservableObject {
             syncFailed = true
             syncLabel = "SYNC FAILED"
         }
-    }
-
-    func saveSettingsAndReconnect(url: String, token: String) {
-        Credentials.apiURL = url.trimmingCharacters(in: .whitespacesAndNewlines)
-        Credentials.apiToken = token.trimmingCharacters(in: .whitespacesAndNewlines)
-        showSettings = false
-        banner = nil
-        boot()
     }
 
     private func applyConfig(_ cfg: ClientConfig) {
