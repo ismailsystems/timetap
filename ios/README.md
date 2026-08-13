@@ -1,107 +1,59 @@
-# timetap iOS (Path 2)
+# timetap iOS (Path 3)
 
-SwiftUI capture client. The brain stays in `Code.gs`. The phone posts the same
-ops the web client already uses, over HTTPS with a shared secret.
+The iPhone signs in with Google Sign-In, not an API_TOKEN. It writes Google
+Calendar itself. Capture stays at Path 2 parity. Rollup stays on Apps Script.
 
-This is a pure port of the capture surface. Rollup, PLAN editing, and category
-retirement stay on Apps Script / Sheets / Calendar — same as the web app.
+If the HTML app and the iPhone both write, last-write-wins. There is no lock.
 
-## 1. Script property
+## 1. Mint an iOS OAuth client
 
-In the Apps Script project: **Project Settings → Script properties** → add:
+Use GCP project `timetap-505402` only. Enable the Calendar API.
 
-| Property    | Value                                       |
-|-------------|---------------------------------------------|
-| `API_TOKEN` | long random string (32+ chars). Keep private. |
+1. Google Cloud Console → APIs & Services → Credentials → Create credentials
+   → OAuth client ID → **iOS**.
+2. Name `timetap`. Bundle ID `app.timetap.ios`.
+3. Copy the client ID (`….apps.googleusercontent.com`).
+4. Write it to `ios/.secrets/GOOGLE_IOS_CLIENT_ID` (gitignored).
 
-```bash
-openssl rand -hex 24
-```
+The Xcode URL scheme is the reversed client ID:
+`com.googleusercontent.apps.{prefix-before-.apps.googleusercontent.com}`.
+`ios/scripts/sync-google-config.sh` writes `TimeTap/Config/Google.xcconfig`
+from that secret. Info.plist already reads `GIDClientID` and the URL scheme
+from that file.
 
-## 2. Second deployment (API)
+A testing project's consent screen may show a warning. That is accepted.
 
-Keep your existing **MYSELF** web deployment for the HTML shell.
-
-Create another deployment of the same project:
-
-1. **Deploy → Manage deployments → Add deployment**
-2. Type: **Web app**
-3. Execute as: **Me**
-4. Who has access: **Anyone** (including anonymous)
-5. Deploy. Copy the `/exec` URL.
-
-That URL is what the iOS app posts to. Anyone who has the URL still needs
-`API_TOKEN`. Anonymous `doGet` does not serve the capture HTML.
-
-Redeploy (**New version**) after pulling API changes, on **both** deployments
-if you want the HTML shell and the API on the same code revision.
-
-## 3. Build the app
+## 2. Build
 
 ```bash
 cd ios
+./scripts/sync-google-config.sh
 xcodegen generate
 open TimeTap.xcodeproj
 ```
 
-Select your Development Team under Signing, Run on a phone or simulator.
+Select Development Team `Y3NGT7263T` under Signing. Run on a phone or the
+simulator (iPhone 17 Pro Max).
 
-On first launch, paste:
+## 3. First launch
 
-- **Web app /exec URL** — the Anyone deployment URL
-- **API_TOKEN** — the script property value
+1. **Google Sign-In** — scope `https://www.googleapis.com/auth/calendar`.
+2. **calendar picker** — PLAN / ACTUAL / SITTING are pre-selected by name
+   when those calendars exist (first match on a duplicate name). Confirm
+   needs all three. Settings can change them later.
+3. Sign-out clears the Google session. Saved calendar IDs stay on the device.
 
-Use **Test connection** in Settings before you leave the sheet.
+## 4. What the phone does
 
-## 4. Wire contract
+Tap a category. The phone inserts/patches events on ACTUAL (and SITTING)
+through Calendar REST. Titles, colours, `#ref:` / `#open`, stale `?`, undo,
+and STOP match `Code.gs`. Add category stays on the device (cap 10).
 
-`POST` JSON body:
+Device proof is the user's Google Calendar, not curl against `/exec`.
 
-```json
-{ "token": "…", "action": "config" }
-{ "token": "…", "action": "getState" }
-{ "token": "…", "action": "applyOps", "ops": [ /* same shapes as Index.html */ ] }
-{ "token": "…", "action": "addCategory", "label": "Deep reading" }
-```
+## 5. What stays off the phone
 
-Success: `{ "ok": true, "result": … }`  
-Failure: `{ "ok": false, "error": "…" }`
-
-## 5. Ported surface (parity with Index.html)
-
-- Categories + Add category (server `addCategory`, max from config)
-- NOW panel (since clock, note, tap to split)
-- Day rail (UNLOGGED gaps, open outline, proportional heights)
-- Split sheet (remainder cut + whole-block recategorize)
-- Sitting toggle + sit-edit sheet (set start / delete)
-- STOP + undo ribbon
-- Mark strip (`+ = -`)
-- Dead-letter drawer with arm-to-discard
-- Offline queue, ContentService redirect (POST `/exec` → GET echo), corrective getState after undo
-- Unreadable open-block banner
-- Settings (URL, token in Keychain, tz, connection probe)
-
-## 6. Deliberately not on the phone
-
-Same as the web client — not missing, just not capture:
-
-- Nightly rollup / Sheets UI (`dailyRollup`, `rollupStatus`)
-- PLAN calendar editing (hand-written on Sunday)
-- `removeCategory` (editor-only on purpose; no delete beside a log control)
-
-## 7. Smoke check without the phone
-
-```bash
-TOKEN='…'
-URL='https://script.google.com/macros/s/…/exec'
-
-# Do not use `-X POST` with `-L`: that forces POST on the echo hop and returns 405.
-curl -sL \
-  -H 'Content-Type: application/json' \
-  -d "{\"token\":\"$TOKEN\",\"action\":\"config\"}" \
-  "$URL"
-```
-
-Apps Script `ContentService` answers the first POST with 302 to
-`script.googleusercontent.com/macros/echo…`. That hop must be a GET. The iOS
-client forces GET on the echo host for that reason.
+- Nightly rollup / Sheets (`dailyRollup`, `setupRollup`) — rollup stays on Apps Script
+- PLAN editing by hand
+- `removeCategory` (editor-only)
+- Widgets, Watch, App Store

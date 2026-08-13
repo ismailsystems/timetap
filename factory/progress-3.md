@@ -1,5 +1,47 @@
 # Progress — Path 3 (SwiftUI writes Calendar itself)
 
+## RUN SUMMARY
+
+Outcome: **all remaining tasks C1–D2 done.** Stages A–D complete on `path-3-ios`. No parked tasks. Circuit breaker did not fire. GAS 1196 / 0 twice. Lint all clear twice. Headless 31/0 twice. XCTest 86/0 twice on iPhone 17 Pro Max, OS 26.5. Nothing was pushed.
+
+| Task | Status |
+|---|---|
+| A1–B4 | done (prior run) |
+| C1 | done (2 attempts; checker FAIL then PASS) |
+| C2 | done |
+| C3 | done (3 attempts; checker FAIL ×2 on weak asserts, then PASS) |
+| D1 | done |
+| D2 | done |
+
+Parked: none.
+
+Vacuity (five required):
+- A3 omit `colorId` → colour criterion red (`""` ≠ `"9"`); restored.
+- B1 mark regex `[+=\\-]` → `?` parse red (19 fails); restored `[+=\\-?]`.
+- B2 drop already-closed guard → stretch red; restored.
+- B3 skip `if ne != nil return` → 2 `#open`; restored.
+- D2 delete last-write-wins sentence → lint FAIL names `ios/README.md`; restored.
+
+Tier-2 the human still owes (`RUN_LIVE=1` on the iPhone, not overnight):
+- A1 live Sign-In token+scope
+- A2 live calendarList
+- A3 live DW insert
+- A4 leftover API_TOKEN / live HTTPS
+- C3 live phone parity + rollup sees titles
+
+Commands to see it work:
+
+```bash
+node test/tests.js && node test/lint.js
+node test/headless.js
+cd ios && ./scripts/sync-google-config.sh && xcodegen generate
+xcodebuild -scheme TimeTap \
+  -destination 'platform=iOS Simulator,name=iPhone 17 Pro Max,OS=26.5' \
+  test
+```
+
+On a phone: Sign in with Google (GCP `timetap-505402`), pick PLAN/ACTUAL/SITTING, tap DW, check Calendar. Do not paste `API_TOKEN` or an `/exec` URL.
+
 Branch: `path-3-ios`
 Handoff: `factory/HANDOFF-3.md`
 Baseline (2026-08-12, `main` at `1f84fce`): **1196 passed / 0 failed** · lint all clear.
@@ -18,7 +60,7 @@ Baseline (2026-08-12, `main` at `1f84fce`): **1196 passed / 0 failed** · lint a
 | C2 | C | done | 1 | Local addCategory. DEEPREAD from Deep reading. Cap 10. Persist extras. No removeCategory. Code.gs CATEGORIES still six. Checker PASS (cursor-grok-4.6-high-fast). |
 | C3 | C | done | 3 | TapStore clock + fake calendar: DW/MTG/undo/sit/split/recat/note/mark/STOP match B2 writer. Rail UNLOGGED gap. Lunch→UNFILED unreadable. Attempts 1–2 checker FAIL (weak asserts). Attempt 3 PASS (cursor-grok-4.6-high-fast). Tier-2 live skipped. |
 | D1 | D | done | 1 | Settings picker keeps saved IDs; Confirm ACTUAL=a2 used on next insert. Sign-out clears token, IDs survive relaunch. Empty SITTING does not overwrite. No lock. Checker PASS (cursor-grok-4.6-high-fast). |
-| D2 | D | pending | 0 | |
+| D2 | D | done | 1 | Path 3 ios/README.md: OAuth client, URL scheme, Sign-In, picker, last-write-wins, rollup on Apps Script. Lint rules pin last-write-wins + Sign-In. Vacuity: delete last-write-wins → lint FAIL names ios/README.md; restored. Checker PASS (cursor-grok-4.6-high-fast). |
 
 ## Contract additions
 

@@ -609,5 +609,28 @@ if (!fs.existsSync(guidePath)) {
 check('GUIDE.md Part 2 does not present the shelf double-tap as live', guideLive,
   'Part 2 is the record of what was wrong that day; Part 3 is where the shipped fix lives');
 
+/*
+ * Path 3. ios/README.md is the iOS setup. Last-write-wins and Sign-In are the
+ * two sentences that stop a reader from wiring API_TOKEN /exec again, and from
+ * thinking HTML and iPhone are locked. Vacuity: delete last-write-wins, this
+ * rule names ios/README.md, put the sentence back.
+ */
+const iosReadmePath = path.join(ROOT, 'ios/README.md');
+const iosReadme = fs.existsSync(iosReadmePath)
+  ? fs.readFileSync(iosReadmePath, 'utf8') : '';
+const iosWins = [];
+const iosSign = [];
+if (!iosReadme) {
+  iosWins.push('ios/README.md');
+  iosSign.push('ios/README.md');
+} else {
+  if (!/last-write-wins/i.test(iosReadme)) iosWins.push('ios/README.md');
+  if (!/Google Sign-In/i.test(iosReadme)) iosSign.push('ios/README.md');
+}
+check('ios/README.md states last-write-wins', iosWins,
+  'Path 3 accepts last-write-wins between HTML and iPhone; losing that sentence hides the product law');
+check('ios/README.md states Google Sign-In', iosSign,
+  'Path 3 setup is Google Sign-In; losing that sentence sends the reader back to a token form');
+
 console.log(fails ? '\n' + fails + ' failed\n' : '\nall clear\n');
 process.exit(fails ? 1 : 0);
