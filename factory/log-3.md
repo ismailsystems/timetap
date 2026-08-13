@@ -1,5 +1,7 @@
 # Log — Path 3
 
+## [2026-08-12 22:52] B4 | getState returns ServerState from FakeCalendar. Lunch→UNFILED. Read error throws. checker: cursor-grok-4.5-high PASS. GAS 1196. Stage B complete.
+
 ## [2026-08-12 22:46] B3 | undoSwitch + staleGuard America/Chicago. Vacuity: skip ne-return → testUndoSwitchOvertakenDoesNotReopen red (2 #open); restored. checker: cursor-grok-4.5-high PASS. GAS 1196.
 
 ## [2026-08-12 22:40] B2 | ApplyOps ports open/close/split/sit ops on FakeCalendar. Vacuity: already-closed guard off → testAlreadyClosedDoesNotStretch red; restored. checker: cursor-grok-4.5-high PASS. GAS 1196.

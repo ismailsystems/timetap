@@ -13,7 +13,7 @@ Baseline (2026-08-12, `main` at `1f84fce`): **1196 passed / 0 failed** · lint a
 | B1 | B | done | 1 | Swift Grammar matches Code.gs titles/colours/desc. Vacuity: `[+=\\-]` → ? parse red (19 fails); restored. Checker PASS. HANDOFF `??` sentence is stale; GAS 41d wins. |
 | B2 | B | done | 1 | ApplyOps against FakeCalendar. Vacuity: drop already-closed guard → stretch red (1700010800000 ≠ 1700003600000); restored. Checker PASS. |
 | B3 | B | done | 1 | undoSwitch + staleGuard Chicago. Vacuity: skip `if ne != nil return` → overtaken test red (2 #open); restored. Checker PASS. MISTAP 20s not HANDOFF 30s. |
-| B4 | B | pending | 0 | |
+| B4 | B | done | 1 | getState: findOpen + staleGuard + today. Lunch → UNFILED. Read error throws. Checker PASS. today skips UNLOGGED (GAS). |
 | C1 | C | pending | 0 | |
 | C2 | C | pending | 0 | |
 | C3 | C | pending | 0 | |
@@ -24,6 +24,7 @@ Baseline (2026-08-12, `main` at `1f84fce`): **1196 passed / 0 failed** · lint a
 
 - B1 `DW: memo ??`: HANDOFF says mark `?` / text `memo ?`. Code.gs `MARK_TAIL_RE_` and `test/tests.js` 41d say mark null / text `memo ??`. GAS is the spec; Swift matches 41d.
 - B3 fresh-open: HANDOFF says 30s across midnight stays open. Code.gs uses `age < MISTAP_SECONDS` (20s). Swift matches GAS.
+- B4 stale today: HANDOFF says today includes the `?` block and UNLOGGED. GAS skips UNLOGGED and a block that ends at local midnight. Swift matches GAS.
 
 ## Parked tasks
 

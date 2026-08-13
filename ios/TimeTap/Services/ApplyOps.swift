@@ -5,6 +5,7 @@ enum ApplyOps {
     static var actual: FakeCalendar?
     static var sitting: FakeCalendar?
     static var timeZone = TimeZone.current
+    static var readError: String?
     static let msMin: Double = 60_000
     static let msHour: Double = 3_600_000
 
@@ -13,6 +14,7 @@ enum ApplyOps {
         actual = nil
         sitting = nil
         timeZone = TimeZone.current
+        readError = nil
     }
 
     static func apply(_ ops: [Op]) -> ApplyResult {
@@ -32,6 +34,40 @@ enum ApplyOps {
             }
         }
         return out
+    }
+
+    enum ReadError: Error {
+        case calendar(String)
+    }
+
+    static func getState() throws -> ServerState {
+        if let readError { throw ReadError.calendar(readError) }
+        guard let ca = actual, let cs = sitting else {
+            throw ReadError.calendar("calendars missing")
+        }
+        var evA = findOpen(ca)
+        evA = staleGuard(ca, evA, isActual: true)
+        var open: OpenBlock?
+        if let evA {
+            let p = Grammar.parseTitle(evA.title)
+                ?? ParsedTitle(key: TT.unfiledKey, text: evA.title, mark: nil)
+            open = OpenBlock(ref: refOf(evA), key: p.key, text: p.text, startMs: evA.startMs)
+        }
+        let dayLo = localMidnightMs(nowMs)
+        let dayHi = addLocalDays(dayLo, 1)
+        let today: [TodayBlock] = ca.events(from: dayLo, to: dayHi).compactMap { e in
+            let q = Grammar.parseTitle(e.title)
+            if q?.key == "UNLOGGED" { return nil }
+            if let evA, e.startMs == evA.startMs { return nil }
+            return TodayBlock(key: q?.key ?? TT.unfiledKey, startMs: e.startMs, endMs: e.endMs)
+        }
+        var evS = findOpen(cs)
+        evS = staleGuard(cs, evS, isActual: false)
+        let sit: SitBlock? = evS.map { SitBlock(ref: refOf($0), startMs: $0.startMs) }
+        return ServerState(
+            nowMs: nowMs, tz: timeZone.identifier, open: open, sit: sit,
+            notes: [], today: today
+        )
     }
 
     static func valid(_ op: Op) -> Bool {

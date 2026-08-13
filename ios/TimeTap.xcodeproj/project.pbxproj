@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		02FC0D91E87A14D4F678123C /* SplitSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 47B9719A4D5ACAE3A65E08CB /* SplitSheet.swift */; };
+		036E218AE8B64A72E79FA10F /* B4Tests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A110EC0051A7A1D87110C352 /* B4Tests.swift */; };
 		099D42E94F480B0F26A3C5B9 /* B3Tests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 18B8279D8F1187956ABD0783 /* B3Tests.swift */; };
 		155752CD3F60C3AC82969373 /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4E7744EE4EAB4173F4B3D188 /* Models.swift */; };
 		2D0897E0A6B3231F37BEB32F /* A4Tests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 72AB36F224AB7588E53018B4 /* A4Tests.swift */; };
@@ -71,6 +72,7 @@
 		92673D20F168B38B293C621F /* Format.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Format.swift; sourceTree = "<group>"; };
 		979753C469BB46C427293E02 /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
 		9D9D4875A281E3F960C3A7CD /* Grammar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Grammar.swift; sourceTree = "<group>"; };
+		A110EC0051A7A1D87110C352 /* B4Tests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = B4Tests.swift; sourceTree = "<group>"; };
 		B1FF4806EEB7A5DA1B512B3C /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		C85019F7B88C8EE4DFBE85A0 /* TapStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TapStore.swift; sourceTree = "<group>"; };
 		CAAA7DE9DBBAA54C77A78BD0 /* TimeTapTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = TimeTapTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -157,6 +159,7 @@
 				D943F9A6CAF5F4D8B8DCC048 /* B1Tests.swift */,
 				0D151859F57377AEC8118124 /* B2Tests.swift */,
 				18B8279D8F1187956ABD0783 /* B3Tests.swift */,
+				A110EC0051A7A1D87110C352 /* B4Tests.swift */,
 			);
 			path = TimeTapTests;
 			sourceTree = "<group>";
@@ -292,6 +295,7 @@
 				2FB00CD640D7409118A8E4E2 /* B1Tests.swift in Sources */,
 				581EFFC879088FD71F1DC717 /* B2Tests.swift in Sources */,
 				099D42E94F480B0F26A3C5B9 /* B3Tests.swift in Sources */,
+				036E218AE8B64A72E79FA10F /* B4Tests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
