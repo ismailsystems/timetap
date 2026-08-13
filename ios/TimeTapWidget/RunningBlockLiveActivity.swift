@@ -27,10 +27,10 @@ struct RunningBlockLiveActivity: Widget {
                     .padding(.horizontal, 10)
                 }
             } compactLeading: {
-                islandBlock(context.state, nameSize: 10, timeSize: 12, timeWidth: 54)
+                IslandCompact.islandBlock(context.state, nameSize: 10, timeSize: 12, timeWidth: 54)
                     .padding(.leading, 8)
             } compactTrailing: {
-                islandPosture(context.state, nameSize: 10, timeSize: 12, timeWidth: 54)
+                IslandCompact.islandPosture(context.state, nameSize: 10, timeSize: 12, timeWidth: 54)
                     .padding(.trailing, 8)
             } minimal: {
                 if context.state.hasBlock {
@@ -82,15 +82,7 @@ struct RunningBlockLiveActivity: Widget {
         timeWidth: CGFloat
     ) -> some View {
         if state.hasBlock {
-            VStack(alignment: .leading, spacing: 0) {
-                faceLabel(state.face ?? "", size: nameSize)
-                    .frame(width: timeWidth, alignment: .leading)
-                if let range = state.timerRange {
-                    elapsed(range, size: timeSize, width: timeWidth, align: .leading)
-                }
-            }
-            .frame(width: timeWidth, alignment: .leading)
-            .clipped()
+            IslandCompact.islandBlock(state, nameSize: nameSize, timeSize: timeSize, timeWidth: timeWidth)
         } else {
             Color.clear.frame(width: 1, height: 1)
         }
@@ -103,7 +95,7 @@ struct RunningBlockLiveActivity: Widget {
         timeWidth: CGFloat
     ) -> some View {
         VStack(alignment: .trailing, spacing: 0) {
-            Text(verbatim: state.sitting ? "SITTING" : "STANDING")
+            Text(verbatim: state.sitting ? "SITTING" : "NOT SITTING")
                 .font(.system(size: nameSize, weight: .black))
                 .foregroundStyle(Theme.fg)
                 .lineLimit(1)

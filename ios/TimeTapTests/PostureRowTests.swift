@@ -15,13 +15,14 @@ final class PostureRowTests: TimeTapTestCase {
         let text = try captureText()
         let body = try sitChipBody(in: text)
         XCTAssertTrue(
-            body.contains("\"STANDING\""),
-            "idle sit chip must say STANDING"
+            body.contains("\"NOT SITTING\""),
+            "idle sit chip must say NOT SITTING"
         )
         XCTAssertTrue(
-            body.contains("sitting ? \"SITTING\" : \"STANDING\""),
-            "idle (not sitting) label is STANDING"
+            body.contains("sitting ? \"SITTING\" : \"NOT SITTING\""),
+            "idle (not sitting) label is NOT SITTING"
         )
+        XCTAssertFalse(body.contains("STANDING"), "sit chip must not say STANDING")
         XCTAssertFalse(
             text.contains("TAP TO SIT"),
             "idle sit must never say TAP TO SIT"
@@ -35,7 +36,7 @@ final class PostureRowTests: TimeTapTestCase {
             "sitting chip must say SITTING"
         )
         XCTAssertTrue(
-            body.contains("sitting ? \"SITTING\" : \"STANDING\""),
+            body.contains("sitting ? \"SITTING\" : \"NOT SITTING\""),
             "sitting label is SITTING"
         )
     }

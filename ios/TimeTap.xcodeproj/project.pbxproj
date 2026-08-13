@@ -12,6 +12,7 @@
 		03749D68D801BE2CDF6B7AA3 /* R7Tests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 50A1BD01C683FF67F8F298F1 /* R7Tests.swift */; };
 		06778033684CE4B834E03DFA /* NowPanelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D740D026C2724E59E51C467 /* NowPanelTests.swift */; };
 		099D42E94F480B0F26A3C5B9 /* B3Tests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 18B8279D8F1187956ABD0783 /* B3Tests.swift */; };
+		0CB4DD25A6E542AE087FE070 /* IslandCompactLayoutTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D565856237848B63734F222E /* IslandCompactLayoutTests.swift */; };
 		0CEC9C9EB6392DBAD6FA0167 /* RunningBlockAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6905879EA2B4015915ED6D85 /* RunningBlockAttributes.swift */; };
 		155752CD3F60C3AC82969373 /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4E7744EE4EAB4173F4B3D188 /* Models.swift */; };
 		2D0897E0A6B3231F37BEB32F /* A4Tests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 72AB36F224AB7588E53018B4 /* A4Tests.swift */; };
@@ -20,6 +21,7 @@
 		2FC7B8D83007D33089079266 /* CaptureLayoutTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 916221A5EC9C0A87ECE13B28 /* CaptureLayoutTests.swift */; };
 		35470FB9689707A27867C3C0 /* RunningBlockIntents.swift in Sources */ = {isa = PBXBuildFile; fileRef = 039CE5BB1C222A62B5E31C03 /* RunningBlockIntents.swift */; };
 		3BE07A0305050503BCA5CE8D /* SitEditSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = CF45FF913A460C9661EDF34B /* SitEditSheet.swift */; };
+		3CAC6B775714033E3E41F3A9 /* IslandCompact.swift in Sources */ = {isa = PBXBuildFile; fileRef = 07EB54A6808D250C34B80A28 /* IslandCompact.swift */; };
 		3D742B0CFBC1B8A0D3969583 /* A3Tests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 416881FDA0DDE709D21E55C3 /* A3Tests.swift */; };
 		40D059EFA67A504708D25447 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = F480CE7080FAF633ABD17E01 /* Assets.xcassets */; };
 		432271095523E83E5D0BB366 /* TimeTapWidget.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = D5D9AC587B12850A2BC55FC7 /* TimeTapWidget.appex */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
@@ -40,15 +42,18 @@
 		8932106E4F3D829158AF1A70 /* RunningBlockLiveActivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = D718D6E99F21872C9D001A1E /* RunningBlockLiveActivity.swift */; };
 		8B9BCD03171BB47A1FDDA0B8 /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 979753C469BB46C427293E02 /* RootView.swift */; };
 		8CC4CBFD19D775D120BB2467 /* TimeTapTestCase.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A9A5606319F1BD6FBB83147 /* TimeTapTestCase.swift */; };
+		8F9FE98E68ABB3AAAA07D966 /* IslandActivityKitTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1F5930FFC528A2FFBD795210 /* IslandActivityKitTests.swift */; };
 		915AC4EE2BB6C4A81CC5509B /* C1Tests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7609C6A77691CD52326C9F36 /* C1Tests.swift */; };
 		9384EB7759FD38EBDABFB323 /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0947EED16A8B40C767B8FA0 /* Theme.swift */; };
 		956E790A0753C11234383A9A /* DayRailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 49092CA9D4C73500509BB649 /* DayRailView.swift */; };
 		9ED3731DEF0BF69D4EAB26A6 /* RunningBlockSync.swift in Sources */ = {isa = PBXBuildFile; fileRef = 73A8E6B72917D588965E13C7 /* RunningBlockSync.swift */; };
 		A0940278920551E0F63C4EC2 /* RailSyncTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB1F0CC73C68335BC4F422A3 /* RailSyncTests.swift */; };
 		A517FED50BB45AFCAD67AC72 /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0947EED16A8B40C767B8FA0 /* Theme.swift */; };
+		A89B3764F7528E571B00FF36 /* IslandWidgetProcessTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E040026C39B4785B31695C2A /* IslandWidgetProcessTests.swift */; };
 		AF5D10E1A87E27D14D970B6D /* CaptureChromeUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 985589721A894348CA376DA2 /* CaptureChromeUITests.swift */; };
 		B33172D73E144F82411C4E10 /* PostureRowTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E953503CB9FB2A7BF36BFA9C /* PostureRowTests.swift */; };
 		BBE466DE1345E22BC5700126 /* TapStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = C85019F7B88C8EE4DFBE85A0 /* TapStore.swift */; };
+		C6C0E7812A05BD6D1E37CFDE /* IslandCompact.swift in Sources */ = {isa = PBXBuildFile; fileRef = 07EB54A6808D250C34B80A28 /* IslandCompact.swift */; };
 		CED4B51392FE19FAA6469E64 /* LAIslandTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = ACACF2CAA54ADB3781FFB466 /* LAIslandTests.swift */; };
 		DC1D8DE48367B8E83C66452D /* TimeTapApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6DC9D8FAFE6CD1911BA1BA06 /* TimeTapApp.swift */; };
 		DC693AE87028C02E393735BB /* A2Tests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8126B4FE3CB9C4362805622A /* A2Tests.swift */; };
@@ -105,9 +110,11 @@
 
 /* Begin PBXFileReference section */
 		039CE5BB1C222A62B5E31C03 /* RunningBlockIntents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RunningBlockIntents.swift; sourceTree = "<group>"; };
+		07EB54A6808D250C34B80A28 /* IslandCompact.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IslandCompact.swift; sourceTree = "<group>"; };
 		0C48DCFC2B8F43129B8031AB /* TimeTap.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = TimeTap.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		0D151859F57377AEC8118124 /* B2Tests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = B2Tests.swift; sourceTree = "<group>"; };
 		18B8279D8F1187956ABD0783 /* B3Tests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = B3Tests.swift; sourceTree = "<group>"; };
+		1F5930FFC528A2FFBD795210 /* IslandActivityKitTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IslandActivityKitTests.swift; sourceTree = "<group>"; };
 		202DBF96A0E63CD41E7A516D /* Google.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Google.xcconfig; sourceTree = "<group>"; };
 		2D55675D4A21D2C2D804358B /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		2D740D026C2724E59E51C467 /* NowPanelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NowPanelTests.swift; sourceTree = "<group>"; };
@@ -152,10 +159,12 @@
 		C85019F7B88C8EE4DFBE85A0 /* TapStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TapStore.swift; sourceTree = "<group>"; };
 		CAAA7DE9DBBAA54C77A78BD0 /* TimeTapTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = TimeTapTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		CF45FF913A460C9661EDF34B /* SitEditSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SitEditSheet.swift; sourceTree = "<group>"; };
+		D565856237848B63734F222E /* IslandCompactLayoutTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IslandCompactLayoutTests.swift; sourceTree = "<group>"; };
 		D5D9AC587B12850A2BC55FC7 /* TimeTapWidget.appex */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = "wrapper.app-extension"; path = TimeTapWidget.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		D718D6E99F21872C9D001A1E /* RunningBlockLiveActivity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RunningBlockLiveActivity.swift; sourceTree = "<group>"; };
 		D943F9A6CAF5F4D8B8DCC048 /* B1Tests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = B1Tests.swift; sourceTree = "<group>"; };
 		DD80F6B3006ACF8E61D20600 /* TimeTapWidgetBundle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimeTapWidgetBundle.swift; sourceTree = "<group>"; };
+		E040026C39B4785B31695C2A /* IslandWidgetProcessTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IslandWidgetProcessTests.swift; sourceTree = "<group>"; };
 		E953503CB9FB2A7BF36BFA9C /* PostureRowTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PostureRowTests.swift; sourceTree = "<group>"; };
 		EC2416C4707736A43FD2ACF6 /* Credentials.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Credentials.swift; sourceTree = "<group>"; };
 		F0947EED16A8B40C767B8FA0 /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
@@ -213,6 +222,7 @@
 			isa = PBXGroup;
 			children = (
 				89D4E7C3B275598E24D369B8 /* ElapsedTimer.swift */,
+				07EB54A6808D250C34B80A28 /* IslandCompact.swift */,
 				6905879EA2B4015915ED6D85 /* RunningBlockAttributes.swift */,
 				039CE5BB1C222A62B5E31C03 /* RunningBlockIntents.swift */,
 				73A8E6B72917D588965E13C7 /* RunningBlockSync.swift */,
@@ -278,6 +288,9 @@
 				916221A5EC9C0A87ECE13B28 /* CaptureLayoutTests.swift */,
 				62372ECAE115ACC89B6A24D3 /* D1Tests.swift */,
 				5E8BF97CDBFD4A1958452544 /* D2Tests.swift */,
+				1F5930FFC528A2FFBD795210 /* IslandActivityKitTests.swift */,
+				D565856237848B63734F222E /* IslandCompactLayoutTests.swift */,
+				E040026C39B4785B31695C2A /* IslandWidgetProcessTests.swift */,
 				947854D364BF09E649B58C60 /* LAContractTests.swift */,
 				ACACF2CAA54ADB3781FFB466 /* LAIslandTests.swift */,
 				F30FBDC97A8B85EE5378C6E7 /* LASyncTests.swift */,
@@ -487,6 +500,9 @@
 				2FC7B8D83007D33089079266 /* CaptureLayoutTests.swift in Sources */,
 				2EA116BE2281759FD8359C24 /* D1Tests.swift in Sources */,
 				FF50CD03EC10A6DA85165BC4 /* D2Tests.swift in Sources */,
+				8F9FE98E68ABB3AAAA07D966 /* IslandActivityKitTests.swift in Sources */,
+				0CB4DD25A6E542AE087FE070 /* IslandCompactLayoutTests.swift in Sources */,
+				A89B3764F7528E571B00FF36 /* IslandWidgetProcessTests.swift in Sources */,
 				76714B8B45CC80A8FD787338 /* LAContractTests.swift in Sources */,
 				CED4B51392FE19FAA6469E64 /* LAIslandTests.swift in Sources */,
 				6C1626B3B6E0ECE23BB71658 /* LASyncTests.swift in Sources */,
@@ -514,6 +530,7 @@
 				674A0AB9AE587F11D9091E36 /* Format.swift in Sources */,
 				46EAECF479D1F77CC70D37E8 /* GoogleAuth.swift in Sources */,
 				DD873BAE5377A7AABBAC7D34 /* Grammar.swift in Sources */,
+				C6C0E7812A05BD6D1E37CFDE /* IslandCompact.swift in Sources */,
 				155752CD3F60C3AC82969373 /* Models.swift in Sources */,
 				8B9BCD03171BB47A1FDDA0B8 /* RootView.swift in Sources */,
 				E9690D9084C34359B2CA4BE0 /* RunningBlockAttributes.swift in Sources */,
@@ -534,6 +551,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				771F53452D9A17420293FDCD /* ElapsedTimer.swift in Sources */,
+				3CAC6B775714033E3E41F3A9 /* IslandCompact.swift in Sources */,
 				0CEC9C9EB6392DBAD6FA0167 /* RunningBlockAttributes.swift in Sources */,
 				35470FB9689707A27867C3C0 /* RunningBlockIntents.swift in Sources */,
 				8932106E4F3D829158AF1A70 /* RunningBlockLiveActivity.swift in Sources */,

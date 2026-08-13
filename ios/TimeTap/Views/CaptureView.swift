@@ -445,7 +445,7 @@ struct CaptureView: View {
                     .foregroundStyle(Theme.fg)
                     .frame(width: 18, height: 18)
                     .accessibilityHidden(true)
-                Text(sitting ? "SITTING" : "STANDING")
+                Text(sitting ? "SITTING" : "NOT SITTING")
                     .font(Theme.font(20, weight: .semibold))
                     .fontWidth(.standard)
                     .lineLimit(1)
@@ -468,12 +468,12 @@ struct CaptureView: View {
         .buttonStyle(.plain)
         .accessibilityIdentifier("sitChip")
         .accessibilityAddTraits(.isSelected)
-        .accessibilityValue(sitting ? "SITTING" : "STANDING")
-        .accessibilityLabel(sitting ? "Sitting for \(postureElapsed)" : "Standing for \(postureElapsed)")
+        .accessibilityValue(sitting ? "SITTING" : "NOT SITTING")
+        .accessibilityLabel(sitting ? "Sitting for \(postureElapsed)" : "Not sitting for \(postureElapsed)")
         .accessibilityHint(
             sitting
-                ? "Stops sitting and starts standing. Long press to adjust when sitting started."
-                : "Stops standing and starts sitting"
+                ? "Stops sitting. Long press to adjust when sitting started."
+                : "Starts sitting"
         )
         .contextMenu {
             if sitting {

@@ -10,73 +10,68 @@ final class LASyncTests: TimeTapTestCase {
     }
 
     func testApplySourcePinsLifecycle() throws {
-        let apply = try sliceFunction(
-            readIOS("TimeTap/LiveActivity/RunningBlockSync.swift"),
-            named: "static func apply("
+        let text = try readIOS("TimeTap/LiveActivity/RunningBlockSync.swift")
+        XCTAssertTrue(text.contains("protocol LiveActivityRuntime"), "apply must go through a testable runtime")
+        XCTAssertTrue(
+            text.contains("struct ActivityKitLiveActivityRuntime"),
+            "production must still talk to ActivityKit"
         )
         XCTAssertTrue(
-            apply.contains("guard ActivityAuthorizationInfo().areActivitiesEnabled else { return }"),
+            text.contains("nonisolated(unsafe) static var runtime"),
+            "tests replace RunningBlockSync.runtime"
+        )
+        XCTAssertTrue(
+            text.contains("ActivityKitLiveActivityRuntime()"),
+            "default runtime is ActivityKit"
+        )
+        XCTAssertTrue(
+            text.contains("await apply(state, runtime: runtime)"),
+            "apply(_:) must forward to the injected runtime"
+        )
+        XCTAssertTrue(
+            text.contains("guard runtime.areEnabled else { return }"),
             "apply must bail when Live Activities are off"
         )
-        XCTAssertLessThan(
-            try range(apply, "areActivitiesEnabled").lowerBound,
-            try range(apply, "if let state").lowerBound,
-            "disabled devices must bail before update or request"
-        )
-        XCTAssertTrue(apply.contains("if let state"), "non-nil state updates or requests")
         XCTAssertTrue(
-            apply.contains("current.activityState == .active"),
-            "an active Live Activity must be updated"
-        )
-        XCTAssertTrue(
-            apply.contains("current.activityState == .stale"),
-            "a stale Live Activity must be updated"
-        )
-        XCTAssertTrue(
-            apply.contains(".active || current.activityState == .stale"),
+            text.contains("current.state == .active || current.state == .stale"),
             "active or stale is the update path"
         )
         XCTAssertTrue(
-            apply.contains("await current.update(content)"),
+            text.contains("await runtime.update(id: current.id, state: state)"),
             "active/stale path must update the first activity"
         )
         XCTAssertTrue(
-            apply.contains("existing.dropFirst()"),
+            text.contains("existing.dropFirst()"),
             "update path must end extra activities"
         )
         XCTAssertTrue(
-            apply.contains("attributes: RunningBlockAttributes()"),
-            "request uses RunningBlockAttributes()"
+            text.contains("try await runtime.request(state)"),
+            "missing activity must request"
         )
-        XCTAssertTrue(apply.contains("pushType: nil"), "request must not use a push type")
-        XCTAssertEqual(
-            apply.components(separatedBy: "Activity.request").count - 1,
-            2,
+        XCTAssertTrue(
+            text.contains("try? await runtime.request(state)"),
             "request must catch and retry once"
         )
-        XCTAssertTrue(apply.contains("} catch {"), "missing request must retry in catch")
+        XCTAssertTrue(text.contains("} catch {"), "missing request must retry in catch")
+        XCTAssertTrue(text.contains("pushType: nil"), "request must not use a push type")
+        XCTAssertTrue(text.contains("staleDate: nil"), "we do not mark our own 8h stale")
         XCTAssertTrue(
-            apply.contains("try? await Activity.request("),
-            "retry request must be try?"
-        )
-        XCTAssertLessThan(
-            try range(apply, "for extra in existing").lowerBound,
-            try range(apply, "Activity.request").lowerBound,
-            "leftovers must end before Activity.request"
-        )
-        XCTAssertEqual(
-            apply.components(separatedBy: "dismissalPolicy: .immediate").count - 1,
-            3,
-            "extras, leftovers, and nil state must all end immediately"
+            text.contains("dismissalPolicy: .immediate"),
+            "end must dismiss immediately"
         )
         XCTAssertTrue(
-            apply.contains("for activity in Activity<RunningBlockAttributes>.activities"),
-            "nil state must end every activity"
+            text.contains("Activity.request"),
+            "ActivityKit adapter still calls Activity.request"
         )
         XCTAssertLessThan(
-            try range(apply, "if let state").lowerBound,
-            try range(apply, "for activity in Activity<RunningBlockAttributes>.activities").lowerBound,
-            "nil state is the else of if let state"
+            try range(text, "guard runtime.areEnabled").lowerBound,
+            try range(text, "if let state").lowerBound,
+            "disabled devices must bail before update or request"
+        )
+        XCTAssertLessThan(
+            try range(text, "for extra in existing").lowerBound,
+            try range(text, "runtime.request(state)").lowerBound,
+            "leftovers must end before request"
         )
     }
 

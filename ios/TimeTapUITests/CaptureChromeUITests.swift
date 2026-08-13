@@ -28,13 +28,15 @@ final class CaptureChromeUITests: XCTestCase {
         )
     }
 
-    func testSitChipNamesStanding() {
+    func testSitChipNamesNotSitting() {
         let chip = app.buttons["sitChip"]
         XCTAssertTrue(chip.waitForExistence(timeout: 8), "sit chip is missing")
         let value = (chip.value as? String) ?? chip.label
         XCTAssertTrue(
-            value.contains("STANDING") || value.contains("Standing"),
-            "sit chip must name STANDING, got \(value)"
+            value.localizedCaseInsensitiveContains("NOT SITTING")
+                || value.localizedCaseInsensitiveContains("Not sitting"),
+            "sit chip must name NOT SITTING, got \(value)"
         )
+        XCTAssertFalse(value.localizedCaseInsensitiveContains("STANDING"))
     }
 }

@@ -83,18 +83,31 @@ final class LAIslandTests: TimeTapTestCase {
         XCTAssertTrue(wrapper.contains("ElapsedTimer("), "elapsed() must wrap ElapsedTimer")
     }
 
-    func testPostureNamesStandingOnIslandAndNotSittingOnLockScreen() throws {
+    func testPostureNamesNotSittingWhenIdle() throws {
         let text = try liveActivity()
+        let compact = try String(
+            contentsOf: URL(fileURLWithPath: #filePath)
+                .deletingLastPathComponent()
+                .deletingLastPathComponent()
+                .appendingPathComponent("TimeTap/LiveActivity/IslandCompact.swift"),
+            encoding: .utf8
+        )
         let posture = slice(text, from: "private func islandPosture(", to: "private func sittingRow(")
         let sitting = slice(text, from: "private func sittingRow(", to: "private func faceLabel(")
         XCTAssertTrue(
-            posture.contains("state.sitting ? \"SITTING\" : \"STANDING\""),
-            "compact and expanded right must name STANDING when not sitting"
+            posture.contains("state.sitting ? \"SITTING\" : \"NOT SITTING\""),
+            "expanded right must name NOT SITTING when not sitting"
+        )
+        XCTAssertTrue(
+            compact.contains("state.sitting ? \"SITTING\" : \"NOT SITTING\""),
+            "compact right must name NOT SITTING when not sitting"
         )
         XCTAssertTrue(
             sitting.contains("state.sitting ? \"SITTING\" : \"NOT SITTING\""),
             "lock screen sitting row must name NOT SITTING when not sitting"
         )
+        XCTAssertFalse(text.contains("STANDING"), "Live Activity must not say STANDING")
+        XCTAssertFalse(compact.contains("STANDING"), "compact Island must not say STANDING")
     }
 
     func testLockScreenShowsCategoryBarStopAndAlwaysSittingRow() throws {

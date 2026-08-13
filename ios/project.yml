@@ -55,6 +55,7 @@ targets:
       - path: TimeTap/LiveActivity/RunningBlockAttributes.swift
       - path: TimeTap/LiveActivity/RunningBlockIntents.swift
       - path: TimeTap/LiveActivity/ElapsedTimer.swift
+      - path: TimeTap/LiveActivity/IslandCompact.swift
       - path: TimeTap/Theme.swift
     settings:
       base:
