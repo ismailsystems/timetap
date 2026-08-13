@@ -5,7 +5,7 @@ struct CalendarSummary: Equatable, Identifiable {
     var summary: String
 }
 
-struct CalEvent: Equatable {
+final class CalEvent: Equatable {
     var id: String
     var calendarId: String
     var key: String
@@ -14,6 +14,30 @@ struct CalEvent: Equatable {
     var description: String
     var startMs: Double
     var endMs: Double
+    var isAllDay: Bool
+
+    init(
+        id: String, calendarId: String, key: String, title: String,
+        colorId: String, description: String, startMs: Double, endMs: Double,
+        isAllDay: Bool = false
+    ) {
+        self.id = id
+        self.calendarId = calendarId
+        self.key = key
+        self.title = title
+        self.colorId = colorId
+        self.description = description
+        self.startMs = startMs
+        self.endMs = endMs
+        self.isAllDay = isAllDay
+    }
+
+    static func == (lhs: CalEvent, rhs: CalEvent) -> Bool {
+        lhs.id == rhs.id && lhs.calendarId == rhs.calendarId && lhs.key == rhs.key
+            && lhs.title == rhs.title && lhs.colorId == rhs.colorId
+            && lhs.description == rhs.description && lhs.startMs == rhs.startMs
+            && lhs.endMs == rhs.endMs && lhs.isAllDay == rhs.isAllDay
+    }
 }
 
 final class FakeCalendar {
@@ -25,6 +49,25 @@ final class FakeCalendar {
         lastCalendarId = event.calendarId
         if failInsert { throw CalendarAPIError.insertFailed }
         events.append(event)
+    }
+
+    func events(from lo: Double, to hi: Double) -> [CalEvent] {
+        events.filter { !$0.isAllDay && $0.endMs > lo && $0.startMs < hi }
+            .sorted { $0.startMs < $1.startMs }
+    }
+
+    func createEvent(calendarId: String, title: String, startMs: Double, endMs: Double) -> CalEvent {
+        lastCalendarId = calendarId
+        let ev = CalEvent(
+            id: Op.uid(), calendarId: calendarId, key: "", title: title,
+            colorId: "", description: "", startMs: startMs, endMs: endMs
+        )
+        events.append(ev)
+        return ev
+    }
+
+    func delete(_ ev: CalEvent) {
+        events.removeAll { $0 === ev || $0.id == ev.id }
     }
 }
 

@@ -108,7 +108,7 @@ enum Grammar {
         TT.colorHex[colorId(for: key)] ?? "#616161"
     }
 
-    private static func match(_ pattern: String, _ s: String) -> [String]? {
+    static func match(_ pattern: String, _ s: String) -> [String]? {
         let re = try! NSRegularExpression(pattern: pattern)
         let ns = s as NSString
         guard let m = re.firstMatch(in: s, range: NSRange(location: 0, length: ns.length)) else {

@@ -15,6 +15,7 @@
 		3D742B0CFBC1B8A0D3969583 /* A3Tests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 416881FDA0DDE709D21E55C3 /* A3Tests.swift */; };
 		40D059EFA67A504708D25447 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = F480CE7080FAF633ABD17E01 /* Assets.xcassets */; };
 		46EAECF479D1F77CC70D37E8 /* GoogleAuth.swift in Sources */ = {isa = PBXBuildFile; fileRef = 39244103B3847640AAA55B11 /* GoogleAuth.swift */; };
+		581EFFC879088FD71F1DC717 /* B2Tests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D151859F57377AEC8118124 /* B2Tests.swift */; };
 		58F7E0C393D62920F700C37E /* A1Tests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6C9E642DDAC8A5F6C60D9EF4 /* A1Tests.swift */; };
 		674A0AB9AE587F11D9091E36 /* Format.swift in Sources */ = {isa = PBXBuildFile; fileRef = 92673D20F168B38B293C621F /* Format.swift */; };
 		6815C88AE2DF31036A8B5A8B /* SignInView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6D7B42C20E98A8B8C2475C8B /* SignInView.swift */; };
@@ -29,6 +30,7 @@
 		DC693AE87028C02E393735BB /* A2Tests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8126B4FE3CB9C4362805622A /* A2Tests.swift */; };
 		DD873BAE5377A7AABBAC7D34 /* Grammar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9D9D4875A281E3F960C3A7CD /* Grammar.swift */; };
 		E8C1C00798C335C7959CA6B8 /* Credentials.swift in Sources */ = {isa = PBXBuildFile; fileRef = EC2416C4707736A43FD2ACF6 /* Credentials.swift */; };
+		ED4399E69EE496C6FF815DCD /* ApplyOps.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5D9FAAEA0FBB3106BE727550 /* ApplyOps.swift */; };
 		F0D1D645E73776D17B15A756 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D55675D4A21D2C2D804358B /* SettingsView.swift */; };
 		FAF11E3081864E2D33B11B77 /* CaptureView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 749D803612D26E9D5D20E863 /* CaptureView.swift */; };
 		FE4C16B4DBEA5F7CCA79E6E5 /* DeadLetterSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 67FE41A5E22FCCF25FC6FFDB /* DeadLetterSheet.swift */; };
@@ -46,6 +48,7 @@
 
 /* Begin PBXFileReference section */
 		0C48DCFC2B8F43129B8031AB /* TimeTap.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = TimeTap.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		0D151859F57377AEC8118124 /* B2Tests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = B2Tests.swift; sourceTree = "<group>"; };
 		202DBF96A0E63CD41E7A516D /* Google.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Google.xcconfig; sourceTree = "<group>"; };
 		2D55675D4A21D2C2D804358B /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		31BB6E2F4AC7571D01632124 /* CalendarPickerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalendarPickerView.swift; sourceTree = "<group>"; };
@@ -55,6 +58,7 @@
 		47B9719A4D5ACAE3A65E08CB /* SplitSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SplitSheet.swift; sourceTree = "<group>"; };
 		49092CA9D4C73500509BB649 /* DayRailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DayRailView.swift; sourceTree = "<group>"; };
 		4E7744EE4EAB4173F4B3D188 /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
+		5D9FAAEA0FBB3106BE727550 /* ApplyOps.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ApplyOps.swift; sourceTree = "<group>"; };
 		67FE41A5E22FCCF25FC6FFDB /* DeadLetterSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeadLetterSheet.swift; sourceTree = "<group>"; };
 		6C9E642DDAC8A5F6C60D9EF4 /* A1Tests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = A1Tests.swift; sourceTree = "<group>"; };
 		6D7B42C20E98A8B8C2475C8B /* SignInView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SignInView.swift; sourceTree = "<group>"; };
@@ -122,6 +126,7 @@
 		B4A439978C48A6D87AD9D481 /* Services */ = {
 			isa = PBXGroup;
 			children = (
+				5D9FAAEA0FBB3106BE727550 /* ApplyOps.swift */,
 				46DD023ECACFCEE59D37F58C /* CalendarAPI.swift */,
 				EC2416C4707736A43FD2ACF6 /* Credentials.swift */,
 				39244103B3847640AAA55B11 /* GoogleAuth.swift */,
@@ -148,6 +153,7 @@
 				416881FDA0DDE709D21E55C3 /* A3Tests.swift */,
 				72AB36F224AB7588E53018B4 /* A4Tests.swift */,
 				D943F9A6CAF5F4D8B8DCC048 /* B1Tests.swift */,
+				0D151859F57377AEC8118124 /* B2Tests.swift */,
 			);
 			path = TimeTapTests;
 			sourceTree = "<group>";
@@ -281,6 +287,7 @@
 				3D742B0CFBC1B8A0D3969583 /* A3Tests.swift in Sources */,
 				2D0897E0A6B3231F37BEB32F /* A4Tests.swift in Sources */,
 				2FB00CD640D7409118A8E4E2 /* B1Tests.swift in Sources */,
+				581EFFC879088FD71F1DC717 /* B2Tests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -288,6 +295,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				ED4399E69EE496C6FF815DCD /* ApplyOps.swift in Sources */,
 				6C3F4C2381A713E29945746B /* CalendarAPI.swift in Sources */,
 				6A17E8C8E7A7E5DCEAA82108 /* CalendarPickerView.swift in Sources */,
 				FAF11E3081864E2D33B11B77 /* CaptureView.swift in Sources */,

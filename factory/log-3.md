@@ -1,5 +1,7 @@
 # Log — Path 3
 
+## [2026-08-12 22:40] B2 | ApplyOps ports open/close/split/sit ops on FakeCalendar. Vacuity: already-closed guard off → testAlreadyClosedDoesNotStretch red; restored. checker: cursor-grok-4.5-high PASS. GAS 1196.
+
 ## [2026-08-12 22:33] B1 | Grammar.swift = buildTitle/parseTitle/writeDesc + COLOR_HEX + seed. Golden 35 rows from Code.gs. Vacuity: mark class `[+=\\-]` → testParseTitleQuestionMark + roundtrip red (19); restored `[+=\\-?]`. checker: cursor-grok-4.5-high PASS. GAS 1196.
 
 ## [2026-08-12 22:26] A4 | TimetapAPI gone; configured = Google session + 3 calendar IDs. Attempt 1 checker FAIL (empty grid). Attempt 2: seed DW…FRAG+POOP color 1 #7986cb. GAS 1196 + lint + headless. XCTest green twice. checker: cursor-grok-4.5-high PASS. skipped: A4 live HTTPS.
