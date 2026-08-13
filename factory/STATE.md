@@ -20,12 +20,10 @@ notes: |
   PATH 3 REVIEWED — 2026-08-13.
 
   factory/REVIEW-7.md. Verdict FIX FIRST. GAS 1196 / lint / headless / XCTest
-  86 green twice. Code.gs unharmed. Blocking: empty-queue boot never lists
-  Calendar HTTP; banner is ApplyOps.ReadError error 0; today stays empty.
-  Angle 1 (GPT) independently named that hole, plus cancel/sign-out pinning
-  testHasSession=false. Angle 3 (Opus) added: staleGuard never pushed,
-  extra-category colorId empty, picker trap, SYNCING lie. Mini-handoff
-  P3-R7-1, P3-R7-2, P3-R7-3. Do not ship.
+  86 green twice. Code.gs unharmed. Blocking: boot never lists Calendar;
+  staleGuard never pushed; cancel/sign-out pins testHasSession. Should-fix:
+  extra-category colorId empty, picker trap, SYNCING lie, liveFlush untested,
+  batch HTTP dead-letters the head op. Mini-handoff P3-R7-1/2/3. Do not ship.
 
   ---
   PATH 3 HANDOFF READY — 2026-08-12.

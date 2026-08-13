@@ -8,12 +8,9 @@ Path 3 on `path-3-ios` (`1f84fce..4bd123f`, thirteen task commits A1–D2).
 per-task criteria). `factory/progress-3.md` was treated as a claimed-done list,
 not as proof. `factory/log-3.md` and the commit messages were read only at the
 end. Three independent Task reviewers were launched (GPT 5.6 Sol Max / Fable 5
-Max / Opus 5) and told to stay read-only. Angle 1 (GPT) returned **NOT DONE**.
-Angles 2 and 3 were still running at this amend. Probe mutations to
-`ApplyOps.swift` / `TimeTapApp.swift` / `project.yml` were reverted before the
-numbers below were taken. Every finding that would block, and the two new
-auth findings from angle 1, were reproduced by the orchestrator on the
-restored tree.
+Max / Opus 5) and told to stay read-only. All three returned. Probe mutations
+were reverted before the numbers below were taken. Blocking findings were
+reproduced by the orchestrator on the restored tree.
 
 ---
 
@@ -24,7 +21,7 @@ restored tree.
 | orchestrator | **FIX FIRST** — suite green twice, GAS unharmed; the phone does not read Calendar, and `staleGuard` never writes back |
 | angle 1 (GPT 5.6 Sol Max, contract) | **NOT DONE** — boot-read hole; cancel/sign-out pin the test seam |
 | angle 3 (Claude Opus 5, user-fail) | **FIX FIRST** — same two holes, plus extra-category `colorId ""`, picker trap, and a SYNCING lie |
-| angle 2 | **NOT IN** — still running at this amend |
+| angle 2 (Fable 5 Max, breakage) | **FIX FIRST** — same two holes; `liveFlush`/`pushDiff` have zero tests; a batch HTTP failure dead-letters only the head op |
 
 **The loop built a real Path 3 and it is not finished.** Capture ops, title
 grammar, flush/401/403, add-category, settings, and the README all exist and
@@ -178,6 +175,20 @@ XCTAssertNil failed: "false" - sign-out must not pin testHasSession either
 
 Not a Path 3 regression: the keyboard covers STOP / undo / marks (`CaptureView` `.ignoresSafeArea(.keyboard)`). That file is not in `1f84fce..HEAD`. Report it; do not spend the fix loop on it unless the human asks.
 
+### 11. `liveFlush` / `pushDiff` never run in XCTest
+
+- what happens: Every Swift test sets `GoogleAuth.testHasSession != nil`, so `flushOps` calls `ApplyOps.apply` and never `liveFlush`. The ~150 lines that list a 96-hour window, diff, and DELETE/PATCH/POST have no tier-1 test. Tier-2 live is the first execution.
+- how I proved it: `CalendarAPI.flushOps` 268-273; grep of `TimeTapTests` for `liveFlush` / `pushDiff` is empty. Angle 2.
+- severity: **should fix** (structural). The recovery story (partial push, re-list, apply by `#ref:`) is unproven.
+- suggested next step: A Fake URLSession or recorded HTTP seam that drives `pushDiff` without Google. Do not wait for `RUN_LIVE=1` to learn the diff engine is wrong.
+
+### 12. A whole-batch HTTP failure charges tries to `queue.first` only
+
+- what happens: 403/429/5xx call `quarantine` with `queue.first?.id` (`flushAsync` 748-752). Five transport failures (~2 min backoff) dead-letter the head op and can clear the running block, while later ops in the same batch were never attempted.
+- how I proved it: `quarantine` 770-776 vs the HTTP catch that passes only the first id. Angle 2.
+- severity: **should fix**
+- suggested next step: Count a transport failure against the flush, not against one op, or charge every op in the batch. Decision 3 below.
+
 ---
 
 ## Parked work
@@ -209,8 +220,10 @@ Those skips are honest. They are not a pass. Finding 1 is not in that list — i
 
 ## Decisions for you
 
-1. **Fix the boot read and the unpushed `staleGuard` before daily use?** Recommendation: fix. The contract already says the phone ports `staleGuard_`. Computing `?` / `UNLOGGED` in memory and throwing them away is worse than leaving that work on Apps Script.
-2. **Run the five tier-2 live checks on the iPhone after those reads write, not before.** A live DW insert today would write; it would not prove the rail or the overnight bound.
+1. **Fix the boot read and the unpushed `staleGuard` before daily use?** Recommendation: fix. The contract already says the phone ports `staleGuard_`. Computing `?` / `UNLOGGED` in memory and throwing them away is worse than leaving that work on Apps Script. A dedicated HTTP `getState` that also pushes bounds is a write-on-read; that is intended, not a new product.
+2. **Run the five tier-2 live checks on the iPhone after those reads write, not before.** A live DW insert today would write; it would not prove the rail or the overnight bound. Those checks are also the first run of `liveFlush`.
+3. **Five 5xx flushes (~2 min) dead-letter the head tap and clear the running block.** Accept that (contract 21 as written), or count tries only for per-op rejects. Recommendation: keep 21 for 403; do not let a transport outage delete the open block.
+4. **Ratify the three GAS-wins "Contract additions"** (`??` parse, MISTAP 20s, `today` skips UNLOGGED). The code follows `Code.gs`. The handoff letter said PARK. Recommendation: ratify them as amendments so the next review does not re-litigate.
 
 ---
 
