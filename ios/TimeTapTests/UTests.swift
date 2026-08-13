@@ -36,7 +36,32 @@ final class UTests: TimeTapTestCase {
         )
         XCTAssertFalse(text.contains("Button(\"Done\")"), "keyboard Done bar is back")
         XCTAssertFalse(text.contains("axis: .vertical"), "note field must stay single-line so the key is Done")
-        XCTAssertTrue(text.contains("if store.open != nil"), "note field must hide when nothing is running")
+        XCTAssertTrue(text.contains("showNoteField"), "note field must hide when idle or when a note is already set")
+        XCTAssertTrue(text.contains("if let banner = store.banner"), "banner must stay in CaptureView")
+        XCTAssertTrue(text.contains("multilineTextAlignment(.center)"), "banner must be centered at the top")
+        XCTAssertTrue(text.contains("face: \"New\""), "ADD must be New and at the top of the list")
+        XCTAssertFalse(text.contains("face: \"ADD\""), "ADD label is back")
+    }
+
+    func testOpenBlockNoteShowsOnTheRail() {
+        GoogleAuth.testHasSession = true
+        GoogleAuth.testAccessToken = "t"
+        Credentials.planId = "p1"
+        Credentials.actualId = "a1"
+        Credentials.sittingId = "s1"
+        var now: Double = 1_700_000_000_000
+        let store = TapStore()
+        store.clock = { now }
+        store.tapCategory("MTG")
+        store.noteChanged("Poop")
+        now += 60_000
+        let (_, items) = store.railItems(budget: 400, now: now)
+        XCTAssertEqual(items.first { $0.isOpen }?.note, "Poop")
+        now += 300
+        store.tapCategory("DW")
+        now += 60_000
+        let (_, after) = store.railItems(budget: 400, now: now)
+        XCTAssertEqual(after.first { $0.name == "MEETINGS" }?.note, "Poop")
     }
 
     func testSplitChipIsTheOnlyOpenSplitControl() throws {

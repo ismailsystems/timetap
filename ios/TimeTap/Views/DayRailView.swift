@@ -3,6 +3,8 @@ import SwiftUI
 struct DayRailView: View {
     @EnvironmentObject private var store: TapStore
     let tick: Date
+    var onOpenTap: () -> Void = {}
+    var onOtherTap: () -> Void = {}
 
     var body: some View {
         let _ = tick
@@ -17,16 +19,24 @@ struct DayRailView: View {
                     .minimumScaleFactor(0.7)
                 VStack(spacing: 0) {
                     ForEach(rail.items) { item in
-                        HStack(spacing: 4) {
-                            Text(item.name)
-                                .font(.system(size: 9, weight: .bold))
-                                .lineLimit(1)
-                            Spacer(minLength: 0)
-                            Text(Format.shortElapsed(item.ms))
-                                .font(.system(size: 9, weight: .bold).monospacedDigit())
+                        VStack(alignment: .leading, spacing: 2) {
+                            HStack(spacing: 4) {
+                                Text(item.name)
+                                    .font(.system(size: 9, weight: .bold))
+                                    .lineLimit(1)
+                                Spacer(minLength: 0)
+                                Text(Format.shortElapsed(item.ms))
+                                    .font(.system(size: 9, weight: .bold).monospacedDigit())
+                            }
+                            if !item.note.isEmpty {
+                                Text(item.note)
+                                    .font(.system(size: 9, weight: .semibold))
+                                    .lineLimit(2)
+                            }
                         }
                         .padding(.horizontal, 6)
-                        .frame(height: item.height, alignment: .center)
+                        .padding(.vertical, item.note.isEmpty ? 0 : 4)
+                        .frame(height: item.height, alignment: item.note.isEmpty ? .center : .top)
                         .foregroundStyle(item.isGap ? Theme.mute : .white)
                         .background {
                             if item.isGap {
@@ -43,6 +53,10 @@ struct DayRailView: View {
                             }
                         }
                         .clipped()
+                        .contentShape(Rectangle())
+                        .onTapGesture {
+                            if item.isOpen { onOpenTap() } else { onOtherTap() }
+                        }
                     }
                 }
             }

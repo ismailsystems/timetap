@@ -8,6 +8,7 @@ struct CaptureView: View {
     @State private var naming = false
     @State private var addDraft = ""
     @State private var catWidth: CGFloat = 96
+    @State private var editingNote = false
     @FocusState private var focus: Field?
 
     private enum Field: Hashable { case note, add }
@@ -17,18 +18,36 @@ struct CaptureView: View {
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
+                if let banner = store.banner {
+                    Button {
+                        store.openDeadDrawer()
+                    } label: {
+                        Text(banner)
+                            .font(.system(size: 11, weight: .bold))
+                            .foregroundStyle(Theme.accentOn)
+                            .multilineTextAlignment(.center)
+                            .frame(maxWidth: .infinity, alignment: .center)
+                            .padding(.horizontal, 18)
+                            .padding(.vertical, 8)
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(store.deadCount == 0)
+                    .accessibilityLabel(banner)
+                }
                 nowPanel
                 GeometryReader { geo in
                     let screen = geo.size.width > 1 ? geo.size.width : UIScreen.main.bounds.width
                     let catW = min(max(catWidth + 24, 128), screen * 0.67)
                     HStack(spacing: 0) {
-                        DayRailView(tick: tick)
+                        DayRailView(
+                            tick: tick,
+                            onOpenTap: beginNoteEdit,
+                            onOtherTap: finishNoteEdit
+                        )
                             .frame(maxWidth: .infinity)
                             .clipped()
                             .accessibilityElement(children: .contain)
                             .accessibilityLabel("Day rail")
-                            .contentShape(Rectangle())
-                            .onTapGesture { focus = nil }
                             .overlay(alignment: .trailing) {
                                 Rectangle().fill(Theme.rule2).frame(width: 2)
                             }
@@ -47,6 +66,7 @@ struct CaptureView: View {
         }
         .onReceive(timer) { tick = $0 }
         .onChange(of: store.open?.ref) { _, _ in
+            editingNote = false
             if focus != .note {
                 noteDraft = store.open?.text ?? ""
             }
@@ -71,71 +91,72 @@ struct CaptureView: View {
 
     private var nowPanel: some View {
         VStack(alignment: .leading, spacing: 0) {
-            VStack(alignment: .leading, spacing: 0) {
-                HStack {
-                    Text(store.nowKick)
+            HStack(alignment: .firstTextBaseline) {
+                Text(store.nowKick)
+                    .font(.system(size: 10, weight: .bold))
+                    .tracking(1.0)
+                    .foregroundStyle(Theme.dim)
+                    .lineLimit(2)
+                    .minimumScaleFactor(0.8)
+                Spacer(minLength: 8)
+                Button {
+                    finishNoteEdit()
+                    store.showSettings = true
+                } label: {
+                    Text(store.syncLabel)
                         .font(.system(size: 10, weight: .bold))
-                        .tracking(1.0)
-                        .foregroundStyle(Theme.dim)
+                        .tracking(1.4)
+                        .foregroundStyle(store.syncFailed ? Theme.accentOn : Theme.dim)
+                        .multilineTextAlignment(.trailing)
                         .lineLimit(2)
                         .minimumScaleFactor(0.8)
-                    Spacer(minLength: 8)
-                    if store.open != nil {
-                        Button {
-                            focus = nil
-                            store.openSplit()
-                        } label: {
-                            Text("TAP TO SPLIT")
-                                .font(.system(size: 9, weight: .bold))
-                                .tracking(1.0)
-                                .foregroundStyle(Theme.mute)
-                        }
-                        .buttonStyle(.plain)
-                        .accessibilityLabel("TAP TO SPLIT")
-                        .accessibilityHint("Opens split sheet")
-                    }
-                }
-                Button {
-                    focus = nil
-                } label: {
-                    VStack(alignment: .leading, spacing: 0) {
-                        Text(store.open.map { store.labelFor($0.key).uppercased() } ?? "NOTHING RUNNING")
-                            .font(.system(size: 32, weight: .black))
-                            .padding(.top, 8)
-                        Text(store.open == nil ? "—" : elapsedLabel)
-                            .font(.system(size: 48, weight: .heavy))
-                            .foregroundStyle(isLong ? Theme.flag : Theme.accentOn)
-                            .monospacedDigit()
-                            .padding(.top, 8)
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel(nowAccessibility)
-                .accessibilityHint("Dismisses the keyboard")
+                .accessibilityLabel(store.syncLabel)
+                .accessibilityHint("Opens settings")
             }
-
+            HStack(alignment: .firstTextBaseline) {
+                Text(store.open.map { store.labelFor($0.key).uppercased() } ?? "NOTHING RUNNING")
+                    .font(.system(size: 32, weight: .black))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.6)
+                Spacer(minLength: 8)
+                if store.open != nil {
+                    Button {
+                        finishNoteEdit()
+                        store.openSplit()
+                    } label: {
+                        Text("TAP TO SPLIT")
+                            .font(.system(size: 9, weight: .bold))
+                            .tracking(1.0)
+                            .foregroundStyle(Theme.mute)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("TAP TO SPLIT")
+                    .accessibilityHint("Opens split sheet")
+                }
+            }
+            .padding(.top, 8)
             Button {
-                focus = nil
-                store.showSettings = true
+                finishNoteEdit()
             } label: {
-                Text(store.syncLabel)
-                    .font(.system(size: 10, weight: .bold))
-                    .tracking(1.4)
-                    .foregroundStyle(store.syncFailed ? Theme.accentOn : Theme.dim)
+                Text(store.open == nil ? "—" : elapsedLabel)
+                    .font(.system(size: 48, weight: .heavy))
+                    .foregroundStyle(isLong ? Theme.flag : Theme.accentOn)
+                    .monospacedDigit()
                     .frame(maxWidth: .infinity, alignment: .leading)
+                    .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .padding(.top, 2)
-            .accessibilityLabel(store.syncLabel)
-            .accessibilityHint("Opens settings")
+            .padding(.top, 8)
+            .accessibilityLabel(nowAccessibility)
+            .accessibilityHint("Dismisses the keyboard")
 
-            if store.open != nil {
+            if showNoteField {
                 TextField("note", text: $noteDraft)
                     .focused($focus, equals: .note)
                     .submitLabel(.done)
-                    .onSubmit { focus = nil }
+                    .onSubmit { finishNoteEdit() }
                     .padding(11)
                     .frame(minHeight: 44)
                     .background(Theme.panel2)
@@ -156,57 +177,64 @@ struct CaptureView: View {
         }
     }
 
+    private var showNoteField: Bool {
+        guard store.open != nil else { return false }
+        if editingNote || focus == .note { return true }
+        return noteDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    private func beginNoteEdit() {
+        guard store.open != nil else { return }
+        editingNote = true
+        focus = .note
+    }
+
+    private func finishNoteEdit() {
+        focus = nil
+        editingNote = false
+    }
+
     private var categoryList: some View {
-        ScrollViewReader { proxy in
-            ScrollView {
-                VStack(alignment: .leading, spacing: 2) {
-                    ForEach(store.categories) { cat in
-                        Button {
-                            focus = nil
-                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                            store.tapCategory(cat.key)
-                        } label: {
-                            categoryRow(face: cat.face, hex: cat.hex, dim: false)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .contentShape(Rectangle())
-                                .background(store.open?.key == cat.key ? Theme.panel : Color.clear)
-                        }
-                        .buttonStyle(.plain)
-                        .accessibilityLabel(cat.face)
-                        .accessibilityAddTraits(store.open?.key == cat.key ? [.isSelected] : [])
-                        .accessibilityValue(store.open?.key == cat.key ? elapsedLabel : "")
-                        .id(cat.key)
+        VStack(alignment: .leading, spacing: 0) {
+            if store.canAddCategory {
+                addRow
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+                    .id("add")
+            } else {
+                Text("That is \(store.config?.maxCategories ?? 10) categories already.")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(Theme.mute)
+                    .padding(.leading, 12)
+                    .padding(.trailing, 16)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+            }
 
-                        Rectangle().fill(Theme.rule2.opacity(0.5)).frame(height: 1)
-                    }
-
-                    if store.canAddCategory {
-                        addRow
-                            .id("add")
-                    } else {
-                        Text("That is \(store.config?.maxCategories ?? 10) categories already.")
-                            .font(.system(size: 12, weight: .semibold))
-                            .foregroundStyle(Theme.mute)
-                            .padding(.leading, 12)
-                            .padding(.trailing, 16)
-                            .padding(.vertical, 10)
-                    }
+            ForEach(store.categories) { cat in
+                Rectangle().fill(Theme.rule2.opacity(0.5)).frame(height: 1)
+                Button {
+                    finishNoteEdit()
+                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                    store.tapCategory(cat.key)
+                } label: {
+                    categoryRow(face: cat.face, hex: cat.hex, dim: false)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+                        .contentShape(Rectangle())
+                        .background(store.open?.key == cat.key ? Theme.panel : Color.clear)
                 }
+                .buttonStyle(.plain)
+                .frame(maxHeight: .infinity)
+                .accessibilityLabel(cat.face)
+                .accessibilityAddTraits(store.open?.key == cat.key ? [.isSelected] : [])
+                .accessibilityValue(store.open?.key == cat.key ? elapsedLabel : "")
+                .id(cat.key)
             }
-            .onChange(of: store.scrollToKey) { _, key in
-                guard let key else { return }
-                withAnimation {
-                    proxy.scrollTo(key, anchor: .center)
-                }
-                store.scrollToKey = nil
-            }
-            .onChange(of: naming) { _, on in
-                if on {
-                    DispatchQueue.main.async {
-                        proxy.scrollTo("add", anchor: .bottom)
-                    }
-                }
-            }
+        }
+        .frame(maxHeight: .infinity)
+        .onChange(of: store.scrollToKey) { _, _ in
+            store.scrollToKey = nil
+        }
+        .onChange(of: naming) { _, on in
+            if on { focus = .add }
         }
     }
 
@@ -235,8 +263,8 @@ struct CaptureView: View {
             Button {
                 naming = true
             } label: {
-                categoryRow(face: "ADD", hex: nil, dim: true)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                categoryRow(face: "New", hex: nil, dim: true)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
@@ -284,22 +312,6 @@ struct CaptureView: View {
                 .overlay(alignment: .top) {
                     Rectangle().fill(Theme.rule2).frame(height: 2)
                 }
-            }
-
-            if let banner = store.banner {
-                Button {
-                    store.openDeadDrawer()
-                } label: {
-                    Text(banner)
-                        .font(.system(size: 11, weight: .bold))
-                        .foregroundStyle(Theme.accentOn)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.horizontal, 18)
-                        .padding(.vertical, 8)
-                }
-                .buttonStyle(.plain)
-                .disabled(store.deadCount == 0)
-                .accessibilityLabel(banner)
             }
 
             HStack(spacing: 0) {

@@ -58,6 +58,7 @@ final class TapStore: ObservableObject {
         var isGap: Bool
         var isOpen: Bool
         var height: CGFloat
+        var note: String = ""
     }
 
     private struct UndoOffer {
@@ -497,7 +498,7 @@ final class TapStore: ObservableObject {
         var blocks = today.filter { $0.endMs > dayStart }
         if let open {
             blocks.append(TodayBlock(
-                ref: open.ref, key: open.key, startMs: open.startMs, endMs: now
+                ref: open.ref, key: open.key, startMs: open.startMs, endMs: now, text: open.text
             ))
         }
         blocks.sort { $0.startMs < $1.startMs }
@@ -505,12 +506,12 @@ final class TapStore: ObservableObject {
 
         let first = max(firstBlock.startMs, dayStart)
         let span = max(now - first, 60_000)
-        var raw: [(name: String, ms: Double, hex: String?, gap: Bool, open: Bool, floor: CGFloat)] = []
+        var raw: [(name: String, ms: Double, hex: String?, gap: Bool, open: Bool, floor: CGFloat, note: String)] = []
         var prevEnd: Double?
 
         for b in blocks {
             if let pe = prevEnd, b.startMs - pe > gapMs {
-                raw.append(("UNLOGGED", b.startMs - pe, nil, true, false, 20))
+                raw.append(("UNLOGGED", b.startMs - pe, nil, true, false, 20, ""))
             }
             let cat = catByKey[b.key]
             let ms = b.endMs - max(b.startMs, dayStart)
@@ -523,12 +524,13 @@ final class TapStore: ObservableObject {
                 cat?.hex,
                 false,
                 isOpen,
-                26
+                26,
+                b.text
             ))
             prevEnd = max(prevEnd ?? b.endMs, b.endMs)
         }
         if open == nil, let pe = prevEnd, now - pe > 5000 {
-            raw.append(("UNLOGGED", now - pe, nil, true, false, 20))
+            raw.append(("UNLOGGED", now - pe, nil, true, false, 20, ""))
         }
 
         let px = budget / span
@@ -545,7 +547,8 @@ final class TapStore: ObservableObject {
             return RailItem(
                 id: "\(idx)",
                 name: r.name, ms: r.ms, hex: r.hex,
-                isGap: r.gap, isOpen: r.open, height: max(h, 1)
+                isGap: r.gap, isOpen: r.open, height: max(h, 1),
+                note: r.note
             )
         }
         return ("TODAY · \(Format.clock(first))", items)
@@ -919,7 +922,7 @@ final class TapStore: ObservableObject {
     private func railClosed(_ block: OpenBlock, endMs: Double) {
         let dayStart = Format.dayStartMs(endMs)
         today = today.filter { $0.startMs >= dayStart }
-        today.append(TodayBlock(ref: block.ref, key: block.key, startMs: block.startMs, endMs: endMs))
+        today.append(TodayBlock(ref: block.ref, key: block.key, startMs: block.startMs, endMs: endMs, text: block.text))
     }
 
     private func railReopen(_ ref: String) {

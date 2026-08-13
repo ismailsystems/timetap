@@ -78,6 +78,7 @@ struct TodayBlock: Codable, Equatable {
     var key: String
     var startMs: Double
     var endMs: Double
+    var text: String = ""
 }
 
 struct DeadEntry: Codable, Equatable, Identifiable {
