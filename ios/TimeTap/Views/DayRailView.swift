@@ -11,11 +11,20 @@ struct DayRailView: View {
         GeometryReader { geo in
             let now = store.clock()
             VStack(alignment: .leading, spacing: 6) {
-                Text(store.railItems(budget: 40, now: now).startLabel)
-                    .font(Theme.font(10, weight: .semibold))
-                    .foregroundStyle(Theme.mute)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.7)
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    Text(store.railItems(budget: 40, now: now).startLabel)
+                        .font(Theme.font(10, weight: .semibold))
+                        .foregroundStyle(Theme.mute)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.7)
+                    Spacer(minLength: 6)
+                    Text(store.syncLabel)
+                        .font(Theme.font(10, weight: .semibold))
+                        .foregroundStyle(store.syncFailed ? Theme.accentOn : Theme.mute)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.7)
+                        .multilineTextAlignment(.trailing)
+                }
                 GeometryReader { bodyGeo in
                     let rail = store.railItems(budget: max(bodyGeo.size.height, 40), now: now)
                     VStack(spacing: 0) {

@@ -1,16 +1,19 @@
 import Foundation
 import SwiftUI
 import Combine
+import UIKit
 
 @MainActor
 final class TapStore: ObservableObject {
     @Published var config: ClientConfig?
     @Published var open: OpenBlock?
     @Published var sit: SitBlock?
+    /// Start of the current not-sitting bout. Feeds the Live Activity standing timer.
+    var standStartMs: Double?
     @Published var today: [TodayBlock] = []
     @Published var queue: [Op] = []
     @Published var dead: [DeadEntry] = []
-    @Published var syncLabel = "GOOGLE CALENDAR · SYNCED"
+    @Published var syncLabel = "synced"
     @Published var syncFailed = false
     @Published var banner: String?
     @Published var showSettings = false
@@ -137,6 +140,7 @@ final class TapStore: ObservableObject {
         showSettings = false
         showPicker = false
         paintSync()
+        Task { await RunningBlockSync.apply(nil) }
     }
 
     func boot() { Task { await bootAsync() } }
@@ -146,6 +150,7 @@ final class TapStore: ObservableObject {
     }
 
     func refreshOnReturnNow() async {
+        defer { syncLiveActivity() }
         guard Credentials.isConfigured, config != nil else { return }
         if !queue.isEmpty {
             await flushNow()
@@ -232,6 +237,7 @@ final class TapStore: ObservableObject {
         }
         if !lastInsertFailed { flush() }
         paintSync()
+        syncLiveActivity()
     }
 
     func retryLastInsert() {
@@ -267,18 +273,19 @@ final class TapStore: ObservableObject {
             if let pending { showMarkStrip(pending) } else { hideMarkStrip() }
         }
 
-        let sitClosed = closeSit(at: now)
-        if prev != nil || sitClosed != nil {
+        if prev != nil {
             armUndo(UndoOffer(
                 prev: prev, newRef: nil, atMs: now,
-                closeId: closeId, openId: nil, sit: sitClosed,
+                closeId: closeId, openId: nil, sit: nil,
                 label: "STOPPED — NOW UNLOGGED",
                 until: Date().addingTimeInterval(Double(config?.undoSeconds ?? 5))
             ))
+            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
         }
         unreadableOpen = false
         persist()
         flush()
+        syncLiveActivity()
     }
 
     func toggleSit() {
@@ -299,6 +306,54 @@ final class TapStore: ObservableObject {
         }
         persist()
         flush()
+        syncLiveActivity()
+    }
+
+    func stopSit() {
+        if !sessionReady { return }
+        guard GoogleAuth.hasSession else {
+            showSignIn = true
+            return
+        }
+        guard sit != nil else { return }
+        let now = clock()
+        if now - lastTapMs < 300 { return }
+        lastTapMs = now
+        _ = closeSit(at: now)
+        persist()
+        flush()
+        syncLiveActivity()
+    }
+
+    func handleSitIntent() async {
+        await ensureIntentSession()
+        toggleSit()
+        await flushNow()
+    }
+
+    func handleStopSitIntent() async {
+        await ensureIntentSession()
+        stopSit()
+        await flushNow()
+    }
+
+    func handleStopIntent() async {
+        await ensureIntentSession()
+        endDay()
+        await flushNow()
+    }
+
+    /// Live Activity intents can start a killed app in the background. Restore Google first.
+    private func ensureIntentSession() async {
+        if GoogleAuth.testHasSession != nil { return }
+        if !GoogleAuth.hasSession {
+            await withCheckedContinuation { (cont: CheckedContinuation<Void, Never>) in
+                GoogleAuth.restore { cont.resume() }
+            }
+        }
+        if !sessionReady {
+            await bootNow()
+        }
     }
 
     func takeUndo() {
@@ -340,6 +395,7 @@ final class TapStore: ObservableObject {
         refreshUnreadable()
         persist()
         flush()
+        syncLiveActivity()
     }
 
     func applyMark(_ mark: String) {
@@ -446,6 +502,7 @@ final class TapStore: ObservableObject {
         split = nil
         persist()
         flush()
+        syncLiveActivity()
     }
 
     private func recatWhole(key: String) {
@@ -465,6 +522,7 @@ final class TapStore: ObservableObject {
         split = nil
         persist()
         flush()
+        syncLiveActivity()
     }
 
     // MARK: - Sit edit
@@ -494,6 +552,7 @@ final class TapStore: ObservableObject {
         sitEdit = nil
         persist()
         flush()
+        syncLiveActivity()
     }
 
     func deleteSit() {
@@ -504,9 +563,11 @@ final class TapStore: ObservableObject {
             ref: cur.ref, hintMs: cur.startMs
         ))
         sit = nil
+        standStartMs = clock()
         sitEdit = nil
         persist()
         flush()
+        syncLiveActivity()
     }
 
     // MARK: - Dead letter
@@ -605,11 +666,6 @@ final class TapStore: ObservableObject {
     var deadCount: Int { dead.count }
     var canAddCategory: Bool {
         categories.count < (config?.maxCategories ?? 10)
-    }
-
-    var nowKick: String {
-        guard let open else { return "NOTHING RUNNING — TIME IS UNLOGGED" }
-        return "NOW · SINCE \(Format.clock(open.startMs).uppercased())"
     }
 
     func addCategory(label: String, onSuccess: (() -> Void)? = nil) {
@@ -726,6 +782,7 @@ final class TapStore: ObservableObject {
         }
         _ = closeSit(at: now)
         persist()
+        syncLiveActivity()
     }
 
     private func bootAsync() async {
@@ -804,6 +861,7 @@ final class TapStore: ObservableObject {
         }
         persist()
         refreshUnreadable()
+        syncLiveActivity()
         return true
     }
 
@@ -972,13 +1030,18 @@ final class TapStore: ObservableObject {
         }
         if removed.type == "openSit", sit?.ref == removed.ref {
             sit = nil
+            standStartMs = clock()
             cleared = true
         }
         if removed.type == "undoSwitch", let sitRef = removed.sitRef, sit?.ref == sitRef {
             sit = nil
+            standStartMs = clock()
             cleared = true
         }
-        if cleared { persist() }
+        if cleared {
+            persist()
+            syncLiveActivity()
+        }
         banner = deadMsg() + " — the last: \(err.message ?? "failed")"
         syncFailed = true
         paintSync()
@@ -1050,6 +1113,7 @@ final class TapStore: ObservableObject {
         guard let cur = sit else { return nil }
         let id = enqueue(Op(id: Op.uid(), type: "closeSit", ts: now, ref: cur.ref, endMs: now))
         sit = nil
+        standStartMs = now
         return ClosedSit(ref: cur.ref, startMs: cur.startMs, closeId: id)
     }
 
@@ -1169,35 +1233,53 @@ final class TapStore: ObservableObject {
         undoSecondsLeft = max(1, left)
     }
 
+    /// Always on: one is sitting or standing. Ends only on sign-out.
+    private func syncLiveActivity() {
+        guard NSClassFromString("XCTestCase") == nil else { return }
+        if sit == nil && standStartMs == nil {
+            standStartMs = clock()
+        }
+        let state = RunningBlockAttributes.ContentState(
+            key: open?.key,
+            face: open.map { labelFor($0.key) },
+            hex: open.flatMap { catByKey[$0.key]?.hex },
+            startMs: open?.startMs,
+            sitting: sit != nil,
+            sitStartMs: sit?.startMs,
+            standStartMs: standStartMs
+        )
+        Task { await RunningBlockSync.apply(state) }
+    }
+
     private func paintSync() {
         if lastInsertFailed {
-            syncLabel = "SYNC FAILED"
+            syncLabel = "sync failed"
             syncFailed = true
             return
         }
         if !GoogleAuth.hasSession || !sessionReady {
-            syncLabel = "GOOGLE CALENDAR · WAITING"
+            syncLabel = "waiting"
             syncFailed = false
             return
         }
         if banner != nil, queue.isEmpty, dead.isEmpty {
-            syncLabel = "GOOGLE CALENDAR · WAITING"
+            syncLabel = "waiting"
             syncFailed = true
             return
         }
         if !dead.isEmpty {
             syncLabel = queue.isEmpty
-                ? "\(dead.count) SET ASIDE"
-                : "\(dead.count) SET ASIDE · RETRYING"
+                ? "\(dead.count) set aside"
+                : "\(dead.count) set aside · retrying"
             syncFailed = true
         } else if flushing && !queue.isEmpty {
-            syncLabel = "SYNCING · \(queue.count)"
+            syncLabel = "syncing · \(queue.count)"
             syncFailed = false
         } else if !queue.isEmpty {
-            syncLabel = "GOOGLE CALENDAR · WAITING"
+            syncLabel = "waiting"
             syncFailed = true
         } else {
-            syncLabel = "GOOGLE CALENDAR · SYNCED"
+            syncLabel = "synced"
             syncFailed = false
         }
     }
@@ -1218,6 +1300,7 @@ final class TapStore: ObservableObject {
             open = st.open
             sit = st.sit
             today = st.today ?? []
+            standStartMs = st.standStartMs
         }
         if let data = UserDefaults.standard.data(forKey: deadKey),
            let d = try? JSONDecoder().decode([DeadEntry].self, from: data) {
@@ -1239,10 +1322,11 @@ final class TapStore: ObservableObject {
             applyConfig(.seed)
         }
         paintSync()
+        syncLiveActivity()
     }
 
     private func persist() {
-        let st = Persisted(open: open, sit: sit, today: today)
+        let st = Persisted(open: open, sit: sit, today: today, standStartMs: standStartMs)
         if let data = try? JSONEncoder().encode(st) {
             UserDefaults.standard.set(data, forKey: stateKey)
         }
@@ -1282,5 +1366,6 @@ final class TapStore: ObservableObject {
         var open: OpenBlock?
         var sit: SitBlock?
         var today: [TodayBlock]?
+        var standStartMs: Double?
     }
 }

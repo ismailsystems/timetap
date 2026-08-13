@@ -14,6 +14,10 @@ enum Theme {
     static let flag = Color(red: 0xc9 / 255, green: 0xa2 / 255, blue: 0x27 / 255)
     static let fail = Color(red: 0x2a / 255, green: 0x16 / 255, blue: 0x13 / 255)
 
+    static func postureSymbol(sitting: Bool) -> String {
+        sitting ? "figure.seated.side.right" : "figure.stand"
+    }
+
     static func hex(_ s: String) -> Color {
         guard let rgb = rgb(s) else { return .gray }
         return Color(red: rgb.r, green: rgb.g, blue: rgb.b)

@@ -58,6 +58,9 @@ struct CaptureView: View {
                     .onPreferenceChange(CatWidthKey.self) { catWidth = $0 }
                 }
                 .frame(maxHeight: .infinity)
+                .overlay(alignment: .bottom) {
+                    Rectangle().fill(Theme.rule2).frame(height: 2)
+                }
                 footer
             }
             .foregroundStyle(Theme.fg)
@@ -90,104 +93,48 @@ struct CaptureView: View {
     }
 
     private var nowPanel: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            HStack(alignment: .center, spacing: 8) {
-                Text(store.open.map { store.labelFor($0.key).uppercased() } ?? "NOTHING RUNNING")
-                    .font(.system(size: 32, weight: .black))
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.6)
-                Spacer(minLength: 8)
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(alignment: .top, spacing: 8) {
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack(alignment: .center, spacing: 8) {
+                        Text(store.open.map { store.labelFor($0.key).uppercased() } ?? "NOTHING RUNNING")
+                            .font(.system(size: 32, weight: .black))
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.6)
+                        Spacer(minLength: 8)
+                        settingsButton
+                    }
+                    HStack(alignment: .center, spacing: 12) {
+                        if store.open != nil {
+                            Button {
+                                finishNoteEdit()
+                            } label: {
+                                Text(elapsedLabel)
+                                    .font(.system(size: 48, weight: .heavy))
+                                    .foregroundStyle(isLong ? Theme.flag : Theme.accentOn)
+                                    .monospacedDigit()
+                                    .contentShape(Rectangle())
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel(nowAccessibility)
+                            .accessibilityHint("Dismisses the keyboard")
+                            if showAddNote {
+                                addNoteButton
+                            }
+                        } else {
+                            Text("—")
+                                .font(.system(size: 48, weight: .heavy))
+                                .foregroundStyle(Theme.accentOn)
+                                .accessibilityLabel(nowAccessibility)
+                        }
+                    }
+                }
                 if store.open != nil {
-                    Button {
-                        finishNoteEdit()
-                        store.openSplit()
-                    } label: {
-                        outlineChip("SPLIT")
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel("SPLIT")
-                    .accessibilityHint("Opens split sheet")
-                }
-                if store.open != nil || store.sit != nil {
-                    Button {
-                        finishNoteEdit()
-                        store.endDay()
-                    } label: {
-                        outlineChip("STOP")
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel("End the day")
+                    headerActions
                 }
             }
-            if store.open != nil {
-                Button {
-                    finishNoteEdit()
-                } label: {
-                    Text(elapsedLabel)
-                        .font(.system(size: 48, weight: .heavy))
-                        .foregroundStyle(isLong ? Theme.flag : Theme.accentOn)
-                        .monospacedDigit()
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                .padding(.top, 8)
-                .accessibilityLabel(nowAccessibility)
-                .accessibilityHint("Dismisses the keyboard")
-            } else {
-                Text("—")
-                    .font(.system(size: 48, weight: .heavy))
-                    .foregroundStyle(Theme.accentOn)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.top, 8)
-                    .accessibilityLabel(nowAccessibility)
-            }
-            HStack(alignment: .firstTextBaseline) {
-                Text(store.nowKick)
-                    .font(Theme.font(10, weight: .bold))
-                    .tracking(1.0)
-                    .foregroundStyle(Theme.dim)
-                    .lineLimit(2)
-                    .minimumScaleFactor(0.8)
-                Spacer(minLength: 8)
-                Button {
-                    finishNoteEdit()
-                    if store.deadCount > 0 {
-                        store.openDeadDrawer()
-                    } else {
-                        store.showSettings = true
-                    }
-                } label: {
-                    Text(store.syncLabel)
-                        .font(Theme.font(10, weight: .bold))
-                        .tracking(1.4)
-                        .foregroundStyle(store.syncFailed ? Theme.accentOn : Theme.dim)
-                        .multilineTextAlignment(.trailing)
-                        .lineLimit(2)
-                        .minimumScaleFactor(0.8)
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel(store.syncLabel)
-                .accessibilityHint(store.deadCount > 0 ? "Opens set-aside writes" : "Opens settings")
-            }
-            .padding(.top, 8)
-
             if showNoteField {
-                TextField("note", text: $noteDraft)
-                    .focused($focus, equals: .note)
-                    .submitLabel(.done)
-                    .onSubmit { finishNoteEdit() }
-                    .padding(11)
-                    .frame(minHeight: 44)
-                    .background(Theme.panel2)
-                    .padding(.top, 12)
-                    .onChange(of: noteDraft) { _, val in
-                        store.noteChanged(val)
-                    }
-                    .onChange(of: store.open?.text) { _, text in
-                        if focus != .note { noteDraft = text ?? "" }
-                    }
-                    .accessibilityLabel("Note for the running block")
+                noteField
             }
         }
         .padding(16)
@@ -197,8 +144,96 @@ struct CaptureView: View {
         }
     }
 
+    private var settingsButton: some View {
+        Button {
+            finishNoteEdit()
+            store.showSettings = true
+        } label: {
+            Image(systemName: "gearshape")
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundStyle(Theme.dim)
+                .frame(width: 44, height: 44)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Settings")
+        .accessibilityHint("Opens settings")
+    }
+
+    private var addNoteButton: some View {
+        Button(action: beginNoteEdit) {
+            Text("ADD NOTE")
+                .font(.system(size: 12, weight: .heavy))
+                .tracking(1.2)
+                .foregroundStyle(Theme.dim)
+                .frame(minHeight: 44, alignment: .leading)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Add note")
+        .accessibilityHint("Opens the note field")
+    }
+
+    private var noteField: some View {
+        TextField("note", text: $noteDraft)
+            .focused($focus, equals: .note)
+            .submitLabel(.done)
+            .onSubmit { finishNoteEdit() }
+            .padding(11)
+            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+            .background(Theme.panel2)
+            .onChange(of: noteDraft) { _, val in
+                store.noteChanged(val)
+            }
+            .onChange(of: store.open?.text) { _, text in
+                if focus != .note { noteDraft = text ?? "" }
+            }
+            .accessibilityLabel("Note for the running block")
+    }
+
+    private var headerActions: some View {
+        VStack(spacing: 8) {
+            stopButton
+            splitButton
+        }
+        .containerRelativeFrame(.horizontal, alignment: .trailing) { width, _ in width / 4 }
+    }
+
+    private var splitButton: some View {
+        Button {
+            finishNoteEdit()
+            store.openSplit()
+        } label: {
+            outlineChip("SPLIT", fill: true)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("SPLIT")
+        .accessibilityHint("Opens split sheet")
+    }
+
+    private var stopButton: some View {
+        Button {
+            finishNoteEdit()
+            store.endDay()
+        } label: {
+            outlineChip("STOP", fill: true)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Stop the running block")
+        .accessibilityHint("Does not stop sitting")
+    }
+
     private var showNoteField: Bool {
-        store.open != nil
+        store.open != nil && (editingNote || focus == .note)
+    }
+
+    private var showAddNote: Bool {
+        store.open != nil && !hasNote && !showNoteField
+    }
+
+    private var hasNote: Bool {
+        let text = store.open?.text ?? noteDraft
+        return !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
     private func beginNoteEdit() {
@@ -213,10 +248,25 @@ struct CaptureView: View {
     }
 
     private func categoryList(height: CGFloat) -> some View {
-        let n = CGFloat(store.categories.count + 1)
+        let n = CGFloat(store.categories.count + 2)
         let rowH = max(44, height / max(n, 1))
         return ScrollView {
             VStack(alignment: .leading, spacing: 0) {
+                if store.canAddCategory {
+                    addRow
+                        .frame(maxWidth: .infinity, minHeight: rowH, maxHeight: rowH)
+                        .overlay(alignment: .top) { Rectangle().fill(Theme.rule2.opacity(0.5)).frame(height: 1) }
+                        .id("add")
+                } else {
+                    Text("That is \(store.config?.maxCategories ?? 10) categories already.")
+                        .font(Theme.font(12, weight: .semibold))
+                        .foregroundStyle(Theme.mute)
+                        .padding(.leading, 12)
+                        .padding(.trailing, 16)
+                        .frame(maxWidth: .infinity, minHeight: rowH, maxHeight: rowH, alignment: .leading)
+                        .overlay(alignment: .top) { Rectangle().fill(Theme.rule2.opacity(0.5)).frame(height: 1) }
+                }
+
                 ForEach(store.categories) { cat in
                     Button {
                         finishNoteEdit()
@@ -244,20 +294,10 @@ struct CaptureView: View {
                     .id(cat.key)
                 }
 
-                if store.canAddCategory {
-                    addRow
-                        .frame(maxWidth: .infinity, minHeight: rowH, maxHeight: rowH)
-                        .overlay(alignment: .top) { Rectangle().fill(Theme.rule2.opacity(0.5)).frame(height: 1) }
-                        .id("add")
-                } else {
-                    Text("That is \(store.config?.maxCategories ?? 10) categories already.")
-                        .font(Theme.font(12, weight: .semibold))
-                        .foregroundStyle(Theme.mute)
-                        .padding(.leading, 12)
-                        .padding(.trailing, 16)
-                        .frame(maxWidth: .infinity, minHeight: rowH, maxHeight: rowH, alignment: .leading)
-                        .overlay(alignment: .top) { Rectangle().fill(Theme.rule2.opacity(0.5)).frame(height: 1) }
-                }
+                sitChip
+                    .frame(maxWidth: .infinity, minHeight: rowH, maxHeight: rowH)
+                    .overlay(alignment: .top) { Rectangle().fill(Theme.rule2.opacity(0.5)).frame(height: 1) }
+                    .id("sit")
             }
         }
         .scrollDisabled(rowH > 44.5)
@@ -360,17 +400,6 @@ struct CaptureView: View {
                     Rectangle().fill(Theme.rule2).frame(height: 2)
                 }
             }
-
-            HStack(spacing: 0) {
-                Spacer(minLength: 0)
-                sitChip
-                    .padding(.trailing, 12)
-                    .padding(.vertical, 8)
-            }
-            .padding(.top, 12)
-            .overlay(alignment: .top) {
-                Rectangle().fill(Theme.rule2).frame(height: 2)
-            }
         }
     }
 
@@ -393,64 +422,69 @@ struct CaptureView: View {
         return "Nothing running, time is unlogged"
     }
 
-    private var sitElapsed: String {
-        guard let sit = store.sit else { return "" }
+    private var postureElapsed: String {
         _ = tick
-        return Format.shortElapsed(store.clock() - sit.startMs)
+        let start = store.sit?.startMs ?? store.standStartMs
+        guard let start else { return "0m" }
+        return Format.shortElapsed(store.clock() - start)
     }
 
     @ViewBuilder
     private var sitChip: some View {
-        if store.sit == nil {
-            Button(action: store.toggleSit) {
-                outlineChip("TAP TO SIT")
+        let sitting = store.sit != nil
+        Button {
+            finishNoteEdit()
+            store.toggleSit()
+        } label: {
+            HStack(spacing: 10) {
+                Image(systemName: Theme.postureSymbol(sitting: sitting))
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(Theme.fg)
+                    .frame(width: 18, height: 18)
+                    .accessibilityHidden(true)
+                Text(sitting ? "SITTING" : "STANDING")
+                    .font(Theme.font(20, weight: .semibold))
+                    .fontWidth(.standard)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.6)
+                    .foregroundStyle(Theme.fg)
+                Spacer(minLength: 4)
+                Text(postureElapsed)
+                    .font(Theme.font(12, weight: .bold).monospacedDigit())
+                    .foregroundStyle(Theme.dim)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
             }
-            .buttonStyle(.plain)
-            .accessibilityLabel("Tap to sit")
-            .accessibilityHint("Starts sitting")
-        } else {
-            HStack(spacing: 8) {
-                Button(action: store.toggleSit) {
-                    HStack(spacing: 8) {
-                        Circle()
-                            .fill(Theme.accent)
-                            .frame(width: 10, height: 10)
-                        Text("SITTING")
-                            .font(.system(size: 12, weight: .heavy))
-                            .tracking(1.2)
-                            .foregroundStyle(Theme.accentOn)
-                    }
-                    .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Sitting")
-                .accessibilityHint("Stops sitting")
-                Button(action: store.openSitEdit) {
-                    Text("· \(sitElapsed)")
-                        .font(.system(size: 12, weight: .heavy).monospacedDigit())
-                        .tracking(1.2)
-                        .foregroundStyle(Theme.accentOn)
-                        .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Sitting for \(sitElapsed)")
-                .accessibilityHint("Adjust when sitting started")
+            .padding(.leading, 12)
+            .padding(.trailing, 16)
+            .padding(.vertical, 8)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+            .contentShape(Rectangle())
+            .background(Theme.panel)
+        }
+        .buttonStyle(.plain)
+        .accessibilityAddTraits(.isSelected)
+        .accessibilityLabel(sitting ? "Sitting for \(postureElapsed)" : "Standing for \(postureElapsed)")
+        .accessibilityHint(
+            sitting
+                ? "Stops sitting and starts standing. Long press to adjust when sitting started."
+                : "Stops standing and starts sitting"
+        )
+        .contextMenu {
+            if sitting {
+                Button("Adjust sitting start") { store.openSitEdit() }
             }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 12)
-            .frame(minHeight: 44)
-            .overlay(Rectangle().strokeBorder(Theme.rule2, lineWidth: 2))
         }
     }
 
-    private func outlineChip(_ title: String) -> some View {
+    private func outlineChip(_ title: String, fill: Bool = false) -> some View {
         Text(title)
             .font(.system(size: 12, weight: .heavy))
             .tracking(1.2)
             .foregroundStyle(Theme.accentOn)
             .padding(.horizontal, 14)
             .padding(.vertical, 12)
-            .frame(minHeight: 44)
+            .frame(maxWidth: fill ? .infinity : nil, minHeight: 44)
             .overlay(Rectangle().strokeBorder(Theme.rule2, lineWidth: 2))
     }
 
@@ -491,11 +525,6 @@ struct CaptureView: View {
         .padding(.leading, 12)
         .padding(.trailing, 16)
         .padding(.vertical, 8)
-        .overlay(alignment: .leading) {
-            if running {
-                Rectangle().fill(Theme.accent).frame(width: 4)
-            }
-        }
     }
 
     private var categoryWidthProbe: some View {

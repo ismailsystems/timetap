@@ -121,7 +121,7 @@ final class C3Tests: TimeTapTestCase {
         store.endDay()
         await store.flushNow()
         XCTAssertFalse(actual.events.contains { $0.description.contains("#open") })
-        XCTAssertFalse(sitting.events.contains { $0.description.contains("#open") })
+        XCTAssertTrue(sitting.events.contains { $0.description.contains("#open") })
         XCTAssertEqual(actual.events.count, 2)
         let dwDone = actual.events.first { $0.title.hasPrefix("DW") }!
         let bodyDone = actual.events.first { $0.title.hasPrefix("BODY") }!
@@ -131,8 +131,15 @@ final class C3Tests: TimeTapTestCase {
         XCTAssertEqual(bodyDone.endMs, stopAt)
         XCTAssertEqual(sitting.events.count, 1)
         XCTAssertEqual(sitting.events[0].title, "SIT")
-        XCTAssertEqual(sitting.events[0].endMs, stopAt)
         XCTAssertNil(store.open)
+        XCTAssertNotNil(store.sit)
+
+        t += 60_000
+        let sitStopAt = t
+        store.stopSit()
+        await store.flushNow()
+        XCTAssertFalse(sitting.events.contains { $0.description.contains("#open") })
+        XCTAssertEqual(sitting.events[0].endMs, sitStopAt)
         XCTAssertNil(store.sit)
     }
 

@@ -36,8 +36,8 @@ final class C1Tests: TimeTapTestCase {
         XCTAssertEqual(actual.events.count, 1)
         XCTAssertEqual(actual.events[0].title, "DW:")
         XCTAssertTrue(CalendarAPI.didFlush)
-        XCTAssertFalse(store.syncLabel.contains("SYNCED") && store.syncFailed)
-        XCTAssertEqual(store.syncLabel, "GOOGLE CALENDAR · SYNCED")
+        XCTAssertFalse(store.syncLabel.contains("synced") && store.syncFailed)
+        XCTAssertEqual(store.syncLabel, "synced")
         try assertNoTimetapAPI()
     }
 
@@ -52,7 +52,7 @@ final class C1Tests: TimeTapTestCase {
         XCTAssertEqual(store.dead[0].op.id, "o1")
         XCTAssertEqual(store.dead[0].op.type, "openActual")
         XCTAssertNil(store.open, "grid must not show the failed open as running")
-        XCTAssertFalse(store.syncLabel.contains("SYNCED"))
+        XCTAssertFalse(store.syncLabel.contains("synced"))
     }
 
     func testSetAsideSetMarkLeavesBlockRunning() async {
@@ -85,7 +85,7 @@ final class C1Tests: TimeTapTestCase {
         XCTAssertEqual(store.queue.map(\.id), ["o1"])
         XCTAssertTrue(actual.events.isEmpty)
         XCTAssertTrue(store.showSignIn)
-        XCTAssertFalse(store.syncLabel.contains("SYNCING"))
+        XCTAssertFalse(store.syncLabel.contains("syncing"))
         let before = GoogleAuth.refreshCount
         CalendarAPI.testStatusQueue = [401, 401]
         await store.flushNow()
@@ -174,7 +174,7 @@ final class C1Tests: TimeTapTestCase {
         let store = TapStore()
         CalendarAPI.testStatusQueue = [403]
         await store.flushNow()
-        XCTAssertFalse(store.syncLabel.contains("SYNCED"))
+        XCTAssertFalse(store.syncLabel.contains("synced"))
         XCTAssertEqual(store.queue.map(\.id), ["o1"])
         XCTAssertEqual(store.queue.first?.tries, 1)
         XCTAssertTrue(store.dead.isEmpty)
@@ -182,7 +182,7 @@ final class C1Tests: TimeTapTestCase {
         for _ in 1...4 { await store.flushNow() }
         XCTAssertTrue(store.queue.isEmpty)
         XCTAssertEqual(store.dead.map(\.op.id), ["o1"])
-        XCTAssertFalse(store.syncLabel.contains("SYNCED"))
+        XCTAssertFalse(store.syncLabel.contains("synced"))
         XCTAssertTrue(actual.events.isEmpty, "403 must not silently drop after applying")
     }
 

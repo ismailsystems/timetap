@@ -35,6 +35,20 @@
                ReferencedContainer = "container:TimeTap.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
+         <BuildActionEntry
+            buildForTesting = "YES"
+            buildForRunning = "YES"
+            buildForProfiling = "YES"
+            buildForArchiving = "YES"
+            buildForAnalyzing = "YES">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "3808FD036A9F99338925BEB8"
+               BuildableName = "TimeTapWidget.appex"
+               BlueprintName = "TimeTapWidget"
+               ReferencedContainer = "container:TimeTap.xcodeproj">
+            </BuildableReference>
+         </BuildActionEntry>
       </BuildActionEntries>
    </BuildAction>
    <TestAction

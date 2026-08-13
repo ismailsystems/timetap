@@ -46,8 +46,13 @@ simulator (iPhone 17 Pro Max).
 ## 4. What the phone does
 
 Tap a category. The phone inserts/patches events on ACTUAL (and SITTING)
-through Calendar REST. Titles, colours, `#ref:` / `#open`, stale `?`, undo,
-and STOP match `Code.gs`. Add category stays on the device (cap 10).
+through Calendar REST. Titles, colours, `#ref:` / `#open`, stale `?`, and undo
+match `Code.gs`. STOP closes the running block only. Sitting has its own
+start/stop. Add category stays on the device (cap 10).
+
+The Lock Screen and Dynamic Island show the running block, and sitting as a
+second row with its own timer. Enable Live Activities for timetap in Settings
+if the Island stays empty.
 
 Device proof is the user's Google Calendar, not curl against `/exec`.
 
@@ -56,4 +61,4 @@ Device proof is the user's Google Calendar, not curl against `/exec`.
 - Nightly rollup / Sheets (`dailyRollup`, `setupRollup`) — rollup stays on Apps Script
 - PLAN editing by hand
 - `removeCategory` (editor-only)
-- Widgets, Watch, App Store
+- Home Screen widgets, Watch app, App Store

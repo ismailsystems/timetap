@@ -11,13 +11,16 @@
 		036E218AE8B64A72E79FA10F /* B4Tests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A110EC0051A7A1D87110C352 /* B4Tests.swift */; };
 		03749D68D801BE2CDF6B7AA3 /* R7Tests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 50A1BD01C683FF67F8F298F1 /* R7Tests.swift */; };
 		099D42E94F480B0F26A3C5B9 /* B3Tests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 18B8279D8F1187956ABD0783 /* B3Tests.swift */; };
+		0CEC9C9EB6392DBAD6FA0167 /* RunningBlockAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6905879EA2B4015915ED6D85 /* RunningBlockAttributes.swift */; };
 		155752CD3F60C3AC82969373 /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4E7744EE4EAB4173F4B3D188 /* Models.swift */; };
 		2D0897E0A6B3231F37BEB32F /* A4Tests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 72AB36F224AB7588E53018B4 /* A4Tests.swift */; };
 		2EA116BE2281759FD8359C24 /* D1Tests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 62372ECAE115ACC89B6A24D3 /* D1Tests.swift */; };
 		2FB00CD640D7409118A8E4E2 /* B1Tests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D943F9A6CAF5F4D8B8DCC048 /* B1Tests.swift */; };
+		35470FB9689707A27867C3C0 /* RunningBlockIntents.swift in Sources */ = {isa = PBXBuildFile; fileRef = 039CE5BB1C222A62B5E31C03 /* RunningBlockIntents.swift */; };
 		3BE07A0305050503BCA5CE8D /* SitEditSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = CF45FF913A460C9661EDF34B /* SitEditSheet.swift */; };
 		3D742B0CFBC1B8A0D3969583 /* A3Tests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 416881FDA0DDE709D21E55C3 /* A3Tests.swift */; };
 		40D059EFA67A504708D25447 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = F480CE7080FAF633ABD17E01 /* Assets.xcassets */; };
+		432271095523E83E5D0BB366 /* TimeTapWidget.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = D5D9AC587B12850A2BC55FC7 /* TimeTapWidget.appex */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		46EAECF479D1F77CC70D37E8 /* GoogleAuth.swift in Sources */ = {isa = PBXBuildFile; fileRef = 39244103B3847640AAA55B11 /* GoogleAuth.swift */; };
 		55E5C00C72D20DF5332F9921 /* C3Tests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5B6E4BC029AB56DD7EB503AD /* C3Tests.swift */; };
 		581EFFC879088FD71F1DC717 /* B2Tests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D151859F57377AEC8118124 /* B2Tests.swift */; };
@@ -26,19 +29,25 @@
 		6815C88AE2DF31036A8B5A8B /* SignInView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6D7B42C20E98A8B8C2475C8B /* SignInView.swift */; };
 		6A17E8C8E7A7E5DCEAA82108 /* CalendarPickerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 31BB6E2F4AC7571D01632124 /* CalendarPickerView.swift */; };
 		6C3F4C2381A713E29945746B /* CalendarAPI.swift in Sources */ = {isa = PBXBuildFile; fileRef = 46DD023ECACFCEE59D37F58C /* CalendarAPI.swift */; };
+		6C6BD82B6B90AB6AE376B39C /* RunningBlockIntents.swift in Sources */ = {isa = PBXBuildFile; fileRef = 039CE5BB1C222A62B5E31C03 /* RunningBlockIntents.swift */; };
 		81925425FD2759B8617E9D60 /* GoogleSignIn in Frameworks */ = {isa = PBXBuildFile; productRef = E2AC37527A1324DCA04213C6 /* GoogleSignIn */; };
 		84CC97FF9426A9CE8AA98F91 /* UTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 43B809B676BE90248BE9584E /* UTests.swift */; };
+		8932106E4F3D829158AF1A70 /* RunningBlockLiveActivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = D718D6E99F21872C9D001A1E /* RunningBlockLiveActivity.swift */; };
 		8B9BCD03171BB47A1FDDA0B8 /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 979753C469BB46C427293E02 /* RootView.swift */; };
 		8CC4CBFD19D775D120BB2467 /* TimeTapTestCase.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A9A5606319F1BD6FBB83147 /* TimeTapTestCase.swift */; };
 		915AC4EE2BB6C4A81CC5509B /* C1Tests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7609C6A77691CD52326C9F36 /* C1Tests.swift */; };
+		9384EB7759FD38EBDABFB323 /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0947EED16A8B40C767B8FA0 /* Theme.swift */; };
 		956E790A0753C11234383A9A /* DayRailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 49092CA9D4C73500509BB649 /* DayRailView.swift */; };
+		9ED3731DEF0BF69D4EAB26A6 /* RunningBlockSync.swift in Sources */ = {isa = PBXBuildFile; fileRef = 73A8E6B72917D588965E13C7 /* RunningBlockSync.swift */; };
 		A517FED50BB45AFCAD67AC72 /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0947EED16A8B40C767B8FA0 /* Theme.swift */; };
 		BBE466DE1345E22BC5700126 /* TapStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = C85019F7B88C8EE4DFBE85A0 /* TapStore.swift */; };
 		DC1D8DE48367B8E83C66452D /* TimeTapApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6DC9D8FAFE6CD1911BA1BA06 /* TimeTapApp.swift */; };
 		DC693AE87028C02E393735BB /* A2Tests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8126B4FE3CB9C4362805622A /* A2Tests.swift */; };
 		DD873BAE5377A7AABBAC7D34 /* Grammar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9D9D4875A281E3F960C3A7CD /* Grammar.swift */; };
 		E8C1C00798C335C7959CA6B8 /* Credentials.swift in Sources */ = {isa = PBXBuildFile; fileRef = EC2416C4707736A43FD2ACF6 /* Credentials.swift */; };
+		E9690D9084C34359B2CA4BE0 /* RunningBlockAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6905879EA2B4015915ED6D85 /* RunningBlockAttributes.swift */; };
 		ED4399E69EE496C6FF815DCD /* ApplyOps.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5D9FAAEA0FBB3106BE727550 /* ApplyOps.swift */; };
+		EE887BB1B6C4E3954FE18778 /* TimeTapWidgetBundle.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD80F6B3006ACF8E61D20600 /* TimeTapWidgetBundle.swift */; };
 		F0D1D645E73776D17B15A756 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D55675D4A21D2C2D804358B /* SettingsView.swift */; };
 		F80F9FE33774C44C0E469E98 /* C2Tests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B8AD8C15BC946325CF02364B /* C2Tests.swift */; };
 		FAF11E3081864E2D33B11B77 /* CaptureView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 749D803612D26E9D5D20E863 /* CaptureView.swift */; };
@@ -47,6 +56,13 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
+		17F23FC3B08766FFD68CAD70 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = F857DF8535F9DD23FF6EC550 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 3808FD036A9F99338925BEB8;
+			remoteInfo = TimeTapWidget;
+		};
 		7528F1C1579D2BD55AB99BC7 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = F857DF8535F9DD23FF6EC550 /* Project object */;
@@ -56,7 +72,22 @@
 		};
 /* End PBXContainerItemProxy section */
 
+/* Begin PBXCopyFilesBuildPhase section */
+		D29920C41A44887C8FAA1D59 /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				432271095523E83E5D0BB366 /* TimeTapWidget.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
 /* Begin PBXFileReference section */
+		039CE5BB1C222A62B5E31C03 /* RunningBlockIntents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RunningBlockIntents.swift; sourceTree = "<group>"; };
 		0C48DCFC2B8F43129B8031AB /* TimeTap.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = TimeTap.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		0D151859F57377AEC8118124 /* B2Tests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = B2Tests.swift; sourceTree = "<group>"; };
 		18B8279D8F1187956ABD0783 /* B3Tests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = B3Tests.swift; sourceTree = "<group>"; };
@@ -76,10 +107,12 @@
 		5E8BF97CDBFD4A1958452544 /* D2Tests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = D2Tests.swift; sourceTree = "<group>"; };
 		62372ECAE115ACC89B6A24D3 /* D1Tests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = D1Tests.swift; sourceTree = "<group>"; };
 		67FE41A5E22FCCF25FC6FFDB /* DeadLetterSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeadLetterSheet.swift; sourceTree = "<group>"; };
+		6905879EA2B4015915ED6D85 /* RunningBlockAttributes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RunningBlockAttributes.swift; sourceTree = "<group>"; };
 		6C9E642DDAC8A5F6C60D9EF4 /* A1Tests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = A1Tests.swift; sourceTree = "<group>"; };
 		6D7B42C20E98A8B8C2475C8B /* SignInView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SignInView.swift; sourceTree = "<group>"; };
 		6DC9D8FAFE6CD1911BA1BA06 /* TimeTapApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimeTapApp.swift; sourceTree = "<group>"; };
 		72AB36F224AB7588E53018B4 /* A4Tests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = A4Tests.swift; sourceTree = "<group>"; };
+		73A8E6B72917D588965E13C7 /* RunningBlockSync.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RunningBlockSync.swift; sourceTree = "<group>"; };
 		749D803612D26E9D5D20E863 /* CaptureView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureView.swift; sourceTree = "<group>"; };
 		7609C6A77691CD52326C9F36 /* C1Tests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = C1Tests.swift; sourceTree = "<group>"; };
 		8126B4FE3CB9C4362805622A /* A2Tests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = A2Tests.swift; sourceTree = "<group>"; };
@@ -90,10 +123,14 @@
 		A110EC0051A7A1D87110C352 /* B4Tests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = B4Tests.swift; sourceTree = "<group>"; };
 		B1FF4806EEB7A5DA1B512B3C /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		B8AD8C15BC946325CF02364B /* C2Tests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = C2Tests.swift; sourceTree = "<group>"; };
+		BAC9B25DC0659D8C29467C36 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		C85019F7B88C8EE4DFBE85A0 /* TapStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TapStore.swift; sourceTree = "<group>"; };
 		CAAA7DE9DBBAA54C77A78BD0 /* TimeTapTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = TimeTapTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		CF45FF913A460C9661EDF34B /* SitEditSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SitEditSheet.swift; sourceTree = "<group>"; };
+		D5D9AC587B12850A2BC55FC7 /* TimeTapWidget.appex */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = "wrapper.app-extension"; path = TimeTapWidget.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		D718D6E99F21872C9D001A1E /* RunningBlockLiveActivity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RunningBlockLiveActivity.swift; sourceTree = "<group>"; };
 		D943F9A6CAF5F4D8B8DCC048 /* B1Tests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = B1Tests.swift; sourceTree = "<group>"; };
+		DD80F6B3006ACF8E61D20600 /* TimeTapWidgetBundle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimeTapWidgetBundle.swift; sourceTree = "<group>"; };
 		EC2416C4707736A43FD2ACF6 /* Credentials.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Credentials.swift; sourceTree = "<group>"; };
 		F0947EED16A8B40C767B8FA0 /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
 		F480CE7080FAF633ABD17E01 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
@@ -111,6 +148,16 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		233DEBCCA6357CEA8D50A9BC /* TimeTapWidget */ = {
+			isa = PBXGroup;
+			children = (
+				BAC9B25DC0659D8C29467C36 /* Info.plist */,
+				D718D6E99F21872C9D001A1E /* RunningBlockLiveActivity.swift */,
+				DD80F6B3006ACF8E61D20600 /* TimeTapWidgetBundle.swift */,
+			);
+			path = TimeTapWidget;
+			sourceTree = "<group>";
+		};
 		3E6FC59B3A40708FC4EDF1D1 /* Config */ = {
 			isa = PBXGroup;
 			children = (
@@ -127,6 +174,16 @@
 			path = Models;
 			sourceTree = "<group>";
 		};
+		6A67AE575CE2550792AF5F0F /* LiveActivity */ = {
+			isa = PBXGroup;
+			children = (
+				6905879EA2B4015915ED6D85 /* RunningBlockAttributes.swift */,
+				039CE5BB1C222A62B5E31C03 /* RunningBlockIntents.swift */,
+				73A8E6B72917D588965E13C7 /* RunningBlockSync.swift */,
+			);
+			path = LiveActivity;
+			sourceTree = "<group>";
+		};
 		AB85A8E9997F93FEF628CDE1 /* TimeTap */ = {
 			isa = PBXGroup;
 			children = (
@@ -136,6 +193,7 @@
 				F0947EED16A8B40C767B8FA0 /* Theme.swift */,
 				6DC9D8FAFE6CD1911BA1BA06 /* TimeTapApp.swift */,
 				3E6FC59B3A40708FC4EDF1D1 /* Config */,
+				6A67AE575CE2550792AF5F0F /* LiveActivity */,
 				65661EEC756AF252C8C902EE /* Models */,
 				B4A439978C48A6D87AD9D481 /* Services */,
 				CD89DEDEA4606A0558A58718 /* Views */,
@@ -161,6 +219,7 @@
 			children = (
 				AB85A8E9997F93FEF628CDE1 /* TimeTap */,
 				B854C4CFD46444295D8ACE04 /* TimeTapTests */,
+				233DEBCCA6357CEA8D50A9BC /* TimeTapWidget */,
 				E6FD22C9DCD904BE6FEB037D /* Products */,
 			);
 			sourceTree = "<group>";
@@ -209,6 +268,7 @@
 			children = (
 				0C48DCFC2B8F43129B8031AB /* TimeTap.app */,
 				CAAA7DE9DBBAA54C77A78BD0 /* TimeTapTests.xctest */,
+				D5D9AC587B12850A2BC55FC7 /* TimeTapWidget.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -234,6 +294,23 @@
 			productReference = CAAA7DE9DBBAA54C77A78BD0 /* TimeTapTests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
 		};
+		3808FD036A9F99338925BEB8 /* TimeTapWidget */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 99BE51B1C1F25995A01FE0F1 /* Build configuration list for PBXNativeTarget "TimeTapWidget" */;
+			buildPhases = (
+				A520D67861FF96D41914B8CE /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = TimeTapWidget;
+			packageProductDependencies = (
+			);
+			productName = TimeTapWidget;
+			productReference = D5D9AC587B12850A2BC55FC7 /* TimeTapWidget.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
 		7DD2CA63DA231E2830BEADAB /* TimeTap */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = D4AFCFCA5C9F8D7527F8F5A5 /* Build configuration list for PBXNativeTarget "TimeTap" */;
@@ -241,10 +318,12 @@
 				488A7E2840BC86FAA0E471FF /* Sources */,
 				35200B8D54A900C23603F4D9 /* Resources */,
 				E66F054E9674E3374439E4DC /* Frameworks */,
+				D29920C41A44887C8FAA1D59 /* Embed Foundation Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				2E97F7ECF25DFFD6C487CDC4 /* PBXTargetDependency */,
 			);
 			name = TimeTap;
 			packageProductDependencies = (
@@ -264,6 +343,10 @@
 				LastUpgradeCheck = 1600;
 				TargetAttributes = {
 					2FABA00A70E3E5F3EE9C003E = {
+						DevelopmentTeam = Y3NGT7263T;
+						ProvisioningStyle = Automatic;
+					};
+					3808FD036A9F99338925BEB8 = {
 						DevelopmentTeam = Y3NGT7263T;
 						ProvisioningStyle = Automatic;
 					};
@@ -291,6 +374,7 @@
 			projectRoot = "";
 			targets = (
 				7DD2CA63DA231E2830BEADAB /* TimeTap */,
+				3808FD036A9F99338925BEB8 /* TimeTapWidget */,
 				2FABA00A70E3E5F3EE9C003E /* TimeTapTests */,
 			);
 		};
@@ -347,6 +431,9 @@
 				DD873BAE5377A7AABBAC7D34 /* Grammar.swift in Sources */,
 				155752CD3F60C3AC82969373 /* Models.swift in Sources */,
 				8B9BCD03171BB47A1FDDA0B8 /* RootView.swift in Sources */,
+				E9690D9084C34359B2CA4BE0 /* RunningBlockAttributes.swift in Sources */,
+				6C6BD82B6B90AB6AE376B39C /* RunningBlockIntents.swift in Sources */,
+				9ED3731DEF0BF69D4EAB26A6 /* RunningBlockSync.swift in Sources */,
 				F0D1D645E73776D17B15A756 /* SettingsView.swift in Sources */,
 				6815C88AE2DF31036A8B5A8B /* SignInView.swift in Sources */,
 				3BE07A0305050503BCA5CE8D /* SitEditSheet.swift in Sources */,
@@ -354,6 +441,18 @@
 				BBE466DE1345E22BC5700126 /* TapStore.swift in Sources */,
 				A517FED50BB45AFCAD67AC72 /* Theme.swift in Sources */,
 				DC1D8DE48367B8E83C66452D /* TimeTapApp.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A520D67861FF96D41914B8CE /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				0CEC9C9EB6392DBAD6FA0167 /* RunningBlockAttributes.swift in Sources */,
+				35470FB9689707A27867C3C0 /* RunningBlockIntents.swift in Sources */,
+				8932106E4F3D829158AF1A70 /* RunningBlockLiveActivity.swift in Sources */,
+				9384EB7759FD38EBDABFB323 /* Theme.swift in Sources */,
+				EE887BB1B6C4E3954FE18778 /* TimeTapWidgetBundle.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -365,9 +464,31 @@
 			target = 7DD2CA63DA231E2830BEADAB /* TimeTap */;
 			targetProxy = 7528F1C1579D2BD55AB99BC7 /* PBXContainerItemProxy */;
 		};
+		2E97F7ECF25DFFD6C487CDC4 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 3808FD036A9F99338925BEB8 /* TimeTapWidget */;
+			targetProxy = 17F23FC3B08766FFD68CAD70 /* PBXContainerItemProxy */;
+		};
 /* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
+		0CD6FCFB71269C0BD6D24469 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = Y3NGT7263T;
+				INFOPLIST_FILE = TimeTapWidget/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = timetap;
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = NO;
+				INFOPLIST_KEY_UILaunchScreen_Generation = NO;
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks @executable_path/../../Frameworks";
+				PRODUCT_BUNDLE_IDENTIFIER = app.timetap.ios.widget;
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Release;
+		};
 		1631CA3EABE939D926181E14 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -420,7 +541,7 @@
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UIStatusBarStyle = UIStatusBarStyleLightContent;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;
-				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.2;
 				MARKETING_VERSION = 0.1.0;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
@@ -432,6 +553,23 @@
 				TARGETED_DEVICE_FAMILY = 1;
 			};
 			name = Release;
+		};
+		6576C88405A80022A3080C05 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = Y3NGT7263T;
+				INFOPLIST_FILE = TimeTapWidget/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = timetap;
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = NO;
+				INFOPLIST_KEY_UILaunchScreen_Generation = NO;
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks @executable_path/../../Frameworks";
+				PRODUCT_BUNDLE_IDENTIFIER = app.timetap.ios.widget;
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Debug;
 		};
 		969BBB051D97C896278011BB /* Release */ = {
 			isa = XCBuildConfiguration;
@@ -571,7 +709,7 @@
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UIStatusBarStyle = UIStatusBarStyleLightContent;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;
-				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.2;
 				MARKETING_VERSION = 0.1.0;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
@@ -593,6 +731,15 @@
 			buildConfigurations = (
 				DC3B149A3A7D2402113670F2 /* Debug */,
 				A32D03C9D7826D48AF175622 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		99BE51B1C1F25995A01FE0F1 /* Build configuration list for PBXNativeTarget "TimeTapWidget" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				6576C88405A80022A3080C05 /* Debug */,
+				0CD6FCFB71269C0BD6D24469 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Debug;

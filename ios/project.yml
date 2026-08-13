@@ -2,7 +2,7 @@ name: TimeTap
 options:
   bundleIdPrefix: app.timetap
   deploymentTarget:
-    iOS: "17.0"
+    iOS: "17.2"
   xcodeVersion: "16.0"
   createIntermediateGroups: true
 packages:
@@ -44,6 +44,29 @@ targets:
     dependencies:
       - package: GoogleSignIn
         product: GoogleSignIn
+      - target: TimeTapWidget
+        embed: true
+        codeSign: true
+  TimeTapWidget:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: TimeTapWidget
+      - path: TimeTap/LiveActivity/RunningBlockAttributes.swift
+      - path: TimeTap/LiveActivity/RunningBlockIntents.swift
+      - path: TimeTap/Theme.swift
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: app.timetap.ios.widget
+        DEVELOPMENT_TEAM: "Y3NGT7263T"
+        CODE_SIGN_STYLE: Automatic
+        INFOPLIST_FILE: TimeTapWidget/Info.plist
+        INFOPLIST_KEY_CFBundleDisplayName: timetap
+        INFOPLIST_KEY_UIApplicationSceneManifest_Generation: NO
+        INFOPLIST_KEY_UILaunchScreen_Generation: NO
+        SKIP_INSTALL: YES
+        LD_RUNPATH_SEARCH_PATHS: "$(inherited) @executable_path/Frameworks @executable_path/../../Frameworks"
+        TARGETED_DEVICE_FAMILY: "1"
   TimeTapTests:
     type: bundle.unit-test
     platform: iOS
@@ -62,6 +85,7 @@ schemes:
     build:
       targets:
         TimeTap: all
+        TimeTapWidget: all
         TimeTapTests: [test]
     test:
       targets:

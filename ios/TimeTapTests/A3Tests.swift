@@ -74,7 +74,7 @@ final class A3Tests: TimeTapTestCase {
             store.tapCategory("DW")
             XCTAssertTrue(fake.events.isEmpty)
             XCTAssertTrue(store.lastInsertFailed)
-            XCTAssertFalse(store.syncLabel.contains("SYNCED"))
+            XCTAssertFalse(store.syncLabel.contains("synced"))
             fake.failInsert = false
             store.tapCategory("DW")
             XCTAssertEqual(fake.events.count, 1)
