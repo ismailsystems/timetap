@@ -54,6 +54,7 @@ targets:
       - path: TimeTapWidget
       - path: TimeTap/LiveActivity/RunningBlockAttributes.swift
       - path: TimeTap/LiveActivity/RunningBlockIntents.swift
+      - path: TimeTap/LiveActivity/ElapsedTimer.swift
       - path: TimeTap/Theme.swift
     settings:
       base:
@@ -80,6 +81,20 @@ targets:
         GENERATE_INFOPLIST_FILE: YES
         DEVELOPMENT_TEAM: "Y3NGT7263T"
         CODE_SIGN_STYLE: Automatic
+  TimeTapUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources:
+      - path: TimeTapUITests
+    dependencies:
+      - target: TimeTap
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: app.timetap.ios.uitests
+        GENERATE_INFOPLIST_FILE: YES
+        DEVELOPMENT_TEAM: "Y3NGT7263T"
+        CODE_SIGN_STYLE: Automatic
+        TEST_TARGET_NAME: TimeTap
 schemes:
   TimeTap:
     build:
@@ -87,6 +102,8 @@ schemes:
         TimeTap: all
         TimeTapWidget: all
         TimeTapTests: [test]
+        TimeTapUITests: [test]
     test:
       targets:
         - TimeTapTests
+        - TimeTapUITests

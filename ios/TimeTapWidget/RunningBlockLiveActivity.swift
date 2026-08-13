@@ -166,15 +166,7 @@ struct RunningBlockLiveActivity: Widget {
         width: CGFloat,
         align: Alignment
     ) -> some View {
-        let textAlign: TextAlignment = align == .trailing ? .trailing : .leading
-        return Text(timerInterval: range, countsDown: false, showsHours: true)
-            .font(.system(size: size, weight: .heavy).monospacedDigit())
-            .foregroundStyle(Theme.accentOn)
-            .multilineTextAlignment(textAlign)
-            .lineLimit(1)
-            .minimumScaleFactor(0.6)
-            .frame(width: width, height: size + 4, alignment: align)
-            .clipped()
+        ElapsedTimer(range: range, size: size, width: width, align: align)
     }
 
     private func categoryBar(_ hex: String?, height: CGFloat) -> some View {

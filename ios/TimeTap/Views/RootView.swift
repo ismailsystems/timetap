@@ -26,8 +26,12 @@ struct RootView: View {
             CalendarPickerView()
                 .environmentObject(store)
         }
-        .onAppear { GoogleAuth.restore { store.boot() } }
+        .onAppear {
+            if TimeTapApp.isUISmoke { return }
+            GoogleAuth.restore { store.boot() }
+        }
         .onChange(of: scenePhase) { _, phase in
+            if TimeTapApp.isUISmoke { return }
             if phase == .active { store.refreshOnReturn() }
         }
         .onOpenURL { url in

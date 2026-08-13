@@ -116,6 +116,7 @@ struct CaptureView: View {
                                     .contentShape(Rectangle())
                             }
                             .buttonStyle(.plain)
+                            .accessibilityIdentifier("elapsed")
                             .accessibilityLabel(nowAccessibility)
                             .accessibilityHint("Dismisses the keyboard")
                             if showAddNote {
@@ -170,6 +171,7 @@ struct CaptureView: View {
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .accessibilityIdentifier("addNote")
         .accessibilityLabel("Add note")
         .accessibilityHint("Opens the note field")
     }
@@ -188,6 +190,7 @@ struct CaptureView: View {
             .onChange(of: store.open?.text) { _, text in
                 if focus != .note { noteDraft = text ?? "" }
             }
+            .accessibilityIdentifier("noteField")
             .accessibilityLabel("Note for the running block")
     }
 
@@ -463,7 +466,9 @@ struct CaptureView: View {
             .background(Theme.panel)
         }
         .buttonStyle(.plain)
+        .accessibilityIdentifier("sitChip")
         .accessibilityAddTraits(.isSelected)
+        .accessibilityValue(sitting ? "SITTING" : "STANDING")
         .accessibilityLabel(sitting ? "Sitting for \(postureElapsed)" : "Standing for \(postureElapsed)")
         .accessibilityHint(
             sitting

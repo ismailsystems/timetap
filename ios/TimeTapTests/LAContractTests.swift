@@ -1,17 +1,43 @@
 import XCTest
+import notify
 @testable import TimeTap
+import notify
+
+private final class DarwinHits: @unchecked Sendable {
+    var toggle = 0
+    var stopSit = 0
+    var endDay = 0
+}
+
+private let darwinHits = DarwinHits()
+private var darwinNotifyTokens: [Int32] = []
 
 @MainActor
 final class LAContractTests: TimeTapTestCase {
+
+    override func setUp() {
+        super.setUp()
+        LiveActivityDarwin.onToggleSit = {}
+        LiveActivityDarwin.onStopSit = {}
+        LiveActivityDarwin.onEndDay = {}
+    }
+
     override func tearDown() {
-        LiveActivityActions.toggleSit = {}
-        LiveActivityActions.stopSit = {}
-        LiveActivityActions.endDay = {}
+        darwinNotifyTokens.forEach { notify_cancel($0) }
+        darwinNotifyTokens = []
+        darwinHits.toggle = 0
+        darwinHits.stopSit = 0
+        darwinHits.endDay = 0
+        LiveActivityDarwin.onToggleSit = {}
+        LiveActivityDarwin.onStopSit = {}
+        LiveActivityDarwin.onEndDay = {}
         super.tearDown()
     }
 
     func testIntentsAreUndiscoverableBackgroundLiveActivityIntents() throws {
         let text = try iosSource("TimeTap/LiveActivity/RunningBlockIntents.swift")
+        XCTAssertFalse(text.contains("= {}"), "empty LiveActivityActions defaults are gone")
+        XCTAssertFalse(text.contains("enum LiveActivityActions"), "intents post Darwin, not empty closures")
         let toggle = slice(text, from: "struct ToggleSitIntent", to: "struct StopSitIntent")
         let stopSit = slice(text, from: "struct StopSitIntent", to: "struct StopBlockIntent")
         let stopBlock = slice(text, from: "struct StopBlockIntent")
@@ -30,10 +56,16 @@ final class LAContractTests: TimeTapTestCase {
                 body.contains("isDiscoverable = false")
                     || body.contains("isDiscoverable: Bool = false")
             )
+            XCTAssertTrue(body.contains("LiveActivityDarwin.post"))
+            XCTAssertFalse(body.contains("openAppWhenRun = true"))
         }
-        XCTAssertTrue(toggle.contains("LiveActivityActions.toggleSit()"))
-        XCTAssertTrue(stopSit.contains("LiveActivityActions.stopSit()"))
-        XCTAssertTrue(stopBlock.contains("LiveActivityActions.endDay()"))
+        XCTAssertTrue(toggle.contains("LiveActivityDarwin.toggleSit"))
+        XCTAssertTrue(stopSit.contains("LiveActivityDarwin.stopSit"))
+        XCTAssertTrue(stopBlock.contains("LiveActivityDarwin.endDay"))
+        XCTAssertTrue(text.contains("app.timetap.ios.toggleSit"))
+        XCTAssertTrue(text.contains("app.timetap.ios.stopSit"))
+        XCTAssertTrue(text.contains("app.timetap.ios.endDay"))
+        XCTAssertTrue(text.contains("CFNotificationCenterGetDarwinNotifyCenter"))
         XCTAssertFalse(stopBlock.contains("closeSit"))
         XCTAssertFalse(stopBlock.contains("stopSit"))
         XCTAssertFalse(ToggleSitIntent.openAppWhenRun)
@@ -44,38 +76,31 @@ final class LAContractTests: TimeTapTestCase {
         XCTAssertFalse(StopBlockIntent.isDiscoverable)
     }
 
-    func testIntentPerformCallsLiveActivityActions() async throws {
-        var toggled = 0
-        var stoppedSit = 0
-        var endedDay = 0
-        LiveActivityActions.toggleSit = { toggled += 1 }
-        LiveActivityActions.stopSit = { stoppedSit += 1 }
-        LiveActivityActions.endDay = { endedDay += 1 }
+    func testIntentPerformPostsDarwin() async throws {
+        installDarwinHits()
         _ = try await ToggleSitIntent().perform()
-        XCTAssertEqual(toggled, 1)
-        XCTAssertEqual(stoppedSit, 0)
-        XCTAssertEqual(endedDay, 0)
+        await waitHits({ darwinHits.toggle >= 1 })
+        XCTAssertGreaterThanOrEqual(darwinHits.toggle, 1)
+        XCTAssertEqual(darwinHits.stopSit, 0)
+        XCTAssertEqual(darwinHits.endDay, 0)
         _ = try await StopSitIntent().perform()
-        XCTAssertEqual(toggled, 1)
-        XCTAssertEqual(stoppedSit, 1)
-        XCTAssertEqual(endedDay, 0)
+        await waitHits({ darwinHits.stopSit >= 1 })
+        XCTAssertGreaterThanOrEqual(darwinHits.toggle, 1)
+        XCTAssertGreaterThanOrEqual(darwinHits.stopSit, 1)
+        XCTAssertEqual(darwinHits.endDay, 0)
         _ = try await StopBlockIntent().perform()
-        XCTAssertEqual(toggled, 1)
-        XCTAssertEqual(stoppedSit, 1)
-        XCTAssertEqual(endedDay, 1)
+        await waitHits({ darwinHits.endDay >= 1 })
+        XCTAssertGreaterThanOrEqual(darwinHits.toggle, 1)
+        XCTAssertGreaterThanOrEqual(darwinHits.stopSit, 1)
+        XCTAssertGreaterThanOrEqual(darwinHits.endDay, 1)
     }
 
     func testAppInitWiresLiveActivityActions() throws {
         let text = try iosSource("TimeTap/TimeTapApp.swift")
-        XCTAssertTrue(
-            text.contains("LiveActivityActions.toggleSit = { await store.handleSitIntent() }")
-        )
-        XCTAssertTrue(
-            text.contains("LiveActivityActions.stopSit = { await store.handleStopSitIntent() }")
-        )
-        XCTAssertTrue(
-            text.contains("LiveActivityActions.endDay = { await store.handleStopIntent() }")
-        )
+        XCTAssertTrue(text.contains("LiveActivityDarwin.observe"))
+        XCTAssertTrue(text.contains("store.handleSitIntent()"))
+        XCTAssertTrue(text.contains("store.handleStopSitIntent()"))
+        XCTAssertTrue(text.contains("store.handleStopIntent()"))
     }
 
     func testHandleStopIntentEndsDayWithoutClosingSit() throws {
@@ -119,7 +144,11 @@ final class LAContractTests: TimeTapTestCase {
         XCTAssertTrue(widget.contains("path: TimeTapWidget"))
         XCTAssertTrue(widget.contains("TimeTap/LiveActivity/RunningBlockAttributes.swift"))
         XCTAssertTrue(widget.contains("TimeTap/LiveActivity/RunningBlockIntents.swift"))
+        XCTAssertTrue(widget.contains("TimeTap/LiveActivity/ElapsedTimer.swift"))
         XCTAssertTrue(widget.contains("TimeTap/Theme.swift"))
+        XCTAssertTrue(yml.contains("TimeTapUITests"))
+        XCTAssertTrue(yml.contains("PRODUCT_BUNDLE_IDENTIFIER: app.timetap.ios.uitests"))
+        XCTAssertTrue(yml.contains("- TimeTapUITests"))
     }
 
     func testContentStateHasBlockAndTimerRanges() throws {
@@ -180,6 +209,33 @@ final class LAContractTests: TimeTapTestCase {
         XCTAssertNil(store.sit)
         XCTAssertTrue(store.queue.contains { $0.type == "closeSit" })
         XCTAssertEqual(store.standStartMs, now)
+    }
+
+    private func installDarwinHits() {
+        darwinHits.toggle = 0
+        darwinHits.stopSit = 0
+        darwinHits.endDay = 0
+        darwinNotifyTokens.forEach { notify_cancel($0) }
+        darwinNotifyTokens = []
+        for name in [LiveActivityDarwin.toggleSit, LiveActivityDarwin.stopSit, LiveActivityDarwin.endDay] {
+            var token: Int32 = 0
+            notify_register_dispatch(name, &token, .main) { _ in
+                switch name {
+                case LiveActivityDarwin.toggleSit: darwinHits.toggle += 1
+                case LiveActivityDarwin.stopSit: darwinHits.stopSit += 1
+                case LiveActivityDarwin.endDay: darwinHits.endDay += 1
+                default: break
+                }
+            }
+            darwinNotifyTokens.append(token)
+        }
+    }
+
+    private func waitHits(_ ready: () -> Bool) async {
+        for _ in 0..<40 {
+            if ready() { return }
+            try? await Task.sleep(nanoseconds: 10_000_000)
+        }
     }
 
     private func iosSource(_ relative: String) throws -> String {

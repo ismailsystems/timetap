@@ -57,7 +57,7 @@ final class LAIslandTests: TimeTapTestCase {
     }
 
     func testElapsedTimerIsClippedNotFlexible() throws {
-        let elapsed = slice(try liveActivity(), from: "private func elapsed(", to: "private func categoryBar(")
+        let elapsed = try read("TimeTap/LiveActivity/ElapsedTimer.swift")
         XCTAssertTrue(
             elapsed.contains("Text(timerInterval: range, countsDown: false, showsHours: true)"),
             "Island timers must count up and show hours"
@@ -77,6 +77,10 @@ final class LAIslandTests: TimeTapTestCase {
             elapsed.contains(".frame(maxWidth: .infinity)"),
             "timer must not expand to infinity"
         )
+        let la = try liveActivity()
+        XCTAssertTrue(la.contains("ElapsedTimer("), "Live Activity must host ElapsedTimer")
+        let wrapper = slice(la, from: "private func elapsed(", to: "private func categoryBar(")
+        XCTAssertTrue(wrapper.contains("ElapsedTimer("), "elapsed() must wrap ElapsedTimer")
     }
 
     func testPostureNamesStandingOnIslandAndNotSittingOnLockScreen() throws {

@@ -166,8 +166,19 @@ final class UTests: TimeTapTestCase {
         XCTAssertTrue(text.contains("NOT SITTING"))
         XCTAssertTrue(text.contains("islandBlock"), "Island left is the running category and its duration")
         XCTAssertTrue(text.contains("islandPosture"), "Island right is sitting or not sitting and that duration")
-        XCTAssertTrue(text.contains("frame(width: width, height: size + 4, alignment: align)"), "Island timers must not claim a huge slot")
-        XCTAssertTrue(text.contains(".clipped()"), "timerInterval overflows its frame unless clipped")
+        let elapsed = try String(
+            contentsOf: URL(fileURLWithPath: #filePath)
+                .deletingLastPathComponent()
+                .deletingLastPathComponent()
+                .appendingPathComponent("TimeTap/LiveActivity/ElapsedTimer.swift"),
+            encoding: .utf8
+        )
+        XCTAssertTrue(
+            elapsed.contains("frame(width: width, height: size + 4, alignment: align)"),
+            "Island timers must not claim a huge slot"
+        )
+        XCTAssertTrue(elapsed.contains(".clipped()"), "timerInterval overflows its frame unless clipped")
+        XCTAssertTrue(text.contains("ElapsedTimer("), "Live Activity must host ElapsedTimer")
         XCTAssertTrue(text.contains("\"STANDING\"") || text.contains("STANDING"), "compact right names standing")
         XCTAssertTrue(text.contains("compactLeading"))
         XCTAssertTrue(text.contains("compactTrailing"))

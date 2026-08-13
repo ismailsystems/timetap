@@ -37,6 +37,20 @@
          </BuildActionEntry>
          <BuildActionEntry
             buildForTesting = "YES"
+            buildForRunning = "NO"
+            buildForProfiling = "NO"
+            buildForArchiving = "NO"
+            buildForAnalyzing = "NO">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "8E7B3E1883B4FE47C6917EAA"
+               BuildableName = "TimeTapUITests.xctest"
+               BlueprintName = "TimeTapUITests"
+               ReferencedContainer = "container:TimeTap.xcodeproj">
+            </BuildableReference>
+         </BuildActionEntry>
+         <BuildActionEntry
+            buildForTesting = "YES"
             buildForRunning = "YES"
             buildForProfiling = "YES"
             buildForArchiving = "YES"
@@ -75,6 +89,17 @@
                BlueprintIdentifier = "2FABA00A70E3E5F3EE9C003E"
                BuildableName = "TimeTapTests.xctest"
                BlueprintName = "TimeTapTests"
+               ReferencedContainer = "container:TimeTap.xcodeproj">
+            </BuildableReference>
+         </TestableReference>
+         <TestableReference
+            skipped = "NO"
+            parallelizable = "NO">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "8E7B3E1883B4FE47C6917EAA"
+               BuildableName = "TimeTapUITests.xctest"
+               BlueprintName = "TimeTapUITests"
                ReferencedContainer = "container:TimeTap.xcodeproj">
             </BuildableReference>
          </TestableReference>
