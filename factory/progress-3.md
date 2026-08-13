@@ -14,7 +14,7 @@ Baseline (2026-08-12, `main` at `1f84fce`): **1196 passed / 0 failed** · lint a
 | B2 | B | done | 1 | ApplyOps against FakeCalendar. Vacuity: drop already-closed guard → stretch red (1700010800000 ≠ 1700003600000); restored. Checker PASS. |
 | B3 | B | done | 1 | undoSwitch + staleGuard Chicago. Vacuity: skip `if ne != nil return` → overtaken test red (2 #open); restored. Checker PASS. MISTAP 20s not HANDOFF 30s. |
 | B4 | B | done | 1 | getState: findOpen + staleGuard + today. Lunch → UNFILED. Read error throws. Checker PASS. today skips UNLOGGED (GAS). |
-| C1 | C | pending | 0 | |
+| C1 | C | done | 2 | Flush → ApplyOps + Calendar HTTP. 401 refresh once; second 401 no loop. 429/500 backoff then dead at 5. 403 retried then set aside. Attempt 1 checker FAIL (getState discarded). Attempt 2: adoptServerState; undo leaves open=DW. Checker PASS (cursor-grok-4.6-high-fast). |
 | C2 | C | pending | 0 | |
 | C3 | C | pending | 0 | |
 | D1 | D | pending | 0 | |
@@ -39,3 +39,4 @@ Do not set `RUN_LIVE=1`. Record each skipped live criterion here when you hit it
 - A3 live DW insert — SKIP 2026-08-12. No `RUN_LIVE=1`. FakeCalendar only.
 - A4 leftover API_TOKEN / live HTTPS — SKIP 2026-08-12. No `RUN_LIVE=1`. Grep + XCTest only.
 - C3 live phone parity + rollup sees titles
+

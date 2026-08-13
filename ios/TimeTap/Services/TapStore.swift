@@ -90,7 +90,7 @@ final class TapStore: ObservableObject {
     private var flushing = false
     private var localGen = 0
     private var lastStateAt = Date()
-    private var retryDelay: TimeInterval = 4
+    private(set) var retryDelay: TimeInterval = 4
     private var stateAfterBootDrain = false
     private var stateAfterCorrectiveDrain = false
     private var catByKey: [String: Category] = [:]
@@ -184,16 +184,15 @@ final class TapStore: ObservableObject {
         unreadableOpen = false
         scrollToKey = key
         persist()
-        do {
-            _ = try CalendarAPI.openActual(key: key, at: now, ref: ref)
-            if CalendarAPI.testCalendar == nil {
-                Task { await self.pushInsert() }
-            } else {
+        if CalendarAPI.testCalendar != nil {
+            do {
+                _ = try CalendarAPI.openActual(key: key, at: now, ref: ref)
                 lastInsertFailed = false
+            } catch {
+                lastInsertFailed = true
             }
-        } catch {
-            lastInsertFailed = true
         }
+        if !lastInsertFailed { flush() }
         paintSync()
     }
 
@@ -591,7 +590,7 @@ final class TapStore: ObservableObject {
             return
         }
         guard Credentials.isConfigured else { return }
-        // Path 3: Calendar HTTP is C1. Do not call Apps Script.
+        await flushAsync()
     }
 
     private func applyConfig(_ cfg: ClientConfig) {
@@ -604,8 +603,33 @@ final class TapStore: ObservableObject {
     }
 
     private func loadServerState(corrective: Bool = false) async {
-        _ = corrective
-        // B4/C1 read Calendar. Do not call Apps Script.
+        CalendarAPI.getStateCalls += 1
+        let gen = localGen
+        do {
+            let st = try ApplyOps.getState()
+            if adoptServerState(st, gen: gen) {
+                lastStateAt = Date()
+            } else if corrective {
+                await loadCorrectiveState()
+            }
+        } catch {
+            banner = error.localizedDescription
+        }
+    }
+
+    private func adoptServerState(_ st: ServerState, gen: Int) -> Bool {
+        if gen != localGen || !queue.isEmpty { return false }
+        let wasRef = open?.ref
+        let wasSit = sit?.ref
+        open = st.open
+        sit = st.sit
+        today = st.today ?? []
+        if wasRef != open?.ref || wasSit != sit?.ref {
+            closeBlockSheets()
+        }
+        persist()
+        refreshUnreadable()
+        return true
     }
 
     private func loadCorrectiveState() async {
@@ -619,13 +643,94 @@ final class TapStore: ObservableObject {
 
     func flush() {
         flushTask?.cancel()
-        flushTask = Task { await flushAsync() }
+        flushTask = Task { [weak self] in await self?.flushAsync() }
+    }
+
+    func flushNow() async {
+        flushTask?.cancel()
+        flushTask = nil
+        await flushAsync()
     }
 
     private func flushAsync() async {
         guard !flushing, Credentials.isConfigured else { return }
-        // C1 flushes to Calendar HTTP. Path 2 Apps Script is gone.
+        let batch = Array(queue.prefix(40))
+        guard !batch.isEmpty else {
+            paintSync()
+            if stateAfterBootDrain {
+                stateAfterBootDrain = false
+                await loadServerState()
+            }
+            if stateAfterCorrectiveDrain {
+                await loadCorrectiveState()
+            }
+            return
+        }
+        flushing = true
         paintSync()
+
+        var didRefresh = false
+        while true {
+            do {
+                let result = try await CalendarAPI.flushOps(batch)
+                let done = Set(result.applied ?? [])
+                queue.removeAll { done.contains($0.id) }
+                saveQueue()
+                lastInsertFailed = false
+                flushing = false
+                if batch.contains(where: { $0.type == "undoSwitch" && done.contains($0.id) }) {
+                    await loadCorrectiveState()
+                }
+                if let err = result.errors?.first {
+                    quarantine(err)
+                    scheduleRetry()
+                } else {
+                    retryDelay = 4
+                    if !queue.isEmpty {
+                        await flushAsync()
+                    } else {
+                        if stateAfterBootDrain {
+                            stateAfterBootDrain = false
+                            await loadServerState()
+                        }
+                        if stateAfterCorrectiveDrain {
+                            await loadCorrectiveState()
+                        }
+                    }
+                }
+                paintSync()
+                return
+            } catch let http as CalendarHTTPError {
+                if http.status == 401 {
+                    if didRefresh {
+                        flushing = false
+                        paintSync()
+                        return
+                    }
+                    try? await GoogleAuth.refreshAccessToken()
+                    didRefresh = true
+                    continue
+                }
+                if http.status == 429 || http.status >= 500 || http.status == 403 {
+                    flushing = false
+                    if let id = queue.first?.id {
+                        quarantine(.init(id: id, message: "HTTP \(http.status)"))
+                    }
+                    if !queue.isEmpty { scheduleRetry() }
+                    paintSync()
+                    return
+                }
+                flushing = false
+                scheduleRetry()
+                paintSync()
+                return
+            } catch {
+                flushing = false
+                scheduleRetry()
+                paintSync()
+                return
+            }
+        }
     }
 
     private func quarantine(_ err: ApplyResult.ApplyError) {
@@ -672,9 +777,11 @@ final class TapStore: ObservableObject {
     private func scheduleRetry() {
         let delay = retryDelay
         retryDelay = min(retryDelay * 2, 60)
-        Task {
+        flushTask?.cancel()
+        flushTask = Task { [weak self] in
             try? await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
-            await flushAsync()
+            guard !Task.isCancelled else { return }
+            await self?.flushAsync()
         }
     }
 

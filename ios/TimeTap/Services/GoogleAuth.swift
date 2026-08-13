@@ -11,6 +11,7 @@ enum GoogleAuth {
     static var lastSignInCancelled = false
     static var didFetchCalendarList = false
     static var didAttemptCalendarWrite = false
+    static var refreshCount = 0
 
     static var hasSession: Bool {
         if let testHasSession { return testHasSession }
@@ -65,12 +66,27 @@ enum GoogleAuth {
         GIDSignIn.sharedInstance.restorePreviousSignIn { _, _ in }
     }
 
+    static func refreshAccessToken() async throws {
+        refreshCount += 1
+        if testHasSession != nil { return }
+        guard let user = GIDSignIn.sharedInstance.currentUser else {
+            throw URLError(.userAuthenticationRequired)
+        }
+        try await withCheckedThrowingContinuation { (cont: CheckedContinuation<Void, Error>) in
+            user.refreshTokensIfNeeded { _, error in
+                if let error { cont.resume(throwing: error) }
+                else { cont.resume() }
+            }
+        }
+    }
+
     static func resetForTests() {
         testHasSession = false
         testAccessToken = nil
         lastSignInCancelled = false
         didFetchCalendarList = false
         didAttemptCalendarWrite = false
+        refreshCount = 0
     }
 
     private static func isCancel(_ error: Error) -> Bool {
