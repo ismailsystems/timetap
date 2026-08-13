@@ -548,11 +548,6 @@ final class TapStore: ObservableObject {
             raw.append(("UNLOGGED", max(now - dayStart, 1), nil, true, false, 20, ""))
             prevEnd = now
         } else {
-            let firstStart = blocks[0].startMs
-            if firstStart - dayStart > 5000 {
-                raw.append(("UNLOGGED", firstStart - dayStart, nil, true, false, 20, ""))
-                prevEnd = firstStart
-            }
             for b in blocks {
                 if let pe = prevEnd, b.startMs - pe > gapMs {
                     raw.append(("UNLOGGED", b.startMs - pe, nil, true, false, 20, ""))
@@ -578,7 +573,7 @@ final class TapStore: ObservableObject {
             raw.append(("UNLOGGED", now - pe, nil, true, false, 20, ""))
         }
 
-        let labelStart = (blocks.isEmpty || (blocks.first.map { $0.startMs - dayStart > 5000 } ?? false))
+        let labelStart = blocks.isEmpty
             ? dayStart
             : max(blocks[0].startMs, dayStart)
         let span = max(now - labelStart, 60_000)
@@ -1191,7 +1186,9 @@ final class TapStore: ObservableObject {
             return
         }
         if !dead.isEmpty {
-            syncLabel = "\(dead.count) SET ASIDE · RETRYING"
+            syncLabel = queue.isEmpty
+                ? "\(dead.count) SET ASIDE"
+                : "\(dead.count) SET ASIDE · RETRYING"
             syncFailed = true
         } else if flushing && !queue.isEmpty {
             syncLabel = "SYNCING · \(queue.count)"
@@ -1231,9 +1228,10 @@ final class TapStore: ObservableObject {
             blocks = b
         }
         queue.forEach(noteBlock)
+        if !dead.isEmpty { banner = deadMsg() }
         if let data = UserDefaults.standard.data(forKey: configKey) {
             if let cfg = try? JSONDecoder().decode(ClientConfig.self, from: data) {
-                applyConfig(cfg)
+                applyConfig(Self.migrateSeedColors(cfg))
             } else {
                 applyConfig(.seed, write: false)
             }
@@ -1267,6 +1265,17 @@ final class TapStore: ObservableObject {
         if let data = try? JSONEncoder().encode(blocks) {
             UserDefaults.standard.set(data, forKey: blocksKey)
         }
+    }
+
+    /// Old installs seeded POOP as lavender 1 (DW's hue). Banana is 5.
+    static func migrateSeedColors(_ cfg: ClientConfig) -> ClientConfig {
+        var cfg = cfg
+        guard let i = cfg.categories.firstIndex(where: {
+            $0.key == "POOP" && ($0.color == "1" || $0.hex.lowercased() == "#7986cb")
+        }) else { return cfg }
+        cfg.categories[i].color = "5"
+        cfg.categories[i].hex = "#f6bf26"
+        return cfg
     }
 
     private struct Persisted: Codable {

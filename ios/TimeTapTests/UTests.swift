@@ -56,6 +56,8 @@ final class UTests: TimeTapTestCase {
         XCTAssertLessThan(forEach.lowerBound, add.lowerBound, "+ must sit under the category list")
         XCTAssertTrue(text.contains("Theme.font("), "capture type must scale")
         XCTAssertTrue(text.contains("running: store.open?.key == cat.key"), "running row must show elapsed")
+        XCTAssertTrue(text.contains("openDeadDrawer()"), "SET ASIDE must open the set-aside list")
+        XCTAssertTrue(text.contains("minimumScaleFactor(0.6)"), "Deep work must shrink before it ellipsizes")
     }
 
     func testOpenBlockNoteShowsOnTheRail() {
@@ -335,6 +337,79 @@ final class UTests: TimeTapTestCase {
         XCTAssertTrue(items[0].isGap)
         XCTAssertEqual(items[0].name, "UNLOGGED")
         XCTAssertGreaterThan(items[0].ms, 5_000)
+    }
+
+    func testRailStartsAtFirstBlockNotMidnight() {
+        GoogleAuth.testHasSession = true
+        GoogleAuth.testAccessToken = "t"
+        Credentials.planId = "p1"
+        Credentials.actualId = "a1"
+        Credentials.sittingId = "s1"
+        ApplyOps.timeZone = TimeZone(secondsFromGMT: 0)!
+        let now: Double = 1_700_000_000_000
+        let dayStart = Format.dayStartMs(now)
+        let first = dayStart + 9 * 3_600_000
+        let store = TapStore()
+        store.today = [
+            TodayBlock(ref: "a", key: "DW", startMs: first, endMs: first + 120_000)
+        ]
+        let (label, items) = store.railItems(budget: 400, now: first + 120_000)
+        XCTAssertEqual(items.first?.name, "DEEP WORK")
+        XCTAssertFalse(items.contains { $0.isGap && $0.ms > 8 * 3_600_000 })
+        XCTAssertEqual(label, "TODAY · \(Format.clock(first))")
+    }
+
+    func testLavenderPOOPMigratesToBanana() {
+        var cfg = ClientConfig.seed
+        guard let i = cfg.categories.firstIndex(where: { $0.key == "POOP" }) else {
+            return XCTFail("no POOP")
+        }
+        cfg.categories[i].color = "1"
+        cfg.categories[i].hex = "#7986cb"
+        let out = TapStore.migrateSeedColors(cfg)
+        XCTAssertEqual(out.categories[i].color, "5")
+        XCTAssertEqual(out.categories[i].hex, "#f6bf26")
+    }
+
+    func testPersistedLavenderPOOPBecomesBananaOnLoad() {
+        var cfg = ClientConfig.seed
+        guard let i = cfg.categories.firstIndex(where: { $0.key == "POOP" }) else {
+            return XCTFail("no POOP")
+        }
+        cfg.categories[i].color = "1"
+        cfg.categories[i].hex = "#7986cb"
+        if let data = try? JSONEncoder().encode(cfg) {
+            UserDefaults.standard.set(data, forKey: "tt.config.v1")
+        }
+        GoogleAuth.testHasSession = false
+        let store = TapStore()
+        let poop = store.categories.first { $0.key == "POOP" }
+        XCTAssertEqual(poop?.color, "5")
+        XCTAssertEqual(poop?.hex, "#f6bf26")
+    }
+
+    func testSetAsideDoesNotClaimRetryingWhenQueueIsEmpty() {
+        if let data = try? JSONEncoder().encode([
+            DeadEntry(
+                at: 1_700_000_000_000,
+                why: "insert failed",
+                op: Op(id: "o1", type: "openActual", ref: "abcdefghijklmnop", key: "DW"),
+                key: "DW",
+                startMs: 1_700_000_000_000
+            )
+        ]) {
+            UserDefaults.standard.set(data, forKey: "tt.dead.v1")
+        }
+        GoogleAuth.testHasSession = true
+        GoogleAuth.testAccessToken = "t"
+        Credentials.planId = "p1"
+        Credentials.actualId = "a1"
+        Credentials.sittingId = "s1"
+        let store = TapStore()
+        store.discardDead(token: "nope")
+        XCTAssertEqual(store.syncLabel, "1 SET ASIDE")
+        XCTAssertFalse(store.syncLabel.contains("RETRYING"))
+        XCTAssertNotNil(store.banner)
     }
 
     func testPersistedTodaySurvivesRelaunch() {

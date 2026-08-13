@@ -142,7 +142,11 @@ struct CaptureView: View {
                 Spacer(minLength: 8)
                 Button {
                     finishNoteEdit()
-                    store.showSettings = true
+                    if store.deadCount > 0 {
+                        store.openDeadDrawer()
+                    } else {
+                        store.showSettings = true
+                    }
                 } label: {
                     Text(store.syncLabel)
                         .font(Theme.font(10, weight: .bold))
@@ -154,7 +158,7 @@ struct CaptureView: View {
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel(store.syncLabel)
-                .accessibilityHint("Opens settings")
+                .accessibilityHint(store.deadCount > 0 ? "Opens set-aside writes" : "Opens settings")
             }
             .padding(.top, 8)
 
@@ -456,14 +460,16 @@ struct CaptureView: View {
                 .font(Theme.font(20, weight: .semibold))
                 .fontWidth(.standard)
                 .lineLimit(1)
+                .minimumScaleFactor(0.6)
                 .foregroundStyle(long ? Theme.flag : (dim ? Theme.dim : Theme.fg))
             if running {
                 Spacer(minLength: 4)
                 Text(elapsed)
-                    .font(Theme.font(14, weight: .bold).monospacedDigit())
+                    .font(Theme.font(12, weight: .bold).monospacedDigit())
                     .foregroundStyle(long ? Theme.flag : Theme.dim)
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
+                    .layoutPriority(0)
             }
         }
         .padding(.leading, 12)
@@ -480,6 +486,16 @@ struct CaptureView: View {
         VStack(alignment: .leading, spacing: 0) {
             ForEach(store.categories) { cat in
                 categoryRow(face: cat.face, hex: cat.hex, dim: false)
+                    .fixedSize()
+                    .background(
+                        GeometryReader { g in
+                            Color.clear.preference(key: CatWidthKey.self, value: g.size.width)
+                        }
+                    )
+                categoryRow(
+                    face: cat.face, hex: cat.hex, dim: false,
+                    running: true, elapsed: "12h00", long: false
+                )
                     .fixedSize()
                     .background(
                         GeometryReader { g in

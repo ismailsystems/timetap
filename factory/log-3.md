@@ -1,4 +1,5 @@
-# Log — Path 3
+## [2026-08-13 13:45] R11 | Screenshot: rail starts at first block (Path 2), not midnight. Persist POOP 1→5. Running row keeps the name. SET ASIDE is not RETRYING when the queue is empty.
+
 
 ## [2026-08-13 13:40] R10 | Remaining review items. POOP color 5. Dynamic Type. + last. Note while open. Persist today. Rail lead UNLOGGED. Confirm flushes old calendar. Picker 401. PATCH 404→POST. Retry-After. Skip cancelled. Format TZ. Arm DELETE SITTING. Running-row edge. Rail onFill. XCTest 141/0. GAS 1198/0.
 
