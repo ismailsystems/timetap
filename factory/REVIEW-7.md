@@ -8,11 +8,12 @@ Path 3 on `path-3-ios` (`1f84fce..4bd123f`, thirteen task commits A1–D2).
 per-task criteria). `factory/progress-3.md` was treated as a claimed-done list,
 not as proof. `factory/log-3.md` and the commit messages were read only at the
 end. Three independent Task reviewers were launched (GPT 5.6 Sol Max / Fable 5
-Max / Opus 5) and told to stay read-only. They were still running at assemble
-time, and two of them mutated `ApplyOps.swift`, `TimeTapApp.swift`, and
-`project.yml` for probes; those edits were reverted before the numbers below
-were taken. Every finding that would block was reproduced by the orchestrator
-on the restored tree.
+Max / Opus 5) and told to stay read-only. Angle 1 (GPT) returned **NOT DONE**.
+Angles 2 and 3 were still running at this amend. Probe mutations to
+`ApplyOps.swift` / `TimeTapApp.swift` / `project.yml` were reverted before the
+numbers below were taken. Every finding that would block, and the two new
+auth findings from angle 1, were reproduced by the orchestrator on the
+restored tree.
 
 ---
 
@@ -21,7 +22,8 @@ on the restored tree.
 | Reviewer | Verdict |
 |---|---|
 | orchestrator (contract + suite + boot probe) | **FIX FIRST** — the overnight suite is green twice, GAS is unharmed, and the phone still does not read Calendar on boot |
-| three Task angles | **NOT IN** — still running at assemble; they are not a substitute for the measurement below |
+| angle 1 (GPT 5.6 Sol Max, contract) | **NOT DONE** — same boot-read hole; also cancel/sign-out pin the test seam so a later SDK sign-in is invisible |
+| angles 2 and 3 | **NOT IN** — still running at this amend |
 
 **The loop built a real Path 3 and it is not finished.** Capture ops, title
 grammar, flush/401/403, add-category, settings, and the README all exist and
@@ -106,21 +108,44 @@ XCTAssertNil failed: "The operation couldn’t be completed. (TimeTap.ApplyOps.R
 - severity: **blocks shipping**
 - suggested next step: Give `CalendarAPI` a getState path that lists ACTUAL + SITTING the way `liveFlush` already lists, then `ApplyOps.getState()`. Call it from empty-queue boot, from post-sign-in, from picker Confirm, and from `refreshOnReturn`. Test: boot with session+IDs and a list seam populated with a closed DW + an `#open` MTG; `today`/`open` must match; banner must be nil. Vacuity: boot with the list seam nil must go red.
 
-### 2. A1's cancel criterion is a stub
+Angle 1 independently named this hole (B4 / assertions 16 and 20 on the live path). Assertion 20's parse (Lunch → UNFILED) holds on FakeCalendar; the live miss is this same unread `getState`.
+
+### 2. Cancel or sign-out pins `testHasSession = false`, so the next SDK sign-in is invisible
+
+- what happens: Production `applyCancelledSignIn` and `signOut` write `GoogleAuth.testHasSession = false`. `hasSession` returns that Bool whenever it is non-nil, and never reads `GIDSignIn.currentUser` again. `signInFromKeyWindow` on success does not clear the seam. `SignInView` still dismisses the sheet; the next DW tap sees `hasSession == false` and shows Sign-In again.
+- how I proved it: Temporary XCTest `testCancelDoesNotPinTheTestSeamOff`: `testHasSession = nil`, then `applyCancelledSignIn()`, then `XCTAssertNil(testHasSession)`. Failed:
+
+```
+XCTAssertNil failed: "false" - production cancel must not pin testHasSession; a later SDK sign-in becomes invisible
+XCTAssertNil failed: "false" - sign-out must not pin testHasSession either
+```
+
+  Code: `GoogleAuth.swift` 16–24, 55–68, 38–52. The A1 cancel test (finding 3) hid this: it *wants* `hasSession == false` after cancel, which the stuck seam provides.
+- severity: **should fix** (user-facing in one process: cancel or sign out, then sign in without killing the app)
+- suggested next step: Cancel and sign-out must `signOut()` the SDK and set `testHasSession = nil` unless a test explicitly set the seam. After a successful `signInFromKeyWindow`, `hasSession` must follow `GIDSignIn.currentUser`.
+
+### 3. Cold restore of a Google session does not update the store
+
+- what happens: `@StateObject private var store = TapStore()` runs before `TimeTapApp.init()` calls `GoogleAuth.restore()`. Restore's callback is `{ _, _ in }` — it does not set session, dismiss Sign-In, or boot. A relaunch can show Sign-In while Google still has a user, or skip boot if `currentUser` is already present and `TapStore.init` raced ahead of restore.
+- how I proved it: `TimeTapApp.swift` 6–18; `GoogleAuth.restore` at 71–73; `TapStore.init` 110–116 reads `hasSession` once. No later callback.
+- severity: **should fix**
+- suggested next step: Restore must complete (or fail) before the store decides Sign-In vs capture, and a successful restore must `boot()`.
+
+### 4. A1's cancel criterion is a stub
 
 - what happens: `testCancelledSignInStoresNothingAndDoesNotTalkToCalendar` sets `testHasSession` / `didFetchCalendarList` / `didAttemptCalendarWrite` to true, then calls `GoogleAuth.applyCancelledSignIn()`, then asserts those flags are false. It never presents Sign-In or cancels it.
 - how I proved it: read `A1Tests.swift` and `GoogleAuth.applyCancelledSignIn()`. Production `signInFromKeyWindow` does call `applyCancelledSignIn` on `GIDSignInError.canceled`, so the wiring exists; the test does not drive it.
 - severity: **should fix**
 - suggested next step: Keep the production cancel path. Replace the stub with a test that calls the same `isCancel` branch without inventing a live Google sheet, or mark the criterion as the live Sign-In skip it actually is.
 
-### 3. Dead A3 insert path still sits next to the queue
+### 5. Dead A3 insert path still sits next to the queue
 
 - what happens: `tapCategory` calls `CalendarAPI.openActual` only when `testCalendar != nil` (A3 tests). Production enqueues and flushes. `TapStore.pushInsert` / `CalendarAPI.httpInsertPending` are never called. `retryLastInsert` is the A3 fail/retap path, not the queue.
 - how I proved it: grep `pushInsert(` — definition only. `tapCategory` lines 196–204.
 - severity: **cosmetic** (the queue is the real writer) unless a future change starts calling `pushInsert` and double-writes.
 - suggested next step: Delete `pushInsert` / `httpInsertPending`, or call one of them on purpose. Do not leave both.
 
-### 4. Shared mutable test seams
+### 6. Shared mutable test seams
 
 - what happens: `ApplyOps.actual`, `CalendarAPI.testCalendar`, `GoogleAuth.testHasSession`, and `Credentials` IDs are process globals. A parallel or overlapping run can make A3 see `colorId ""` and B1 see `?` fail to parse — both were observed in this session while another agent had mutated `ApplyOps` / `Grammar` for vacuity and had not put them back yet. On the restored tree, serial XCTest is 86/0 twice.
 - how I proved it: dirty-tree XCTest red (A3 colour, B1 `?` parse, B2 guessed close) vs restored-tree 86/0. `git checkout --` on the mutated files recovered green.
@@ -178,4 +203,10 @@ One task. Same operating loop as HANDOFF-3. Criteria first. Fake calendars only.
 - [tier 1, error] Given list throws, then `open`/`today` from persist are not wiped to a fake idle day (same spirit as B4's read-error criterion).
 - Vacuity: comment out the list call on the boot path; the first criterion goes red; put it back.
 
-Should-fix from this review may ride along if they stay small. Do not "fix" Google Sign-In because tier-2 is still skipped.
+**P3-R7-2. Cancel and sign-out must not pin the test seam**
+
+- [tier 1] Given `testHasSession == nil` (production), when cancel or sign-out runs, then `testHasSession` is still nil and `hasSession` follows `GIDSignIn.currentUser`.
+- [tier 1] Given a successful `signInFromKeyWindow` after a cancel in the same process, then `hasSession` is true (or follows the SDK user), and a DW tap is not bounced back to Sign-In for lack of session.
+- Vacuity: leave `testHasSession = false` in `applyCancelledSignIn`; the first criterion goes red; put it back.
+
+Should-fix 3–4 may ride along if they stay small. Do not "fix" Google Sign-In because tier-2 is still skipped.
