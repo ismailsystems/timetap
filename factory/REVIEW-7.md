@@ -21,18 +21,18 @@ restored tree.
 
 | Reviewer | Verdict |
 |---|---|
-| orchestrator (contract + suite + boot probe) | **FIX FIRST** — the overnight suite is green twice, GAS is unharmed, and the phone still does not read Calendar on boot |
-| angle 1 (GPT 5.6 Sol Max, contract) | **NOT DONE** — same boot-read hole; also cancel/sign-out pin the test seam so a later SDK sign-in is invisible |
-| angles 2 and 3 | **NOT IN** — still running at this amend |
+| orchestrator | **FIX FIRST** — suite green twice, GAS unharmed; the phone does not read Calendar, and `staleGuard` never writes back |
+| angle 1 (GPT 5.6 Sol Max, contract) | **NOT DONE** — boot-read hole; cancel/sign-out pin the test seam |
+| angle 3 (Claude Opus 5, user-fail) | **FIX FIRST** — same two holes, plus extra-category `colorId ""`, picker trap, and a SYNCING lie |
+| angle 2 | **NOT IN** — still running at this amend |
 
 **The loop built a real Path 3 and it is not finished.** Capture ops, title
 grammar, flush/401/403, add-category, settings, and the README all exist and
 the tests that name them pass. What blocks shipping is that `getState` on the
-phone is an in-memory function. Cold launch with a Google session and three
-calendar IDs never lists ACTUAL / SITTING over HTTP. The banner becomes
-`ApplyOps.ReadError error 0`, `today` stays empty, and the day rail only shows
-blocks closed in this process. That is B4 / contract 16's job, and it is not
-done on the path a user hits.
+phone is an in-memory function: cold launch never lists Calendar, and
+`staleGuard` / duplicate-`#open` repairs run only after `pushDiff`, so the
+22:00→07:00 `?` + `UNLOGGED` case in contract 16 cannot reach Google. Cancel
+in the Google sheet also pins a test seam and locks Sign-In until force-quit.
 
 ---
 
@@ -94,21 +94,17 @@ D2 vacuity, run by hand: delete the last-write-wins sentence from `ios/README.md
 
 ## Findings (worst first)
 
-### 1. Boot with saved Google IDs never reads Calendar
+### 1. Boot never reads Calendar, and `staleGuard` never writes back
 
-- what happens: Signed in, three IDs saved, queue empty. `RootView.onAppear` calls `boot()` → `loadServerState()` → `ApplyOps.getState()`. `ApplyOps.actual` / `.sitting` are nil on a fresh process. `getState` throws. The banner is `The operation couldn’t be completed. (TimeTap.ApplyOps.ReadError error 0.)`. `today` is not persisted and stays `[]`. The rail only shows the current `open` (and blocks closed later in this session via `railClosed`). HTML / yesterday's ACTUAL events are invisible.
-- how I proved it: Temporary XCTest `testBootWithNoInMemoryCalendarLeavesTodayEmpty` (session+IDs, `ApplyOps.resetForTests()`, `bootNow()`, `XCTAssertNil(store.banner)`). Failed twice:
+- what happens: Signed in, three IDs saved, queue empty. `boot()` → `loadServerState()` → `ApplyOps.getState()`. `ApplyOps.actual` / `.sitting` are nil on a fresh process. `getState` throws. The banner is `The operation couldn’t be completed. (TimeTap.ApplyOps.ReadError error 0.)`. `today` is not persisted and stays `[]`. The rail only shows the current `open` (and blocks closed later in this session via `railClosed`).
 
-```
-XCTAssertNil failed: "The operation couldn’t be completed. (TimeTap.ApplyOps.ReadError error 0.)"
-- boot with saved IDs must read Calendar, not fail closed
-```
+  Second half: `staleGuard` is called only from `getState` (`ApplyOps.swift:49,65`). `liveFlush` lists, `apply`s, then `pushDiff`s (`CalendarAPI.swift:297-299`). `getState` after a flush mutates that in-memory copy **after** `pushDiff` has finished. A 07:00 category tap uses `opOpenActual`, which ends the overnight DW at 07:00 with no `?` and no `UNLOGGED` gap. Contract 16 / B3 night case therefore cannot happen on a phone. `findOpen`'s duplicate-`#open` close is the same class of unpushed repair.
 
-  Code: `TapStore.swift` `loadServerState` only calls `ApplyOps.getState()`. `CalendarAPI.listEvents` is reached only from `liveFlush`. `liveFlush` runs only when `GoogleAuth.testHasSession == nil` (production flush with a real token). Sign-in success (`SignInView`) and picker Confirm (`CalendarPickerView.confirm`) do not call `boot()`. `refreshOnReturn` also calls `ApplyOps.getState()`, so it cannot repair a process that has never flushed. After the first successful flush, `ApplyOps.actual` is the last flush's snapshot — still not a dedicated read.
+- how I proved it: Temporary XCTest `testBootWithNoInMemoryCalendarLeavesTodayEmpty` failed twice with the ReadError banner. Grep: one `staleGuard` definition, callers only inside `getState`; `liveFlush` order is apply then pushDiff; `apply` does not call `staleGuard`. Angle 3's PROBE-U1 matched the same banner.
 - severity: **blocks shipping**
-- suggested next step: Give `CalendarAPI` a getState path that lists ACTUAL + SITTING the way `liveFlush` already lists, then `ApplyOps.getState()`. Call it from empty-queue boot, from post-sign-in, from picker Confirm, and from `refreshOnReturn`. Test: boot with session+IDs and a list seam populated with a closed DW + an `#open` MTG; `today`/`open` must match; banner must be nil. Vacuity: boot with the list seam nil must go red.
+- suggested next step: List ACTUAL + SITTING on boot / post-sign-in / picker Confirm / `refreshOnReturn`. After `staleGuard` (and duplicate-open repair), push the diff the way `liveFlush` already pushes apply. Test the Chicago 22:00→07:00 case against the fake calendar **after** that push, not only against `getState`'s return value. Vacuity: skip the push after `staleGuard`; the calendar must still hold an unmarked open DW.
 
-Angle 1 independently named this hole (B4 / assertions 16 and 20 on the live path). Assertion 20's parse (Lunch → UNFILED) holds on FakeCalendar; the live miss is this same unread `getState`.
+Angle 1 independently named the unread boot. Angle 3 named the unpushed `staleGuard`. Assertion 20's parse (Lunch → UNFILED) holds on FakeCalendar; the live miss is this same unread `getState`.
 
 ### 2. Cancel or sign-out pins `testHasSession = false`, so the next SDK sign-in is invisible
 
@@ -121,7 +117,7 @@ XCTAssertNil failed: "false" - sign-out must not pin testHasSession either
 ```
 
   Code: `GoogleAuth.swift` 16–24, 55–68, 38–52. The A1 cancel test (finding 3) hid this: it *wants* `hasSession == false` after cancel, which the stuck seam provides.
-- severity: **should fix** (user-facing in one process: cancel or sign out, then sign in without killing the app)
+- severity: **blocks shipping** (first-run: cancel the Google sheet, then sign in again, without force-quit)
 - suggested next step: Cancel and sign-out must `signOut()` the SDK and set `testHasSession = nil` unless a test explicitly set the seam. After a successful `signInFromKeyWindow`, `hasSession` must follow `GIDSignIn.currentUser`.
 
 ### 3. Cold restore of a Google session does not update the store
@@ -151,6 +147,36 @@ XCTAssertNil failed: "false" - sign-out must not pin testHasSession either
 - how I proved it: dirty-tree XCTest red (A3 colour, B1 `?` parse, B2 guessed close) vs restored-tree 86/0. `git checkout --` on the mutated files recovered green.
 - severity: **should fix** for the suite's honesty, not a user-facing Path 3 fault
 - suggested next step: Reset seams in `tearDown` as well as `setUp`. Do not mutate product files for vacuity on a shared tree.
+
+### 7. An added category writes `colorId ""`
+
+- what happens: `addCategory("Deep reading")` stores `color: "2"` on the `Category`. `Grammar.colorId(for:)` reads only `TT.colorIdByKey` (the seven seed keys) and returns `""` for `DEEPREAD`. `applyCatColor` skips an empty id. `eventBody` always sends `"colorId": ""`. The grid shows `#33b679`; Google gets no colour (default, or HTTP 400 — live unproven).
+- how I proved it: `C2Tests` asserts `extra.color == "2"` on the category, not on the event. `Grammar.swift:103-105`; `ApplyOps.applyCatColor` 245-248; `CalendarAPI.eventBody` 373-379. `Grammar.colorId("DEEPREAD")` is `""` by construction.
+- severity: **should fix** (contract 24's add path; colour is how rollup readers scan the calendar)
+- suggested next step: `applyCatColor` / `openActual` must use `Category.color` (or `Grammar.nextColor`'s id) for unknown keys. Vacuity: leave `colorIdByKey` as the only source; a DEEPREAD insert must go red on `colorId != "2"`.
+
+### 8. The calendar picker has no way out when the list fails
+
+- what happens: `fullScreenCover` + `interactiveDismissDisabled()`. No Cancel, Close, or Retry. `listCalendars` throw → `pick = .loaded([])`, Confirm stays disabled, raw `NSURLError` text. First sign-in on a bad radio, and Settings → Change calendars while offline, both trap until force-quit. Contract 8 is met to the letter (Confirm disabled); it did not ask for a way back.
+- how I proved it: `CalendarPickerView.swift` 9-46, 58-66. Angle 3 drove it on the simulator (Confirm disabled, swipe-down still on picker).
+- severity: **should fix**
+- suggested next step: Close (keep saved IDs) and Retry. Do not strand Settings.
+
+### 9. The header says SYNCING after the flush has stopped
+
+- what happens: A second 401 returns without `quarantine`, without a banner, without Sign-In (`TapStore.flushAsync` 738-742). Any other 4xx (400) calls `scheduleRetry` without `quarantine`, so `tries` never increments and the op never reaches dead-letter. `paintSync` still shows `SYNCING · N` while `syncFailed` is false.
+- how I proved it: `flushAsync` 737-760 vs 748-755 (403/429/5xx do quarantine). `paintSync` 1005-1009: nonempty queue → `SYNCING`. Angle 3 PROBE-U14–U16.
+- severity: **should fix**
+- suggested next step: Second 401 must prompt Sign-In (or dead-letter). Other 4xx must count a try. Do not paint SYNCING when no retry is scheduled.
+
+### 10. The eleventh add is refused by hiding Add, with no ceiling text
+
+- what happens: `CaptureView` wraps Add in `if store.canAddCategory`. At 10 the row disappears. The banner `"That is 10 categories already."` is only reachable from `addCategory`, which the UI can no longer call. C2's store test still sees the banner.
+- how I proved it: `CaptureView.swift:184-187`; `TapStore.canAddCategory` 554-556; C2Tests `testEleventhAddIsRefusedWithCeiling`.
+- severity: **cosmetic** (cap is real; the user is not told why Add left)
+- suggested next step: Keep the row disabled and show the ceiling, or show the banner when the count hits 10.
+
+Not a Path 3 regression: the keyboard covers STOP / undo / marks (`CaptureView` `.ignoresSafeArea(.keyboard)`). That file is not in `1f84fce..HEAD`. Report it; do not spend the fix loop on it unless the human asks.
 
 ---
 
@@ -183,16 +209,14 @@ Those skips are honest. They are not a pass. Finding 1 is not in that list — i
 
 ## Decisions for you
 
-1. **Fix the boot read before daily use, or accept a first-session-blind phone?** Recommendation: fix. Last-write-wins only works if the phone reads. The loop claimed B4 done against a FakeCalendar that tests preloaded; a user with an existing ACTUAL calendar does not get that preload.
-2. **Run the five tier-2 live checks on the iPhone after the boot fix, not before.** A live DW insert today would write; it would not prove the rail shows this morning's HTML blocks.
-
-No other open product tradeoff. Do not reopen: Google Sign-In not EventKit; no Calendar SDK; no lock; `CATEGORIES` stays six in `Code.gs`; no `git push` of Path 3 onto `main` from this review.
+1. **Fix the boot read and the unpushed `staleGuard` before daily use?** Recommendation: fix. The contract already says the phone ports `staleGuard_`. Computing `?` / `UNLOGGED` in memory and throwing them away is worse than leaving that work on Apps Script.
+2. **Run the five tier-2 live checks on the iPhone after those reads write, not before.** A live DW insert today would write; it would not prove the rail or the overnight bound.
 
 ---
 
 ## Mini-handoff (if you run another loop)
 
-One task. Same operating loop as HANDOFF-3. Criteria first. Fake calendars only. No `RUN_LIVE=1`. No `Code.gs` edits.
+Three tasks. Same operating loop as HANDOFF-3. Criteria first. Fake calendars only. No `RUN_LIVE=1`. No `Code.gs` edits.
 
 **P3-R7-1. Empty-queue boot lists Calendar and adopts state**
 
@@ -201,7 +225,13 @@ One task. Same operating loop as HANDOFF-3. Criteria first. Fake calendars only.
 - [tier 1] Given Sign-In succeeds and IDs are already saved, when the sheet dismisses, then the same getState path runs.
 - [tier 1] Given picker Confirm writes three IDs, then the same getState path runs.
 - [tier 1, error] Given list throws, then `open`/`today` from persist are not wiped to a fake idle day (same spirit as B4's read-error criterion).
+- [tier 1] Given DW opened at local 22:00 Chicago and no further ops, when getState runs at 07:00 the next local day **and the result is pushed**, then the fake ACTUAL holds `DW` ending at midnight with mark `?` and `UNLOGGED -` from midnight to 07:00. Vacuity: skip that push; the calendar after getState must still show an unmarked open DW.
 - Vacuity: comment out the list call on the boot path; the first criterion goes red; put it back.
+
+**P3-R7-3. Extra categories keep the colour `nextColor` assigned**
+
+- [tier 1] Given `addCategory("Deep reading")` then `openActual` DEEPREAD, then the event's `colorId` is `"2"` (not `""`).
+- Vacuity: `Grammar.colorId` stays seed-only; that insert criterion goes red.
 
 **P3-R7-2. Cancel and sign-out must not pin the test seam**
 
@@ -209,4 +239,4 @@ One task. Same operating loop as HANDOFF-3. Criteria first. Fake calendars only.
 - [tier 1] Given a successful `signInFromKeyWindow` after a cancel in the same process, then `hasSession` is true (or follows the SDK user), and a DW tap is not bounced back to Sign-In for lack of session.
 - Vacuity: leave `testHasSession = false` in `applyCancelledSignIn`; the first criterion goes red; put it back.
 
-Should-fix 3–4 may ride along if they stay small. Do not "fix" Google Sign-In because tier-2 is still skipped.
+Should-fix 3, 8, 9 and restore (finding 3) may ride along if they stay small. Do not "fix" Google Sign-In because tier-2 is still skipped. Do not reopen the keyboard/STOP overlap unless the human asks.

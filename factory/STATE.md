@@ -3,7 +3,7 @@ project: timetap
 stage: 5
 stage_name: Path 3 review 7 returned FIX FIRST; loop the boot-read hole
 last_updated: 2026-08-13
-next_action: "Work through factory/REVIEW-7.md P3-R7-1 (boot read) and P3-R7-2 (cancel/sign-out must not pin testHasSession). Criteria first. Branch path-3-ios. Never point tests at a live calendar. Tier-2 live Sign-In stays the human's, after the boot read works."
+next_action: "Work through factory/REVIEW-7.md P3-R7-1 (boot read + push staleGuard), P3-R7-2 (auth seam), P3-R7-3 (extra-category colour). Criteria first. Branch path-3-ios. Never point tests at a live calendar."
 path3_brief: factory/BRIEF-3.md
 path3_plan: factory/PLAN-3.md
 path3_handoff: factory/HANDOFF-3.md
@@ -23,7 +23,9 @@ notes: |
   86 green twice. Code.gs unharmed. Blocking: empty-queue boot never lists
   Calendar HTTP; banner is ApplyOps.ReadError error 0; today stays empty.
   Angle 1 (GPT) independently named that hole, plus cancel/sign-out pinning
-  testHasSession=false. Mini-handoff P3-R7-1 and P3-R7-2. Do not ship.
+  testHasSession=false. Angle 3 (Opus) added: staleGuard never pushed,
+  extra-category colorId empty, picker trap, SYNCING lie. Mini-handoff
+  P3-R7-1, P3-R7-2, P3-R7-3. Do not ship.
 
   ---
   PATH 3 HANDOFF READY — 2026-08-12.
