@@ -84,6 +84,17 @@ struct DayRailView: View {
         .onTapGesture {
             if item.isOpen { onOpenTap() } else { onOtherTap() }
         }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(railLabel(item))
+        .accessibilityAddTraits(.isButton)
+        .accessibilityHint(item.isOpen ? "Edits the note" : "Hides the note field")
+    }
+
+    private func railLabel(_ item: TapStore.RailItem) -> String {
+        var parts = [item.name]
+        if !item.note.isEmpty { parts.append(item.note) }
+        if item.isOpen { parts.append("open") }
+        return parts.joined(separator: ", ")
     }
 
     /// Grows with block height and rail width; stays readable on a thin strip.

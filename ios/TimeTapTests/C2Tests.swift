@@ -99,5 +99,6 @@ final class C2Tests: TimeTapTestCase {
         XCTAssertTrue(block.contains("FRAG"))
         let keys = ["DW", "MTG", "ADM", "BODY", "REL", "FRAG"]
         XCTAssertEqual(keys.filter { block.contains("key: '\($0)'") || block.contains("key: \"\($0)\"") }.count, 6)
+        XCTAssertEqual(block.components(separatedBy: "key:").count - 1, 6, "a seventh CATEGORIES entry must fail")
     }
 }

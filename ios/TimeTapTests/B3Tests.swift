@@ -142,6 +142,17 @@ final class B3Tests: TimeTapTestCase {
         XCTAssertEqual(actual.events.count, 1)
     }
 
+    func test25sAcrossMidnightIsBounded() {
+        let start = local(2026, 1, 15, 23, 59) + 50_000
+        let now = local(2026, 1, 16, 0, 0) + 15_000
+        ApplyOps.nowMs = now
+        _ = ApplyOps.apply([Op(id: "o1", type: "openActual", ref: dw, key: "DW", startMs: start)])
+        let left = ApplyOps.staleGuard(actual, ApplyOps.findOpen(actual), isActual: true)
+        XCTAssertNil(left, "GAS MISTAP is 20s; 25s across midnight must bound")
+        XCTAssertTrue(actual.events[0].title.hasSuffix("?"))
+        XCTAssertFalse(actual.events[0].description.contains("#open"))
+    }
+
     func testStaleSitBoundedNoUnloggedNoQuestion() {
         let start = local(2026, 1, 15, 22)
         let now = local(2026, 1, 16, 7)

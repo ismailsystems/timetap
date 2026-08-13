@@ -31,6 +31,15 @@ struct DeadLetterSheet: View {
                     }
                 }
             }
+
+            Text("A SET-ASIDE WRITE IS THE ONLY RECORD IT EVER HAPPENED — DISCARD ONLY AFTER FIXING THE CALENDAR BY HAND")
+                .font(.system(size: 10, weight: .bold))
+                .tracking(0.4)
+                .foregroundStyle(Theme.mute)
+                .padding(.horizontal, 18)
+                .padding(.vertical, 12)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .overlay(alignment: .top) { Rectangle().fill(Theme.rule2).frame(height: 2) }
         }
         .foregroundStyle(Theme.fg)
         .background(Theme.ground.ignoresSafeArea())

@@ -19,6 +19,7 @@ struct SplitSheet: View {
 
                 HStack(spacing: 0) {
                     scopeBtn("REMAINDER", on: !s.whole) { store.setSplitWhole(false) }
+                        .disabled(maxMins < 2)
                     scopeBtn("WHOLE BLOCK", on: s.whole) { store.setSplitWhole(true) }
                 }
                 .padding(.horizontal, 18)

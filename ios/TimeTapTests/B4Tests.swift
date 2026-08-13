@@ -72,6 +72,7 @@ final class B4Tests: TimeTapTestCase {
         XCTAssertTrue(dwEv.title.hasSuffix("?"))
         XCTAssertTrue(actual.events.contains { $0.title == "UNLOGGED -" })
         XCTAssertFalse(st.today?.contains { $0.key == "UNLOGGED" } == true)
+        XCTAssertTrue(st.today?.isEmpty == true, "GAS overlap window drops the midnight-ending ? block")
     }
 
     func testLunchIsUnfiledNotAdmin() throws {

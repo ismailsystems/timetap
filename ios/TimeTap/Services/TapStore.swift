@@ -18,6 +18,8 @@ final class TapStore: ObservableObject {
     @Published var showPicker = false
     @Published var showDead = false
     @Published var addingCategory = false
+    /// False until `bootAsync` finishes. Tests that pin `testHasSession` start ready.
+    var sessionReady = false
     var lastInsertFailed = false
 
     @Published var undoLabel: String?
@@ -115,6 +117,7 @@ final class TapStore: ObservableObject {
         // Production restore is async. Flashing Sign-In before it is the bug.
         // Tests pin testHasSession, so they can decide now.
         guard GoogleAuth.testHasSession != nil else { return }
+        sessionReady = true
         if !GoogleAuth.hasSession {
             showSignIn = true
         } else if !Credentials.hasCalendarIds {
@@ -131,13 +134,21 @@ final class TapStore: ObservableObject {
     func boot() { Task { await bootAsync() } }
 
     func refreshOnReturn() {
-        guard Credentials.isConfigured, queue.isEmpty, config != nil else { return }
+        Task { await refreshOnReturnNow() }
+    }
+
+    func refreshOnReturnNow() async {
+        guard Credentials.isConfigured, config != nil else { return }
+        if !queue.isEmpty {
+            await flushNow()
+            return
+        }
         let overdue = Date().timeIntervalSince(lastStateAt) > 10 * 60
         let runaway = open.map {
             Date().timeIntervalSince1970 * 1000 - $0.startMs
                 > Double(config?.staleOpenHours ?? 5) * 3_600_000
         } ?? false
-        if overdue || runaway { Task { await loadServerState() } }
+        if overdue || runaway { await loadServerState() }
     }
 
     // MARK: - Capture actions
@@ -262,6 +273,10 @@ final class TapStore: ObservableObject {
     }
 
     func toggleSit() {
+        guard GoogleAuth.hasSession else {
+            if sessionReady { showSignIn = true }
+            return
+        }
         let now = clock()
         if sit != nil {
             _ = closeSit(at: now)
@@ -356,6 +371,13 @@ final class TapStore: ObservableObject {
         clearUndo()
         let now = clock()
         let span = max(1, Int(((now - cur.startMs) / msMin).rounded()))
+        if span < 2 {
+            split = SplitState(
+                ref: cur.ref, startMs: cur.startMs, nowMs: now,
+                atMs: now, whole: true
+            )
+            return
+        }
         let mid = max(1, span / 2)
         split = SplitState(
             ref: cur.ref,
@@ -394,15 +416,20 @@ final class TapStore: ObservableObject {
             return
         }
         let now = clock()
-        let m = markFor(key: cur.key, durMs: s.atMs - cur.startMs)
+        let at = min(s.atMs, now - msMin)
+        if at <= cur.startMs {
+            recatWhole(key: key)
+            return
+        }
+        let m = markFor(key: cur.key, durMs: at - cur.startMs)
         let newRef = Op.uid()
         _ = enqueue(Op(
             id: Op.uid(), type: "splitActual", ts: now,
             ref: cur.ref, text: cur.text, mark: m.mark,
-            atMs: s.atMs, nowMs: now, newRef: newRef, newKey: key
+            atMs: at, nowMs: now, newRef: newRef, newKey: key
         ))
-        railClosed(cur, endMs: s.atMs)
-        open = OpenBlock(ref: newRef, key: key, startMs: s.atMs)
+        railClosed(cur, endMs: at)
+        open = OpenBlock(ref: newRef, key: key, startMs: at)
         hideMarkStrip()
         split = nil
         persist()
@@ -631,6 +658,7 @@ final class TapStore: ObservableObject {
     }
 
     private func bootAsync() async {
+        defer { sessionReady = true }
         if !GoogleAuth.hasSession {
             showSignIn = true
             return
@@ -663,19 +691,32 @@ final class TapStore: ObservableObject {
 
     private func loadServerState(corrective: Bool = false) async {
         let gen = localGen
-        do {
-            let st = try await CalendarAPI.refreshState()
-            if adoptServerState(st, gen: gen) {
-                lastStateAt = Date()
-                if CalendarAPI.didStaleClose, !unreadableOpen {
-                    banner = "an overnight block was closed with a guess. Check the calendar."
+        var didRefresh = false
+        while true {
+            do {
+                let st = try await CalendarAPI.refreshState()
+                if adoptServerState(st, gen: gen) {
+                    lastStateAt = Date()
+                    if CalendarAPI.didStaleClose, !unreadableOpen {
+                        banner = "an overnight block was closed with a guess. Check the calendar."
+                    }
+                    CalendarAPI.didStaleClose = false
+                } else if corrective {
+                    await loadCorrectiveState()
                 }
-                CalendarAPI.didStaleClose = false
-            } else if corrective {
-                await loadCorrectiveState()
+                return
+            } catch let http as CalendarHTTPError where http.status == 401 {
+                if didRefresh {
+                    showSignIn = true
+                    banner = http.localizedDescription
+                    return
+                }
+                try? await GoogleAuth.refreshAccessToken()
+                didRefresh = true
+            } catch {
+                banner = error.localizedDescription
+                return
             }
-        } catch {
-            banner = error.localizedDescription
         }
     }
 
@@ -787,8 +828,12 @@ final class TapStore: ObservableObject {
                     paintSync()
                     return
                 }
-                if http.status >= 400, let id = queue.first?.id {
-                    quarantine(.init(id: id, message: http.localizedDescription))
+                if http.status >= 400 {
+                    if batch.count == 1, let id = batch.first?.id {
+                        quarantine(.init(id: id, message: http.localizedDescription))
+                    } else {
+                        banner = http.localizedDescription
+                    }
                 }
                 if !queue.isEmpty { scheduleRetry() }
                 paintSync()
@@ -829,11 +874,29 @@ final class TapStore: ObservableObject {
         saveDead()
 
         var cleared = false
-        if removed.type == "openActual", open?.ref == removed.ref {
-            open = nil
+        let openedRef: String? = {
+            switch removed.type {
+            case "openActual": return removed.ref
+            case "splitActual": return removed.newRef
+            case "undoSwitch": return removed.prevRef
+            default: return nil
+            }
+        }()
+        if let openedRef, open?.ref == openedRef {
+            var back: OpenBlock?
+            let keepRef = removed.type == "splitActual" ? removed.ref
+                : removed.type == "undoSwitch" ? removed.newRef : nil
+            if let keepRef, let e = blocks[keepRef], let key = e.key, let start = e.startMs {
+                back = OpenBlock(ref: keepRef, key: key, text: "", startMs: start)
+            }
+            open = back
             cleared = true
         }
         if removed.type == "openSit", sit?.ref == removed.ref {
+            sit = nil
+            cleared = true
+        }
+        if removed.type == "undoSwitch", let sitRef = removed.sitRef, sit?.ref == sitRef {
             sit = nil
             cleared = true
         }

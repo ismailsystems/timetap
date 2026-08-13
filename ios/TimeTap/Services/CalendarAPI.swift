@@ -87,6 +87,14 @@ struct CalendarHTTPError: Error, LocalizedError {
 }
 
 enum CalendarAPI {
+    /// One list/apply/push at a time. Boot getState and a tap flush share ApplyOps.actual.
+    private actor Serial {
+        func run<T>(_ body: () async throws -> T) async rethrows -> T {
+            try await body()
+        }
+    }
+    private static let serial = Serial()
+
     static var testList: [CalendarSummary]?
     static var testStatusQueue: [Int] = []
     static var rejectWrites = false
@@ -247,9 +255,16 @@ enum CalendarAPI {
 
     /// List ACTUAL + SITTING, run getState (staleGuard mutates), push the diff.
     static func refreshState() async throws -> ServerState {
+        try await serial.run { try await refreshStateBody() }
+    }
+
+    private static func refreshStateBody() async throws -> ServerState {
         getStateCalls += 1
         if let testStateError {
             throw ApplyOps.ReadError.calendar(testStateError)
+        }
+        if let s = dequeueStatus(), s != 200 {
+            throw CalendarHTTPError(status: s)
         }
         if let listed = testListedActual {
             ApplyOps.actual = cloneCalendar(listed)
@@ -294,6 +309,10 @@ enum CalendarAPI {
 
     /// Queue flush. Tests never hit the network (`GoogleAuth.testHasSession != nil`).
     static func flushOps(_ ops: [Op]) async throws -> ApplyResult {
+        try await serial.run { try await flushOpsBody(ops) }
+    }
+
+    private static func flushOpsBody(_ ops: [Op]) async throws -> ApplyResult {
         didFlush = true
         if let s = dequeueStatus(), s != 200 {
             throw CalendarHTTPError(status: s)

@@ -67,6 +67,7 @@ Baseline (2026-08-12, `main` at `1f84fce`): **1196 passed / 0 failed** · lint a
 - B1 `DW: memo ??`: HANDOFF says mark `?` / text `memo ?`. Code.gs `MARK_TAIL_RE_` and `test/tests.js` 41d say mark null / text `memo ??`. GAS is the spec; Swift matches 41d.
 - B3 fresh-open: HANDOFF says 30s across midnight stays open. Code.gs uses `age < MISTAP_SECONDS` (20s). Swift matches GAS.
 - B4 stale today: HANDOFF says today includes the `?` block and UNLOGGED. GAS skips UNLOGGED and a block that ends at local midnight. Swift matches GAS.
+- Review 8 vs `main`: `CalendarAPI.refreshState` and `flushOps` share one serial gate so boot getState cannot drop a tap write. A 401 on getState refreshes the token once, then Sign-In. Return-from-background flushes a non-empty queue. HTTP 400 on a multi-op batch retries the batch and does not dead-letter `queue.first`. A set-aside `splitActual` / `undoSwitch` restores the block still running on Calendar (Path 2 `quarantine`). The mark row names the closed block. UNDO sits 12pt above TAP TO SIT. TAP TO SIT without a session does not enqueue. Remainder SPLIT will not cut after now.
 
 ## Parked tasks
 

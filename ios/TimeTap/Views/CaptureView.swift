@@ -47,11 +47,10 @@ struct CaptureView: View {
                             .frame(maxWidth: .infinity)
                             .clipped()
                             .accessibilityElement(children: .contain)
-                            .accessibilityLabel("Day rail")
                             .overlay(alignment: .trailing) {
                                 Rectangle().fill(Theme.rule2).frame(width: 2)
                             }
-                        categoryList
+                        categoryList(height: geo.size.height)
                             .frame(width: catW)
                     }
                     .background(alignment: .topLeading) { categoryWidthProbe }
@@ -191,41 +190,46 @@ struct CaptureView: View {
         editingNote = false
     }
 
-    private var categoryList: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            if store.canAddCategory {
-                addRow
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
-                    .id("add")
-            } else {
-                Text("That is \(store.config?.maxCategories ?? 10) categories already.")
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(Theme.mute)
-                    .padding(.leading, 12)
-                    .padding(.trailing, 16)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
-            }
-
-            ForEach(store.categories) { cat in
-                Rectangle().fill(Theme.rule2.opacity(0.5)).frame(height: 1)
-                Button {
-                    finishNoteEdit()
-                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                    store.tapCategory(cat.key)
-                } label: {
-                    categoryRow(face: cat.face, hex: cat.hex, dim: false)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
-                        .contentShape(Rectangle())
-                        .background(store.open?.key == cat.key ? Theme.panel : Color.clear)
+    private func categoryList(height: CGFloat) -> some View {
+        let n = CGFloat(store.categories.count + 1)
+        let rowH = max(44, height / max(n, 1))
+        return ScrollView {
+            VStack(alignment: .leading, spacing: 0) {
+                if store.canAddCategory {
+                    addRow
+                        .frame(maxWidth: .infinity, minHeight: rowH, maxHeight: rowH, alignment: .leading)
+                        .id("add")
+                } else {
+                    Text("That is \(store.config?.maxCategories ?? 10) categories already.")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(Theme.mute)
+                        .padding(.leading, 12)
+                        .padding(.trailing, 16)
+                        .frame(maxWidth: .infinity, minHeight: rowH, maxHeight: rowH, alignment: .leading)
                 }
-                .buttonStyle(.plain)
-                .frame(maxHeight: .infinity)
-                .accessibilityLabel(cat.face)
-                .accessibilityAddTraits(store.open?.key == cat.key ? [.isSelected] : [])
-                .accessibilityValue(store.open?.key == cat.key ? elapsedLabel : "")
-                .id(cat.key)
+
+                ForEach(store.categories) { cat in
+                    Rectangle().fill(Theme.rule2.opacity(0.5)).frame(height: 1)
+                    Button {
+                        finishNoteEdit()
+                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                        store.tapCategory(cat.key)
+                    } label: {
+                        categoryRow(face: cat.face, hex: cat.hex, dim: false)
+                            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+                            .contentShape(Rectangle())
+                            .background(store.open?.key == cat.key ? Theme.panel : Color.clear)
+                    }
+                    .buttonStyle(.plain)
+                    .frame(height: rowH)
+                    .accessibilityLabel(cat.face)
+                    .accessibilityAddTraits(store.open?.key == cat.key ? [.isSelected] : [])
+                    .accessibilityValue(store.open?.key == cat.key ? elapsedLabel : "")
+                    .id(cat.key)
+                }
             }
         }
+        .scrollDisabled(rowH > 44.5)
         .frame(maxHeight: .infinity)
         .onChange(of: store.scrollToKey) { _, _ in
             store.scrollToKey = nil
@@ -290,21 +294,32 @@ struct CaptureView: View {
                     .background(Theme.accent)
                 }
                 .buttonStyle(.plain)
+                .padding(.bottom, 12)
                 .accessibilityLabel("Undo: \(label)")
                 .accessibilityHint("Available for \(store.undoSecondsLeft) seconds")
             }
 
-            if store.markStrip != nil {
-                HStack(spacing: 0) {
-                    ForEach(["+", "=", "-"], id: \.self) { m in
-                        Button { store.applyMark(m) } label: {
-                            Text(m)
-                                .font(.system(size: 28, weight: .black))
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 12)
+            if let strip = store.markStrip {
+                VStack(spacing: 0) {
+                    Text("\(store.labelFor(strip.key).uppercased()) · \(Format.elapsed(strip.durMs)) — MARK IT")
+                        .font(.system(size: 10, weight: .bold))
+                        .tracking(0.6)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.horizontal, 18)
+                        .padding(.top, 10)
+                        .padding(.bottom, 4)
+                        .accessibilityIdentifier("stripHead")
+                    HStack(spacing: 0) {
+                        ForEach(["+", "=", "-"], id: \.self) { m in
+                            Button { store.applyMark(m) } label: {
+                                Text(m)
+                                    .font(.system(size: 28, weight: .black))
+                                    .frame(maxWidth: .infinity)
+                                    .padding(.vertical, 12)
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel("\(markLabel(m)) \(store.labelFor(strip.key))")
                         }
-                        .buttonStyle(.plain)
-                        .accessibilityLabel(markLabel(m))
                     }
                 }
                 .background(Theme.panel)

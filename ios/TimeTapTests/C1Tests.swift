@@ -190,6 +190,63 @@ final class C1Tests: TimeTapTestCase {
         try assertNoTimetapAPI()
     }
 
+    func testSetAsideSplitPutsPreviousBlockBackInHand() async {
+        var now = t
+        let store = TapStore()
+        store.clock = { now }
+        store.tapCategory("DW")
+        await store.flushNow()
+        let dwRef = store.open?.ref
+        XCTAssertEqual(store.open?.key, "DW")
+        now += 20 * 60_000
+        store.openSplit()
+        store.doSplit(key: "MTG")
+        XCTAssertEqual(store.open?.key, "MTG")
+        CalendarAPI.rejectWrites = true
+        for _ in 1...5 { await store.flushNow() }
+        XCTAssertEqual(store.dead.last?.op.type, "splitActual")
+        XCTAssertEqual(store.open?.key, "DW")
+        XCTAssertEqual(store.open?.ref, dwRef)
+    }
+
+    func test400OnTwoOpBatchDoesNotDeadLetterTheFirst() async {
+        seedQueue([
+            Op(id: "c1", type: "closeActual", ref: dw, key: "DW", mark: "=", endMs: t + 60_000),
+            Op(id: "o2", type: "openActual", ref: "mtgmtgmtgmtgmtg1", key: "MTG", startMs: t + 60_000),
+        ])
+        let store = TapStore()
+        store.open = OpenBlock(ref: "mtgmtgmtgmtgmtg1", key: "MTG", startMs: t + 60_000)
+        CalendarAPI.testStatusQueue = [400]
+        await store.flushNow()
+        XCTAssertEqual(store.queue.map(\.id), ["c1", "o2"])
+        XCTAssertTrue(store.dead.isEmpty)
+        XCTAssertEqual(store.open?.key, "MTG")
+    }
+
+    func testGetState401RefreshesOnceThenLoads() async {
+        let store = TapStore()
+        CalendarAPI.testStatusQueue = [401, 200]
+        await store.bootNow()
+        XCTAssertEqual(GoogleAuth.refreshCount, 1)
+        XCTAssertFalse(store.showSignIn)
+    }
+
+    func testGetStateSecond401ShowsSignIn() async {
+        let store = TapStore()
+        CalendarAPI.testStatusQueue = [401, 401]
+        await store.bootNow()
+        XCTAssertEqual(GoogleAuth.refreshCount, 1)
+        XCTAssertTrue(store.showSignIn)
+    }
+
+    func testRefreshOnReturnFlushesQueuedOp() async {
+        seedQueue([Op(id: "o1", type: "openActual", ref: dw, key: "DW", startMs: t)])
+        let store = TapStore()
+        await store.refreshOnReturnNow()
+        XCTAssertTrue(store.queue.isEmpty)
+        XCTAssertEqual(actual.events.count, 1)
+    }
+
     private func seedQueue(_ ops: [Op]) {
         if let data = try? JSONEncoder().encode(ops) {
             UserDefaults.standard.set(data, forKey: "tt.queue.v1")

@@ -45,6 +45,10 @@ final class UTests: TimeTapTestCase {
         XCTAssertTrue(text.contains("TAP TO SIT"), "idle sit must look tappable")
         XCTAssertTrue(text.contains("outlineChip(\"SPLIT\")"))
         XCTAssertTrue(text.contains("outlineChip(\"STOP\")"))
+        XCTAssertTrue(text.contains("MARK IT"), "mark row must name the closed block")
+        XCTAssertTrue(text.contains("padding(.bottom, 12)"), "UNDO must sit off TAP TO SIT")
+        XCTAssertTrue(text.contains("categoryList(height:"), "category column must know its height")
+        XCTAssertTrue(text.contains("minHeight: 44") || text.contains("max(44"), "category rows need a 44pt floor")
     }
 
     func testOpenBlockNoteShowsOnTheRail() {
@@ -198,5 +202,59 @@ final class UTests: TimeTapTestCase {
         )
         XCTAssertTrue(text.contains("last write wins"))
         XCTAssertTrue(text.contains("Categories you add here do not appear on the web app."))
+    }
+
+    func testDeadLetterWarnsBeforeDiscard() throws {
+        let text = try String(
+            contentsOf: URL(fileURLWithPath: #filePath)
+                .deletingLastPathComponent()
+                .deletingLastPathComponent()
+                .appendingPathComponent("TimeTap/Views/DeadLetterSheet.swift"),
+            encoding: .utf8
+        )
+        XCTAssertTrue(text.contains("ONLY RECORD IT EVER HAPPENED"))
+    }
+
+    func testOpenRailBlockAnnouncesNoteEdit() throws {
+        let text = try String(
+            contentsOf: URL(fileURLWithPath: #filePath)
+                .deletingLastPathComponent()
+                .deletingLastPathComponent()
+                .appendingPathComponent("TimeTap/Views/DayRailView.swift"),
+            encoding: .utf8
+        )
+        XCTAssertTrue(text.contains("Edits the note"))
+    }
+
+    func testToggleSitWithoutSessionDoesNotEnqueue() {
+        GoogleAuth.testHasSession = false
+        let store = TapStore()
+        store.sessionReady = true
+        store.toggleSit()
+        XCTAssertTrue(store.showSignIn)
+        XCTAssertNil(store.sit)
+        XCTAssertTrue(store.queue.isEmpty)
+    }
+
+    func testFreshSplitFallsBackToWholeBlock() {
+        GoogleAuth.testHasSession = true
+        GoogleAuth.testAccessToken = "t"
+        Credentials.planId = "p1"
+        Credentials.actualId = "a1"
+        Credentials.sittingId = "s1"
+        var now: Double = 1_700_000_000_000
+        let store = TapStore()
+        store.clock = { now }
+        store.tapCategory("DW")
+        let start = store.open?.startMs
+        now += 5_000
+        store.openSplit()
+        XCTAssertEqual(store.split?.whole, true)
+        store.setSplitWhole(false)
+        store.setSplitMinutes(2)
+        store.doSplit(key: "MTG")
+        XCTAssertEqual(store.open?.key, "MTG")
+        XCTAssertEqual(store.open?.startMs, start)
+        XCTAssertFalse(store.queue.contains { $0.type == "splitActual" })
     }
 }

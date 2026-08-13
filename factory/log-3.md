@@ -1,5 +1,7 @@
 # Log — Path 3
 
+## [2026-08-13 12:50] R8 | Full-branch review vs main. Serial CalendarAPI gate; getState 401 refresh; return-from-bg flush; batch 400 retry; Path 2 split/undo quarantine restore; mark strip names the block; UNDO 12pt gap; sit needs session; remainder split will not cut after now.
+
 ## [2026-08-13 00:06] D2 | Path 3 ios/README.md. Lint pins last-write-wins + Sign-In. Vacuity: delete last-write-wins → FAIL names ios/README.md; restored. checker: cursor-grok-4.6-high-fast PASS. GAS 1196 twice. XCTest 86 twice. RUN SUMMARY written. All C1–D2 done.
 
 ## [2026-08-12 23:54] D1 | Settings change IDs; sign-out clears Google not IDs. Confirm needs all three. No LockService. checker: cursor-grok-4.6-high-fast PASS. GAS 1196.
