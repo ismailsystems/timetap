@@ -37,6 +37,7 @@ enum Credentials {
         CalendarAPI.testList = nil
         CalendarAPI.lastPending = nil
         CalendarAPI.resetTestHTTP()
+        Grammar.extraColors = [:]
         for key in ["tt.queue.v1", "tt.state.v1", "tt.dead.v1", "tt.blocks.v1", "tt.config.v1"] {
             UserDefaults.standard.removeObject(forKey: key)
         }

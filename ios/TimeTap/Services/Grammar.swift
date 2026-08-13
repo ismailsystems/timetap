@@ -100,8 +100,10 @@ enum Grammar {
         return d.isEmpty ? tail : d + "\n" + tail
     }
 
+    static var extraColors: [String: String] = [:]
+
     static func colorId(for key: String) -> String {
-        TT.colorIdByKey[key] ?? ""
+        TT.colorIdByKey[key] ?? extraColors[key] ?? ""
     }
 
     static func hex(for key: String) -> String {

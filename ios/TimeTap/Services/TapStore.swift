@@ -609,12 +609,30 @@ final class TapStore: ObservableObject {
 
     // MARK: - Boot / network
 
+    func didSignIn() async {
+        showSignIn = false
+        if Credentials.hasCalendarIds {
+            await bootNow()
+        } else {
+            showPicker = true
+        }
+    }
+
+    func didConfirmCalendars() async {
+        showPicker = false
+        await bootNow()
+    }
+
     private func bootAsync() async {
         if !GoogleAuth.hasSession {
             showSignIn = true
             return
         }
-        guard Credentials.isConfigured else { return }
+        showSignIn = false
+        guard Credentials.hasCalendarIds else {
+            showPicker = true
+            return
+        }
         if queue.isEmpty {
             await loadServerState()
         } else {
@@ -626,6 +644,10 @@ final class TapStore: ObservableObject {
     private func applyConfig(_ cfg: ClientConfig) {
         config = cfg
         catByKey = Dictionary(cfg.categories.map { ($0.key, $0) }, uniquingKeysWith: { _, n in n })
+        Grammar.extraColors = [:]
+        for c in cfg.categories where TT.colorIdByKey[c.key] == nil && !c.color.isEmpty {
+            Grammar.extraColors[c.key] = c.color
+        }
         if let data = try? JSONEncoder().encode(cfg) {
             UserDefaults.standard.set(data, forKey: configKey)
         }
@@ -633,10 +655,9 @@ final class TapStore: ObservableObject {
     }
 
     private func loadServerState(corrective: Bool = false) async {
-        CalendarAPI.getStateCalls += 1
         let gen = localGen
         do {
-            let st = try ApplyOps.getState()
+            let st = try await CalendarAPI.refreshState()
             if adoptServerState(st, gen: gen) {
                 lastStateAt = Date()
             } else if corrective {

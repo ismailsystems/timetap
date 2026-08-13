@@ -39,12 +39,7 @@ struct SignInView: View {
         Task {
             do {
                 try await GoogleAuth.signInFromKeyWindow()
-                await MainActor.run {
-                    store.showSignIn = false
-                    if !Credentials.hasCalendarIds {
-                        store.showPicker = true
-                    }
-                }
+                await store.didSignIn()
             } catch {
                 await MainActor.run {
                     if GoogleAuth.lastSignInCancelled {

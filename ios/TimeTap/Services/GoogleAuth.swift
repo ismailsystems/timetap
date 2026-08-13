@@ -44,6 +44,7 @@ enum GoogleAuth {
                 hint: nil,
                 additionalScopes: [calendarScope]
             )
+            followSDKSession()
         } catch {
             if isCancel(error) {
                 applyCancelledSignIn()
@@ -54,8 +55,7 @@ enum GoogleAuth {
 
     static func applyCancelledSignIn() {
         lastSignInCancelled = true
-        testHasSession = false
-        testAccessToken = nil
+        followSDKSession()
         GIDSignIn.sharedInstance.signOut()
         // A2 owns calendar list. A3 owns writes. Cancel must do neither.
         didFetchCalendarList = false
@@ -63,13 +63,18 @@ enum GoogleAuth {
     }
 
     static func signOut() {
-        testHasSession = false
-        testAccessToken = nil
+        followSDKSession()
         GIDSignIn.sharedInstance.signOut()
     }
 
-    static func restore() {
-        GIDSignIn.sharedInstance.restorePreviousSignIn { _, _ in }
+    static func restore(then done: @escaping () -> Void = {}) {
+        GIDSignIn.sharedInstance.restorePreviousSignIn { _, _ in done() }
+    }
+
+    /// Production follows GID. Tests pin the seam with `testHasSession = true/false`.
+    static func followSDKSession() {
+        testHasSession = nil
+        testAccessToken = nil
     }
 
     static func refreshAccessToken() async throws {

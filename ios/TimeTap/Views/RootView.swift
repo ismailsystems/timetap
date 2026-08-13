@@ -21,7 +21,7 @@ struct RootView: View {
             CalendarPickerView()
                 .environmentObject(store)
         }
-        .onAppear { store.boot() }
+        .onAppear { GoogleAuth.restore { store.boot() } }
         .onChange(of: scenePhase) { _, phase in
             if phase == .active { store.refreshOnReturn() }
         }

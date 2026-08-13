@@ -86,12 +86,22 @@ enum CalendarAPI {
     static var rejectWrites = false
     static var getStateCalls = 0
     static var didFlush = false
+    static var testListedActual: FakeCalendar?
+    static var testListedSitting: FakeCalendar?
+    static var skipStatePush = false
+    static var didPushState = false
+    static var testStateError: String?
 
     static func resetTestHTTP() {
         testStatusQueue = []
         rejectWrites = false
         getStateCalls = 0
         didFlush = false
+        testListedActual = nil
+        testListedSitting = nil
+        skipStatePush = false
+        didPushState = false
+        testStateError = nil
     }
 
     static func firstMatch(named name: String, in list: [CalendarSummary]) -> CalendarSummary? {
@@ -252,6 +262,50 @@ enum CalendarAPI {
         }
     }
 
+    /// List ACTUAL + SITTING, run getState (staleGuard mutates), push the diff.
+    static func refreshState() async throws -> ServerState {
+        getStateCalls += 1
+        if let testStateError {
+            throw ApplyOps.ReadError.calendar(testStateError)
+        }
+        if let listed = testListedActual {
+            ApplyOps.actual = cloneCalendar(listed)
+            ApplyOps.sitting = cloneCalendar(testListedSitting ?? FakeCalendar())
+            let st = try ApplyOps.getState()
+            if !skipStatePush {
+                listed.events = (ApplyOps.actual?.events ?? []).map(copyEvent)
+                testListedSitting?.events = (ApplyOps.sitting?.events ?? []).map(copyEvent)
+                didPushState = true
+            }
+            return st
+        }
+        if GoogleAuth.testHasSession != nil {
+            return try ApplyOps.getState()
+        }
+        guard let token = GoogleAuth.accessToken, !token.isEmpty else {
+            throw CalendarHTTPError(status: 401)
+        }
+        let now = Date().timeIntervalSince1970 * 1000
+        let lo = now - 72 * 3_600_000
+        let hi = now + 24 * 3_600_000
+        let actual = FakeCalendar()
+        let sitting = FakeCalendar()
+        actual.events = try await listEvents(calendarId: Credentials.actualId, from: lo, to: hi, token: token)
+        sitting.events = try await listEvents(calendarId: Credentials.sittingId, from: lo, to: hi, token: token)
+        let beforeA = actual.events.map(copyEvent)
+        let beforeS = sitting.events.map(copyEvent)
+        ApplyOps.actual = actual
+        ApplyOps.sitting = sitting
+        ApplyOps.nowMs = now
+        let st = try ApplyOps.getState()
+        if !skipStatePush {
+            try await pushDiff(calendarId: Credentials.actualId, before: beforeA, after: actual.events, token: token)
+            try await pushDiff(calendarId: Credentials.sittingId, before: beforeS, after: sitting.events, token: token)
+            didPushState = true
+        }
+        return st
+    }
+
     /// Queue flush. Tests never hit the network (`GoogleAuth.testHasSession != nil`).
     static func flushOps(_ ops: [Op]) async throws -> ApplyResult {
         didFlush = true
@@ -306,6 +360,14 @@ enum CalendarAPI {
             colorId: e.colorId, description: e.description, startMs: e.startMs,
             endMs: e.endMs, isAllDay: e.isAllDay
         )
+    }
+
+    private static func cloneCalendar(_ cal: FakeCalendar) -> FakeCalendar {
+        let copy = FakeCalendar()
+        copy.events = cal.events.map(copyEvent)
+        copy.failInsert = cal.failInsert
+        copy.lastCalendarId = cal.lastCalendarId
+        return copy
     }
 
     private static func listEvents(calendarId: String, from lo: Double, to hi: Double, token: String) async throws -> [CalEvent] {

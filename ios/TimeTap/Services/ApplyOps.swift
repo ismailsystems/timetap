@@ -36,8 +36,13 @@ enum ApplyOps {
         return out
     }
 
-    enum ReadError: Error {
+    enum ReadError: Error, LocalizedError {
         case calendar(String)
+        var errorDescription: String? {
+            switch self {
+            case .calendar(let msg): return msg
+            }
+        }
     }
 
     static func getState() throws -> ServerState {

@@ -27,12 +27,23 @@ struct CalendarPickerView: View {
             }
             .navigationTitle("Calendars")
             .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                if Credentials.hasCalendarIds {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("Close") { store.showPicker = false }
+                    }
+                }
+            }
             .safeAreaInset(edge: .bottom) {
                 VStack(spacing: 8) {
                     Text(pick.firstMatchRule)
                         .font(.footnote)
                         .foregroundStyle(Theme.mute)
                         .frame(maxWidth: .infinity, alignment: .leading)
+                    if errorText != nil {
+                        Button("Retry") { Task { await load() } }
+                            .frame(maxWidth: .infinity)
+                    }
                     Button("Confirm") { confirm() }
                         .disabled(!pick.canConfirm)
                         .frame(maxWidth: .infinity)
@@ -57,6 +68,7 @@ struct CalendarPickerView: View {
 
     private func load() async {
         loading = true
+        errorText = nil
         defer { loading = false }
         do {
             pick = .fromSaved(try await CalendarAPI.listCalendars())
@@ -68,6 +80,6 @@ struct CalendarPickerView: View {
 
     private func confirm() {
         guard CalendarAPI.confirm(plan: pick.planId, actual: pick.actualId, sitting: pick.sittingId) else { return }
-        store.showPicker = false
+        Task { await store.didConfirmCalendars() }
     }
 }
