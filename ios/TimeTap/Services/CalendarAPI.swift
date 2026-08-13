@@ -88,10 +88,6 @@ enum CalendarAPI {
     static var testCalendar: FakeCalendar?
     static var lastPending: CalEvent?
 
-    static let colorIdByKey: [String: String] = [
-        "DW": "9", "MTG": "3", "ADM": "8", "BODY": "10", "REL": "6", "FRAG": "4"
-    ]
-
     static func openActual(key: String, at t: Double, ref: String) throws -> CalEvent {
         guard !Credentials.actualId.isEmpty else {
             throw CalendarAPIError.calendarsNotPicked
@@ -101,7 +97,7 @@ enum CalendarAPI {
             calendarId: Credentials.actualId,
             key: key,
             title: "\(key):",
-            colorId: colorIdByKey[key] ?? "",
+            colorId: Grammar.colorId(for: key),
             description: "#ref:\(ref)\n#open",
             startMs: t,
             endMs: t + 60_000

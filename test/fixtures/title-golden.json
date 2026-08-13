@@ -1,0 +1,417 @@
+{
+  "roundtrip": [
+    {
+      "text": "",
+      "mark": "+",
+      "built": "DW: +",
+      "parsed": {
+        "key": "DW",
+        "text": "",
+        "mark": "+"
+      },
+      "rebuilt": "DW: +"
+    },
+    {
+      "text": "memo",
+      "mark": "+",
+      "built": "DW: memo +",
+      "parsed": {
+        "key": "DW",
+        "text": "memo",
+        "mark": "+"
+      },
+      "rebuilt": "DW: memo +"
+    },
+    {
+      "text": "memo drafting",
+      "mark": "+",
+      "built": "DW: memo drafting +",
+      "parsed": {
+        "key": "DW",
+        "text": "memo drafting",
+        "mark": "+"
+      },
+      "rebuilt": "DW: memo drafting +"
+    },
+    {
+      "text": "  padded   spaces  ",
+      "mark": "+",
+      "built": "DW: padded spaces +",
+      "parsed": {
+        "key": "DW",
+        "text": "padded spaces",
+        "mark": "+"
+      },
+      "rebuilt": "DW: padded spaces +"
+    },
+    {
+      "text": "memo +",
+      "mark": "+",
+      "built": "DW: memo + +",
+      "parsed": {
+        "key": "DW",
+        "text": "memo +",
+        "mark": "+"
+      },
+      "rebuilt": "DW: memo + +"
+    },
+    {
+      "text": "a ?",
+      "mark": "+",
+      "built": "DW: a ? +",
+      "parsed": {
+        "key": "DW",
+        "text": "a ?",
+        "mark": "+"
+      },
+      "rebuilt": "DW: a ? +"
+    },
+    {
+      "text": "C++",
+      "mark": "+",
+      "built": "DW: C++ +",
+      "parsed": {
+        "key": "DW",
+        "text": "C++",
+        "mark": "+"
+      },
+      "rebuilt": "DW: C++ +"
+    },
+    {
+      "text": "",
+      "mark": "=",
+      "built": "DW: =",
+      "parsed": {
+        "key": "DW",
+        "text": "",
+        "mark": "="
+      },
+      "rebuilt": "DW: ="
+    },
+    {
+      "text": "memo",
+      "mark": "=",
+      "built": "DW: memo =",
+      "parsed": {
+        "key": "DW",
+        "text": "memo",
+        "mark": "="
+      },
+      "rebuilt": "DW: memo ="
+    },
+    {
+      "text": "memo drafting",
+      "mark": "=",
+      "built": "DW: memo drafting =",
+      "parsed": {
+        "key": "DW",
+        "text": "memo drafting",
+        "mark": "="
+      },
+      "rebuilt": "DW: memo drafting ="
+    },
+    {
+      "text": "  padded   spaces  ",
+      "mark": "=",
+      "built": "DW: padded spaces =",
+      "parsed": {
+        "key": "DW",
+        "text": "padded spaces",
+        "mark": "="
+      },
+      "rebuilt": "DW: padded spaces ="
+    },
+    {
+      "text": "memo +",
+      "mark": "=",
+      "built": "DW: memo + =",
+      "parsed": {
+        "key": "DW",
+        "text": "memo +",
+        "mark": "="
+      },
+      "rebuilt": "DW: memo + ="
+    },
+    {
+      "text": "a ?",
+      "mark": "=",
+      "built": "DW: a ? =",
+      "parsed": {
+        "key": "DW",
+        "text": "a ?",
+        "mark": "="
+      },
+      "rebuilt": "DW: a ? ="
+    },
+    {
+      "text": "C++",
+      "mark": "=",
+      "built": "DW: C++ =",
+      "parsed": {
+        "key": "DW",
+        "text": "C++",
+        "mark": "="
+      },
+      "rebuilt": "DW: C++ ="
+    },
+    {
+      "text": "",
+      "mark": "-",
+      "built": "DW: -",
+      "parsed": {
+        "key": "DW",
+        "text": "",
+        "mark": "-"
+      },
+      "rebuilt": "DW: -"
+    },
+    {
+      "text": "memo",
+      "mark": "-",
+      "built": "DW: memo -",
+      "parsed": {
+        "key": "DW",
+        "text": "memo",
+        "mark": "-"
+      },
+      "rebuilt": "DW: memo -"
+    },
+    {
+      "text": "memo drafting",
+      "mark": "-",
+      "built": "DW: memo drafting -",
+      "parsed": {
+        "key": "DW",
+        "text": "memo drafting",
+        "mark": "-"
+      },
+      "rebuilt": "DW: memo drafting -"
+    },
+    {
+      "text": "  padded   spaces  ",
+      "mark": "-",
+      "built": "DW: padded spaces -",
+      "parsed": {
+        "key": "DW",
+        "text": "padded spaces",
+        "mark": "-"
+      },
+      "rebuilt": "DW: padded spaces -"
+    },
+    {
+      "text": "memo +",
+      "mark": "-",
+      "built": "DW: memo + -",
+      "parsed": {
+        "key": "DW",
+        "text": "memo +",
+        "mark": "-"
+      },
+      "rebuilt": "DW: memo + -"
+    },
+    {
+      "text": "a ?",
+      "mark": "-",
+      "built": "DW: a ? -",
+      "parsed": {
+        "key": "DW",
+        "text": "a ?",
+        "mark": "-"
+      },
+      "rebuilt": "DW: a ? -"
+    },
+    {
+      "text": "C++",
+      "mark": "-",
+      "built": "DW: C++ -",
+      "parsed": {
+        "key": "DW",
+        "text": "C++",
+        "mark": "-"
+      },
+      "rebuilt": "DW: C++ -"
+    },
+    {
+      "text": "",
+      "mark": "?",
+      "built": "DW: ?",
+      "parsed": {
+        "key": "DW",
+        "text": "",
+        "mark": "?"
+      },
+      "rebuilt": "DW: ?"
+    },
+    {
+      "text": "memo",
+      "mark": "?",
+      "built": "DW: memo ?",
+      "parsed": {
+        "key": "DW",
+        "text": "memo",
+        "mark": "?"
+      },
+      "rebuilt": "DW: memo ?"
+    },
+    {
+      "text": "memo drafting",
+      "mark": "?",
+      "built": "DW: memo drafting ?",
+      "parsed": {
+        "key": "DW",
+        "text": "memo drafting",
+        "mark": "?"
+      },
+      "rebuilt": "DW: memo drafting ?"
+    },
+    {
+      "text": "  padded   spaces  ",
+      "mark": "?",
+      "built": "DW: padded spaces ?",
+      "parsed": {
+        "key": "DW",
+        "text": "padded spaces",
+        "mark": "?"
+      },
+      "rebuilt": "DW: padded spaces ?"
+    },
+    {
+      "text": "memo +",
+      "mark": "?",
+      "built": "DW: memo + ?",
+      "parsed": {
+        "key": "DW",
+        "text": "memo +",
+        "mark": "?"
+      },
+      "rebuilt": "DW: memo + ?"
+    },
+    {
+      "text": "a ?",
+      "mark": "?",
+      "built": "DW: a ? ?",
+      "parsed": {
+        "key": "DW",
+        "text": "a ?",
+        "mark": "?"
+      },
+      "rebuilt": "DW: a ? ?"
+    },
+    {
+      "text": "C++",
+      "mark": "?",
+      "built": "DW: C++ ?",
+      "parsed": {
+        "key": "DW",
+        "text": "C++",
+        "mark": "?"
+      },
+      "rebuilt": "DW: C++ ?"
+    },
+    {
+      "text": "",
+      "mark": null,
+      "built": "DW:",
+      "parsed": {
+        "key": "DW",
+        "text": "",
+        "mark": null
+      },
+      "rebuilt": "DW:"
+    },
+    {
+      "text": "memo",
+      "mark": null,
+      "built": "DW: memo",
+      "parsed": {
+        "key": "DW",
+        "text": "memo",
+        "mark": null
+      },
+      "rebuilt": "DW: memo"
+    },
+    {
+      "text": "memo drafting",
+      "mark": null,
+      "built": "DW: memo drafting",
+      "parsed": {
+        "key": "DW",
+        "text": "memo drafting",
+        "mark": null
+      },
+      "rebuilt": "DW: memo drafting"
+    },
+    {
+      "text": "  padded   spaces  ",
+      "mark": null,
+      "built": "DW: padded spaces",
+      "parsed": {
+        "key": "DW",
+        "text": "padded spaces",
+        "mark": null
+      },
+      "rebuilt": "DW: padded spaces"
+    },
+    {
+      "text": "memo +",
+      "mark": null,
+      "built": "DW: memo",
+      "parsed": {
+        "key": "DW",
+        "text": "memo",
+        "mark": null
+      },
+      "rebuilt": "DW: memo"
+    },
+    {
+      "text": "a ?",
+      "mark": null,
+      "built": "DW: a",
+      "parsed": {
+        "key": "DW",
+        "text": "a",
+        "mark": null
+      },
+      "rebuilt": "DW: a"
+    },
+    {
+      "text": "C++",
+      "mark": null,
+      "built": "DW: C++",
+      "parsed": {
+        "key": "DW",
+        "text": "C++",
+        "mark": null
+      },
+      "rebuilt": "DW: C++"
+    }
+  ],
+  "extras": {
+    "questionBuilt": "DW: memo drafting ?",
+    "questionParsed": {
+      "key": "DW",
+      "text": "memo drafting",
+      "mark": "?"
+    },
+    "lunch": null,
+    "doubleQ": {
+      "key": "DW",
+      "text": "memo ??",
+      "mark": null
+    },
+    "unloggedEmpty": "UNLOGGED -",
+    "unloggedText": "UNLOGGED: something",
+    "unloggedParsed": {
+      "key": "UNLOGGED",
+      "text": "",
+      "mark": "-"
+    },
+    "unloggedColonParsed": {
+      "key": "UNLOGGED",
+      "text": "something",
+      "mark": null
+    },
+    "writeOpen": "hello\n#ref:abc\n#open",
+    "writeClosed": "hello\n#ref:abc"
+  }
+}

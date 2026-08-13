@@ -10,7 +10,7 @@ Baseline (2026-08-12, `main` at `1f84fce`): **1196 passed / 0 failed** · lint a
 | A2 | A | done | 2 | Picker preselect + first-match + persist via UserDefaults. Attempt 1: checker FAIL (vacuous tests). Attempt 2: Pick state + hand-pick SITTING; checker PASS. |
 | A3 | A | done | 2 | Thin DW insert on fake calendar, colorId 9. Attempt 1 checker FAIL (UserDefaults leak + retry was split). Attempt 2: persist reset + retap retries; checker PASS twice. Vacuity: omit colorId → "" ≠ "9", restored. |
 | A4 | A | done | 2 | Deleted TimetapAPI. Attempt 1 checker FAIL: config nil → empty grid, no DW. Attempt 2: seed CATEGORIES+POOP (color 1). Checker PASS. |
-| B1 | B | pending | 0 | |
+| B1 | B | done | 1 | Swift Grammar matches Code.gs titles/colours/desc. Vacuity: `[+=\\-]` → ? parse red (19 fails); restored. Checker PASS. HANDOFF `??` sentence is stale; GAS 41d wins. |
 | B2 | B | pending | 0 | |
 | B3 | B | pending | 0 | |
 | B4 | B | pending | 0 | |
@@ -22,7 +22,7 @@ Baseline (2026-08-12, `main` at `1f84fce`): **1196 passed / 0 failed** · lint a
 
 ## Contract additions
 
-_None yet. Bugs found later get a criterion here first, then the fix._
+- B1 `DW: memo ??`: HANDOFF says mark `?` / text `memo ?`. Code.gs `MARK_TAIL_RE_` and `test/tests.js` 41d say mark null / text `memo ??`. GAS is the spec; Swift matches 41d.
 
 ## Parked tasks
 
