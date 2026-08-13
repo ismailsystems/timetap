@@ -42,14 +42,8 @@ struct CaptureView: View {
                 footer
             }
             .foregroundStyle(Theme.fg)
-            .ignoresSafeArea(.keyboard, edges: focus == .add ? [] : .bottom)
+            .ignoresSafeArea(.keyboard, edges: focus == nil ? .bottom : [])
             .toolbar(.hidden, for: .navigationBar)
-            .toolbar {
-                ToolbarItemGroup(placement: .keyboard) {
-                    Spacer()
-                    Button("Done") { commitFocus() }
-                }
-            }
         }
         .onReceive(timer) { tick = $0 }
         .onChange(of: store.open?.ref) { _, _ in
@@ -131,24 +125,23 @@ struct CaptureView: View {
             .accessibilityLabel(store.syncLabel)
             .accessibilityHint("Opens settings")
 
-            TextField("note", text: $noteDraft, axis: .vertical)
-                .lineLimit(1...3)
-                .focused($focus, equals: .note)
-                .submitLabel(.done)
-                .onSubmit { focus = nil }
-                .padding(11)
-                .frame(minHeight: 44)
-                .background(Theme.panel2)
-                .disabled(store.open == nil)
-                .opacity(store.open == nil ? 0.4 : 1)
-                .padding(.top, 12)
-                .onChange(of: noteDraft) { _, val in
-                    store.noteChanged(val)
-                }
-                .onChange(of: store.open?.text) { _, text in
-                    if focus != .note { noteDraft = text ?? "" }
-                }
-                .accessibilityLabel("Note for the running block")
+            if store.open != nil {
+                TextField("note", text: $noteDraft)
+                    .focused($focus, equals: .note)
+                    .submitLabel(.done)
+                    .onSubmit { focus = nil }
+                    .padding(11)
+                    .frame(minHeight: 44)
+                    .background(Theme.panel2)
+                    .padding(.top, 12)
+                    .onChange(of: noteDraft) { _, val in
+                        store.noteChanged(val)
+                    }
+                    .onChange(of: store.open?.text) { _, text in
+                        if focus != .note { noteDraft = text ?? "" }
+                    }
+                    .accessibilityLabel("Note for the running block")
+            }
         }
         .padding(16)
         .padding(.horizontal, 2)
@@ -184,6 +177,13 @@ struct CaptureView: View {
                     if store.canAddCategory {
                         addRow
                             .id("add")
+                    } else {
+                        Text("That is \(store.config?.maxCategories ?? 10) categories already.")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(Theme.mute)
+                            .padding(.leading, 12)
+                            .padding(.trailing, 16)
+                            .padding(.vertical, 10)
                     }
                 }
             }

@@ -29,7 +29,7 @@ final class D1Tests: XCTestCase {
         XCTAssertNotEqual(actual.events[0].calendarId, "a1")
     }
 
-    func testSignOutClearsGoogleKeepsIdsAcrossRelaunch() {
+        func testSignOutClearsGoogleKeepsIdsAcrossRelaunch() async {
         let store = TapStore()
         store.signOut()
         XCTAssertFalse(GoogleAuth.hasSession)
@@ -37,7 +37,9 @@ final class D1Tests: XCTestCase {
         XCTAssertEqual(Credentials.planId, "p1")
         XCTAssertEqual(Credentials.actualId, "a1")
         XCTAssertEqual(Credentials.sittingId, "s1")
+        GoogleAuth.testHasSession = false
         let again = TapStore()
+        await again.bootNow()
         XCTAssertEqual(Credentials.planId, "p1")
         XCTAssertEqual(Credentials.actualId, "a1")
         XCTAssertEqual(Credentials.sittingId, "s1")

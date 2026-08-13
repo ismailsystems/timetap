@@ -109,6 +109,9 @@ final class TapStore: ObservableObject {
 
     init() {
         loadPersisted()
+        // Production restore is async. Flashing Sign-In before it is the bug.
+        // Tests pin testHasSession, so they can decide now.
+        guard GoogleAuth.testHasSession != nil else { return }
         if !GoogleAuth.hasSession {
             showSignIn = true
         } else if !Credentials.hasCalendarIds {
@@ -365,6 +368,12 @@ final class TapStore: ObservableObject {
             atMs: cur.startMs + Double(mid) * msMin,
             whole: false
         )
+    }
+
+    /// Slider 1...1 crashes. A block shorter than two minutes still gets 1...2.
+    static func splitSliderRange(startMs: Double, nowMs: Double) -> ClosedRange<Double> {
+        let span = max(1, Int(((nowMs - startMs) / 60_000).rounded()))
+        return 1...Double(max(span - 1, 2))
     }
 
     func setSplitWhole(_ whole: Bool) {
@@ -759,6 +768,7 @@ final class TapStore: ObservableObject {
                 if http.status == 401 {
                     if didRefresh {
                         flushing = false
+                        showSignIn = true
                         paintSync()
                         return
                     }
@@ -766,17 +776,11 @@ final class TapStore: ObservableObject {
                     didRefresh = true
                     continue
                 }
-                if http.status == 429 || http.status >= 500 || http.status == 403 {
-                    flushing = false
-                    if let id = queue.first?.id {
-                        quarantine(.init(id: id, message: "HTTP \(http.status)"))
-                    }
-                    if !queue.isEmpty { scheduleRetry() }
-                    paintSync()
-                    return
-                }
                 flushing = false
-                scheduleRetry()
+                if http.status >= 400, let id = queue.first?.id {
+                    quarantine(.init(id: id, message: "HTTP \(http.status)"))
+                }
+                if !queue.isEmpty { scheduleRetry() }
                 paintSync()
                 return
             } catch {
@@ -1023,10 +1027,15 @@ final class TapStore: ObservableObject {
         if !dead.isEmpty {
             syncLabel = "\(dead.count) SET ASIDE · RETRYING"
             syncFailed = true
-        } else if !queue.isEmpty {
+        } else if flushing && !queue.isEmpty {
             syncLabel = "SYNCING · \(queue.count)"
+            syncFailed = false
+        } else if !queue.isEmpty {
+            syncLabel = "GOOGLE CALENDAR · WAITING"
+            syncFailed = true
         } else {
             syncLabel = "GOOGLE CALENDAR · SYNCED"
+            syncFailed = false
         }
     }
 

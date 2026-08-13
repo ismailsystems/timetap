@@ -8,6 +8,8 @@ struct SplitSheet: View {
             let span = max(1, Int(((s.nowMs - s.startMs) / 60_000).rounded()))
             let maxMins = max(1, span - 1)
             let mins = max(1, Int(((s.atMs - s.startMs) / 60_000).rounded()))
+            let range = TapStore.splitSliderRange(startMs: s.startMs, nowMs: s.nowMs)
+            let value = min(max(Double(mins), range.lowerBound), range.upperBound)
 
             VStack(spacing: 0) {
                 sheetHeader(
@@ -36,13 +38,13 @@ struct SplitSheet: View {
 
                     Slider(
                         value: Binding(
-                            get: { Double(min(max(mins, 1), maxMins)) },
+                            get: { value },
                             set: { store.setSplitMinutes(Int($0.rounded())) }
                         ),
-                        in: 1...Double(max(1, maxMins)),
+                        in: range,
                         step: 1
                     )
-                    .disabled(s.whole)
+                    .disabled(s.whole || maxMins < 2)
                     .tint(Theme.accent)
                     .opacity(s.whole ? 0.35 : 1)
 
@@ -88,6 +90,8 @@ struct SplitSheet: View {
             }
             .foregroundStyle(Theme.fg)
             .background(Theme.ground.ignoresSafeArea())
+        } else {
+            Color.clear.onAppear { store.split = nil }
         }
     }
 

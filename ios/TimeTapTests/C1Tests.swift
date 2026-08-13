@@ -84,6 +84,8 @@ final class C1Tests: XCTestCase {
         XCTAssertEqual(GoogleAuth.refreshCount, 1, "one refresh per flush attempt")
         XCTAssertEqual(store.queue.map(\.id), ["o1"])
         XCTAssertTrue(actual.events.isEmpty)
+        XCTAssertTrue(store.showSignIn)
+        XCTAssertFalse(store.syncLabel.contains("SYNCING"))
         let before = GoogleAuth.refreshCount
         CalendarAPI.testStatusQueue = [401, 401]
         await store.flushNow()
