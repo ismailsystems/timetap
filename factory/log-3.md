@@ -1,5 +1,7 @@
 # Log — Path 3
 
+## [2026-08-12 22:10] A3 | DW openActual on fake ACTUAL: DW:, colorId 9, #ref+#open, +60s. Vacuity: omitted colorId → A3Tests.testOpenActualDWWritesPath2Event red ("" ≠ "9"); restored. Attempt 1 checker FAIL (persist leak). Attempt 2 checker PASS, xcodebuild green twice. skipped: A3 live DW insert.
+
 ## [2026-08-12 21:46] A2 | Calendar picker preselect PLAN/ACTUAL/SITTING; first-match; Confirm needs all three. Attempt 1 checker FAIL (vacuous). Attempt 2 checker PASS. skipped: A2 live calendarList.
 
 ## [2026-08-12 21:30] A1 | Google Sign-In wired; Settings token form gone; 4 XCTest passed on iPhone 17 Pro Max OS 26.5; GAS 1196 + lint + headless green. checker: cursor-grok-4.5-high PASS. skipped: A1 live Sign-In (tier 2).

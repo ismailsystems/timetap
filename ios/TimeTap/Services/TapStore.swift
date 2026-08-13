@@ -18,6 +18,7 @@ final class TapStore: ObservableObject {
     @Published var showPicker = false
     @Published var showDead = false
     @Published var addingCategory = false
+    var lastInsertFailed = false
 
     @Published var undoLabel: String?
     @Published var undoSecondsLeft: Int = 0
@@ -127,9 +128,21 @@ final class TapStore: ObservableObject {
     // MARK: - Capture actions
 
     func tapCategory(_ key: String) {
-        guard Credentials.isConfigured else { return }
+        if Credentials.actualId.isEmpty {
+            banner = "Pick PLAN, ACTUAL and SITTING calendars first."
+            if GoogleAuth.hasSession { showPicker = true }
+            return
+        }
+        guard GoogleAuth.hasSession else {
+            showSignIn = true
+            return
+        }
         let now = Date().timeIntervalSince1970 * 1000
         if let open, open.key == key {
+            if lastInsertFailed {
+                retryLastInsert()
+                return
+            }
             if undo != nil { return }
             openSplit()
             return
@@ -171,7 +184,37 @@ final class TapStore: ObservableObject {
         unreadableOpen = false
         scrollToKey = key
         persist()
-        flush()
+        do {
+            _ = try CalendarAPI.openActual(key: key, at: now, ref: ref)
+            if CalendarAPI.testCalendar == nil {
+                Task { await self.pushInsert() }
+            } else {
+                lastInsertFailed = false
+            }
+        } catch {
+            lastInsertFailed = true
+        }
+        paintSync()
+    }
+
+    func retryLastInsert() {
+        do {
+            try CalendarAPI.retryLastInsert()
+            lastInsertFailed = false
+        } catch {
+            lastInsertFailed = true
+        }
+        paintSync()
+    }
+
+    private func pushInsert() async {
+        do {
+            try await CalendarAPI.httpInsertPending()
+            lastInsertFailed = false
+        } catch {
+            lastInsertFailed = true
+        }
+        paintSync()
     }
 
     func endDay() {
@@ -924,6 +967,11 @@ final class TapStore: ObservableObject {
     }
 
     private func paintSync() {
+        if lastInsertFailed {
+            syncLabel = "SYNC FAILED"
+            syncFailed = true
+            return
+        }
         if !dead.isEmpty {
             syncLabel = "\(dead.count) SET ASIDE · RETRYING"
             syncFailed = true

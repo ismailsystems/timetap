@@ -5,6 +5,34 @@ struct CalendarSummary: Equatable, Identifiable {
     var summary: String
 }
 
+struct CalEvent: Equatable {
+    var id: String
+    var calendarId: String
+    var key: String
+    var title: String
+    var colorId: String
+    var description: String
+    var startMs: Double
+    var endMs: Double
+}
+
+final class FakeCalendar {
+    var events: [CalEvent] = []
+    var failInsert = false
+    var lastCalendarId: String?
+
+    func insert(_ event: CalEvent) throws {
+        lastCalendarId = event.calendarId
+        if failInsert { throw CalendarAPIError.insertFailed }
+        events.append(event)
+    }
+}
+
+enum CalendarAPIError: Error {
+    case calendarsNotPicked
+    case insertFailed
+}
+
 enum CalendarAPI {
     static var testList: [CalendarSummary]?
 
@@ -55,6 +83,70 @@ enum CalendarAPI {
         var firstMatchRule: String {
             "If two calendars share a name, the first one in the list is used."
         }
+    }
+
+    static var testCalendar: FakeCalendar?
+    static var lastPending: CalEvent?
+
+    static let colorIdByKey: [String: String] = [
+        "DW": "9", "MTG": "3", "ADM": "8", "BODY": "10", "REL": "6", "FRAG": "4"
+    ]
+
+    static func openActual(key: String, at t: Double, ref: String) throws -> CalEvent {
+        guard !Credentials.actualId.isEmpty else {
+            throw CalendarAPIError.calendarsNotPicked
+        }
+        let event = CalEvent(
+            id: ref,
+            calendarId: Credentials.actualId,
+            key: key,
+            title: "\(key):",
+            colorId: colorIdByKey[key] ?? "",
+            description: "#ref:\(ref)\n#open",
+            startMs: t,
+            endMs: t + 60_000
+        )
+        lastPending = event
+        GoogleAuth.didAttemptCalendarWrite = true
+        if let testCalendar {
+            try testCalendar.insert(event)
+            lastPending = nil
+        }
+        return event
+    }
+
+    static func retryLastInsert() throws {
+        guard let pending = lastPending else { return }
+        _ = try openActual(key: pending.key, at: pending.startMs, ref: pending.id)
+    }
+
+    static func httpInsertPending() async throws {
+        guard let event = lastPending else { return }
+        guard let token = GoogleAuth.accessToken, !token.isEmpty else {
+            throw URLError(.userAuthenticationRequired)
+        }
+        let enc = event.calendarId.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? event.calendarId
+        var req = URLRequest(url: URL(string: "https://www.googleapis.com/calendar/v3/calendars/\(enc)/events")!)
+        req.httpMethod = "POST"
+        req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        let fmt = ISO8601DateFormatter()
+        fmt.formatOptions = [.withInternetDateTime]
+        let start = fmt.string(from: Date(timeIntervalSince1970: event.startMs / 1000))
+        let end = fmt.string(from: Date(timeIntervalSince1970: event.endMs / 1000))
+        let body: [String: Any] = [
+            "summary": event.title,
+            "description": event.description,
+            "colorId": event.colorId,
+            "start": ["dateTime": start],
+            "end": ["dateTime": end]
+        ]
+        req.httpBody = try JSONSerialization.data(withJSONObject: body)
+        let (_, resp) = try await URLSession.shared.data(for: req)
+        guard let http = resp as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
+            throw CalendarAPIError.insertFailed
+        }
+        lastPending = nil
     }
 
     static func listCalendars() async throws -> [CalendarSummary] {
