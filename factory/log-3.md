@@ -1,5 +1,7 @@
 # Log — Path 3
 
+## [2026-08-12 23:49] C3 | TapStore parity on FakeCalendar: split/recat/note/mark/STOP. Rail UNLOGGED. Lunch UNFILED. Attempts 1–2 checker FAIL (weak asserts). Attempt 3 checker: cursor-grok-4.6-high-fast PASS. GAS 1196. skipped: C3 live phone + rollup.
+
 ## [2026-08-12 23:30] C2 | addCategory local: DEEPREAD, cap 10, persist extras, blank refused. Code.gs CATEGORIES unchanged. checker: cursor-grok-4.6-high-fast PASS. GAS 1196.
 
 ## [2026-08-12 23:24] C1 | Flush → ApplyOps + Calendar HTTP. 401 refresh once; 429/500 backoff; 403 then dead. Attempt 1 checker FAIL (getState discarded). Attempt 2: adoptServerState, undo open=DW. checker: cursor-grok-4.6-high-fast PASS. GAS 1196.

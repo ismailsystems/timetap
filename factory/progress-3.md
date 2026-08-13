@@ -16,7 +16,7 @@ Baseline (2026-08-12, `main` at `1f84fce`): **1196 passed / 0 failed** · lint a
 | B4 | B | done | 1 | getState: findOpen + staleGuard + today. Lunch → UNFILED. Read error throws. Checker PASS. today skips UNLOGGED (GAS). |
 | C1 | C | done | 2 | Flush → ApplyOps + Calendar HTTP. 401 refresh once; second 401 no loop. 429/500 backoff then dead at 5. 403 retried then set aside. Attempt 1 checker FAIL (getState discarded). Attempt 2: adoptServerState; undo leaves open=DW. Checker PASS (cursor-grok-4.6-high-fast). |
 | C2 | C | done | 1 | Local addCategory. DEEPREAD from Deep reading. Cap 10. Persist extras. No removeCategory. Code.gs CATEGORIES still six. Checker PASS (cursor-grok-4.6-high-fast). |
-| C3 | C | pending | 0 | |
+| C3 | C | done | 3 | TapStore clock + fake calendar: DW/MTG/undo/sit/split/recat/note/mark/STOP match B2 writer. Rail UNLOGGED gap. Lunch→UNFILED unreadable. Attempts 1–2 checker FAIL (weak asserts). Attempt 3 PASS (cursor-grok-4.6-high-fast). Tier-2 live skipped. |
 | D1 | D | pending | 0 | |
 | D2 | D | pending | 0 | |
 

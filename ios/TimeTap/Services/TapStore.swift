@@ -87,10 +87,13 @@ final class TapStore: ObservableObject {
     private var markTimer: Timer?
     private var noteTask: Task<Void, Never>?
     private var flushTask: Task<Void, Never>?
+    private var retryTask: Task<Void, Never>?
     private var flushing = false
     private var localGen = 0
     private var lastStateAt = Date()
     private(set) var retryDelay: TimeInterval = 4
+    var clock: () -> Double = { Date().timeIntervalSince1970 * 1000 }
+    var noteDelayNs: UInt64 = 900_000_000
     private var stateAfterBootDrain = false
     private var stateAfterCorrectiveDrain = false
     private var catByKey: [String: Category] = [:]
@@ -137,7 +140,7 @@ final class TapStore: ObservableObject {
             showSignIn = true
             return
         }
-        let now = Date().timeIntervalSince1970 * 1000
+        let now = clock()
         if let open, open.key == key {
             if lastInsertFailed {
                 retryLastInsert()
@@ -217,7 +220,7 @@ final class TapStore: ObservableObject {
     }
 
     func endDay() {
-        let now = Date().timeIntervalSince1970 * 1000
+        let now = clock()
         closeBlockSheets()
         var prev: OpenBlock?
         var closeId: String?
@@ -254,7 +257,7 @@ final class TapStore: ObservableObject {
     }
 
     func toggleSit() {
-        let now = Date().timeIntervalSince1970 * 1000
+        let now = clock()
         if sit != nil {
             _ = closeSit(at: now)
         } else {
@@ -269,7 +272,7 @@ final class TapStore: ObservableObject {
     func takeUndo() {
         guard let u = undo else { return }
         clearUndo()
-        let now = Date().timeIntervalSince1970 * 1000
+        let now = clock()
 
         let newSit: SitBlock? = {
             guard let closed = u.sit, let cur = sit, cur.ref != closed.ref else { return nil }
@@ -313,7 +316,7 @@ final class TapStore: ObservableObject {
         if mark != "=" {
             _ = enqueue(Op(
                 id: Op.uid(), type: "setMark",
-                ts: Date().timeIntervalSince1970 * 1000,
+                ts: clock(),
                 ref: strip.ref, mark: mark, hintMs: strip.hintMs
             ))
             flush()
@@ -329,12 +332,12 @@ final class TapStore: ObservableObject {
         let ref = cur.ref
         let hint = cur.startMs
         noteTask = Task {
-            try? await Task.sleep(nanoseconds: 900_000_000)
+            try? await Task.sleep(nanoseconds: noteDelayNs)
             guard !Task.isCancelled else { return }
             queue = queue.filter { !($0.type == "setText" && $0.ref == ref) }
             _ = enqueue(Op(
                 id: Op.uid(), type: "setText",
-                ts: Date().timeIntervalSince1970 * 1000,
+                ts: clock(),
                 ref: ref, text: text, hintMs: hint
             ))
             flush()
@@ -346,7 +349,7 @@ final class TapStore: ObservableObject {
     func openSplit() {
         guard let cur = open else { return }
         clearUndo()
-        let now = Date().timeIntervalSince1970 * 1000
+        let now = clock()
         let span = max(1, Int(((now - cur.startMs) / msMin).rounded()))
         let mid = max(1, span / 2)
         split = SplitState(
@@ -379,7 +382,7 @@ final class TapStore: ObservableObject {
             recatWhole(key: key)
             return
         }
-        let now = Date().timeIntervalSince1970 * 1000
+        let now = clock()
         let m = markFor(key: cur.key, durMs: s.atMs - cur.startMs)
         let newRef = Op.uid()
         _ = enqueue(Op(
@@ -403,7 +406,7 @@ final class TapStore: ObservableObject {
             if !mutatePendingOpen(ref: cur.ref, key: key) {
                 _ = enqueue(Op(
                     id: Op.uid(), type: "recategorize",
-                    ts: Date().timeIntervalSince1970 * 1000,
+                    ts: clock(),
                     ref: cur.ref, key: key, hintMs: cur.startMs
                 ))
             }
@@ -418,7 +421,7 @@ final class TapStore: ObservableObject {
 
     func openSitEdit() {
         guard let cur = sit else { return }
-        let now = Date().timeIntervalSince1970 * 1000
+        let now = clock()
         let lo = min(cur.startMs, now - 6 * 3_600_000)
         sitEdit = SitEditState(lo: lo, hi: now, atMs: cur.startMs)
     }
@@ -435,7 +438,7 @@ final class TapStore: ObservableObject {
         sit = cur
         _ = enqueue(Op(
             id: Op.uid(), type: "setSitStart",
-            ts: Date().timeIntervalSince1970 * 1000,
+            ts: clock(),
             ref: cur.ref, startMs: s.atMs
         ))
         sitEdit = nil
@@ -447,7 +450,7 @@ final class TapStore: ObservableObject {
         guard let cur = sit else { return }
         _ = enqueue(Op(
             id: Op.uid(), type: "deleteSit",
-            ts: Date().timeIntervalSince1970 * 1000,
+            ts: clock(),
             ref: cur.ref, hintMs: cur.startMs
         ))
         sit = nil
@@ -606,7 +609,12 @@ final class TapStore: ObservableObject {
             return
         }
         guard Credentials.isConfigured else { return }
-        await flushAsync()
+        if queue.isEmpty {
+            await loadServerState()
+        } else {
+            stateAfterBootDrain = true
+            await flushAsync()
+        }
     }
 
     private func applyConfig(_ cfg: ClientConfig) {
@@ -663,10 +671,14 @@ final class TapStore: ObservableObject {
     }
 
     func flushNow() async {
-        flushTask?.cancel()
+        retryTask?.cancel()
+        retryTask = nil
+        if let t = flushTask { await t.value }
         flushTask = nil
         await flushAsync()
     }
+
+    func bootNow() async { await bootAsync() }
 
     private func flushAsync() async {
         guard !flushing, Credentials.isConfigured else { return }
@@ -793,8 +805,8 @@ final class TapStore: ObservableObject {
     private func scheduleRetry() {
         let delay = retryDelay
         retryDelay = min(retryDelay * 2, 60)
-        flushTask?.cancel()
-        flushTask = Task { [weak self] in
+        retryTask?.cancel()
+        retryTask = Task { [weak self] in
             try? await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
             guard !Task.isCancelled else { return }
             await self?.flushAsync()
@@ -807,7 +819,7 @@ final class TapStore: ObservableObject {
     private func enqueue(_ op: Op) -> String {
         var op = op
         if op.id.isEmpty { op.id = Op.uid() }
-        if op.ts == nil { op.ts = Date().timeIntervalSince1970 * 1000 }
+        if op.ts == nil { op.ts = clock() }
         localGen += 1
         noteBlock(op)
         queue.append(op)
