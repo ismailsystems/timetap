@@ -98,6 +98,37 @@ final class UTests: TimeTapTestCase {
         XCTAssertFalse(DayRailView.noteInline(height: 24, hasNote: false, size: 13))
     }
 
+    func testCalendarWriteBodyOmitsEmptyColorId() {
+        let t: Double = 1_700_000_000_000
+        let empty = CalEvent(
+            id: "a", calendarId: "cal", key: "DW", title: "DW:",
+            colorId: "", description: "#ref:abcdefghijklmnop\n#open",
+            startMs: t, endMs: t + 60_000
+        )
+        let body = CalendarAPI.eventBody(empty)
+        XCTAssertNil(body["colorId"], "empty colorId is a Google 400")
+        XCTAssertEqual(body["start"] as? [String: String], ["dateTime": "2023-11-14T22:13:20Z"])
+        let dw = CalEvent(
+            id: "a", calendarId: "cal", key: "DW", title: "DW:",
+            colorId: "9", description: "#open",
+            startMs: t, endMs: t + 60_000
+        )
+        XCTAssertEqual(CalendarAPI.eventBody(dw)["colorId"] as? String, "9")
+    }
+
+    func testCalendarIdEncodesAtSign() {
+        XCTAssertEqual(
+            CalendarAPI.enc("abc@group.calendar.google.com"),
+            "abc%40group.calendar.google.com"
+        )
+    }
+
+    func testGoogleErrorMessageIsReadable() {
+        let data = Data(#"{"error":{"code":400,"message":"Invalid value for: colorId"}}"#.utf8)
+        let err = CalendarAPI.googleError(status: 400, data: data)
+        XCTAssertEqual(err.localizedDescription, "HTTP 400: Invalid value for: colorId")
+    }
+
     func testSecondTapWithin300msIsIgnored() {
         GoogleAuth.testHasSession = true
         GoogleAuth.testAccessToken = "t"

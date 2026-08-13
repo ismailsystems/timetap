@@ -76,8 +76,14 @@ enum CalendarAPIError: Error {
     case insertFailed
 }
 
-struct CalendarHTTPError: Error {
+struct CalendarHTTPError: Error, LocalizedError {
     var status: Int
+    var message: String? = nil
+
+    var errorDescription: String? {
+        if let message, !message.isEmpty { return "HTTP \(status): \(message)" }
+        return "HTTP \(status)"
+    }
 }
 
 enum CalendarAPI {
@@ -370,13 +376,14 @@ enum CalendarAPI {
         }
         var out: [CalEvent] = []
         var page: String?
-        let fmt = ISO8601DateFormatter()
-        fmt.formatOptions = [.withInternetDateTime]
         repeat {
-            var comps = URLComponents(string: "https://www.googleapis.com/calendar/v3/calendars/\(enc(calendarId))/events")!
+            var comps = URLComponents()
+            comps.scheme = "https"
+            comps.host = "www.googleapis.com"
+            comps.percentEncodedPath = "/calendar/v3/calendars/\(enc(calendarId))/events"
             var q = [
-                URLQueryItem(name: "timeMin", value: fmt.string(from: Date(timeIntervalSince1970: lo / 1000))),
-                URLQueryItem(name: "timeMax", value: fmt.string(from: Date(timeIntervalSince1970: hi / 1000))),
+                URLQueryItem(name: "timeMin", value: rfc3339(lo)),
+                URLQueryItem(name: "timeMax", value: rfc3339(hi)),
                 URLQueryItem(name: "singleEvents", value: "true"),
                 URLQueryItem(name: "maxResults", value: "250"),
             ]
@@ -386,20 +393,20 @@ enum CalendarAPI {
             req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
             let (data, resp) = try await URLSession.shared.data(for: req)
             let status = (resp as? HTTPURLResponse)?.statusCode ?? 0
-            if status == 401 || status == 403 || status == 429 || status >= 500 {
-                throw CalendarHTTPError(status: status)
+            if !(200..<300).contains(status) {
+                throw googleError(status: status, data: data)
             }
-            guard (200..<300).contains(status) else { throw CalendarHTTPError(status: status) }
             let decoded = try JSONDecoder().decode(EventsPage.self, from: data)
             for item in decoded.items ?? [] {
                 let allDay = item.start.date != nil
-                let start = parseWhen(item.start, fmt: fmt)
-                let end = parseWhen(item.end, fmt: fmt)
+                if allDay { continue }
+                let start = parseWhen(item.start)
+                let end = parseWhen(item.end)
                 out.append(CalEvent(
                     id: item.id, calendarId: calendarId, key: "",
                     title: item.summary ?? "", colorId: item.colorId ?? "",
                     description: item.description ?? "", startMs: start, endMs: end,
-                    isAllDay: allDay
+                    isAllDay: false
                 ))
             }
             page = decoded.nextPageToken
@@ -424,18 +431,17 @@ enum CalendarAPI {
         }
     }
 
-    private static func eventBody(_ ev: CalEvent) -> [String: Any] {
-        let fmt = ISO8601DateFormatter()
-        fmt.formatOptions = [.withInternetDateTime]
-        let start = fmt.string(from: Date(timeIntervalSince1970: ev.startMs / 1000))
-        let end = fmt.string(from: Date(timeIntervalSince1970: ev.endMs / 1000))
-        return [
+    static func eventBody(_ ev: CalEvent) -> [String: Any] {
+        var body: [String: Any] = [
             "summary": ev.title,
             "description": ev.description,
-            "colorId": ev.colorId,
-            "start": ["dateTime": start],
-            "end": ["dateTime": end],
+            "start": ["dateTime": rfc3339(ev.startMs)],
+            "end": ["dateTime": rfc3339(ev.endMs)],
         ]
+        if (1...11).contains(Int(ev.colorId) ?? 0) {
+            body["colorId"] = ev.colorId
+        }
+        return body
     }
 
     private static func http(_ method: String, calendarId: String, eventId: String?, body: [String: Any]?, token: String) async throws {
@@ -448,30 +454,57 @@ enum CalendarAPI {
             ))
             return
         }
-        var url = "https://www.googleapis.com/calendar/v3/calendars/\(enc(calendarId))/events"
-        if let eventId { url += "/\(enc(eventId))" }
-        var req = URLRequest(url: URL(string: url)!)
+        var comps = URLComponents()
+        comps.scheme = "https"
+        comps.host = "www.googleapis.com"
+        var path = "/calendar/v3/calendars/\(enc(calendarId))/events"
+        if let eventId { path += "/\(enc(eventId))" }
+        comps.percentEncodedPath = path
+        var req = URLRequest(url: comps.url!)
         req.httpMethod = method
         req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         if let body {
             req.setValue("application/json", forHTTPHeaderField: "Content-Type")
             req.httpBody = try JSONSerialization.data(withJSONObject: body)
         }
-        let (_, resp) = try await URLSession.shared.data(for: req)
+        let (data, resp) = try await URLSession.shared.data(for: req)
         let status = (resp as? HTTPURLResponse)?.statusCode ?? 0
-        if status == 401 || status == 403 || status == 429 || status >= 500 {
-            throw CalendarHTTPError(status: status)
+        if !(200..<300).contains(status) {
+            throw googleError(status: status, data: data)
         }
-        guard (200..<300).contains(status) else { throw CalendarHTTPError(status: status) }
     }
 
-    private static func enc(_ s: String) -> String {
-        s.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? s
+    /// RFC 3986 unreserved. `@` in a calendar id must be `%40` or Google returns 400.
+    static func enc(_ s: String) -> String {
+        var allowed = CharacterSet.alphanumerics
+        allowed.insert(charactersIn: "-._~")
+        return s.addingPercentEncoding(withAllowedCharacters: allowed) ?? s
     }
 
-    private static func parseWhen(_ w: EventsPage.Item.When, fmt: ISO8601DateFormatter) -> Double {
-        if let dt = w.dateTime, let d = fmt.date(from: dt) {
-            return d.timeIntervalSince1970 * 1000
+    static func rfc3339(_ ms: Double) -> String {
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.timeZone = TimeZone(secondsFromGMT: 0)
+        f.dateFormat = "yyyy-MM-dd'T'HH:mm:ss'Z'"
+        return f.string(from: Date(timeIntervalSince1970: ms / 1000))
+    }
+
+    static func googleError(status: Int, data: Data) -> CalendarHTTPError {
+        struct Envelope: Decodable {
+            struct Body: Decodable { var message: String? }
+            var error: Body?
+        }
+        let msg = (try? JSONDecoder().decode(Envelope.self, from: data))?.error?.message
+        return CalendarHTTPError(status: status, message: msg)
+    }
+
+    private static func parseWhen(_ w: EventsPage.Item.When) -> Double {
+        if let dt = w.dateTime {
+            let iso = ISO8601DateFormatter()
+            iso.formatOptions = [.withInternetDateTime]
+            if let d = iso.date(from: dt) { return d.timeIntervalSince1970 * 1000 }
+            iso.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+            if let d = iso.date(from: dt) { return d.timeIntervalSince1970 * 1000 }
         }
         if let day = w.date {
             let f = DateFormatter()

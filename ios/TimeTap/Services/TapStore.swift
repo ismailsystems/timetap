@@ -788,7 +788,7 @@ final class TapStore: ObservableObject {
                     return
                 }
                 if http.status >= 400, let id = queue.first?.id {
-                    quarantine(.init(id: id, message: "HTTP \(http.status)"))
+                    quarantine(.init(id: id, message: http.localizedDescription))
                 }
                 if !queue.isEmpty { scheduleRetry() }
                 paintSync()
