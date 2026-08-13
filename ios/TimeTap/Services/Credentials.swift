@@ -56,11 +56,12 @@ enum Credentials {
         set { UserDefaults.standard.set(newValue, forKey: sittingKey) }
     }
 
+    static var hasCalendarIds: Bool {
+        !planId.isEmpty && !actualId.isEmpty && !sittingId.isEmpty
+    }
+
     static var isConfigured: Bool {
-        GoogleAuth.hasSession
-            && !planId.isEmpty
-            && !actualId.isEmpty
-            && !sittingId.isEmpty
+        GoogleAuth.hasSession && hasCalendarIds
     }
 
     static func resetForTests() {

@@ -17,6 +17,10 @@ struct RootView: View {
             SignInView()
                 .environmentObject(store)
         }
+        .fullScreenCover(isPresented: $store.showPicker) {
+            CalendarPickerView()
+                .environmentObject(store)
+        }
         .onAppear { store.boot() }
         .onChange(of: scenePhase) { _, phase in
             if phase == .active { store.refreshOnReturn() }

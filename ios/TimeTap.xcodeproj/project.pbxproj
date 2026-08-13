@@ -15,6 +15,8 @@
 		58F7E0C393D62920F700C37E /* A1Tests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6C9E642DDAC8A5F6C60D9EF4 /* A1Tests.swift */; };
 		674A0AB9AE587F11D9091E36 /* Format.swift in Sources */ = {isa = PBXBuildFile; fileRef = 92673D20F168B38B293C621F /* Format.swift */; };
 		6815C88AE2DF31036A8B5A8B /* SignInView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6D7B42C20E98A8B8C2475C8B /* SignInView.swift */; };
+		6A17E8C8E7A7E5DCEAA82108 /* CalendarPickerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 31BB6E2F4AC7571D01632124 /* CalendarPickerView.swift */; };
+		6C3F4C2381A713E29945746B /* CalendarAPI.swift in Sources */ = {isa = PBXBuildFile; fileRef = 46DD023ECACFCEE59D37F58C /* CalendarAPI.swift */; };
 		81925425FD2759B8617E9D60 /* GoogleSignIn in Frameworks */ = {isa = PBXBuildFile; productRef = E2AC37527A1324DCA04213C6 /* GoogleSignIn */; };
 		8B9BCD03171BB47A1FDDA0B8 /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 979753C469BB46C427293E02 /* RootView.swift */; };
 		956E790A0753C11234383A9A /* DayRailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 49092CA9D4C73500509BB649 /* DayRailView.swift */; };
@@ -22,6 +24,7 @@
 		B2AE2AF91FFF01C1135F2C7D /* TimetapAPI.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1D2F64E4CEB2DB279C547029 /* TimetapAPI.swift */; };
 		BBE466DE1345E22BC5700126 /* TapStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = C85019F7B88C8EE4DFBE85A0 /* TapStore.swift */; };
 		DC1D8DE48367B8E83C66452D /* TimeTapApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6DC9D8FAFE6CD1911BA1BA06 /* TimeTapApp.swift */; };
+		DC693AE87028C02E393735BB /* A2Tests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8126B4FE3CB9C4362805622A /* A2Tests.swift */; };
 		E8C1C00798C335C7959CA6B8 /* Credentials.swift in Sources */ = {isa = PBXBuildFile; fileRef = EC2416C4707736A43FD2ACF6 /* Credentials.swift */; };
 		F0D1D645E73776D17B15A756 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D55675D4A21D2C2D804358B /* SettingsView.swift */; };
 		FAF11E3081864E2D33B11B77 /* CaptureView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 749D803612D26E9D5D20E863 /* CaptureView.swift */; };
@@ -43,7 +46,9 @@
 		1D2F64E4CEB2DB279C547029 /* TimetapAPI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimetapAPI.swift; sourceTree = "<group>"; };
 		202DBF96A0E63CD41E7A516D /* Google.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Google.xcconfig; sourceTree = "<group>"; };
 		2D55675D4A21D2C2D804358B /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		31BB6E2F4AC7571D01632124 /* CalendarPickerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalendarPickerView.swift; sourceTree = "<group>"; };
 		39244103B3847640AAA55B11 /* GoogleAuth.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoogleAuth.swift; sourceTree = "<group>"; };
+		46DD023ECACFCEE59D37F58C /* CalendarAPI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalendarAPI.swift; sourceTree = "<group>"; };
 		47B9719A4D5ACAE3A65E08CB /* SplitSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SplitSheet.swift; sourceTree = "<group>"; };
 		49092CA9D4C73500509BB649 /* DayRailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DayRailView.swift; sourceTree = "<group>"; };
 		4E7744EE4EAB4173F4B3D188 /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
@@ -52,6 +57,7 @@
 		6D7B42C20E98A8B8C2475C8B /* SignInView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SignInView.swift; sourceTree = "<group>"; };
 		6DC9D8FAFE6CD1911BA1BA06 /* TimeTapApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimeTapApp.swift; sourceTree = "<group>"; };
 		749D803612D26E9D5D20E863 /* CaptureView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureView.swift; sourceTree = "<group>"; };
+		8126B4FE3CB9C4362805622A /* A2Tests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = A2Tests.swift; sourceTree = "<group>"; };
 		92673D20F168B38B293C621F /* Format.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Format.swift; sourceTree = "<group>"; };
 		979753C469BB46C427293E02 /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
 		B1FF4806EEB7A5DA1B512B3C /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
@@ -110,6 +116,7 @@
 		B4A439978C48A6D87AD9D481 /* Services */ = {
 			isa = PBXGroup;
 			children = (
+				46DD023ECACFCEE59D37F58C /* CalendarAPI.swift */,
 				EC2416C4707736A43FD2ACF6 /* Credentials.swift */,
 				39244103B3847640AAA55B11 /* GoogleAuth.swift */,
 				C85019F7B88C8EE4DFBE85A0 /* TapStore.swift */,
@@ -131,6 +138,7 @@
 			isa = PBXGroup;
 			children = (
 				6C9E642DDAC8A5F6C60D9EF4 /* A1Tests.swift */,
+				8126B4FE3CB9C4362805622A /* A2Tests.swift */,
 			);
 			path = TimeTapTests;
 			sourceTree = "<group>";
@@ -138,6 +146,7 @@
 		CD89DEDEA4606A0558A58718 /* Views */ = {
 			isa = PBXGroup;
 			children = (
+				31BB6E2F4AC7571D01632124 /* CalendarPickerView.swift */,
 				749D803612D26E9D5D20E863 /* CaptureView.swift */,
 				49092CA9D4C73500509BB649 /* DayRailView.swift */,
 				67FE41A5E22FCCF25FC6FFDB /* DeadLetterSheet.swift */,
@@ -259,6 +268,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				58F7E0C393D62920F700C37E /* A1Tests.swift in Sources */,
+				DC693AE87028C02E393735BB /* A2Tests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -266,6 +276,8 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				6C3F4C2381A713E29945746B /* CalendarAPI.swift in Sources */,
+				6A17E8C8E7A7E5DCEAA82108 /* CalendarPickerView.swift in Sources */,
 				FAF11E3081864E2D33B11B77 /* CaptureView.swift in Sources */,
 				E8C1C00798C335C7959CA6B8 /* Credentials.swift in Sources */,
 				956E790A0753C11234383A9A /* DayRailView.swift in Sources */,

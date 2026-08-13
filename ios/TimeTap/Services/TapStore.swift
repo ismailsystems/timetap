@@ -15,6 +15,7 @@ final class TapStore: ObservableObject {
     @Published var banner: String?
     @Published var showSettings = false
     @Published var showSignIn = false
+    @Published var showPicker = false
     @Published var showDead = false
     @Published var addingCategory = false
 
@@ -106,6 +107,8 @@ final class TapStore: ObservableObject {
         loadPersisted()
         if !GoogleAuth.hasSession {
             showSignIn = true
+        } else if !Credentials.hasCalendarIds {
+            showPicker = true
         }
     }
 

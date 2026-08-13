@@ -41,6 +41,9 @@ struct SignInView: View {
                 try await GoogleAuth.signInFromKeyWindow()
                 await MainActor.run {
                     store.showSignIn = false
+                    if !Credentials.hasCalendarIds {
+                        store.showPicker = true
+                    }
                 }
             } catch {
                 await MainActor.run {
