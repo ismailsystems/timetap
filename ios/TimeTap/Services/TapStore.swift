@@ -564,19 +564,9 @@ final class TapStore: ObservableObject {
             banner = "cannot add a category while offline"
             return
         }
-        addingCategory = true
-        Task {
-            defer { addingCategory = false }
-            do {
-                let cfg = try await TimetapAPI.shared.addCategory(label: name)
-                applyConfig(cfg)
-                if dead.isEmpty { banner = nil }
-                scrollToKey = cfg.categories.last?.key
-                onSuccess?()
-            } catch {
-                banner = error.localizedDescription
-            }
-        }
+        addingCategory = false
+        banner = "Categories stay on this device."
+        _ = onSuccess
     }
 
     private func refreshUnreadable() {
@@ -601,25 +591,7 @@ final class TapStore: ObservableObject {
             return
         }
         guard Credentials.isConfigured else { return }
-        do {
-            applyConfig(try await TimetapAPI.shared.config())
-            if !queue.isEmpty {
-                stateAfterBootDrain = true
-                paintSync()
-                await flushAsync()
-            } else {
-                await loadServerState()
-            }
-            if !dead.isEmpty {
-                banner = deadMsg()
-                syncFailed = true
-                paintSync()
-            }
-        } catch {
-            banner = error.localizedDescription
-            syncFailed = true
-            syncLabel = "SYNC FAILED"
-        }
+        // Path 3: Calendar HTTP is C1. Do not call Apps Script.
     }
 
     private func applyConfig(_ cfg: ClientConfig) {
@@ -632,40 +604,8 @@ final class TapStore: ObservableObject {
     }
 
     private func loadServerState(corrective: Bool = false) async {
-        let gen = localGen
-        do {
-            if config == nil || catByKey.isEmpty {
-                applyConfig(try await TimetapAPI.shared.config())
-            }
-            let st = try await TimetapAPI.shared.getState()
-            guard gen == localGen, queue.isEmpty else {
-                if corrective { await loadCorrectiveState() }
-                return
-            }
-            let wasRef = open?.ref
-            let wasSit = sit?.ref
-            open = st.open.map {
-                OpenBlock(ref: $0.ref, key: $0.key, text: $0.text, startMs: $0.startMs)
-            }
-            sit = st.sit
-            today = st.today ?? []
-            lastStateAt = Date()
-            if wasRef != open?.ref || wasSit != sit?.ref {
-                closeBlockSheets()
-            }
-            if let key = open?.key { scrollToKey = key }
-            refreshUnreadable()
-            if !unreadableOpen {
-                if dead.isEmpty { banner = nil }
-                else { banner = deadMsg() }
-            }
-            if let notes = st.notes, !notes.isEmpty, dead.isEmpty, !unreadableOpen {
-                banner = notes.joined(separator: " · ")
-            }
-            persist()
-        } catch {
-            banner = error.localizedDescription
-        }
+        _ = corrective
+        // B4/C1 read Calendar. Do not call Apps Script.
     }
 
     private func loadCorrectiveState() async {
@@ -684,62 +624,8 @@ final class TapStore: ObservableObject {
 
     private func flushAsync() async {
         guard !flushing, Credentials.isConfigured else { return }
-        let batch = Array(queue.prefix(40))
-        guard !batch.isEmpty else {
-            if dead.isEmpty { syncFailed = false }
-            paintSync()
-            return
-        }
-        flushing = true
+        // C1 flushes to Calendar HTTP. Path 2 Apps Script is gone.
         paintSync()
-        defer { flushing = false }
-
-        do {
-            let res = try await TimetapAPI.shared.applyOps(batch)
-            let done = Set(res.applied ?? [])
-            queue = queue.filter { !done.contains($0.id) }
-            saveQueue()
-
-            if let dropped = res.dropped, !dropped.isEmpty {
-                banner = "discarded \(dropped.count) malformed write\(dropped.count == 1 ? "" : "s")"
-            }
-
-            if batch.contains(where: { $0.type == "undoSwitch" && done.contains($0.id) }) {
-                await loadCorrectiveState()
-            }
-
-            if let err = res.errors?.first {
-                quarantine(err)
-                syncFailed = true
-                paintSync()
-                scheduleRetry()
-            } else {
-                retryDelay = 4
-                if queue.isEmpty {
-                    if dead.isEmpty { syncFailed = false }
-                    if !dead.isEmpty {
-                        banner = deadMsg()
-                    } else if banner?.contains("malformed") != true, !unreadableOpen {
-                        banner = nil
-                    }
-                    paintSync()
-                    if stateAfterBootDrain {
-                        stateAfterBootDrain = false
-                        await loadServerState()
-                    }
-                    if stateAfterCorrectiveDrain {
-                        await loadCorrectiveState()
-                    }
-                } else {
-                    await flushAsync()
-                }
-            }
-        } catch {
-            syncFailed = true
-            banner = error.localizedDescription
-            paintSync()
-            scheduleRetry()
-        }
     }
 
     private func quarantine(_ err: ApplyResult.ApplyError) {
@@ -1005,6 +891,8 @@ final class TapStore: ObservableObject {
         if let data = UserDefaults.standard.data(forKey: configKey),
            let cfg = try? JSONDecoder().decode(ClientConfig.self, from: data) {
             applyConfig(cfg)
+        } else {
+            applyConfig(.seed)
         }
         paintSync()
     }
