@@ -38,6 +38,25 @@ final class A3Tests: TimeTapTestCase {
         XCTAssertNotEqual(fake.lastCalendarId, "s1")
     }
 
+    func testApplyOpsOpenActualDWWritesPath2Event() {
+        let t: Double = 1_700_000_000_000
+        ApplyOps.resetForTests()
+        ApplyOps.actual = fake
+        ApplyOps.sitting = FakeCalendar()
+        ApplyOps.nowMs = t
+        _ = ApplyOps.apply([
+            Op(id: "o1", type: "openActual", ref: "abcdefghijklmnop", key: "DW", startMs: t)
+        ])
+        XCTAssertEqual(fake.events.count, 1)
+        let ev = fake.events[0]
+        XCTAssertEqual(ev.title, "DW:")
+        XCTAssertEqual(ev.colorId, "9")
+        XCTAssertNotNil(ev.description.range(of: #"#ref:[A-Za-z0-9]{16}"#, options: .regularExpression))
+        XCTAssertTrue(ev.description.contains("#open"))
+        XCTAssertEqual(ev.startMs, t)
+        XCTAssertEqual(ev.endMs, t + 60_000)
+    }
+
     func testTapWithoutActualIdDoesNotInsert() async {
         Credentials.actualId = ""
         await MainActor.run {

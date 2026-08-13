@@ -80,15 +80,19 @@ struct CalendarPickerView: View {
         loading = true
         errorText = nil
         defer { loading = false }
-        do {
-            pick = .fromSaved(try await CalendarAPI.listCalendars())
-        } catch {
+        switch await store.loadCalendars() {
+        case .success(let list):
+            pick = .fromSaved(list)
+        case .failure(let error):
             errorText = error.localizedDescription
         }
     }
 
     private func confirm() {
-        guard CalendarAPI.confirm(plan: pick.planId, actual: pick.actualId, sitting: pick.sittingId) else { return }
-        Task { await store.didConfirmCalendars() }
+        Task {
+            await store.confirmCalendars(
+                plan: pick.planId, actual: pick.actualId, sitting: pick.sittingId
+            )
+        }
     }
 }

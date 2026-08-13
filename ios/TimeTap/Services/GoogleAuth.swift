@@ -45,6 +45,7 @@ enum GoogleAuth {
                 additionalScopes: [calendarScope]
             )
             followSDKSession()
+            try requireCalendarScope()
         } catch {
             if isCancel(error) {
                 applyCancelledSignIn()
@@ -89,6 +90,15 @@ enum GoogleAuth {
                 else { cont.resume() }
             }
         }
+    }
+
+    /// Tests pin `testHasSession` and count as granted. Live: missing calendar scope signs out.
+    static func requireCalendarScope() throws {
+        if testHasSession != nil { return }
+        let granted = GIDSignIn.sharedInstance.currentUser?.grantedScopes ?? []
+        if granted.contains(calendarScope) { return }
+        signOut()
+        throw CalendarHTTPError(status: 403, message: "Google Calendar access was not granted")
     }
 
     static func resetForTests() {

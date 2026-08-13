@@ -541,36 +541,47 @@ final class TapStore: ObservableObject {
             ))
         }
         blocks.sort { $0.startMs < $1.startMs }
-        guard let firstBlock = blocks.first else { return ("", []) }
 
-        let first = max(firstBlock.startMs, dayStart)
-        let span = max(now - first, 60_000)
         var raw: [(name: String, ms: Double, hex: String?, gap: Bool, open: Bool, floor: CGFloat, note: String)] = []
         var prevEnd: Double?
-
-        for b in blocks {
-            if let pe = prevEnd, b.startMs - pe > gapMs {
-                raw.append(("UNLOGGED", b.startMs - pe, nil, true, false, 20, ""))
+        if blocks.isEmpty {
+            raw.append(("UNLOGGED", max(now - dayStart, 1), nil, true, false, 20, ""))
+            prevEnd = now
+        } else {
+            let firstStart = blocks[0].startMs
+            if firstStart - dayStart > 5000 {
+                raw.append(("UNLOGGED", firstStart - dayStart, nil, true, false, 20, ""))
+                prevEnd = firstStart
             }
-            let cat = catByKey[b.key]
-            let ms = b.endMs - max(b.startMs, dayStart)
-            let isOpen = open.map { o in
-                (b.ref != nil && b.ref == o.ref) || (b.ref == nil && b.startMs == o.startMs && b.endMs == now)
-            } ?? false
-            raw.append((
-                (cat?.face ?? b.key).uppercased(),
-                ms,
-                cat?.hex,
-                false,
-                isOpen,
-                26,
-                b.text
-            ))
-            prevEnd = max(prevEnd ?? b.endMs, b.endMs)
+            for b in blocks {
+                if let pe = prevEnd, b.startMs - pe > gapMs {
+                    raw.append(("UNLOGGED", b.startMs - pe, nil, true, false, 20, ""))
+                }
+                let cat = catByKey[b.key]
+                let ms = b.endMs - max(b.startMs, dayStart)
+                let isOpen = open.map { o in
+                    (b.ref != nil && b.ref == o.ref) || (b.ref == nil && b.startMs == o.startMs && b.endMs == now)
+                } ?? false
+                raw.append((
+                    (cat?.face ?? b.key).uppercased(),
+                    ms,
+                    cat?.hex,
+                    false,
+                    isOpen,
+                    26,
+                    b.text
+                ))
+                prevEnd = max(prevEnd ?? b.endMs, b.endMs)
+            }
         }
         if open == nil, let pe = prevEnd, now - pe > 5000 {
             raw.append(("UNLOGGED", now - pe, nil, true, false, 20, ""))
         }
+
+        let labelStart = (blocks.isEmpty || (blocks.first.map { $0.startMs - dayStart > 5000 } ?? false))
+            ? dayStart
+            : max(blocks[0].startMs, dayStart)
+        let span = max(now - labelStart, 60_000)
 
         let px = budget / span
         let share = budget / CGFloat(max(1, raw.count))
@@ -590,7 +601,7 @@ final class TapStore: ObservableObject {
                 note: r.note
             )
         }
-        return ("TODAY · \(Format.clock(first))", items)
+        return ("TODAY · \(Format.clock(labelStart))", items)
     }
 
     func labelFor(_ key: String) -> String { catByKey[key]?.face ?? key }
@@ -667,6 +678,59 @@ final class TapStore: ObservableObject {
     func didConfirmCalendars() async {
         showPicker = false
         await bootNow()
+    }
+
+    func confirmCalendars(plan: String?, actual: String?, sitting: String?) async {
+        guard CalendarAPI.canConfirm(plan: plan, actual: actual, sitting: sitting) else { return }
+        let newA = actual ?? ""
+        let newS = sitting ?? ""
+        let switching = Credentials.hasCalendarIds
+            && (Credentials.actualId != newA || Credentials.sittingId != newS)
+        if switching {
+            if open != nil || sit != nil {
+                closeRunningOnCurrentCalendars()
+            }
+            if !queue.isEmpty {
+                await flushNow()
+            }
+        }
+        guard CalendarAPI.confirm(plan: plan, actual: actual, sitting: sitting) else { return }
+        await didConfirmCalendars()
+    }
+
+    func loadCalendars() async -> Result<[CalendarSummary], Error> {
+        var didRefresh = false
+        while true {
+            do {
+                return .success(try await CalendarAPI.listCalendars())
+            } catch let http as CalendarHTTPError where http.status == 401 {
+                if didRefresh {
+                    showSignIn = true
+                    return .failure(http)
+                }
+                try? await GoogleAuth.refreshAccessToken()
+                didRefresh = true
+            } catch {
+                return .failure(error)
+            }
+        }
+    }
+
+    private func closeRunningOnCurrentCalendars() {
+        let now = clock()
+        closeBlockSheets()
+        if let cur = open {
+            let m = markFor(key: cur.key, durMs: now - cur.startMs)
+            _ = enqueue(Op(
+                id: Op.uid(), type: "closeActual", ts: now,
+                ref: cur.ref, key: cur.key, text: cur.text, mark: m.mark, endMs: now
+            ))
+            railClosed(cur, endMs: now)
+            open = nil
+            hideMarkStrip()
+        }
+        _ = closeSit(at: now)
+        persist()
     }
 
     private func bootAsync() async {
@@ -837,6 +901,9 @@ final class TapStore: ObservableObject {
                     continue
                 }
                 flushing = false
+                if http.status == 429, let ra = http.retryAfter {
+                    retryDelay = max(retryDelay, ra)
+                }
                 if http.status == 429 || http.status >= 500 {
                     transportFails += 1
                     banner = "Google Calendar is unreachable. The running block is still here."
@@ -1153,6 +1220,7 @@ final class TapStore: ObservableObject {
            let st = try? JSONDecoder().decode(Persisted.self, from: data) {
             open = st.open
             sit = st.sit
+            today = st.today ?? []
         }
         if let data = UserDefaults.standard.data(forKey: deadKey),
            let d = try? JSONDecoder().decode([DeadEntry].self, from: data) {
@@ -1176,7 +1244,7 @@ final class TapStore: ObservableObject {
     }
 
     private func persist() {
-        let st = Persisted(open: open, sit: sit)
+        let st = Persisted(open: open, sit: sit, today: today)
         if let data = try? JSONEncoder().encode(st) {
             UserDefaults.standard.set(data, forKey: stateKey)
         }
@@ -1204,5 +1272,6 @@ final class TapStore: ObservableObject {
     private struct Persisted: Codable {
         var open: OpenBlock?
         var sit: SitBlock?
+        var today: [TodayBlock]?
     }
 }

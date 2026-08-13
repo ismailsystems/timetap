@@ -78,7 +78,7 @@ final class B1Tests: TimeTapTestCase {
     func testSeedHasSixPlusPOOP() throws {
         let keys = ClientConfig.seed.categories.map(\.key)
         XCTAssertEqual(keys, ["DW", "MTG", "ADM", "BODY", "REL", "FRAG", "POOP"])
-        XCTAssertEqual(ClientConfig.seed.categories.first { $0.key == "POOP" }?.color, "1")
+        XCTAssertEqual(ClientConfig.seed.categories.first { $0.key == "POOP" }?.color, "5")
         let gs = try String(
             contentsOf: URL(fileURLWithPath: #filePath)
                 .deletingLastPathComponent()

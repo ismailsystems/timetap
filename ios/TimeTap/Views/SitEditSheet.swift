@@ -2,6 +2,9 @@ import SwiftUI
 
 struct SitEditSheet: View {
     @EnvironmentObject private var store: TapStore
+    @State private var armed = false
+    @State private var armTask: Task<Void, Never>?
+    @State private var armedAt: TimeInterval = 0
 
     var body: some View {
         if let s = store.sitEdit {
@@ -65,18 +68,44 @@ struct SitEditSheet: View {
                 .buttonStyle(.plain)
                 .padding(.bottom, 16)
 
-                Button(role: .destructive, action: store.deleteSit) {
-                    Text("DELETE SITTING")
+                Button(role: .destructive, action: armOrDelete) {
+                    Text(armed ? "TAP AGAIN TO DELETE" : "DELETE SITTING")
                         .font(.system(size: 12, weight: .heavy))
                         .tracking(1.2)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 16)
-                        .foregroundStyle(Theme.accentOn)
+                        .background(armed ? Theme.accent : Color.clear)
+                        .foregroundStyle(armed ? Color.white : Theme.accentOn)
                 }
                 .buttonStyle(.plain)
             }
             .foregroundStyle(Theme.fg)
             .background(Theme.ground.ignoresSafeArea())
+            .onDisappear { disarm() }
         }
+    }
+
+    private func armOrDelete() {
+        if armed {
+            if Date().timeIntervalSince1970 - armedAt < 0.3 { return }
+            disarm()
+            store.deleteSit()
+            return
+        }
+        disarm()
+        armed = true
+        armedAt = Date().timeIntervalSince1970
+        let ms = store.config?.confirmTimeoutMs ?? 4000
+        armTask = Task {
+            try? await Task.sleep(nanoseconds: UInt64(ms) * 1_000_000)
+            guard !Task.isCancelled else { return }
+            await MainActor.run { armed = false }
+        }
+    }
+
+    private func disarm() {
+        armTask?.cancel()
+        armTask = nil
+        armed = false
     }
 }

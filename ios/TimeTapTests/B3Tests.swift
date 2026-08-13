@@ -212,4 +212,11 @@ final class B3Tests: TimeTapTestCase {
         XCTAssertEqual(actual.events.filter { ApplyOps.isOpen($0) }.count, 1)
         XCTAssertTrue(actual.events.first { $0.description.contains(dw) }!.description.contains("#open"))
     }
+
+    func testAddLocalDaysCrossesChicagoSpringForward() {
+        let start = local(2026, 3, 8, 0)
+        let next = ApplyOps.addLocalDays(start, 1)
+        XCTAssertEqual(next, local(2026, 3, 9, 0))
+        XCTAssertEqual(next - start, 23 * 3_600_000)
+    }
 }

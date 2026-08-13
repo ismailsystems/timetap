@@ -32,7 +32,7 @@ final class C2Tests: TimeTapTestCase {
         let extra = store.categories.last
         XCTAssertEqual(extra?.key, "DEEPREAD")
         XCTAssertEqual(extra?.label, "Deep reading")
-        XCTAssertEqual(extra?.color, "2")
+        XCTAssertEqual(extra?.color, "1")
         XCTAssertFalse(CalendarAPI.didFlush)
         XCTAssertFalse(GoogleAuth.didFetchCalendarList)
         XCTAssertFalse(GoogleAuth.didAttemptCalendarWrite)

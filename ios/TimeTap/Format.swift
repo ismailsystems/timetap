@@ -5,7 +5,7 @@ enum Format {
 
     static func clock(_ ms: Double) -> String {
         let d = Date(timeIntervalSince1970: ms / 1000)
-        let cal = Calendar.current
+        let cal = calendar()
         var h = cal.component(.hour, from: d)
         let m = cal.component(.minute, from: d)
         let am = h < 12
@@ -35,7 +35,13 @@ enum Format {
 
     static func dayStartMs(_ ms: Double) -> Double {
         let d = Date(timeIntervalSince1970: ms / 1000)
-        return Calendar.current.startOfDay(for: d).timeIntervalSince1970 * 1000
+        return calendar().startOfDay(for: d).timeIntervalSince1970 * 1000
+    }
+
+    private static func calendar() -> Calendar {
+        var cal = Calendar(identifier: .gregorian)
+        cal.timeZone = ApplyOps.timeZone
+        return cal
     }
 
     static let opWords: [String: String] = [

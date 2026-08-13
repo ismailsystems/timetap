@@ -22,7 +22,7 @@ final class A4Tests: TimeTapTestCase {
         )
     }
 
-    func testSeedPutsDWOnTheGridWithPOOPColor1() async {
+    func testSeedPutsDWOnTheGridWithPOOPColor5() async {
         await MainActor.run {
             Credentials.resetForTests()
             let store = TapStore()
@@ -33,8 +33,8 @@ final class A4Tests: TimeTapTestCase {
             XCTAssertEqual(store.categories.first { $0.key == "DW" }?.color, "9")
             XCTAssertEqual(store.categories.first { $0.key == "DW" }?.hex, "#3f51b5")
             let poop = store.categories.first { $0.key == "POOP" }
-            XCTAssertEqual(poop?.color, "1")
-            XCTAssertEqual(poop?.hex, "#7986cb")
+            XCTAssertEqual(poop?.color, "5")
+            XCTAssertEqual(poop?.hex, "#f6bf26")
         }
     }
 

@@ -22,7 +22,7 @@ enum TT {
         "9": "#3f51b5", "10": "#0b8043", "11": "#d50000"
     ]
     static let colorIdByKey: [String: String] = [
-        "DW": "9", "MTG": "3", "ADM": "8", "BODY": "10", "REL": "6", "FRAG": "4", "POOP": "1"
+        "DW": "9", "MTG": "3", "ADM": "8", "BODY": "10", "REL": "6", "FRAG": "4", "POOP": "5"
     ]
 }
 

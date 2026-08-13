@@ -2185,6 +2185,27 @@ chk('every mark x text combination round-trips unchanged', rt41.length === 0,
 chk('and the table actually covered all four marks plus unmarked',
   MARKS41.length === 5 && TEXTS41.length === 7);
 
+console.log('\n41d. title-golden.json matches live buildTitle_ / parseTitle_');
+const golden41 = JSON.parse(require('fs').readFileSync(
+  require('path').join(__dirname, 'fixtures/title-golden.json'), 'utf8'));
+const goldFails41 = [];
+for (const row of golden41.roundtrip) {
+  const built = buildTitle_('DW', row.text, row.mark);
+  if (built !== row.built) goldFails41.push('build ' + JSON.stringify(row) + ' -> ' + built);
+  const parsed = parseTitle_(built);
+  if (!parsed || parsed.key !== row.parsed.key || parsed.text !== row.parsed.text
+      || parsed.mark !== row.parsed.mark) {
+    goldFails41.push('parse ' + built + ' -> ' + JSON.stringify(parsed));
+    continue;
+  }
+  const rebuilt = buildTitle_(parsed.key, parsed.text, parsed.mark);
+  if (rebuilt !== row.rebuilt || rebuilt !== built) {
+    goldFails41.push('rebuild ' + built + ' -> ' + rebuilt);
+  }
+}
+chk('title-golden roundtrip rows match live GAS', goldFails41.length === 0, goldFails41.join(' | '));
+chk('golden has 35 roundtrip rows', golden41.roundtrip.length === 35);
+
 console.log('\n41c. an op may not carry "?", nor anything else the user cannot choose');
 /* AMENDED — A1's criterion 4 originally required this op to be APPLIED, and the
  * round shipped that way. The human ruled otherwise (Q4, amendment F3): a mark

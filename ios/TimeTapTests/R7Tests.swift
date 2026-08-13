@@ -163,16 +163,16 @@ final class R7Tests: TimeTapTestCase {
     func testDeepReadingOpenActualKeepsNextColor() throws {
         let store = TapStore()
         store.addCategory(label: "Deep reading")
-        XCTAssertEqual(Grammar.colorId(for: "DEEPREAD"), "2")
+        XCTAssertEqual(Grammar.colorId(for: "DEEPREAD"), "1")
         let actual = FakeCalendar()
         ApplyOps.actual = actual
         ApplyOps.sitting = FakeCalendar()
         _ = ApplyOps.apply([
             Op(id: "o1", type: "openActual", ref: dw, key: "DEEPREAD", startMs: t)
         ])
-        XCTAssertEqual(actual.events[0].colorId, "2")
+        XCTAssertEqual(actual.events[0].colorId, "1")
         let ev = try CalendarAPI.openActual(key: "DEEPREAD", at: t, ref: dw)
-        XCTAssertEqual(ev.colorId, "2")
+        XCTAssertEqual(ev.colorId, "1")
     }
 
     // MARK: - Seams

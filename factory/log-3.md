@@ -1,5 +1,8 @@
 # Log — Path 3
 
+## [2026-08-13 13:40] R10 | Remaining review items. POOP color 5. Dynamic Type. + last. Note while open. Persist today. Rail lead UNLOGGED. Confirm flushes old calendar. Picker 401. PATCH 404→POST. Retry-After. Skip cancelled. Format TZ. Arm DELETE SITTING. Running-row edge. Rail onFill. XCTest 141/0. GAS 1198/0.
+
+
 ## [2026-08-13 13:20] R9 | UI/UX + leftover holes vs main. Serial gate holds busy across await. POST reads Google id. First-run does not claim SYNCED. Picker has Sign out. Rail NOW ▲ and dashed UNLOGGED. Sit is a chip. Clocks use store.clock.
 
 ## [2026-08-13 12:50] R8 | Full-branch review vs main. Serial CalendarAPI gate; getState 401 refresh; return-from-bg flush; batch 400 retry; Path 2 split/undo quarantine restore; mark strip names the block; UNDO 12pt gap; sit needs session; remainder split will not cut after now.

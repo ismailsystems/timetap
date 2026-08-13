@@ -13,7 +13,7 @@ struct DayRailView: View {
             let rail = store.railItems(budget: max(geo.size.height - 44, 40), now: now)
             VStack(alignment: .leading, spacing: 6) {
                 Text(rail.startLabel)
-                    .font(.system(size: 10, weight: .semibold))
+                    .font(Theme.font(10, weight: .semibold))
                     .foregroundStyle(Theme.mute)
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
@@ -24,7 +24,7 @@ struct DayRailView: View {
                 }
                 Spacer(minLength: 0)
                 Text("NOW ▲")
-                    .font(.system(size: 10, weight: .bold))
+                    .font(Theme.font(10, weight: .bold))
                     .tracking(1.0)
                     .foregroundStyle(Theme.accentOn)
             }
@@ -40,28 +40,28 @@ struct DayRailView: View {
         return VStack(alignment: .leading, spacing: 2) {
             HStack(spacing: 6) {
                 Text(item.name)
-                    .font(.system(size: size, weight: .bold))
+                    .font(Theme.font(size, weight: .bold))
                     .lineLimit(1)
                     .minimumScaleFactor(0.6)
                     .layoutPriority(1)
                 if inline {
                     Text("·")
-                        .font(.system(size: size, weight: .bold))
+                        .font(Theme.font(size, weight: .bold))
                     Text(item.note)
-                        .font(.system(size: max(11, size * 0.85), weight: .semibold))
+                        .font(Theme.font(max(11, size * 0.85), weight: .semibold))
                         .lineLimit(1)
                         .minimumScaleFactor(0.5)
                 }
                 Spacer(minLength: 0)
                 Text(Format.shortElapsed(item.ms))
-                    .font(.system(size: size, weight: .bold).monospacedDigit())
+                    .font(Theme.font(size, weight: .bold).monospacedDigit())
                     .lineLimit(1)
                     .minimumScaleFactor(0.6)
                     .layoutPriority(1)
             }
             if !item.note.isEmpty, !inline {
                 Text(item.note)
-                    .font(.system(size: max(11, size * 0.75), weight: .semibold))
+                    .font(Theme.font(max(11, size * 0.75), weight: .semibold))
                     .lineLimit(2)
                     .minimumScaleFactor(0.7)
             }
@@ -69,7 +69,7 @@ struct DayRailView: View {
         .padding(.horizontal, 8)
         .padding(.vertical, 6)
         .frame(height: item.height, alignment: item.note.isEmpty || inline ? .center : .topLeading)
-        .foregroundStyle(item.isGap ? Theme.dim : .white)
+        .foregroundStyle(item.isGap ? Theme.dim : Theme.onFill(item.hex ?? "#616161"))
         .background {
             if item.isGap {
                 GapFill()

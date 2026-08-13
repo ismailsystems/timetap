@@ -36,7 +36,9 @@ final class UTests: TimeTapTestCase {
         )
         XCTAssertFalse(text.contains("Button(\"Done\")"), "keyboard Done bar is back")
         XCTAssertFalse(text.contains("axis: .vertical"), "note field must stay single-line so the key is Done")
-        XCTAssertTrue(text.contains("showNoteField"), "note field must hide when idle or when a note is already set")
+        XCTAssertTrue(text.contains("showNoteField"), "note field must hide when idle")
+        XCTAssertTrue(text.contains("store.open != nil"), "note field stays up while a block is open")
+        XCTAssertFalse(text.contains("noteDraft.trimmingCharacters"), "note field must not hide after a note is set")
         XCTAssertTrue(text.contains("if let banner = store.banner"), "banner must stay in CaptureView")
         XCTAssertTrue(text.contains("multilineTextAlignment(.center)"), "banner must be centered at the top")
         XCTAssertTrue(text.contains("Text(\"+\")"), "New must be a plus, not a category row")
@@ -49,6 +51,11 @@ final class UTests: TimeTapTestCase {
         XCTAssertTrue(text.contains("padding(.bottom, 12)"), "UNDO must sit off TAP TO SIT")
         XCTAssertTrue(text.contains("categoryList(height:"), "category column must know its height")
         XCTAssertTrue(text.contains("minHeight: 44") || text.contains("max(44"), "category rows need a 44pt floor")
+        let forEach = text.range(of: "ForEach(store.categories)")!
+        let add = text.range(of: "if store.canAddCategory")!
+        XCTAssertLessThan(forEach.lowerBound, add.lowerBound, "+ must sit under the category list")
+        XCTAssertTrue(text.contains("Theme.font("), "capture type must scale")
+        XCTAssertTrue(text.contains("running: store.open?.key == cat.key"), "running row must show elapsed")
     }
 
     func testOpenBlockNoteShowsOnTheRail() {
@@ -310,5 +317,185 @@ final class UTests: TimeTapTestCase {
         let data = Data(#"{"id":"google-event-1","summary":"DW:"}"#.utf8)
         XCTAssertEqual(CalendarAPI.createdEventId(from: data), "google-event-1")
         XCTAssertNil(CalendarAPI.createdEventId(from: Data("{}".utf8)))
+    }
+
+    func testRailLeadUnloggedWhenTodayIsEmpty() {
+        GoogleAuth.testHasSession = true
+        GoogleAuth.testAccessToken = "t"
+        Credentials.planId = "p1"
+        Credentials.actualId = "a1"
+        Credentials.sittingId = "s1"
+        ApplyOps.timeZone = TimeZone(secondsFromGMT: 0)!
+        let now: Double = 1_700_000_000_000
+        let store = TapStore()
+        store.clock = { now }
+        let (label, items) = store.railItems(budget: 400, now: now)
+        XCTAssertTrue(label.hasPrefix("TODAY · "))
+        XCTAssertEqual(items.count, 1)
+        XCTAssertTrue(items[0].isGap)
+        XCTAssertEqual(items[0].name, "UNLOGGED")
+        XCTAssertGreaterThan(items[0].ms, 5_000)
+    }
+
+    func testPersistedTodaySurvivesRelaunch() {
+        GoogleAuth.testHasSession = true
+        GoogleAuth.testAccessToken = "t"
+        Credentials.planId = "p1"
+        Credentials.actualId = "a1"
+        Credentials.sittingId = "s1"
+        var now: Double = 1_700_000_000_000
+        let store = TapStore()
+        store.clock = { now }
+        store.tapCategory("DW")
+        now += 60_000
+        store.endDay()
+        XCTAssertEqual(store.today.first?.key, "DW")
+        let again = TapStore()
+        XCTAssertEqual(again.today.first?.key, "DW")
+        XCTAssertEqual(again.today.first?.endMs, now)
+    }
+
+    func testPatch404PostsTheEvent() async {
+        GoogleAuth.testHasSession = true
+        GoogleAuth.testAccessToken = "t"
+        Credentials.planId = "p1"
+        Credentials.actualId = "a1"
+        Credentials.sittingId = "s1"
+        let t: Double = 1_700_000_000_000
+        ApplyOps.nowMs = t + 120_000
+        let open = CalEvent(
+            id: "gid-old", calendarId: "a1", key: "DW", title: "DW:",
+            colorId: "9", description: "#ref:abcdefghijklmnop\n#open",
+            startMs: t, endMs: t + 60_000
+        )
+        CalendarAPI.testListedByCal = ["a1": [open], "s1": []]
+        CalendarAPI.testPatch404 = true
+        if let data = try? JSONEncoder().encode([
+            Op(id: "n1", type: "setText", ref: "abcdefghijklmnop", text: "memo")
+        ]) {
+            UserDefaults.standard.set(data, forKey: "tt.queue.v1")
+        }
+        let store = TapStore()
+        await store.flushNow()
+        XCTAssertTrue(
+            CalendarAPI.testPushes.contains { $0.method == "PATCH" && $0.eventId == "gid-old" },
+            "\(CalendarAPI.testPushes)"
+        )
+        XCTAssertTrue(
+            CalendarAPI.testPushes.contains { $0.method == "POST" && $0.summary.contains("DW") },
+            "PATCH 404 must POST \(CalendarAPI.testPushes)"
+        )
+        XCTAssertTrue(store.queue.isEmpty)
+    }
+
+    func testCancelledListedEventsAreSkipped() throws {
+        let json = Data("""
+        {"items":[
+          {"id":"a","status":"cancelled","summary":"DW:","start":{"dateTime":"2023-11-14T22:13:20Z"},"end":{"dateTime":"2023-11-14T22:14:20Z"}},
+          {"id":"b","status":"confirmed","summary":"MTG:","start":{"dateTime":"2023-11-14T22:13:20Z"},"end":{"dateTime":"2023-11-14T22:14:20Z"}}
+        ]}
+        """.utf8)
+        let evs = try CalendarAPI.listedEvents(from: json, calendarId: "a1")
+        XCTAssertEqual(evs.map(\.id), ["b"])
+        XCTAssertEqual(evs[0].title, "MTG:")
+    }
+
+    func testRetryAfterRaisesTheBackoffFloor() async {
+        let dw = "abcdefghijklmnop"
+        if let data = try? JSONEncoder().encode([
+            Op(id: "o1", type: "openActual", ref: dw, key: "DW", startMs: 1_700_000_000_000)
+        ]) {
+            UserDefaults.standard.set(data, forKey: "tt.queue.v1")
+        }
+        GoogleAuth.testHasSession = true
+        GoogleAuth.testAccessToken = "t"
+        Credentials.planId = "p1"
+        Credentials.actualId = "a1"
+        Credentials.sittingId = "s1"
+        ApplyOps.actual = FakeCalendar()
+        ApplyOps.sitting = FakeCalendar()
+        let store = TapStore()
+        CalendarAPI.testRetryAfter = 10
+        CalendarAPI.testStatusQueue = [429]
+        await store.flushNow()
+        XCTAssertEqual(store.retryDelay, 20)
+        XCTAssertEqual(store.queue.map(\.id), ["o1"])
+    }
+
+    func testOnFillUsesDarkTextOnPaleBlocks() {
+        XCTAssertEqual(Theme.onFill("#f6bf26"), Theme.ground)
+        XCTAssertEqual(Theme.onFill("#e67c73"), Theme.ground)
+        XCTAssertEqual(Theme.onFill("#f4511e"), Theme.ground)
+        XCTAssertNotEqual(Theme.onFill("#3f51b5"), Theme.ground)
+    }
+
+    func testClockUsesApplyOpsTimeZone() {
+        ApplyOps.timeZone = TimeZone(identifier: "America/Chicago")!
+        var c = DateComponents()
+        c.year = 2026; c.month = 1; c.day = 15; c.hour = 10; c.minute = 5
+        var cal = Calendar(identifier: .gregorian)
+        cal.timeZone = ApplyOps.timeZone
+        let ms = cal.date(from: c)!.timeIntervalSince1970 * 1000
+        XCTAssertEqual(Format.clock(ms), "10:05 AM")
+        XCTAssertEqual(Format.dayStartMs(ms), cal.startOfDay(for: cal.date(from: c)!).timeIntervalSince1970 * 1000)
+    }
+
+    func testSitDeleteArmsLikeDiscard() throws {
+        let text = try String(
+            contentsOf: URL(fileURLWithPath: #filePath)
+                .deletingLastPathComponent()
+                .deletingLastPathComponent()
+                .appendingPathComponent("TimeTap/Views/SitEditSheet.swift"),
+            encoding: .utf8
+        )
+        XCTAssertTrue(text.contains("TAP AGAIN TO DELETE"))
+        XCTAssertTrue(text.contains("0.3"))
+        XCTAssertTrue(text.contains("armOrDelete"))
+    }
+
+    func testPickerLoadRefreshesOnceOn401() async {
+        GoogleAuth.testHasSession = true
+        GoogleAuth.testAccessToken = "t"
+        Credentials.planId = "p1"
+        Credentials.actualId = "a1"
+        Credentials.sittingId = "s1"
+        CalendarAPI.testListError = CalendarHTTPError(status: 401)
+        let store = TapStore()
+        let before = GoogleAuth.refreshCount
+        let first = await store.loadCalendars()
+        XCTAssertEqual(GoogleAuth.refreshCount, before + 1)
+        if case .failure(let err as CalendarHTTPError) = first {
+            XCTAssertEqual(err.status, 401)
+        } else {
+            XCTFail("second 401 must fail")
+        }
+        XCTAssertTrue(store.showSignIn)
+    }
+
+    func testConfirmCalendarsFlushesOldIdsBeforeSwitch() async {
+        GoogleAuth.testHasSession = true
+        GoogleAuth.testAccessToken = "t"
+        Credentials.planId = "p1"
+        Credentials.actualId = "a1"
+        Credentials.sittingId = "s1"
+        let t: Double = 1_700_000_000_000
+        ApplyOps.nowMs = t + 120_000
+        let open = CalEvent(
+            id: "gid-a1", calendarId: "a1", key: "DW", title: "DW:",
+            colorId: "9", description: "#ref:abcdefghijklmnop\n#open",
+            startMs: t, endMs: t + 60_000
+        )
+        CalendarAPI.testListedByCal = ["a1": [open], "a2": [], "s1": []]
+        var now = t + 120_000
+        let store = TapStore()
+        store.clock = { now }
+        store.open = OpenBlock(ref: "abcdefghijklmnop", key: "DW", startMs: t)
+        await store.confirmCalendars(plan: "p1", actual: "a2", sitting: "s1")
+        XCTAssertEqual(Credentials.actualId, "a2")
+        XCTAssertTrue(
+            CalendarAPI.testPushes.contains { $0.calendarId == "a1" },
+            "close must hit the old calendar \(CalendarAPI.testPushes)"
+        )
+        XCTAssertNil(store.open)
     }
 }

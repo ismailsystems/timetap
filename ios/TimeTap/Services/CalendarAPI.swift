@@ -79,6 +79,7 @@ enum CalendarAPIError: Error {
 struct CalendarHTTPError: Error, LocalizedError {
     var status: Int
     var message: String? = nil
+    var retryAfter: TimeInterval? = nil
 
     var errorDescription: String? {
         if let message, !message.isEmpty { return "HTTP \(status): \(message)" }
@@ -122,6 +123,9 @@ enum CalendarAPI {
     static var testListedByCal: [String: [CalEvent]]?
     static var testPushes: [(method: String, calendarId: String, eventId: String?, summary: String)] = []
     static var didStaleClose = false
+    static var testPatch404 = false
+    static var testRetryAfter: TimeInterval?
+    static var testListError: CalendarHTTPError?
 
     static func resetTestHTTP() {
         testStatusQueue = []
@@ -136,6 +140,9 @@ enum CalendarAPI {
         testListedByCal = nil
         testPushes = []
         didStaleClose = false
+        testPatch404 = false
+        testRetryAfter = nil
+        testListError = nil
     }
 
     static func firstMatch(named name: String, in list: [CalendarSummary]) -> CalendarSummary? {
@@ -232,6 +239,8 @@ enum CalendarAPI {
 
     static func listCalendars() async throws -> [CalendarSummary] {
         if let testList { return testList }
+        if let testListError { throw testListError }
+        try GoogleAuth.requireCalendarScope()
         GoogleAuth.didFetchCalendarList = true
         guard let token = GoogleAuth.accessToken, !token.isEmpty else {
             throw CalendarHTTPError(status: 401)
@@ -248,7 +257,7 @@ enum CalendarAPI {
             let (data, resp) = try await URLSession.shared.data(for: req)
             let status = (resp as? HTTPURLResponse)?.statusCode ?? 0
             if !(200..<300).contains(status) {
-                throw googleError(status: status, data: data)
+                throw googleError(status: status, data: data, response: resp as? HTTPURLResponse)
             }
             let decoded = try JSONDecoder().decode(ListPage.self, from: data)
             for item in decoded.items ?? [] {
@@ -279,7 +288,7 @@ enum CalendarAPI {
             throw ApplyOps.ReadError.calendar(testStateError)
         }
         if let s = dequeueStatus(), s != 200 {
-            throw CalendarHTTPError(status: s)
+            throw httpStatus(s)
         }
         if let listed = testListedActual {
             ApplyOps.actual = cloneCalendar(listed)
@@ -300,6 +309,7 @@ enum CalendarAPI {
         guard let token = GoogleAuth.accessToken, !token.isEmpty else {
             throw CalendarHTTPError(status: 401)
         }
+        try GoogleAuth.requireCalendarScope()
         ApplyOps.timeZone = TimeZone.current
         let now = Date().timeIntervalSince1970 * 1000
         let lo = now - 72 * 3_600_000
@@ -331,7 +341,7 @@ enum CalendarAPI {
     private static func flushOpsBody(_ ops: [Op]) async throws -> ApplyResult {
         didFlush = true
         if let s = dequeueStatus(), s != 200 {
-            throw CalendarHTTPError(status: s)
+            throw httpStatus(s)
         }
         if rejectWrites {
             return ApplyResult(
@@ -356,6 +366,10 @@ enum CalendarAPI {
         return testStatusQueue.removeFirst()
     }
 
+    private static func httpStatus(_ s: Int) -> CalendarHTTPError {
+        CalendarHTTPError(status: s, retryAfter: s == 429 ? testRetryAfter : nil)
+    }
+
     private static func liveFlush(_ ops: [Op]) async throws -> ApplyResult {
         let seamed = testListedByCal != nil
         let token = GoogleAuth.accessToken ?? ""
@@ -363,6 +377,7 @@ enum CalendarAPI {
             throw CalendarHTTPError(status: 401)
         }
         if !seamed {
+            try GoogleAuth.requireCalendarScope()
             ApplyOps.timeZone = TimeZone.current
             ApplyOps.nowMs = Date().timeIntervalSince1970 * 1000
         }
@@ -432,20 +447,10 @@ enum CalendarAPI {
             let (data, resp) = try await URLSession.shared.data(for: req)
             let status = (resp as? HTTPURLResponse)?.statusCode ?? 0
             if !(200..<300).contains(status) {
-                throw googleError(status: status, data: data)
+                throw googleError(status: status, data: data, response: resp as? HTTPURLResponse)
             }
+            out.append(contentsOf: try listedEvents(from: data, calendarId: calendarId))
             let decoded = try JSONDecoder().decode(EventsPage.self, from: data)
-            for item in decoded.items ?? [] {
-                let allDay = item.start.date != nil
-                if allDay { continue }
-                guard let start = parseWhen(item.start), let end = parseWhen(item.end) else { continue }
-                out.append(CalEvent(
-                    id: item.id, calendarId: calendarId, key: "",
-                    title: item.summary ?? "", colorId: item.colorId ?? "",
-                    description: item.description ?? "", startMs: start, endMs: end,
-                    isAllDay: false
-                ))
-            }
             page = decoded.nextPageToken
         } while page != nil
         return out
@@ -460,7 +465,13 @@ enum CalendarAPI {
         for ev in after {
             if let old = beforeById[ev.id] {
                 if old != ev {
-                    try await http("PATCH", calendarId: calendarId, eventId: ev.id, body: eventBody(ev), token: token)
+                    do {
+                        try await http("PATCH", calendarId: calendarId, eventId: ev.id, body: eventBody(ev), token: token)
+                    } catch let err as CalendarHTTPError where err.status == 404 || err.status == 410 {
+                        if let gid = try await http("POST", calendarId: calendarId, eventId: nil, body: eventBody(ev), token: token) {
+                            ev.id = gid
+                        }
+                    }
                 }
             } else {
                 if let gid = try await http("POST", calendarId: calendarId, eventId: nil, body: eventBody(ev), token: token) {
@@ -492,7 +503,10 @@ enum CalendarAPI {
                 eventId: eventId,
                 summary: body?["summary"] as? String ?? ""
             ))
-            return nil
+            if method == "PATCH", testPatch404 {
+                throw CalendarHTTPError(status: 404)
+            }
+            return method == "POST" ? "posted-id" : nil
         }
         var comps = URLComponents()
         comps.scheme = "https"
@@ -508,10 +522,11 @@ enum CalendarAPI {
             req.httpBody = try JSONSerialization.data(withJSONObject: body)
         }
         let (data, resp) = try await URLSession.shared.data(for: req)
-        let status = (resp as? HTTPURLResponse)?.statusCode ?? 0
+        let httpResp = resp as? HTTPURLResponse
+        let status = httpResp?.statusCode ?? 0
         if method == "DELETE", status == 404 || status == 410 { return nil }
         if !(200..<300).contains(status) {
-            throw googleError(status: status, data: data)
+            throw googleError(status: status, data: data, response: httpResp)
         }
         if method == "POST" { return createdEventId(from: data) }
         return nil
@@ -537,13 +552,43 @@ enum CalendarAPI {
         return f.string(from: Date(timeIntervalSince1970: ms / 1000))
     }
 
-    static func googleError(status: Int, data: Data) -> CalendarHTTPError {
+    static func googleError(status: Int, data: Data, response: HTTPURLResponse? = nil) -> CalendarHTTPError {
         struct Envelope: Decodable {
             struct Body: Decodable { var message: String? }
             var error: Body?
         }
         let msg = (try? JSONDecoder().decode(Envelope.self, from: data))?.error?.message
-        return CalendarHTTPError(status: status, message: msg)
+        return CalendarHTTPError(status: status, message: msg, retryAfter: retryAfter(response))
+    }
+
+    static func retryAfter(_ response: HTTPURLResponse?) -> TimeInterval? {
+        guard let raw = response?.value(forHTTPHeaderField: "Retry-After"), !raw.isEmpty else { return nil }
+        if let secs = TimeInterval(raw) { return secs }
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.timeZone = TimeZone(secondsFromGMT: 0)
+        f.dateFormat = "EEE, dd MMM yyyy HH:mm:ss zzz"
+        if let d = f.date(from: raw) {
+            return max(0, d.timeIntervalSinceNow)
+        }
+        return nil
+    }
+
+    static func listedEvents(from data: Data, calendarId: String) throws -> [CalEvent] {
+        let decoded = try JSONDecoder().decode(EventsPage.self, from: data)
+        var out: [CalEvent] = []
+        for item in decoded.items ?? [] {
+            if item.status == "cancelled" { continue }
+            if item.start.date != nil { continue }
+            guard let start = parseWhen(item.start), let end = parseWhen(item.end) else { continue }
+            out.append(CalEvent(
+                id: item.id, calendarId: calendarId, key: "",
+                title: item.summary ?? "", colorId: item.colorId ?? "",
+                description: item.description ?? "", startMs: start, endMs: end,
+                isAllDay: false
+            ))
+        }
+        return out
     }
 
     private static func parseWhen(_ w: EventsPage.Item.When) -> Double? {
@@ -573,6 +618,7 @@ enum CalendarAPI {
             var summary: String?
             var description: String?
             var colorId: String?
+            var status: String?
             var start: When
             var end: When
             struct When: Decodable {

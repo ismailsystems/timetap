@@ -23,7 +23,7 @@ struct ClientConfig: Codable {
     var maxOpTries: Int
     var tz: String
 
-    /// Code.gs CATEGORIES plus POOP. POOP colour is nextColor_ after the six (id 1).
+    /// Code.gs CATEGORIES plus POOP. POOP is banana yellow (id 5), not lavender 1 (DW's hue).
     static let seed = ClientConfig(
         categories: [
             Category(key: "DW", label: "Deep work", color: "9", hex: "#3f51b5", autoMark: nil),
@@ -32,7 +32,7 @@ struct ClientConfig: Codable {
             Category(key: "BODY", label: "Body", color: "10", hex: "#0b8043", autoMark: "+"),
             Category(key: "REL", label: "People", color: "6", hex: "#f4511e", autoMark: nil),
             Category(key: "FRAG", label: "Fragments", color: "4", hex: "#e67c73", autoMark: "-"),
-            Category(key: "POOP", label: "Poop", color: "1", hex: "#7986cb", autoMark: nil),
+            Category(key: "POOP", label: "Poop", color: "5", hex: "#f6bf26", autoMark: nil),
         ],
         minMarkMinutes: 15,
         confirmTimeoutMs: 4000,

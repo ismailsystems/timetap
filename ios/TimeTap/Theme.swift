@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 enum Theme {
     static let ground = Color(red: 0x16 / 255, green: 0x15 / 255, blue: 0x13 / 255)
@@ -14,13 +15,29 @@ enum Theme {
     static let fail = Color(red: 0x2a / 255, green: 0x16 / 255, blue: 0x13 / 255)
 
     static func hex(_ s: String) -> Color {
+        guard let rgb = rgb(s) else { return .gray }
+        return Color(red: rgb.r, green: rgb.g, blue: rgb.b)
+    }
+
+    static func font(_ size: CGFloat, weight: Font.Weight = .regular) -> Font {
+        .system(size: UIFontMetrics.default.scaledValue(for: size), weight: weight)
+    }
+
+    /// Pale fills (FRAG / REL / POOP yellow) get dark text. Dark fills stay white.
+    static func onFill(_ hex: String) -> Color {
+        guard let rgb = rgb(hex) else { return .white }
+        let l = 0.2126 * rgb.r + 0.7152 * rgb.g + 0.0722 * rgb.b
+        return l > 0.42 ? ground : .white
+    }
+
+    private static func rgb(_ s: String) -> (r: Double, g: Double, b: Double)? {
         var h = s.trimmingCharacters(in: .whitespacesAndNewlines)
         if h.hasPrefix("#") { h.removeFirst() }
-        guard h.count == 6, let v = UInt32(h, radix: 16) else { return .gray }
-        return Color(
-            red: Double((v >> 16) & 0xff) / 255,
-            green: Double((v >> 8) & 0xff) / 255,
-            blue: Double(v & 0xff) / 255
+        guard h.count == 6, let v = UInt32(h, radix: 16) else { return nil }
+        return (
+            Double((v >> 16) & 0xff) / 255,
+            Double((v >> 8) & 0xff) / 255,
+            Double(v & 0xff) / 255
         )
     }
 }

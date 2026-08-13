@@ -15,6 +15,11 @@ Outcome: **all remaining tasks C1–D2 done.** Stages A–D complete on `path-3-
 
 Parked: none.
 
+## R10 remaining review items — 2026-08-13
+
+POOP seed color 5 `#f6bf26`. Dynamic Type via `Theme.font`. `+` last. Note field while a block is open. Persist `today`. Rail lead UNLOGGED. Confirm flushes old calendar IDs. Picker 401 refresh. PATCH 404→POST. 429 Retry-After. Skip cancelled. `Format` uses `ApplyOps.timeZone`. Arm DELETE SITTING. Running-row 4px edge. Rail `onFill`.
+
+
 Vacuity (five required):
 - A3 omit `colorId` → colour criterion red (`""` ≠ `"9"`); restored.
 - B1 mark regex `[+=\\-]` → `?` parse red (19 fails); restored `[+=\\-?]`.

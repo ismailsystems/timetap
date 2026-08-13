@@ -23,7 +23,7 @@ struct CaptureView: View {
                         store.openDeadDrawer()
                     } label: {
                         Text(banner)
-                            .font(.system(size: 11, weight: .bold))
+                            .font(Theme.font(11, weight: .bold))
                             .foregroundStyle(Theme.accentOn)
                             .multilineTextAlignment(.center)
                             .frame(maxWidth: .infinity, alignment: .center)
@@ -134,7 +134,7 @@ struct CaptureView: View {
             }
             HStack(alignment: .firstTextBaseline) {
                 Text(store.nowKick)
-                    .font(.system(size: 10, weight: .bold))
+                    .font(Theme.font(10, weight: .bold))
                     .tracking(1.0)
                     .foregroundStyle(Theme.dim)
                     .lineLimit(2)
@@ -145,7 +145,7 @@ struct CaptureView: View {
                     store.showSettings = true
                 } label: {
                     Text(store.syncLabel)
-                        .font(.system(size: 10, weight: .bold))
+                        .font(Theme.font(10, weight: .bold))
                         .tracking(1.4)
                         .foregroundStyle(store.syncFailed ? Theme.accentOn : Theme.dim)
                         .multilineTextAlignment(.trailing)
@@ -184,9 +184,7 @@ struct CaptureView: View {
     }
 
     private var showNoteField: Bool {
-        guard store.open != nil else { return false }
-        if editingNote || focus == .note { return true }
-        return noteDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        store.open != nil
     }
 
     private func beginNoteEdit() {
@@ -205,19 +203,6 @@ struct CaptureView: View {
         let rowH = max(44, height / max(n, 1))
         return ScrollView {
             VStack(alignment: .leading, spacing: 0) {
-                if store.canAddCategory {
-                    addRow
-                        .frame(maxWidth: .infinity, minHeight: rowH, maxHeight: rowH, alignment: .leading)
-                        .id("add")
-                } else {
-                    Text("That is \(store.config?.maxCategories ?? 10) categories already.")
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(Theme.mute)
-                        .padding(.leading, 12)
-                        .padding(.trailing, 16)
-                        .frame(maxWidth: .infinity, minHeight: rowH, maxHeight: rowH, alignment: .leading)
-                }
-
                 ForEach(store.categories) { cat in
                     Rectangle().fill(Theme.rule2.opacity(0.5)).frame(height: 1)
                     Button {
@@ -225,7 +210,14 @@ struct CaptureView: View {
                         UIImpactFeedbackGenerator(style: .light).impactOccurred()
                         store.tapCategory(cat.key)
                     } label: {
-                        categoryRow(face: cat.face, hex: cat.hex, dim: false)
+                        categoryRow(
+                            face: cat.face,
+                            hex: cat.hex,
+                            dim: false,
+                            running: store.open?.key == cat.key,
+                            elapsed: elapsedLabel,
+                            long: store.open?.key == cat.key && isLong
+                        )
                             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
                             .contentShape(Rectangle())
                             .background(store.open?.key == cat.key ? Theme.panel : Color.clear)
@@ -236,6 +228,20 @@ struct CaptureView: View {
                     .accessibilityAddTraits(store.open?.key == cat.key ? [.isSelected] : [])
                     .accessibilityValue(store.open?.key == cat.key ? elapsedLabel : "")
                     .id(cat.key)
+                }
+
+                if store.canAddCategory {
+                    Rectangle().fill(Theme.rule2.opacity(0.5)).frame(height: 1)
+                    addRow
+                        .frame(maxWidth: .infinity, minHeight: rowH, maxHeight: rowH, alignment: .leading)
+                        .id("add")
+                } else {
+                    Text("That is \(store.config?.maxCategories ?? 10) categories already.")
+                        .font(Theme.font(12, weight: .semibold))
+                        .foregroundStyle(Theme.mute)
+                        .padding(.leading, 12)
+                        .padding(.trailing, 16)
+                        .frame(maxWidth: .infinity, minHeight: rowH, maxHeight: rowH, alignment: .leading)
                 }
             }
         }
@@ -257,7 +263,7 @@ struct CaptureView: View {
                     .fill(Theme.rule2)
                     .frame(width: 8, height: 18)
                 TextField("name it", text: $addDraft)
-                    .font(.system(size: 20, weight: .semibold))
+                    .font(Theme.font(20, weight: .semibold))
                     .fontWidth(.standard)
                     .textInputAutocapitalization(.words)
                     .autocorrectionDisabled()
@@ -437,21 +443,37 @@ struct CaptureView: View {
         }
     }
 
-    private func categoryRow(face: String, hex: String?, dim: Bool) -> some View {
+    private func categoryRow(
+        face: String, hex: String?, dim: Bool,
+        running: Bool = false, elapsed: String = "", long: Bool = false
+    ) -> some View {
         HStack(spacing: 10) {
             RoundedRectangle(cornerRadius: 2, style: .continuous)
                 .fill(hex.map { Theme.hex($0) } ?? Theme.rule2)
                 .frame(width: 8, height: 18)
                 .accessibilityHidden(true)
             Text(face)
-                .font(.system(size: 20, weight: .semibold))
+                .font(Theme.font(20, weight: .semibold))
                 .fontWidth(.standard)
                 .lineLimit(1)
-                .foregroundStyle(dim ? Theme.dim : Theme.fg)
+                .foregroundStyle(long ? Theme.flag : (dim ? Theme.dim : Theme.fg))
+            if running {
+                Spacer(minLength: 4)
+                Text(elapsed)
+                    .font(Theme.font(14, weight: .bold).monospacedDigit())
+                    .foregroundStyle(long ? Theme.flag : Theme.dim)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+            }
         }
         .padding(.leading, 12)
         .padding(.trailing, 16)
         .padding(.vertical, 8)
+        .overlay(alignment: .leading) {
+            if running {
+                Rectangle().fill(Theme.accent).frame(width: 4)
+            }
+        }
     }
 
     private var categoryWidthProbe: some View {
