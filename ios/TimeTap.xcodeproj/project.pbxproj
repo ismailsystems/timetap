@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		02FC0D91E87A14D4F678123C /* SplitSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 47B9719A4D5ACAE3A65E08CB /* SplitSheet.swift */; };
+		099D42E94F480B0F26A3C5B9 /* B3Tests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 18B8279D8F1187956ABD0783 /* B3Tests.swift */; };
 		155752CD3F60C3AC82969373 /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4E7744EE4EAB4173F4B3D188 /* Models.swift */; };
 		2D0897E0A6B3231F37BEB32F /* A4Tests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 72AB36F224AB7588E53018B4 /* A4Tests.swift */; };
 		2FB00CD640D7409118A8E4E2 /* B1Tests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D943F9A6CAF5F4D8B8DCC048 /* B1Tests.swift */; };
@@ -49,6 +50,7 @@
 /* Begin PBXFileReference section */
 		0C48DCFC2B8F43129B8031AB /* TimeTap.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = TimeTap.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		0D151859F57377AEC8118124 /* B2Tests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = B2Tests.swift; sourceTree = "<group>"; };
+		18B8279D8F1187956ABD0783 /* B3Tests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = B3Tests.swift; sourceTree = "<group>"; };
 		202DBF96A0E63CD41E7A516D /* Google.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Google.xcconfig; sourceTree = "<group>"; };
 		2D55675D4A21D2C2D804358B /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		31BB6E2F4AC7571D01632124 /* CalendarPickerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalendarPickerView.swift; sourceTree = "<group>"; };
@@ -154,6 +156,7 @@
 				72AB36F224AB7588E53018B4 /* A4Tests.swift */,
 				D943F9A6CAF5F4D8B8DCC048 /* B1Tests.swift */,
 				0D151859F57377AEC8118124 /* B2Tests.swift */,
+				18B8279D8F1187956ABD0783 /* B3Tests.swift */,
 			);
 			path = TimeTapTests;
 			sourceTree = "<group>";
@@ -288,6 +291,7 @@
 				2D0897E0A6B3231F37BEB32F /* A4Tests.swift in Sources */,
 				2FB00CD640D7409118A8E4E2 /* B1Tests.swift in Sources */,
 				581EFFC879088FD71F1DC717 /* B2Tests.swift in Sources */,
+				099D42E94F480B0F26A3C5B9 /* B3Tests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

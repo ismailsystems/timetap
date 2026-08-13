@@ -4,6 +4,7 @@ enum ApplyOps {
     static var nowMs: Double = Date().timeIntervalSince1970 * 1000
     static var actual: FakeCalendar?
     static var sitting: FakeCalendar?
+    static var timeZone = TimeZone.current
     static let msMin: Double = 60_000
     static let msHour: Double = 3_600_000
 
@@ -11,6 +12,7 @@ enum ApplyOps {
         nowMs = Date().timeIntervalSince1970 * 1000
         actual = nil
         sitting = nil
+        timeZone = TimeZone.current
     }
 
     static func apply(_ ops: [Op]) -> ApplyResult {
@@ -64,8 +66,99 @@ enum ApplyOps {
         case "closeSit": opCloseSit(op)
         case "setSitStart": opSetSitStart(op)
         case "deleteSit": opDeleteSit(op)
-        case "undoSwitch": return
+        case "undoSwitch": opUndoSwitch(op)
         default: return
+        }
+    }
+
+    static func ymd(_ ms: Double) -> String {
+        var cal = Calendar(identifier: .gregorian)
+        cal.timeZone = timeZone
+        let d = Date(timeIntervalSince1970: ms / 1000)
+        let c = cal.dateComponents([.year, .month, .day], from: d)
+        return String(format: "%04d-%02d-%02d", c.year ?? 0, c.month ?? 0, c.day ?? 0)
+    }
+
+    static func localMidnightMs(_ ms: Double) -> Double {
+        var cal = Calendar(identifier: .gregorian)
+        cal.timeZone = timeZone
+        let d = Date(timeIntervalSince1970: ms / 1000)
+        return cal.startOfDay(for: d).timeIntervalSince1970 * 1000
+    }
+
+    static func addLocalDays(_ ms: Double, _ days: Int) -> Double {
+        var cal = Calendar(identifier: .gregorian)
+        cal.timeZone = timeZone
+        let d = Date(timeIntervalSince1970: localMidnightMs(ms) / 1000)
+        return cal.date(byAdding: .day, value: days, to: d)!.timeIntervalSince1970 * 1000
+    }
+
+    @discardableResult
+    static func staleGuard(_ cal: FakeCalendar, _ ev: CalEvent?, isActual: Bool) -> CalEvent? {
+        guard let ev else { return nil }
+        let startMs = ev.startMs
+        let now = nowMs
+        let age = now - startMs
+        if age < Double(TT.mistapSeconds) * 1000 { return ev }
+        let crossedDay = ymd(startMs) != ymd(now)
+        if age <= Double(TT.staleOpenHours) * msHour && !crossedDay { return ev }
+
+        var boundEnd = min(startMs + Double(TT.staleOpenHours) * msHour, now)
+        if crossedDay { boundEnd = min(boundEnd, addLocalDays(startMs, 1)) }
+        if !(boundEnd > startMs) { boundEnd = startMs + msMin }
+
+        if isActual {
+            let p = Grammar.parseTitle(ev.title)
+                ?? ParsedTitle(key: TT.unfiledKey, text: ev.title, mark: nil)
+            ev.title = Grammar.buildTitle(p.key, p.text, "?")
+        }
+        endEventAt(ev, boundEnd)
+        writeDesc(ev, ref: refOf(ev), isOpen: false)
+
+        if isActual && now - boundEnd >= msMin {
+            let un = cal.createEvent(
+                calendarId: ev.calendarId,
+                title: TT.unloggedTitle,
+                startMs: boundEnd, endMs: now
+            )
+            un.description = TT.refPrefix + Op.uid()
+            un.colorId = "8"
+        }
+        return nil
+    }
+
+    private static func opUndoSwitch(_ op: Op) {
+        guard let cal = actual else { return }
+        var ne = op.newRef.flatMap { findByRef(cal, $0, hintMs: op.atMs) }
+        if let ev = ne, isOpen(ev), ev.startMs == op.atMs {
+            cal.delete(ev)
+            ne = nil
+        }
+        // Vacuity: skip `if ne != nil { return }` and the double-open criterion goes red.
+        if ne != nil { return }
+
+        if let prevRef = op.prevRef {
+            if let pe = findByRef(cal, prevRef, hintMs: op.prevStartMs),
+               !isOpen(pe), pe.endMs == op.atMs {
+                let p = Grammar.parseTitle(pe.title)
+                    ?? ParsedTitle(key: op.prevKey ?? TT.unfiledKey, text: pe.title, mark: nil)
+                let text = op.prevText ?? p.text
+                pe.title = Grammar.buildTitle(p.key, text, nil)
+                endEventAt(pe, max((op.prevStartMs ?? pe.startMs) + msMin, op.nowMs ?? nowMs))
+                writeDesc(pe, ref: prevRef, isOpen: true)
+            }
+        }
+
+        if op.killSitRef != nil || op.sitRef != nil, let sc = sitting {
+            if let kill = op.killSitRef, let ke = findByRef(sc, kill, hintMs: op.nowMs) {
+                sc.delete(ke)
+            }
+            if let sitRef = op.sitRef,
+               let se = findByRef(sc, sitRef, hintMs: op.sitStartMs),
+               !isOpen(se), se.endMs == op.atMs {
+                endEventAt(se, max((op.sitStartMs ?? se.startMs) + msMin, op.nowMs ?? nowMs))
+                writeDesc(se, ref: sitRef, isOpen: true)
+            }
         }
     }
 
