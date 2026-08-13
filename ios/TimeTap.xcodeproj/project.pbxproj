@@ -35,6 +35,7 @@
 		E8C1C00798C335C7959CA6B8 /* Credentials.swift in Sources */ = {isa = PBXBuildFile; fileRef = EC2416C4707736A43FD2ACF6 /* Credentials.swift */; };
 		ED4399E69EE496C6FF815DCD /* ApplyOps.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5D9FAAEA0FBB3106BE727550 /* ApplyOps.swift */; };
 		F0D1D645E73776D17B15A756 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D55675D4A21D2C2D804358B /* SettingsView.swift */; };
+		F80F9FE33774C44C0E469E98 /* C2Tests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B8AD8C15BC946325CF02364B /* C2Tests.swift */; };
 		FAF11E3081864E2D33B11B77 /* CaptureView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 749D803612D26E9D5D20E863 /* CaptureView.swift */; };
 		FE4C16B4DBEA5F7CCA79E6E5 /* DeadLetterSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 67FE41A5E22FCCF25FC6FFDB /* DeadLetterSheet.swift */; };
 /* End PBXBuildFile section */
@@ -76,6 +77,7 @@
 		9D9D4875A281E3F960C3A7CD /* Grammar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Grammar.swift; sourceTree = "<group>"; };
 		A110EC0051A7A1D87110C352 /* B4Tests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = B4Tests.swift; sourceTree = "<group>"; };
 		B1FF4806EEB7A5DA1B512B3C /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		B8AD8C15BC946325CF02364B /* C2Tests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = C2Tests.swift; sourceTree = "<group>"; };
 		C85019F7B88C8EE4DFBE85A0 /* TapStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TapStore.swift; sourceTree = "<group>"; };
 		CAAA7DE9DBBAA54C77A78BD0 /* TimeTapTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = TimeTapTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		CF45FF913A460C9661EDF34B /* SitEditSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SitEditSheet.swift; sourceTree = "<group>"; };
@@ -163,6 +165,7 @@
 				18B8279D8F1187956ABD0783 /* B3Tests.swift */,
 				A110EC0051A7A1D87110C352 /* B4Tests.swift */,
 				7609C6A77691CD52326C9F36 /* C1Tests.swift */,
+				B8AD8C15BC946325CF02364B /* C2Tests.swift */,
 			);
 			path = TimeTapTests;
 			sourceTree = "<group>";
@@ -300,6 +303,7 @@
 				099D42E94F480B0F26A3C5B9 /* B3Tests.swift in Sources */,
 				036E218AE8B64A72E79FA10F /* B4Tests.swift in Sources */,
 				915AC4EE2BB6C4A81CC5509B /* C1Tests.swift in Sources */,
+				F80F9FE33774C44C0E469E98 /* C2Tests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

@@ -552,20 +552,36 @@ final class TapStore: ObservableObject {
     }
 
     func addCategory(label: String, onSuccess: (() -> Void)? = nil) {
-        let name = label
+        let name = String(label)
             .replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
             .trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !name.isEmpty else {
+        let clipped = String(name.prefix(24))
+        guard !clipped.isEmpty else {
             banner = "A category needs a name."
             return
         }
-        guard Credentials.isConfigured else {
-            banner = "cannot add a category while offline"
+        var cats = config?.categories ?? ClientConfig.seed.categories
+        let max = config?.maxCategories ?? TT.maxCategories
+        if cats.count >= max {
+            banner = "That is \(max) categories already."
             return
         }
+        if let hit = cats.first(where: { $0.label.lowercased() == clipped.lowercased() }) {
+            banner = "There is already a category called \(hit.label)."
+            return
+        }
+        let key = Grammar.keyFor(clipped, taken: cats)
+        let color = Grammar.nextColor(cats)
+        cats.append(Category(
+            key: key, label: clipped, color: color,
+            hex: TT.colorHex[color] ?? "#616161", autoMark: nil
+        ))
+        var cfg = config ?? .seed
+        cfg.categories = cats
+        applyConfig(cfg)
         addingCategory = false
-        banner = "Categories stay on this device."
-        _ = onSuccess
+        banner = nil
+        onSuccess?()
     }
 
     private func refreshUnreadable() {

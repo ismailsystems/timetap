@@ -108,6 +108,32 @@ enum Grammar {
         TT.colorHex[colorId(for: key)] ?? "#616161"
     }
 
+    static func keyFor(_ label: String, taken: [Category]) -> String {
+        let stripped = label.uppercased().replacingOccurrences(
+            of: "[^A-Z0-9]", with: "", options: .regularExpression
+        )
+        let base = String(stripped.prefix(8))
+        let baseKey = base.isEmpty ? "CAT" : base
+        var used = Set(taken.map(\.key))
+        used.insert("UNLOGGED")
+        used.insert(TT.unfiledKey)
+        var key = baseKey
+        var n = 2
+        while used.contains(key) {
+            key = String(baseKey.prefix(7)) + "\(n)"
+            n += 1
+        }
+        return key
+    }
+
+    static func nextColor(_ taken: [Category]) -> String {
+        let used = Set(taken.map(\.color))
+        for id in 1...11 {
+            if !used.contains(String(id)) { return String(id) }
+        }
+        return String((taken.count % 11) + 1)
+    }
+
     static func match(_ pattern: String, _ s: String) -> [String]? {
         let re = try! NSRegularExpression(pattern: pattern)
         let ns = s as NSString
