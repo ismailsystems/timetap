@@ -19,44 +19,7 @@ struct DayRailView: View {
                     .minimumScaleFactor(0.7)
                 VStack(spacing: 0) {
                     ForEach(rail.items) { item in
-                        VStack(alignment: .leading, spacing: 2) {
-                            HStack(spacing: 4) {
-                                Text(item.name)
-                                    .font(.system(size: 9, weight: .bold))
-                                    .lineLimit(1)
-                                Spacer(minLength: 0)
-                                Text(Format.shortElapsed(item.ms))
-                                    .font(.system(size: 9, weight: .bold).monospacedDigit())
-                            }
-                            if !item.note.isEmpty {
-                                Text(item.note)
-                                    .font(.system(size: 9, weight: .semibold))
-                                    .lineLimit(2)
-                            }
-                        }
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, item.note.isEmpty ? 0 : 4)
-                        .frame(height: item.height, alignment: item.note.isEmpty ? .center : .top)
-                        .foregroundStyle(item.isGap ? Theme.mute : .white)
-                        .background {
-                            if item.isGap {
-                                GapFill()
-                            } else if let hex = item.hex {
-                                Theme.hex(hex)
-                            } else {
-                                Color.gray
-                            }
-                        }
-                        .overlay {
-                            if item.isOpen {
-                                Rectangle().strokeBorder(Theme.fg, lineWidth: 2)
-                            }
-                        }
-                        .clipped()
-                        .contentShape(Rectangle())
-                        .onTapGesture {
-                            if item.isOpen { onOpenTap() } else { onOtherTap() }
-                        }
+                        block(item, railWidth: geo.size.width - 24)
                     }
                 }
             }
@@ -64,6 +27,57 @@ struct DayRailView: View {
             .frame(width: geo.size.width, height: geo.size.height, alignment: .topLeading)
             .clipped()
         }
+    }
+
+    private func block(_ item: TapStore.RailItem, railWidth: CGFloat) -> some View {
+        let size = Self.labelSize(height: item.height, width: railWidth)
+        return VStack(alignment: .leading, spacing: 2) {
+            HStack(spacing: 6) {
+                Text(item.name)
+                    .font(.system(size: size, weight: .bold))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.6)
+                Spacer(minLength: 0)
+                Text(Format.shortElapsed(item.ms))
+                    .font(.system(size: size, weight: .bold).monospacedDigit())
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.6)
+            }
+            if !item.note.isEmpty {
+                Text(item.note)
+                    .font(.system(size: max(11, size * 0.75), weight: .semibold))
+                    .lineLimit(2)
+                    .minimumScaleFactor(0.7)
+            }
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 6)
+        .frame(height: item.height, alignment: item.note.isEmpty ? .center : .topLeading)
+        .foregroundStyle(item.isGap ? Theme.mute : .white)
+        .background {
+            if item.isGap {
+                GapFill()
+            } else if let hex = item.hex {
+                Theme.hex(hex)
+            } else {
+                Color.gray
+            }
+        }
+        .overlay {
+            if item.isOpen {
+                Rectangle().strokeBorder(Theme.fg, lineWidth: 2)
+            }
+        }
+        .clipped()
+        .contentShape(Rectangle())
+        .onTapGesture {
+            if item.isOpen { onOpenTap() } else { onOtherTap() }
+        }
+    }
+
+    /// Grows with block height and rail width; stays readable on a thin strip.
+    static func labelSize(height: CGFloat, width: CGFloat) -> CGFloat {
+        min(28, max(13, min(height * 0.42, width * 0.14)))
     }
 }
 

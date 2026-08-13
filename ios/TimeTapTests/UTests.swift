@@ -39,8 +39,12 @@ final class UTests: TimeTapTestCase {
         XCTAssertTrue(text.contains("showNoteField"), "note field must hide when idle or when a note is already set")
         XCTAssertTrue(text.contains("if let banner = store.banner"), "banner must stay in CaptureView")
         XCTAssertTrue(text.contains("multilineTextAlignment(.center)"), "banner must be centered at the top")
-        XCTAssertTrue(text.contains("face: \"New\""), "ADD must be New and at the top of the list")
+        XCTAssertTrue(text.contains("Text(\"+\")"), "New must be a plus, not a category row")
         XCTAssertFalse(text.contains("face: \"ADD\""), "ADD label is back")
+        XCTAssertFalse(text.contains("face: \"New\""), "New text label is back")
+        XCTAssertTrue(text.contains("TAP TO SIT"), "idle sit must look tappable")
+        XCTAssertTrue(text.contains("outlineChip(\"SPLIT\")"))
+        XCTAssertTrue(text.contains("outlineChip(\"STOP\")"))
     }
 
     func testOpenBlockNoteShowsOnTheRail() {
@@ -72,13 +76,23 @@ final class UTests: TimeTapTestCase {
                 .appendingPathComponent("TimeTap/Views/CaptureView.swift"),
             encoding: .utf8
         )
-        XCTAssertTrue(text.contains("TAP TO SPLIT"))
+        XCTAssertTrue(text.contains("outlineChip(\"SPLIT\")"))
         XCTAssertTrue(text.contains("store.openSplit()"))
+        XCTAssertFalse(text.contains("TAP TO SPLIT"), "mute TAP TO SPLIT chip is back")
         XCTAssertFalse(
             text.contains("if store.open != nil { store.openSplit() }"),
             "title/elapsed must not open SPLIT"
         )
         XCTAssertTrue(text.contains("Dismisses the keyboard"))
+    }
+
+    func testRailLabelSizeGrowsWithTheBlock() {
+        XCTAssertGreaterThan(
+            DayRailView.labelSize(height: 200, width: 200),
+            DayRailView.labelSize(height: 26, width: 200)
+        )
+        XCTAssertGreaterThanOrEqual(DayRailView.labelSize(height: 10, width: 80), 13)
+        XCTAssertLessThanOrEqual(DayRailView.labelSize(height: 400, width: 400), 28)
     }
 
     func testSecondTapWithin300msIsIgnored() {

@@ -91,6 +91,38 @@ struct CaptureView: View {
 
     private var nowPanel: some View {
         VStack(alignment: .leading, spacing: 0) {
+            HStack(alignment: .center) {
+                Text(store.open.map { store.labelFor($0.key).uppercased() } ?? "NOTHING RUNNING")
+                    .font(.system(size: 32, weight: .black))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.6)
+                Spacer(minLength: 8)
+                if store.open != nil {
+                    Button {
+                        finishNoteEdit()
+                        store.openSplit()
+                    } label: {
+                        outlineChip("SPLIT")
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("SPLIT")
+                    .accessibilityHint("Opens split sheet")
+                }
+            }
+            Button {
+                finishNoteEdit()
+            } label: {
+                Text(store.open == nil ? "—" : elapsedLabel)
+                    .font(.system(size: 48, weight: .heavy))
+                    .foregroundStyle(isLong ? Theme.flag : Theme.accentOn)
+                    .monospacedDigit()
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .padding(.top, 8)
+            .accessibilityLabel(nowAccessibility)
+            .accessibilityHint("Dismisses the keyboard")
             HStack(alignment: .firstTextBaseline) {
                 Text(store.nowKick)
                     .font(.system(size: 10, weight: .bold))
@@ -115,42 +147,7 @@ struct CaptureView: View {
                 .accessibilityLabel(store.syncLabel)
                 .accessibilityHint("Opens settings")
             }
-            HStack(alignment: .firstTextBaseline) {
-                Text(store.open.map { store.labelFor($0.key).uppercased() } ?? "NOTHING RUNNING")
-                    .font(.system(size: 32, weight: .black))
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.6)
-                Spacer(minLength: 8)
-                if store.open != nil {
-                    Button {
-                        finishNoteEdit()
-                        store.openSplit()
-                    } label: {
-                        Text("TAP TO SPLIT")
-                            .font(.system(size: 9, weight: .bold))
-                            .tracking(1.0)
-                            .foregroundStyle(Theme.mute)
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel("TAP TO SPLIT")
-                    .accessibilityHint("Opens split sheet")
-                }
-            }
             .padding(.top, 8)
-            Button {
-                finishNoteEdit()
-            } label: {
-                Text(store.open == nil ? "—" : elapsedLabel)
-                    .font(.system(size: 48, weight: .heavy))
-                    .foregroundStyle(isLong ? Theme.flag : Theme.accentOn)
-                    .monospacedDigit()
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .padding(.top, 8)
-            .accessibilityLabel(nowAccessibility)
-            .accessibilityHint("Dismisses the keyboard")
 
             if showNoteField {
                 TextField("note", text: $noteDraft)
@@ -263,8 +260,10 @@ struct CaptureView: View {
             Button {
                 naming = true
             } label: {
-                categoryRow(face: "New", hex: nil, dim: true)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+                Text("+")
+                    .font(.system(size: 28, weight: .bold))
+                    .foregroundStyle(Theme.mute)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
@@ -316,24 +315,30 @@ struct CaptureView: View {
 
             HStack(spacing: 0) {
                 Button(action: store.toggleSit) {
-                    HStack(spacing: 10) {
-                        Circle()
-                            .fill(store.sit == nil ? Theme.rule2 : Theme.accent)
-                            .frame(width: 10, height: 10)
-                        Text(store.sit == nil ? "NOT SITTING" : "SITTING")
-                            .font(.system(size: 12, weight: .heavy))
-                            .tracking(1.2)
-                            .foregroundStyle(store.sit == nil ? Theme.mute : Theme.accentOn)
+                    if store.sit == nil {
+                        outlineChip("TAP TO SIT")
+                    } else {
+                        HStack(spacing: 10) {
+                            Circle()
+                                .fill(Theme.accent)
+                                .frame(width: 10, height: 10)
+                            Text("SITTING")
+                                .font(.system(size: 12, weight: .heavy))
+                                .tracking(1.2)
+                                .foregroundStyle(Theme.accentOn)
+                        }
                     }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal, 18)
-                    .padding(.vertical, 16)
-                    .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel(store.sit == nil ? "Not sitting" : "Sitting")
+                .padding(.leading, 12)
+                .frame(maxWidth: store.sit == nil ? nil : .infinity, alignment: .leading)
+                .padding(.vertical, store.sit == nil ? 8 : 16)
+                .contentShape(Rectangle())
+                .accessibilityLabel(store.sit == nil ? "Tap to sit" : "Sitting")
                 .accessibilityHint("Toggles sitting posture")
                 .accessibilityAddTraits(.isButton)
+
+                if store.sit == nil { Spacer() }
 
                 if let sit = store.sit {
                     Button(action: store.openSitEdit) {
@@ -352,13 +357,7 @@ struct CaptureView: View {
 
                 if store.open != nil || store.sit != nil {
                     Button(action: store.endDay) {
-                        Text("STOP")
-                            .font(.system(size: 12, weight: .heavy))
-                            .tracking(1.2)
-                            .foregroundStyle(Theme.accentOn)
-                            .padding(.horizontal, 14)
-                            .padding(.vertical, 10)
-                            .overlay(Rectangle().strokeBorder(Theme.rule2, lineWidth: 2))
+                        outlineChip("STOP")
                     }
                     .buttonStyle(.plain)
                     .accessibilityLabel("End the day")
@@ -388,6 +387,16 @@ struct CaptureView: View {
             return "Now \(store.labelFor(open.key)), \(elapsedLabel), since \(Format.clock(open.startMs))"
         }
         return "Nothing running, time is unlogged"
+    }
+
+    private func outlineChip(_ title: String) -> some View {
+        Text(title)
+            .font(.system(size: 12, weight: .heavy))
+            .tracking(1.2)
+            .foregroundStyle(Theme.accentOn)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 10)
+            .overlay(Rectangle().strokeBorder(Theme.rule2, lineWidth: 2))
     }
 
     private func markLabel(_ m: String) -> String {
