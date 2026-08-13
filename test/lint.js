@@ -272,7 +272,10 @@ function repoFiles() {
    accept something nobody can diff, so it is named one line at a time with the
    reason — never widened into an extension filter, which would silently swallow
    the next Code.gs that grew a NUL. */
-const BINARY_EXEMPT = [];
+const BINARY_EXEMPT = [
+  /* 1024×1024 app icon. PNG is binary by nature; git will not show a useful diff. */
+  'ios/TimeTap/Assets.xcassets/AppIcon.appiconset/TimeTapAppIcon.png'
+];
 
 const census = repoFiles();
 const nulBad = [], nulSkipped = [];

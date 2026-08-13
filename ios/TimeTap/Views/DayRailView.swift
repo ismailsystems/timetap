@@ -5,9 +5,10 @@ struct DayRailView: View {
     let tick: Date
 
     var body: some View {
+        let _ = tick
         GeometryReader { geo in
             let now = Date().timeIntervalSince1970 * 1000
-            let rail = store.railItems(budget: max(geo.size.height - 28, 40), now: now)
+            let rail = store.railItems(budget: max(geo.size.height - 44, 40), now: now)
             VStack(alignment: .leading, spacing: 6) {
                 Text(rail.startLabel)
                     .font(.system(size: 10, weight: .semibold))
@@ -44,18 +45,11 @@ struct DayRailView: View {
                         .clipped()
                     }
                 }
-                if store.open != nil {
-                    Text("NOW")
-                        .font(.system(size: 10, weight: .heavy))
-                        .tracking(1.2)
-                        .foregroundStyle(Theme.accentOn)
-                }
-                Spacer(minLength: 0)
             }
             .padding(12)
+            .frame(width: geo.size.width, height: geo.size.height, alignment: .topLeading)
+            .clipped()
         }
-        // tick forces redraw as time passes
-        .onChange(of: tick) { _, _ in }
     }
 }
 

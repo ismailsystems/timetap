@@ -77,7 +77,7 @@ Failure: `{ "ok": false, "error": "…" }`
 - STOP + undo ribbon
 - Mark strip (`+ = -`)
 - Dead-letter drawer with arm-to-discard
-- Offline queue, redirect-safe POST, corrective getState after undo
+- Offline queue, ContentService redirect (POST `/exec` → GET echo), corrective getState after undo
 - Unreadable open-block banner
 - Settings (URL, token in Keychain, tz, connection probe)
 
@@ -95,10 +95,13 @@ Same as the web client — not missing, just not capture:
 TOKEN='…'
 URL='https://script.google.com/macros/s/…/exec'
 
-curl -sL -X POST "$URL" \
+# Do not use `-X POST` with `-L`: that forces POST on the echo hop and returns 405.
+curl -sL \
   -H 'Content-Type: application/json' \
-  -d "{\"token\":\"$TOKEN\",\"action\":\"config\"}"
+  -d "{\"token\":\"$TOKEN\",\"action\":\"config\"}" \
+  "$URL"
 ```
 
-`-L` matters: Apps Script redirects once. `curl` re-POSTs; browsers often do
-not. The iOS client re-issues POST on redirect for the same reason.
+Apps Script `ContentService` answers the first POST with 302 to
+`script.googleusercontent.com/macros/echo…`. That hop must be a GET. The iOS
+client forces GET on the echo host for that reason.

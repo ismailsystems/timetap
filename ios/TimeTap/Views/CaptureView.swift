@@ -5,31 +5,55 @@ struct CaptureView: View {
     @EnvironmentObject private var store: TapStore
     @State private var noteDraft = ""
     @State private var tick = Date()
-    @State private var noteFocused = false
+    @State private var naming = false
+    @State private var addDraft = ""
+    @State private var catWidth: CGFloat = 96
+    @FocusState private var focus: Field?
+
+    private enum Field: Hashable { case note, add }
 
     private let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
 
     var body: some View {
-        VStack(spacing: 0) {
-            header
-            nowPanel
-            HStack(spacing: 0) {
-                DayRailView(tick: tick)
-                    .frame(width: 140)
-                    .accessibilityElement(children: .contain)
-                    .accessibilityLabel("Day rail")
-                    .overlay(alignment: .trailing) {
-                        Rectangle().fill(Theme.rule2).frame(width: 2)
+        NavigationStack {
+            VStack(spacing: 0) {
+                nowPanel
+                GeometryReader { geo in
+                    let screen = geo.size.width > 1 ? geo.size.width : UIScreen.main.bounds.width
+                    let catW = min(max(catWidth + 24, 128), screen * 0.67)
+                    HStack(spacing: 0) {
+                        DayRailView(tick: tick)
+                            .frame(maxWidth: .infinity)
+                            .clipped()
+                            .accessibilityElement(children: .contain)
+                            .accessibilityLabel("Day rail")
+                            .contentShape(Rectangle())
+                            .onTapGesture { focus = nil }
+                            .overlay(alignment: .trailing) {
+                                Rectangle().fill(Theme.rule2).frame(width: 2)
+                            }
+                        categoryList
+                            .frame(width: catW)
                     }
-                categoryList
+                    .background(alignment: .topLeading) { categoryWidthProbe }
+                    .onPreferenceChange(CatWidthKey.self) { catWidth = $0 }
+                }
+                .frame(maxHeight: .infinity)
+                footer
             }
-            .frame(maxHeight: .infinity)
-            footer
+            .foregroundStyle(Theme.fg)
+            .ignoresSafeArea(.keyboard, edges: focus == .add ? [] : .bottom)
+            .toolbar(.hidden, for: .navigationBar)
+            .toolbar {
+                ToolbarItemGroup(placement: .keyboard) {
+                    Spacer()
+                    Button("Done") { commitFocus() }
+                }
+            }
         }
-        .foregroundStyle(Theme.fg)
         .onReceive(timer) { tick = $0 }
         .onChange(of: store.open?.ref) { _, _ in
-            if !noteFocused {
+            if focus != .note {
                 noteDraft = store.open?.text ?? ""
             }
         }
@@ -49,41 +73,15 @@ struct CaptureView: View {
         .fullScreenCover(isPresented: $store.showDead) {
             DeadLetterSheet().environmentObject(store)
         }
-        .sheet(isPresented: $store.showAddCategory) {
-            AddCategorySheet().environmentObject(store)
-        }
-    }
-
-    private var header: some View {
-        HStack(alignment: .firstTextBaseline) {
-            Text("TIMETAP")
-                .font(.system(size: 15, weight: .heavy))
-                .tracking(1.2)
-                .accessibilityAddTraits(.isHeader)
-            Spacer()
-            Button {
-                store.showSettings = true
-            } label: {
-                Text(store.syncLabel)
-                    .font(.system(size: 10, weight: .bold))
-                    .tracking(1.4)
-                    .foregroundStyle(store.syncFailed ? Theme.accentOn : Theme.dim)
-                    .multilineTextAlignment(.trailing)
-            }
-            .accessibilityLabel(store.syncLabel)
-            .accessibilityHint("Opens settings")
-        }
-        .padding(.horizontal, 18)
-        .padding(.top, 8)
-        .padding(.bottom, 12)
-        .overlay(alignment: .bottom) {
-            Rectangle().fill(Theme.rule2).frame(height: 2)
-        }
     }
 
     private var nowPanel: some View {
         VStack(alignment: .leading, spacing: 0) {
             Button {
+                if focus != nil {
+                    focus = nil
+                    return
+                }
                 if store.open != nil { store.openSplit() }
             } label: {
                 VStack(alignment: .leading, spacing: 0) {
@@ -116,11 +114,28 @@ struct CaptureView: View {
             }
             .buttonStyle(.plain)
             .accessibilityLabel(nowAccessibility)
-            .accessibilityHint(store.open == nil ? "" : "Opens split sheet")
-            .disabled(store.open == nil)
+            .accessibilityHint(store.open == nil ? "Dismisses the keyboard" : "Opens split sheet")
+
+            Button {
+                focus = nil
+                store.showSettings = true
+            } label: {
+                Text(store.syncLabel)
+                    .font(.system(size: 10, weight: .bold))
+                    .tracking(1.4)
+                    .foregroundStyle(store.syncFailed ? Theme.accentOn : Theme.dim)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .buttonStyle(.plain)
+            .padding(.top, 2)
+            .accessibilityLabel(store.syncLabel)
+            .accessibilityHint("Opens settings")
 
             TextField("note", text: $noteDraft, axis: .vertical)
                 .lineLimit(1...3)
+                .focused($focus, equals: .note)
+                .submitLabel(.done)
+                .onSubmit { focus = nil }
                 .padding(11)
                 .frame(minHeight: 44)
                 .background(Theme.panel2)
@@ -131,7 +146,7 @@ struct CaptureView: View {
                     store.noteChanged(val)
                 }
                 .onChange(of: store.open?.text) { _, text in
-                    if !noteFocused { noteDraft = text ?? "" }
+                    if focus != .note { noteDraft = text ?? "" }
                 }
                 .accessibilityLabel("Note for the running block")
         }
@@ -145,31 +160,17 @@ struct CaptureView: View {
     private var categoryList: some View {
         ScrollViewReader { proxy in
             ScrollView {
-                LazyVStack(spacing: 0) {
+                VStack(alignment: .leading, spacing: 2) {
                     ForEach(store.categories) { cat in
                         Button {
+                            focus = nil
                             UIImpactFeedbackGenerator(style: .light).impactOccurred()
                             store.tapCategory(cat.key)
                         } label: {
-                            HStack(spacing: 12) {
-                                Rectangle()
-                                    .fill(Theme.hex(cat.hex))
-                                    .frame(width: 12, height: 28)
-                                    .accessibilityHidden(true)
-                                Text(cat.face.uppercased())
-                                    .font(.system(size: 18, weight: .bold))
-                                    .tracking(0.6)
-                                Spacer()
-                                if store.open?.key == cat.key {
-                                    Text(elapsedLabel)
-                                        .font(.system(size: 12, weight: .bold).monospacedDigit())
-                                        .foregroundStyle(isLong ? Theme.flag : Theme.accentOn)
-                                }
-                            }
-                            .padding(.horizontal, 18)
-                            .padding(.vertical, 14)
-                            .contentShape(Rectangle())
-                            .background(store.open?.key == cat.key ? Theme.panel : Color.clear)
+                            categoryRow(face: cat.face, hex: cat.hex, dim: false)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .contentShape(Rectangle())
+                                .background(store.open?.key == cat.key ? Theme.panel : Color.clear)
                         }
                         .buttonStyle(.plain)
                         .accessibilityLabel(cat.face)
@@ -181,26 +182,8 @@ struct CaptureView: View {
                     }
 
                     if store.canAddCategory {
-                        Button {
-                            store.showAddCategory = true
-                        } label: {
-                            HStack(spacing: 12) {
-                                Rectangle()
-                                    .fill(Theme.rule2)
-                                    .frame(width: 12, height: 28)
-                                Text("ADD")
-                                    .font(.system(size: 18, weight: .bold))
-                                    .tracking(0.6)
-                                    .foregroundStyle(Theme.dim)
-                                Spacer()
-                            }
-                            .padding(.horizontal, 18)
-                            .padding(.vertical, 14)
-                            .contentShape(Rectangle())
-                        }
-                        .buttonStyle(.plain)
-                        .accessibilityLabel("Add a category")
-                        .id("add")
+                        addRow
+                            .id("add")
                     }
                 }
             }
@@ -211,6 +194,47 @@ struct CaptureView: View {
                 }
                 store.scrollToKey = nil
             }
+            .onChange(of: naming) { _, on in
+                if on {
+                    DispatchQueue.main.async {
+                        proxy.scrollTo("add", anchor: .bottom)
+                    }
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var addRow: some View {
+        if naming {
+            HStack(spacing: 10) {
+                RoundedRectangle(cornerRadius: 2, style: .continuous)
+                    .fill(Theme.rule2)
+                    .frame(width: 8, height: 18)
+                TextField("name it", text: $addDraft)
+                    .font(.system(size: 20, weight: .semibold))
+                    .fontWidth(.standard)
+                    .textInputAutocapitalization(.words)
+                    .autocorrectionDisabled()
+                    .focused($focus, equals: .add)
+                    .submitLabel(.done)
+                    .onSubmit { commitAdd() }
+                    .onAppear { focus = .add }
+                    .disabled(store.addingCategory)
+            }
+            .padding(.leading, 12)
+            .padding(.trailing, 16)
+            .padding(.vertical, 8)
+        } else {
+            Button {
+                naming = true
+            } label: {
+                categoryRow(face: "ADD", hex: nil, dim: true)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Add a category")
         }
     }
 
@@ -355,5 +379,70 @@ struct CaptureView: View {
         case "-": return "Mark poor"
         default: return "Mark \(m)"
         }
+    }
+
+    private func categoryRow(face: String, hex: String?, dim: Bool) -> some View {
+        HStack(spacing: 10) {
+            RoundedRectangle(cornerRadius: 2, style: .continuous)
+                .fill(hex.map { Theme.hex($0) } ?? Theme.rule2)
+                .frame(width: 8, height: 18)
+                .accessibilityHidden(true)
+            Text(face)
+                .font(.system(size: 20, weight: .semibold))
+                .fontWidth(.standard)
+                .lineLimit(1)
+                .foregroundStyle(dim ? Theme.dim : Theme.fg)
+        }
+        .padding(.leading, 12)
+        .padding(.trailing, 16)
+        .padding(.vertical, 8)
+    }
+
+    private var categoryWidthProbe: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            ForEach(store.categories) { cat in
+                categoryRow(face: cat.face, hex: cat.hex, dim: false)
+                    .fixedSize()
+                    .background(
+                        GeometryReader { g in
+                            Color.clear.preference(key: CatWidthKey.self, value: g.size.width)
+                        }
+                    )
+            }
+        }
+        .fixedSize()
+        .opacity(0)
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
+    }
+
+    private func commitFocus() {
+        if focus == .add {
+            commitAdd()
+        } else {
+            focus = nil
+        }
+    }
+
+    private func commitAdd() {
+        let name = addDraft.trimmingCharacters(in: .whitespacesAndNewlines)
+        if name.isEmpty {
+            naming = false
+            addDraft = ""
+            focus = nil
+            return
+        }
+        store.addCategory(label: name) {
+            naming = false
+            addDraft = ""
+            focus = nil
+        }
+    }
+}
+
+private struct CatWidthKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = max(value, nextValue())
     }
 }

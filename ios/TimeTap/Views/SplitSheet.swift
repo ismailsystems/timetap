@@ -36,10 +36,10 @@ struct SplitSheet: View {
 
                     Slider(
                         value: Binding(
-                            get: { Double(mins) },
+                            get: { Double(min(max(mins, 1), maxMins)) },
                             set: { store.setSplitMinutes(Int($0.rounded())) }
                         ),
-                        in: 1...Double(maxMins),
+                        in: 1...Double(max(1, maxMins)),
                         step: 1
                     )
                     .disabled(s.whole)

@@ -20,9 +20,9 @@ enum TimetapAPIError: LocalizedError {
 
 /// Posts JSON to the Apps Script `/exec` deployment.
 ///
-/// Apps Script often 302s the first POST onto a googleusercontent host and
-/// drops the body if the client turns the redirect into a GET. The session
-/// below re-issues the same POST on redirect.
+/// ContentService replies with 302 → `script.googleusercontent.com/macros/echo`.
+/// The JSON is already produced; the echo URL must be fetched with GET.
+/// Re-POSTing that URL returns HTTP 405.
 final class TimetapAPI: NSObject, URLSessionTaskDelegate {
     static let shared = TimetapAPI()
 
@@ -100,17 +100,14 @@ final class TimetapAPI: NSObject, URLSessionTaskDelegate {
         completionHandler: @escaping (URLRequest?) -> Void
     ) {
         var next = request
-        if task.originalRequest?.httpMethod == "POST" {
-            next.httpMethod = "POST"
-            if next.httpBody == nil {
-                next.httpBody = task.originalRequest?.httpBody
-            }
-            if next.value(forHTTPHeaderField: "Content-Type") == nil {
-                next.setValue(
-                    "application/json; charset=utf-8",
-                    forHTTPHeaderField: "Content-Type"
-                )
-            }
+        // Force GET on the echo hop even if URLSession kept POST (some iOS builds do).
+        if let host = request.url?.host,
+           host.contains("googleusercontent.com"),
+           request.url?.path.contains("/macros/echo") == true {
+            next.httpMethod = "GET"
+            next.httpBody = nil
+            next.setValue(nil, forHTTPHeaderField: "Content-Type")
+            next.setValue(nil, forHTTPHeaderField: "Content-Length")
         }
         completionHandler(next)
     }

@@ -14,3 +14,6 @@ factory/proof/out/
 ios/**/xcuserdata/
 ios/**/*.xcuserstate
 ios/TimeTap.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/
+
+# Local API URL + token for device testing — never commit
+ios/.secrets/

@@ -15,7 +15,6 @@ final class TapStore: ObservableObject {
     @Published var banner: String?
     @Published var showSettings = false
     @Published var showDead = false
-    @Published var showAddCategory = false
     @Published var addingCategory = false
 
     @Published var undoLabel: String?
@@ -49,7 +48,7 @@ final class TapStore: ObservableObject {
     }
 
     struct RailItem: Identifiable {
-        let id = UUID()
+        var id: String
         var name: String
         var ms: Double
         var hex: String?
@@ -87,7 +86,7 @@ final class TapStore: ObservableObject {
     private var flushTask: Task<Void, Never>?
     private var flushing = false
     private var localGen = 0
-    private var lastStateAt = Date.distantPast
+    private var lastStateAt = Date()
     private var retryDelay: TimeInterval = 4
     private var stateAfterBootDrain = false
     private var stateAfterCorrectiveDrain = false
@@ -98,6 +97,7 @@ final class TapStore: ObservableObject {
     private let stateKey = "tt.state.v1"
     private let deadKey = "tt.dead.v1"
     private let blocksKey = "tt.blocks.v1"
+    private let configKey = "tt.config.v1"
     private let msMin: Double = 60_000
     private let gapMs: Double = 90_000
 
@@ -111,7 +111,7 @@ final class TapStore: ObservableObject {
     func boot() { Task { await bootAsync() } }
 
     func refreshOnReturn() {
-        guard Credentials.isConfigured, queue.isEmpty else { return }
+        guard Credentials.isConfigured, queue.isEmpty, config != nil else { return }
         let overdue = Date().timeIntervalSince(lastStateAt) > 10 * 60
         let runaway = open.map {
             Date().timeIntervalSince1970 * 1000 - $0.startMs
@@ -480,10 +480,12 @@ final class TapStore: ObservableObject {
             heights = heights.map { $0 * k }
         }
 
-        let items = zip(raw, heights).map { r, h in
-            RailItem(
+        let items = zip(raw.indices, zip(raw, heights)).map { idx, pair in
+            let (r, h) = pair
+            return RailItem(
+                id: "\(idx)",
                 name: r.name, ms: r.ms, hex: r.hex,
-                isGap: r.gap, isOpen: r.open, height: h
+                isGap: r.gap, isOpen: r.open, height: max(h, 1)
             )
         }
         return ("TODAY · \(Format.clock(first))", items)
@@ -502,7 +504,7 @@ final class TapStore: ObservableObject {
         return "NOW · SINCE \(Format.clock(open.startMs).uppercased())"
     }
 
-    func addCategory(label: String) {
+    func addCategory(label: String, onSuccess: (() -> Void)? = nil) {
         let name = label
             .replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
             .trimmingCharacters(in: .whitespacesAndNewlines)
@@ -520,9 +522,9 @@ final class TapStore: ObservableObject {
             do {
                 let cfg = try await TimetapAPI.shared.addCategory(label: name)
                 applyConfig(cfg)
-                showAddCategory = false
                 if dead.isEmpty { banner = nil }
                 scrollToKey = cfg.categories.last?.key
+                onSuccess?()
             } catch {
                 banner = error.localizedDescription
             }
@@ -530,6 +532,7 @@ final class TapStore: ObservableObject {
     }
 
     private func refreshUnreadable() {
+        guard config != nil, !catByKey.isEmpty else { return }
         let bad = open.map { catByKey[$0.key] == nil } ?? false
         if bad {
             let name = open?.text.isEmpty == false ? open!.text : (open?.key ?? "")
@@ -567,7 +570,7 @@ final class TapStore: ObservableObject {
         } catch {
             banner = error.localizedDescription
             syncFailed = true
-            paintSync()
+            syncLabel = "SYNC FAILED"
         }
     }
 
@@ -581,12 +584,19 @@ final class TapStore: ObservableObject {
 
     private func applyConfig(_ cfg: ClientConfig) {
         config = cfg
-        catByKey = Dictionary(uniqueKeysWithValues: cfg.categories.map { ($0.key, $0) })
+        catByKey = Dictionary(cfg.categories.map { ($0.key, $0) }, uniquingKeysWith: { _, n in n })
+        if let data = try? JSONEncoder().encode(cfg) {
+            UserDefaults.standard.set(data, forKey: configKey)
+        }
+        refreshUnreadable()
     }
 
     private func loadServerState(corrective: Bool = false) async {
         let gen = localGen
         do {
+            if config == nil || catByKey.isEmpty {
+                applyConfig(try await TimetapAPI.shared.config())
+            }
             let st = try await TimetapAPI.shared.getState()
             guard gen == localGen, queue.isEmpty else {
                 if corrective { await loadCorrectiveState() }
@@ -946,6 +956,10 @@ final class TapStore: ObservableObject {
         if let data = UserDefaults.standard.data(forKey: blocksKey),
            let b = try? JSONDecoder().decode([String: BlockMeta].self, from: data) {
             blocks = b
+        }
+        if let data = UserDefaults.standard.data(forKey: configKey),
+           let cfg = try? JSONDecoder().decode(ClientConfig.self, from: data) {
+            applyConfig(cfg)
         }
         paintSync()
     }

@@ -11,11 +11,30 @@ enum Credentials {
         set { UserDefaults.standard.set(newValue, forKey: urlKey) }
     }
 
+    /// DEBUG-only UserDefaults mirror so `simctl` can inject a token for E2E.
+    private static let debugTokenKey = "apiTokenDebug"
+
     static var apiToken: String {
-        get { readKeychain() ?? "" }
+        get {
+            if let keychain = readKeychain(), !keychain.isEmpty { return keychain }
+            #if DEBUG
+            return UserDefaults.standard.string(forKey: debugTokenKey) ?? ""
+            #else
+            return ""
+            #endif
+        }
         set {
-            if newValue.isEmpty { deleteKeychain() }
-            else { writeKeychain(newValue) }
+            if newValue.isEmpty {
+                deleteKeychain()
+                #if DEBUG
+                UserDefaults.standard.removeObject(forKey: debugTokenKey)
+                #endif
+            } else {
+                writeKeychain(newValue)
+                #if DEBUG
+                UserDefaults.standard.set(newValue, forKey: debugTokenKey)
+                #endif
+            }
         }
     }
 

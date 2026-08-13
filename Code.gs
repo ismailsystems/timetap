@@ -266,8 +266,15 @@ function doGet(e) {
 function doPost(e) {
   try {
     var body = parsePostBody_(e);
-    requireApiToken_(body.token);
     var action = body.action;
+    /*
+     * One-shot setup for Path 2 when clasp/scripts.run cannot write properties.
+     * Runs BEFORE the token gate, and only while API_TOKEN is still unset.
+     */
+    if (action === 'bootstrapApiToken') {
+      return jsonOut_({ ok: true, result: bootstrapApiToken_(body.newToken) });
+    }
+    requireApiToken_(body.token);
     if (action === 'config') {
       return jsonOut_({ ok: true, result: clientConfig_() });
     }
@@ -327,6 +334,25 @@ function signedInUser_() {
   } catch (err) {
     return false;
   }
+}
+
+/**
+ * One-shot installer for Path 2. Run from the editor or `clasp run`:
+ *   clasp run path2InstallApiToken -p '["YOUR_TOKEN"]'
+ * Safe to leave: it only writes the property you already chose.
+ */
+function path2InstallApiToken(token) {
+  return bootstrapApiToken_(token);
+}
+
+/** Writes API_TOKEN only when none is set yet. */
+function bootstrapApiToken_(token) {
+  if (prop_('API_TOKEN')) throw new Error('API_TOKEN is already set');
+  token = String(token == null ? '' : token).trim();
+  if (token.length < 16) throw new Error('API_TOKEN must be at least 16 characters');
+  PropertiesService.getScriptProperties().setProperty('API_TOKEN', token);
+  PROPS_ = null;
+  return 'API_TOKEN set (' + token.length + ' chars)';
 }
 
 /** Config the client needs. Touches no calendar, so it can never fail on a bad ID. */
