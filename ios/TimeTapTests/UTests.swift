@@ -2,7 +2,7 @@ import XCTest
 @testable import TimeTap
 
 @MainActor
-final class UTests: XCTestCase {
+final class UTests: TimeTapTestCase {
     override func setUp() {
         super.setUp()
         Credentials.resetForTests()
@@ -37,5 +37,93 @@ final class UTests: XCTestCase {
         XCTAssertFalse(text.contains("Button(\"Done\")"), "keyboard Done bar is back")
         XCTAssertFalse(text.contains("axis: .vertical"), "note field must stay single-line so the key is Done")
         XCTAssertTrue(text.contains("if store.open != nil"), "note field must hide when nothing is running")
+    }
+
+    func testSplitChipIsTheOnlyOpenSplitControl() throws {
+        let text = try String(
+            contentsOf: URL(fileURLWithPath: #filePath)
+                .deletingLastPathComponent()
+                .deletingLastPathComponent()
+                .appendingPathComponent("TimeTap/Views/CaptureView.swift"),
+            encoding: .utf8
+        )
+        XCTAssertTrue(text.contains("TAP TO SPLIT"))
+        XCTAssertTrue(text.contains("store.openSplit()"))
+        XCTAssertFalse(
+            text.contains("if store.open != nil { store.openSplit() }"),
+            "title/elapsed must not open SPLIT"
+        )
+        XCTAssertTrue(text.contains("Dismisses the keyboard"))
+    }
+
+    func testSecondTapWithin300msIsIgnored() {
+        GoogleAuth.testHasSession = true
+        GoogleAuth.testAccessToken = "t"
+        Credentials.planId = "p1"
+        Credentials.actualId = "a1"
+        Credentials.sittingId = "s1"
+        var now: Double = 1_700_000_000_000
+        let store = TapStore()
+        store.clock = { now }
+        store.tapCategory("DW")
+        XCTAssertEqual(store.open?.key, "DW")
+        now += 100
+        store.tapCategory("MTG")
+        XCTAssertEqual(store.open?.key, "DW")
+        XCTAssertFalse(store.queue.contains { $0.key == "MTG" })
+        now += 300
+        store.tapCategory("MTG")
+        XCTAssertEqual(store.open?.key, "MTG")
+    }
+
+    func testSecondSameKeyTapWithin300msDoesNotOpenSplit() {
+        GoogleAuth.testHasSession = true
+        GoogleAuth.testAccessToken = "t"
+        Credentials.planId = "p1"
+        Credentials.actualId = "a1"
+        Credentials.sittingId = "s1"
+        var now: Double = 1_700_000_000_000
+        let store = TapStore()
+        store.clock = { now }
+        store.tapCategory("DW")
+        now += 100
+        store.tapCategory("DW")
+        XCTAssertNil(store.split)
+        XCTAssertEqual(store.queue.filter { $0.type == "openActual" }.count, 1)
+    }
+
+    func testLiveFlushSeamPostsDW() async {
+        GoogleAuth.testHasSession = true
+        GoogleAuth.testAccessToken = "t"
+        Credentials.planId = "p1"
+        Credentials.actualId = "a1"
+        Credentials.sittingId = "s1"
+        ApplyOps.nowMs = 1_700_000_000_000
+        CalendarAPI.testListedByCal = ["a1": [], "s1": []]
+        let dw = "abcdefghijklmnop"
+        if let data = try? JSONEncoder().encode([
+            Op(id: "o1", type: "openActual", ref: dw, key: "DW", startMs: ApplyOps.nowMs)
+        ]) {
+            UserDefaults.standard.set(data, forKey: "tt.queue.v1")
+        }
+        let store = TapStore()
+        await store.flushNow()
+        XCTAssertTrue(store.queue.isEmpty)
+        XCTAssertTrue(
+            CalendarAPI.testPushes.contains { $0.method == "POST" && $0.summary == "DW:" },
+            "liveFlush must POST DW: \(CalendarAPI.testPushes)"
+        )
+    }
+
+    func testSettingsWarnsLastWriteWinsAndExtrasStayOnPhone() throws {
+        let text = try String(
+            contentsOf: URL(fileURLWithPath: #filePath)
+                .deletingLastPathComponent()
+                .deletingLastPathComponent()
+                .appendingPathComponent("TimeTap/Views/SettingsView.swift"),
+            encoding: .utf8
+        )
+        XCTAssertTrue(text.contains("last write wins"))
+        XCTAssertTrue(text.contains("Categories you add here do not appear on the web app."))
     }
 }

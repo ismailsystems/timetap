@@ -19,6 +19,9 @@ struct SettingsView: View {
                         store.showPicker = true
                     }
                 }
+                Section("This phone and the web app") {
+                    Text("If the web app and this phone both write, last write wins. Categories you add here do not appear on the web app.")
+                }
                 Section {
                     Button("Sign out", role: .destructive) {
                         store.signOut()

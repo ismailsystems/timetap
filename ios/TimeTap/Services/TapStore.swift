@@ -94,6 +94,8 @@ final class TapStore: ObservableObject {
     private(set) var retryDelay: TimeInterval = 4
     var clock: () -> Double = { Date().timeIntervalSince1970 * 1000 }
     var noteDelayNs: UInt64 = 900_000_000
+    private var lastTapMs: Double = 0
+    private var transportFails = 0
     private var stateAfterBootDrain = false
     private var stateAfterCorrectiveDrain = false
     private var catByKey: [String: Category] = [:]
@@ -150,6 +152,8 @@ final class TapStore: ObservableObject {
             return
         }
         let now = clock()
+        if now - lastTapMs < 300 { return }
+        lastTapMs = now
         if let open, open.key == key {
             if lastInsertFailed {
                 retryLastInsert()
@@ -211,16 +215,6 @@ final class TapStore: ObservableObject {
     func retryLastInsert() {
         do {
             try CalendarAPI.retryLastInsert()
-            lastInsertFailed = false
-        } catch {
-            lastInsertFailed = true
-        }
-        paintSync()
-    }
-
-    private func pushInsert() async {
-        do {
-            try await CalendarAPI.httpInsertPending()
             lastInsertFailed = false
         } catch {
             lastInsertFailed = true
@@ -669,6 +663,10 @@ final class TapStore: ObservableObject {
             let st = try await CalendarAPI.refreshState()
             if adoptServerState(st, gen: gen) {
                 lastStateAt = Date()
+                if CalendarAPI.didStaleClose, !unreadableOpen {
+                    banner = "an overnight block was closed with a guess. Check the calendar."
+                }
+                CalendarAPI.didStaleClose = false
             } else if corrective {
                 await loadCorrectiveState()
             }
@@ -741,6 +739,7 @@ final class TapStore: ObservableObject {
                 queue.removeAll { done.contains($0.id) }
                 saveQueue()
                 lastInsertFailed = false
+                transportFails = 0
                 flushing = false
                 if batch.contains(where: { $0.type == "undoSwitch" && done.contains($0.id) }) {
                     await loadCorrectiveState()
@@ -777,6 +776,13 @@ final class TapStore: ObservableObject {
                     continue
                 }
                 flushing = false
+                if http.status == 429 || http.status >= 500 {
+                    transportFails += 1
+                    banner = "Google Calendar is unreachable. The running block is still here."
+                    if transportFails < 5 { scheduleRetry() }
+                    paintSync()
+                    return
+                }
                 if http.status >= 400, let id = queue.first?.id {
                     quarantine(.init(id: id, message: "HTTP \(http.status)"))
                 }

@@ -1,7 +1,7 @@
 import XCTest
 @testable import TimeTap
 
-final class B4Tests: XCTestCase {
+final class B4Tests: TimeTapTestCase {
     let actual = FakeCalendar()
     let sitting = FakeCalendar()
     let t: Double = 1_700_000_000_000

@@ -2,7 +2,7 @@ import XCTest
 @testable import TimeTap
 
 @MainActor
-final class R7Tests: XCTestCase {
+final class R7Tests: TimeTapTestCase {
     let t: Double = 1_700_000_000_000
     let dw = "abcdefghijklmnop"
     let mtg = "mtgmtgmtgmtgmtg1"
@@ -105,6 +105,18 @@ final class R7Tests: XCTestCase {
         XCTAssertTrue(dwEv.description.contains("#open"))
         XCTAssertFalse(dwEv.title.hasSuffix("?"))
         XCTAssertFalse(listed.events.contains { $0.title == "UNLOGGED -" })
+    }
+
+    func testOvernightBootShowsClosedGuessBanner() async {
+        seedOvernightOpenDW()
+        let store = TapStore()
+        await store.bootNow()
+        XCTAssertNil(store.open)
+        XCTAssertEqual(
+            store.banner,
+            "an overnight block was closed with a guess. Check the calendar."
+        )
+        XCTAssertFalse(store.unreadableOpen)
     }
 
     // MARK: - P3-R7-2

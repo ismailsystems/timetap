@@ -1,7 +1,7 @@
 import XCTest
 @testable import TimeTap
 
-final class A3Tests: XCTestCase {
+final class A3Tests: TimeTapTestCase {
     let fake = FakeCalendar()
 
     override func setUp() {

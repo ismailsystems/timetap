@@ -2,7 +2,7 @@ import XCTest
 @testable import TimeTap
 
 @MainActor
-final class C1Tests: XCTestCase {
+final class C1Tests: TimeTapTestCase {
     let actual = FakeCalendar()
     let sitting = FakeCalendar()
     let t: Double = 1_700_000_000_000
@@ -96,23 +96,54 @@ final class C1Tests: XCTestCase {
     func test429And500BackoffAndStayQueued() async {
         seedQueue([Op(id: "o1", type: "openActual", ref: dw, key: "DW", startMs: t)])
         let store = TapStore()
+        store.open = OpenBlock(ref: dw, key: "DW", startMs: t)
         XCTAssertEqual(store.retryDelay, 4)
         CalendarAPI.testStatusQueue = [429]
         await store.flushNow()
         XCTAssertEqual(store.queue.map(\.id), ["o1"])
         XCTAssertEqual(store.retryDelay, 8)
-        XCTAssertEqual(store.queue.first?.tries, 1)
+        XCTAssertTrue(store.queue.first?.tries == nil || store.queue.first?.tries == 0)
+        XCTAssertEqual(store.open?.ref, dw)
         CalendarAPI.testStatusQueue = [500]
         await store.flushNow()
         XCTAssertEqual(store.queue.map(\.id), ["o1"])
         XCTAssertEqual(store.retryDelay, 16)
-        XCTAssertEqual(store.queue.first?.tries, 2)
+        XCTAssertTrue(store.dead.isEmpty)
         CalendarAPI.testStatusQueue = [500, 500, 500]
         await store.flushNow()
         await store.flushNow()
         await store.flushNow()
+        XCTAssertEqual(store.queue.map(\.id), ["o1"], "429/5xx must not dead-letter")
+        XCTAssertTrue(store.dead.isEmpty)
+        XCTAssertEqual(store.open?.ref, dw)
+        XCTAssertTrue(store.banner?.contains("unreachable") == true)
+    }
+
+    func test400GoesDeadAfterFive() async {
+        seedQueue([Op(id: "o1", type: "openActual", ref: dw, key: "DW", startMs: t)])
+        let store = TapStore()
+        store.open = OpenBlock(ref: dw, key: "DW", startMs: t)
+        CalendarAPI.testStatusQueue = [400, 400, 400, 400, 400]
+        for _ in 1...5 { await store.flushNow() }
         XCTAssertTrue(store.queue.isEmpty)
-        XCTAssertEqual(store.dead.map(\.op.id), ["o1"])
+        XCTAssertEqual(store.dead.count, 1)
+        XCTAssertTrue(store.dead[0].why.contains("HTTP 400"))
+        XCTAssertNil(store.open)
+    }
+
+    func testDidSignInAfterSecond401FlushesQueue() async {
+        seedQueue([Op(id: "o1", type: "openActual", ref: dw, key: "DW", startMs: t)])
+        let store = TapStore()
+        CalendarAPI.testStatusQueue = [401, 401]
+        await store.flushNow()
+        XCTAssertTrue(store.showSignIn)
+        XCTAssertEqual(store.queue.map(\.id), ["o1"])
+        CalendarAPI.testStatusQueue = [200]
+        await store.didSignIn()
+        XCTAssertFalse(store.showSignIn)
+        XCTAssertTrue(store.queue.isEmpty)
+        XCTAssertEqual(actual.events.count, 1)
+        XCTAssertEqual(actual.events[0].title, "DW:")
     }
 
     func testAppliedUndoSwitchRunsGetState() async {

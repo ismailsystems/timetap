@@ -1,7 +1,7 @@
 import XCTest
 @testable import TimeTap
 
-final class B1Tests: XCTestCase {
+final class B1Tests: TimeTapTestCase {
     func testBuildTitleQuestionMark() {
         XCTAssertEqual(Grammar.buildTitle("DW", "memo drafting", "?"), "DW: memo drafting ?")
     }

@@ -2,7 +2,7 @@ import XCTest
 @testable import TimeTap
 
 @MainActor
-final class D1Tests: XCTestCase {
+final class D1Tests: TimeTapTestCase {
     let actual = FakeCalendar()
 
     override func setUp() {

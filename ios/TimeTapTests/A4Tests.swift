@@ -1,7 +1,7 @@
 import XCTest
 @testable import TimeTap
 
-final class A4Tests: XCTestCase {
+final class A4Tests: TimeTapTestCase {
     func testTimeTapSourcesDoNotReferenceTimetapAPI() throws {
         let ios = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent()

@@ -71,44 +71,50 @@ struct CaptureView: View {
 
     private var nowPanel: some View {
         VStack(alignment: .leading, spacing: 0) {
-            Button {
-                if focus != nil {
-                    focus = nil
-                    return
-                }
-                if store.open != nil { store.openSplit() }
-            } label: {
-                VStack(alignment: .leading, spacing: 0) {
-                    HStack {
-                        Text(store.nowKick)
-                            .font(.system(size: 10, weight: .bold))
-                            .tracking(1.0)
-                            .foregroundStyle(Theme.dim)
-                            .lineLimit(2)
-                            .minimumScaleFactor(0.8)
-                        Spacer(minLength: 8)
-                        if store.open != nil {
+            VStack(alignment: .leading, spacing: 0) {
+                HStack {
+                    Text(store.nowKick)
+                        .font(.system(size: 10, weight: .bold))
+                        .tracking(1.0)
+                        .foregroundStyle(Theme.dim)
+                        .lineLimit(2)
+                        .minimumScaleFactor(0.8)
+                    Spacer(minLength: 8)
+                    if store.open != nil {
+                        Button {
+                            focus = nil
+                            store.openSplit()
+                        } label: {
                             Text("TAP TO SPLIT")
                                 .font(.system(size: 9, weight: .bold))
                                 .tracking(1.0)
                                 .foregroundStyle(Theme.mute)
                         }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("TAP TO SPLIT")
+                        .accessibilityHint("Opens split sheet")
                     }
-                    Text(store.open.map { store.labelFor($0.key).uppercased() } ?? "NOTHING RUNNING")
-                        .font(.system(size: 32, weight: .black))
-                        .padding(.top, 8)
-                    Text(store.open == nil ? "—" : elapsedLabel)
-                        .font(.system(size: 48, weight: .heavy))
-                        .foregroundStyle(isLong ? Theme.flag : Theme.accentOn)
-                        .monospacedDigit()
-                        .padding(.top, 8)
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .contentShape(Rectangle())
+                Button {
+                    focus = nil
+                } label: {
+                    VStack(alignment: .leading, spacing: 0) {
+                        Text(store.open.map { store.labelFor($0.key).uppercased() } ?? "NOTHING RUNNING")
+                            .font(.system(size: 32, weight: .black))
+                            .padding(.top, 8)
+                        Text(store.open == nil ? "—" : elapsedLabel)
+                            .font(.system(size: 48, weight: .heavy))
+                            .foregroundStyle(isLong ? Theme.flag : Theme.accentOn)
+                            .monospacedDigit()
+                            .padding(.top, 8)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(nowAccessibility)
+                .accessibilityHint("Dismisses the keyboard")
             }
-            .buttonStyle(.plain)
-            .accessibilityLabel(nowAccessibility)
-            .accessibilityHint(store.open == nil ? "Dismisses the keyboard" : "Opens split sheet")
 
             Button {
                 focus = nil

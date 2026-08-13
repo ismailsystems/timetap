@@ -1,7 +1,7 @@
 import XCTest
 @testable import TimeTap
 
-final class D2Tests: XCTestCase {
+final class D2Tests: TimeTapTestCase {
     func testReadmeHasPath3SetupSentences() throws {
         let text = try String(
             contentsOf: URL(fileURLWithPath: #filePath)

@@ -2,7 +2,7 @@ import XCTest
 @testable import TimeTap
 
 @MainActor
-final class C3Tests: XCTestCase {
+final class C3Tests: TimeTapTestCase {
     let actual = FakeCalendar()
     let sitting = FakeCalendar()
     let t0: Double = 1_700_000_000_000

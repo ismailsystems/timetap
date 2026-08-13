@@ -91,6 +91,9 @@ enum CalendarAPI {
     static var skipStatePush = false
     static var didPushState = false
     static var testStateError: String?
+    static var testListedByCal: [String: [CalEvent]]?
+    static var testPushes: [(method: String, calendarId: String, eventId: String?, summary: String)] = []
+    static var didStaleClose = false
 
     static func resetTestHTTP() {
         testStatusQueue = []
@@ -102,6 +105,9 @@ enum CalendarAPI {
         skipStatePush = false
         didPushState = false
         testStateError = nil
+        testListedByCal = nil
+        testPushes = []
+        didStaleClose = false
     }
 
     static func firstMatch(named name: String, in list: [CalendarSummary]) -> CalendarSummary? {
@@ -196,35 +202,6 @@ enum CalendarAPI {
         _ = try openActual(key: pending.key, at: pending.startMs, ref: pending.id)
     }
 
-    static func httpInsertPending() async throws {
-        guard let event = lastPending else { return }
-        guard let token = GoogleAuth.accessToken, !token.isEmpty else {
-            throw URLError(.userAuthenticationRequired)
-        }
-        let enc = event.calendarId.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? event.calendarId
-        var req = URLRequest(url: URL(string: "https://www.googleapis.com/calendar/v3/calendars/\(enc)/events")!)
-        req.httpMethod = "POST"
-        req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        let fmt = ISO8601DateFormatter()
-        fmt.formatOptions = [.withInternetDateTime]
-        let start = fmt.string(from: Date(timeIntervalSince1970: event.startMs / 1000))
-        let end = fmt.string(from: Date(timeIntervalSince1970: event.endMs / 1000))
-        let body: [String: Any] = [
-            "summary": event.title,
-            "description": event.description,
-            "colorId": event.colorId,
-            "start": ["dateTime": start],
-            "end": ["dateTime": end]
-        ]
-        req.httpBody = try JSONSerialization.data(withJSONObject: body)
-        let (_, resp) = try await URLSession.shared.data(for: req)
-        guard let http = resp as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
-            throw CalendarAPIError.insertFailed
-        }
-        lastPending = nil
-    }
-
     static func listCalendars() async throws -> [CalendarSummary] {
         if let testList { return testList }
         GoogleAuth.didFetchCalendarList = true
@@ -271,7 +248,9 @@ enum CalendarAPI {
         if let listed = testListedActual {
             ApplyOps.actual = cloneCalendar(listed)
             ApplyOps.sitting = cloneCalendar(testListedSitting ?? FakeCalendar())
+            let beforeA = (ApplyOps.actual?.events ?? []).map(copyEvent)
             let st = try ApplyOps.getState()
+            noteStaleClose(before: beforeA, after: ApplyOps.actual?.events ?? [])
             if !skipStatePush {
                 listed.events = (ApplyOps.actual?.events ?? []).map(copyEvent)
                 testListedSitting?.events = (ApplyOps.sitting?.events ?? []).map(copyEvent)
@@ -298,6 +277,7 @@ enum CalendarAPI {
         ApplyOps.sitting = sitting
         ApplyOps.nowMs = now
         let st = try ApplyOps.getState()
+        noteStaleClose(before: beforeA, after: actual.events)
         if !skipStatePush {
             try await pushDiff(calendarId: Credentials.actualId, before: beforeA, after: actual.events, token: token)
             try await pushDiff(calendarId: Credentials.sittingId, before: beforeS, after: sitting.events, token: token)
@@ -319,6 +299,9 @@ enum CalendarAPI {
                 dropped: []
             )
         }
+        if testListedByCal != nil {
+            return try await liveFlush(ops)
+        }
         if GoogleAuth.testHasSession != nil {
             if ApplyOps.actual == nil { ApplyOps.actual = testCalendar ?? FakeCalendar() }
             if ApplyOps.sitting == nil { ApplyOps.sitting = FakeCalendar() }
@@ -333,10 +316,13 @@ enum CalendarAPI {
     }
 
     private static func liveFlush(_ ops: [Op]) async throws -> ApplyResult {
-        guard let token = GoogleAuth.accessToken, !token.isEmpty else {
+        let seamed = testListedByCal != nil
+        let token = GoogleAuth.accessToken ?? ""
+        if !seamed, token.isEmpty {
             throw CalendarHTTPError(status: 401)
         }
-        let now = Date().timeIntervalSince1970 * 1000
+        if !seamed { ApplyOps.nowMs = Date().timeIntervalSince1970 * 1000 }
+        let now = ApplyOps.nowMs
         let lo = now - 72 * 3_600_000
         let hi = now + 24 * 3_600_000
         let actual = FakeCalendar()
@@ -347,11 +333,17 @@ enum CalendarAPI {
         let beforeS = sitting.events.map(copyEvent)
         ApplyOps.actual = actual
         ApplyOps.sitting = sitting
-        ApplyOps.nowMs = now
         let result = ApplyOps.apply(ops)
         try await pushDiff(calendarId: Credentials.actualId, before: beforeA, after: actual.events, token: token)
         try await pushDiff(calendarId: Credentials.sittingId, before: beforeS, after: sitting.events, token: token)
         return result
+    }
+
+    private static func noteStaleClose(before: [CalEvent], after: [CalEvent]) {
+        guard before.contains(where: { $0.description.contains("#open") }) else { return }
+        let openGone = !after.contains { $0.description.contains("#open") }
+        let guess = after.contains { $0.title.hasSuffix("?") }
+        if openGone, guess { didStaleClose = true }
     }
 
     private static func copyEvent(_ e: CalEvent) -> CalEvent {
@@ -371,6 +363,11 @@ enum CalendarAPI {
     }
 
     private static func listEvents(calendarId: String, from lo: Double, to hi: Double, token: String) async throws -> [CalEvent] {
+        if let listed = testListedByCal {
+            return (listed[calendarId] ?? []).map(copyEvent).filter {
+                !$0.isAllDay && $0.endMs > lo && $0.startMs < hi
+            }.sorted { $0.startMs < $1.startMs }
+        }
         var out: [CalEvent] = []
         var page: String?
         let fmt = ISO8601DateFormatter()
@@ -442,6 +439,15 @@ enum CalendarAPI {
     }
 
     private static func http(_ method: String, calendarId: String, eventId: String?, body: [String: Any]?, token: String) async throws {
+        if testListedByCal != nil {
+            testPushes.append((
+                method: method,
+                calendarId: calendarId,
+                eventId: eventId,
+                summary: body?["summary"] as? String ?? ""
+            ))
+            return
+        }
         var url = "https://www.googleapis.com/calendar/v3/calendars/\(enc(calendarId))/events"
         if let eventId { url += "/\(enc(eventId))" }
         var req = URLRequest(url: URL(string: url)!)

@@ -1,7 +1,7 @@
 import XCTest
 @testable import TimeTap
 
-final class A2Tests: XCTestCase {
+final class A2Tests: TimeTapTestCase {
     override func setUp() {
         super.setUp()
         Credentials.resetForTests()
