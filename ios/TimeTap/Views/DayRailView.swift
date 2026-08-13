@@ -31,19 +31,30 @@ struct DayRailView: View {
 
     private func block(_ item: TapStore.RailItem, railWidth: CGFloat) -> some View {
         let size = Self.labelSize(height: item.height, width: railWidth)
+        let inline = Self.noteInline(height: item.height, hasNote: !item.note.isEmpty, size: size)
         return VStack(alignment: .leading, spacing: 2) {
             HStack(spacing: 6) {
                 Text(item.name)
                     .font(.system(size: size, weight: .bold))
                     .lineLimit(1)
                     .minimumScaleFactor(0.6)
+                    .layoutPriority(1)
+                if inline {
+                    Text("·")
+                        .font(.system(size: size, weight: .bold))
+                    Text(item.note)
+                        .font(.system(size: max(11, size * 0.85), weight: .semibold))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.5)
+                }
                 Spacer(minLength: 0)
                 Text(Format.shortElapsed(item.ms))
                     .font(.system(size: size, weight: .bold).monospacedDigit())
                     .lineLimit(1)
                     .minimumScaleFactor(0.6)
+                    .layoutPriority(1)
             }
-            if !item.note.isEmpty {
+            if !item.note.isEmpty, !inline {
                 Text(item.note)
                     .font(.system(size: max(11, size * 0.75), weight: .semibold))
                     .lineLimit(2)
@@ -52,7 +63,7 @@ struct DayRailView: View {
         }
         .padding(.horizontal, 8)
         .padding(.vertical, 6)
-        .frame(height: item.height, alignment: item.note.isEmpty ? .center : .topLeading)
+        .frame(height: item.height, alignment: item.note.isEmpty || inline ? .center : .topLeading)
         .foregroundStyle(item.isGap ? Theme.mute : .white)
         .background {
             if item.isGap {
@@ -78,6 +89,11 @@ struct DayRailView: View {
     /// Grows with block height and rail width; stays readable on a thin strip.
     static func labelSize(height: CGFloat, width: CGFloat) -> CGFloat {
         min(28, max(13, min(height * 0.42, width * 0.14)))
+    }
+
+    /// A short block cannot hold a second line, so the note sits after a middot.
+    static func noteInline(height: CGFloat, hasNote: Bool, size: CGFloat) -> Bool {
+        hasNote && height < max(36, size * 2.2)
     }
 }
 

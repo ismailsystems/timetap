@@ -93,6 +93,9 @@ final class UTests: TimeTapTestCase {
         )
         XCTAssertGreaterThanOrEqual(DayRailView.labelSize(height: 10, width: 80), 13)
         XCTAssertLessThanOrEqual(DayRailView.labelSize(height: 400, width: 400), 28)
+        XCTAssertTrue(DayRailView.noteInline(height: 24, hasNote: true, size: 13))
+        XCTAssertFalse(DayRailView.noteInline(height: 80, hasNote: true, size: 18))
+        XCTAssertFalse(DayRailView.noteInline(height: 24, hasNote: false, size: 13))
     }
 
     func testSecondTapWithin300msIsIgnored() {
