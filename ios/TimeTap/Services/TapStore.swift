@@ -101,6 +101,7 @@ final class TapStore: ObservableObject {
     private var transportFails = 0
     private var stateAfterBootDrain = false
     private var stateAfterCorrectiveDrain = false
+    private var persistBroken = false
     private var catByKey: [String: Category] = [:]
     private var blocks: [String: BlockMeta] = [:]
 
@@ -126,9 +127,16 @@ final class TapStore: ObservableObject {
     }
 
     func signOut() {
+        flushTask?.cancel()
+        retryTask?.cancel()
+        flushTask = nil
+        retryTask = nil
+        flushing = false
         GoogleAuth.signOut()
         showSignIn = true
         showSettings = false
+        showPicker = false
+        paintSync()
     }
 
     func boot() { Task { await bootAsync() } }
@@ -154,13 +162,14 @@ final class TapStore: ObservableObject {
     // MARK: - Capture actions
 
     func tapCategory(_ key: String) {
-        if Credentials.actualId.isEmpty {
-            banner = "Pick PLAN, ACTUAL and SITTING calendars first."
-            if GoogleAuth.hasSession { showPicker = true }
-            return
-        }
+        if !sessionReady { return }
         guard GoogleAuth.hasSession else {
             showSignIn = true
+            return
+        }
+        if Credentials.actualId.isEmpty {
+            banner = "Pick PLAN, ACTUAL and SITTING calendars first."
+            showPicker = true
             return
         }
         let now = clock()
@@ -273,11 +282,14 @@ final class TapStore: ObservableObject {
     }
 
     func toggleSit() {
+        if !sessionReady { return }
         guard GoogleAuth.hasSession else {
-            if sessionReady { showSignIn = true }
+            showSignIn = true
             return
         }
         let now = clock()
+        if now - lastTapMs < 300 { return }
+        lastTapMs = now
         if sit != nil {
             _ = closeSit(at: now)
         } else {
@@ -348,18 +360,18 @@ final class TapStore: ObservableObject {
         cur.text = text
         open = cur
         persist()
-        noteTask?.cancel()
         let ref = cur.ref
         let hint = cur.startMs
+        queue = queue.filter { !($0.type == "setText" && $0.ref == ref) }
+        _ = enqueue(Op(
+            id: Op.uid(), type: "setText",
+            ts: clock(),
+            ref: ref, text: text, hintMs: hint
+        ))
+        noteTask?.cancel()
         noteTask = Task {
             try? await Task.sleep(nanoseconds: noteDelayNs)
             guard !Task.isCancelled else { return }
-            queue = queue.filter { !($0.type == "setText" && $0.ref == ref) }
-            _ = enqueue(Op(
-                id: Op.uid(), type: "setText",
-                ts: clock(),
-                ref: ref, text: text, hintMs: hint
-            ))
             flush()
         }
     }
@@ -659,6 +671,7 @@ final class TapStore: ObservableObject {
 
     private func bootAsync() async {
         defer { sessionReady = true }
+        if persistBroken { return }
         if !GoogleAuth.hasSession {
             showSignIn = true
             return
@@ -676,14 +689,14 @@ final class TapStore: ObservableObject {
         }
     }
 
-    private func applyConfig(_ cfg: ClientConfig) {
+    private func applyConfig(_ cfg: ClientConfig, write: Bool = true) {
         config = cfg
         catByKey = Dictionary(cfg.categories.map { ($0.key, $0) }, uniquingKeysWith: { _, n in n })
         Grammar.extraColors = [:]
         for c in cfg.categories where TT.colorIdByKey[c.key] == nil && !c.color.isEmpty {
             Grammar.extraColors[c.key] = c.color
         }
-        if let data = try? JSONEncoder().encode(cfg) {
+        if write, let data = try? JSONEncoder().encode(cfg) {
             UserDefaults.standard.set(data, forKey: configKey)
         }
         refreshUnreadable()
@@ -745,8 +758,11 @@ final class TapStore: ObservableObject {
     }
 
     func flush() {
-        flushTask?.cancel()
-        flushTask = Task { [weak self] in await self?.flushAsync() }
+        guard flushTask == nil, !flushing else { return }
+        flushTask = Task { [weak self] in
+            await self?.flushAsync()
+            self?.flushTask = nil
+        }
     }
 
     func flushNow() async {
@@ -1097,6 +1113,16 @@ final class TapStore: ObservableObject {
             syncFailed = true
             return
         }
+        if !GoogleAuth.hasSession || !sessionReady {
+            syncLabel = "GOOGLE CALENDAR · WAITING"
+            syncFailed = false
+            return
+        }
+        if banner != nil, queue.isEmpty, dead.isEmpty {
+            syncLabel = "GOOGLE CALENDAR · WAITING"
+            syncFailed = true
+            return
+        }
         if !dead.isEmpty {
             syncLabel = "\(dead.count) SET ASIDE · RETRYING"
             syncFailed = true
@@ -1115,9 +1141,13 @@ final class TapStore: ObservableObject {
     // MARK: - Persistence
 
     private func loadPersisted() {
-        if let data = UserDefaults.standard.data(forKey: queueKey),
-           let q = try? JSONDecoder().decode([Op].self, from: data) {
-            queue = q
+        if let data = UserDefaults.standard.data(forKey: queueKey) {
+            if let q = try? JSONDecoder().decode([Op].self, from: data) {
+                queue = q
+            } else {
+                persistBroken = true
+                banner = "could not read the saved queue. Nothing was overwritten."
+            }
         }
         if let data = UserDefaults.standard.data(forKey: stateKey),
            let st = try? JSONDecoder().decode(Persisted.self, from: data) {
@@ -1132,9 +1162,13 @@ final class TapStore: ObservableObject {
            let b = try? JSONDecoder().decode([String: BlockMeta].self, from: data) {
             blocks = b
         }
-        if let data = UserDefaults.standard.data(forKey: configKey),
-           let cfg = try? JSONDecoder().decode(ClientConfig.self, from: data) {
-            applyConfig(cfg)
+        queue.forEach(noteBlock)
+        if let data = UserDefaults.standard.data(forKey: configKey) {
+            if let cfg = try? JSONDecoder().decode(ClientConfig.self, from: data) {
+                applyConfig(cfg)
+            } else {
+                applyConfig(.seed, write: false)
+            }
         } else {
             applyConfig(.seed)
         }

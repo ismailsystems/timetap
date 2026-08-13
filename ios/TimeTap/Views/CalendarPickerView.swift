@@ -11,8 +11,10 @@ struct CalendarPickerView: View {
             Form {
                 if loading {
                     ProgressView()
-                } else if let empty = pick.emptyLabel {
-                    Text(empty)
+                } else if pick.list.isEmpty {
+                    Text(errorText == nil
+                         ? "Create calendars named PLAN, ACTUAL and SITTING in Google Calendar, then tap Retry."
+                         : "Could not load calendars.")
                         .foregroundStyle(Theme.mute)
                 } else {
                     slot("PLAN", selection: $pick.planId)
@@ -28,9 +30,14 @@ struct CalendarPickerView: View {
             .navigationTitle("Calendars")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                if Credentials.hasCalendarIds {
-                    ToolbarItem(placement: .cancellationAction) {
+                ToolbarItem(placement: .cancellationAction) {
+                    if Credentials.hasCalendarIds {
                         Button("Close") { store.showPicker = false }
+                    } else {
+                        Button("Sign out") {
+                            store.signOut()
+                            store.showPicker = false
+                        }
                     }
                 }
             }
@@ -40,13 +47,16 @@ struct CalendarPickerView: View {
                         .font(.footnote)
                         .foregroundStyle(Theme.mute)
                         .frame(maxWidth: .infinity, alignment: .leading)
-                    if errorText != nil {
-                        Button("Retry") { Task { await load() } }
-                            .frame(maxWidth: .infinity)
-                    }
+                    Button("Retry") { Task { await load() } }
+                        .frame(maxWidth: .infinity)
                     Button("Confirm") { confirm() }
                         .disabled(!pick.canConfirm)
                         .frame(maxWidth: .infinity)
+                    if !pick.canConfirm, !loading, pick.emptyLabel == nil {
+                        Text("Choose all three calendars.")
+                            .font(.footnote)
+                            .foregroundStyle(Theme.mute)
+                    }
                 }
                 .padding()
                 .background(Theme.ground)
@@ -74,7 +84,6 @@ struct CalendarPickerView: View {
             pick = .fromSaved(try await CalendarAPI.listCalendars())
         } catch {
             errorText = error.localizedDescription
-            pick = .loaded([])
         }
     }
 

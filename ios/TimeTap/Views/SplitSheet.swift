@@ -125,6 +125,7 @@ struct SplitSheet: View {
             Button("CLOSE", action: close)
                 .font(.system(size: 11, weight: .bold))
                 .foregroundStyle(Theme.dim)
+                .frame(minHeight: 44)
         }
         .padding(.horizontal, 18)
         .padding(.vertical, 14)

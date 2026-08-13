@@ -69,6 +69,8 @@ Baseline (2026-08-12, `main` at `1f84fce`): **1196 passed / 0 failed** · lint a
 - B4 stale today: HANDOFF says today includes the `?` block and UNLOGGED. GAS skips UNLOGGED and a block that ends at local midnight. Swift matches GAS.
 - Review 8 vs `main`: `CalendarAPI.refreshState` and `flushOps` share one serial gate so boot getState cannot drop a tap write. A 401 on getState refreshes the token once, then Sign-In. Return-from-background flushes a non-empty queue. HTTP 400 on a multi-op batch retries the batch and does not dead-letter `queue.first`. A set-aside `splitActual` / `undoSwitch` restores the block still running on Calendar (Path 2 `quarantine`). The mark row names the closed block. UNDO sits 12pt above TAP TO SIT. TAP TO SIT without a session does not enqueue. Remainder SPLIT will not cut after now.
 
+- Review 9: serial gate keeps `busy` across `await`. POST reads Google’s event id. DELETE 404 is gone. First-run does not paint SYNCED. Picker always has Sign out + Retry. Capture clocks use `store.clock`. Rail keeps NOW ▲ and a dashed UNLOGGED edge. SITTING is a chip. TAP TO SIT uses the 300 ms guard. Corrupt queue decode does not run `getState`.
+
 ## Parked tasks
 
 _None. Three parked tasks trips the circuit breaker and ends the run._

@@ -7,7 +7,12 @@ struct RootView: View {
     var body: some View {
         ZStack {
             Theme.ground.ignoresSafeArea()
-            CaptureView()
+            if store.sessionReady {
+                CaptureView()
+            } else {
+                ProgressView()
+                    .tint(Theme.accentOn)
+            }
         }
         .sheet(isPresented: $store.showSettings) {
             SettingsView()

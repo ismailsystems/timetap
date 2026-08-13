@@ -17,6 +17,7 @@ struct SitEditSheet: View {
                     Button("CLOSE") { store.sitEdit = nil }
                         .font(.system(size: 11, weight: .bold))
                         .foregroundStyle(Theme.dim)
+                        .frame(minHeight: 44)
                 }
                 .padding(.horizontal, 18)
                 .padding(.vertical, 14)
@@ -44,7 +45,7 @@ struct SitEditSheet: View {
                     )
                     .tint(Theme.accent)
 
-                    Text("sitting for \(Format.duration(Date().timeIntervalSince1970 * 1000 - s.atMs)) if applied")
+                    Text("sitting for \(Format.duration(store.clock() - s.atMs)) if applied")
                         .font(.system(size: 12, weight: .semibold))
                         .foregroundStyle(Theme.dim)
                 }
@@ -62,6 +63,7 @@ struct SitEditSheet: View {
                         .foregroundStyle(.white)
                 }
                 .buttonStyle(.plain)
+                .padding(.bottom, 16)
 
                 Button(role: .destructive, action: store.deleteSit) {
                     Text("DELETE SITTING")

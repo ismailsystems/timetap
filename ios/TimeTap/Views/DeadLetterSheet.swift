@@ -4,6 +4,7 @@ struct DeadLetterSheet: View {
     @EnvironmentObject private var store: TapStore
     @State private var armedToken: String?
     @State private var armTask: Task<Void, Never>?
+    @State private var armedAt: TimeInterval = 0
 
     var body: some View {
         VStack(spacing: 0) {
@@ -67,6 +68,7 @@ struct DeadLetterSheet: View {
                     .font(.system(size: 12, weight: .heavy))
                     .tracking(1.0)
                     .frame(maxWidth: .infinity)
+                    .frame(minHeight: 44)
                     .padding(.vertical, 12)
                     .background(armedToken == e.token ? Theme.accent : Theme.panel2)
                     .foregroundStyle(.white)
@@ -78,12 +80,14 @@ struct DeadLetterSheet: View {
 
     private func armOrDiscard(_ token: String) {
         if armedToken == token {
+            if Date().timeIntervalSince1970 - armedAt < 0.3 { return }
             disarm()
             store.discardDead(token: token)
             return
         }
         disarm()
         armedToken = token
+        armedAt = Date().timeIntervalSince1970
         let ms = store.config?.confirmTimeoutMs ?? 4000
         armTask = Task {
             try? await Task.sleep(nanoseconds: UInt64(ms) * 1_000_000)

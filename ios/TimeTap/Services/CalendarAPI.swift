@@ -87,10 +87,24 @@ struct CalendarHTTPError: Error, LocalizedError {
 }
 
 enum CalendarAPI {
-    /// One list/apply/push at a time. Boot getState and a tap flush share ApplyOps.actual.
+    /// One list/apply/push at a time. `await body()` leaves the actor (SE-0338),
+    /// so `busy` stays set across the awaits and the next caller waits.
     private actor Serial {
-        func run<T>(_ body: () async throws -> T) async rethrows -> T {
-            try await body()
+        private var busy = false
+        private var waiters: [CheckedContinuation<Void, Never>] = []
+
+        func run<T>(_ body: () async throws -> T) async throws -> T {
+            while busy {
+                await withCheckedContinuation { waiters.append($0) }
+            }
+            busy = true
+            defer {
+                busy = false
+                if !waiters.isEmpty {
+                    waiters.removeFirst().resume()
+                }
+            }
+            return try await body()
         }
     }
     private static let serial = Serial()
@@ -220,7 +234,7 @@ enum CalendarAPI {
         if let testList { return testList }
         GoogleAuth.didFetchCalendarList = true
         guard let token = GoogleAuth.accessToken, !token.isEmpty else {
-            throw URLError(.userAuthenticationRequired)
+            throw CalendarHTTPError(status: 401)
         }
         var out: [CalendarSummary] = []
         var page: String?
@@ -232,8 +246,9 @@ enum CalendarAPI {
             var req = URLRequest(url: comps.url!)
             req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
             let (data, resp) = try await URLSession.shared.data(for: req)
-            guard let http = resp as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
-                throw URLError(.badServerResponse)
+            let status = (resp as? HTTPURLResponse)?.statusCode ?? 0
+            if !(200..<300).contains(status) {
+                throw googleError(status: status, data: data)
             }
             let decoded = try JSONDecoder().decode(ListPage.self, from: data)
             for item in decoded.items ?? [] {
@@ -285,6 +300,7 @@ enum CalendarAPI {
         guard let token = GoogleAuth.accessToken, !token.isEmpty else {
             throw CalendarHTTPError(status: 401)
         }
+        ApplyOps.timeZone = TimeZone.current
         let now = Date().timeIntervalSince1970 * 1000
         let lo = now - 72 * 3_600_000
         let hi = now + 24 * 3_600_000
@@ -346,7 +362,10 @@ enum CalendarAPI {
         if !seamed, token.isEmpty {
             throw CalendarHTTPError(status: 401)
         }
-        if !seamed { ApplyOps.nowMs = Date().timeIntervalSince1970 * 1000 }
+        if !seamed {
+            ApplyOps.timeZone = TimeZone.current
+            ApplyOps.nowMs = Date().timeIntervalSince1970 * 1000
+        }
         let now = ApplyOps.nowMs
         let lo = now - 72 * 3_600_000
         let hi = now + 24 * 3_600_000
@@ -419,8 +438,7 @@ enum CalendarAPI {
             for item in decoded.items ?? [] {
                 let allDay = item.start.date != nil
                 if allDay { continue }
-                let start = parseWhen(item.start)
-                let end = parseWhen(item.end)
+                guard let start = parseWhen(item.start), let end = parseWhen(item.end) else { continue }
                 out.append(CalEvent(
                     id: item.id, calendarId: calendarId, key: "",
                     title: item.summary ?? "", colorId: item.colorId ?? "",
@@ -445,7 +463,9 @@ enum CalendarAPI {
                     try await http("PATCH", calendarId: calendarId, eventId: ev.id, body: eventBody(ev), token: token)
                 }
             } else {
-                try await http("POST", calendarId: calendarId, eventId: nil, body: eventBody(ev), token: token)
+                if let gid = try await http("POST", calendarId: calendarId, eventId: nil, body: eventBody(ev), token: token) {
+                    ev.id = gid
+                }
             }
         }
     }
@@ -463,7 +483,8 @@ enum CalendarAPI {
         return body
     }
 
-    private static func http(_ method: String, calendarId: String, eventId: String?, body: [String: Any]?, token: String) async throws {
+    @discardableResult
+    private static func http(_ method: String, calendarId: String, eventId: String?, body: [String: Any]?, token: String) async throws -> String? {
         if testListedByCal != nil {
             testPushes.append((
                 method: method,
@@ -471,7 +492,7 @@ enum CalendarAPI {
                 eventId: eventId,
                 summary: body?["summary"] as? String ?? ""
             ))
-            return
+            return nil
         }
         var comps = URLComponents()
         comps.scheme = "https"
@@ -488,9 +509,17 @@ enum CalendarAPI {
         }
         let (data, resp) = try await URLSession.shared.data(for: req)
         let status = (resp as? HTTPURLResponse)?.statusCode ?? 0
+        if method == "DELETE", status == 404 || status == 410 { return nil }
         if !(200..<300).contains(status) {
             throw googleError(status: status, data: data)
         }
+        if method == "POST" { return createdEventId(from: data) }
+        return nil
+    }
+
+    static func createdEventId(from data: Data) -> String? {
+        struct Created: Decodable { var id: String? }
+        return (try? JSONDecoder().decode(Created.self, from: data))?.id
     }
 
     /// RFC 3986 unreserved. `@` in a calendar id must be `%40` or Google returns 400.
@@ -517,7 +546,7 @@ enum CalendarAPI {
         return CalendarHTTPError(status: status, message: msg)
     }
 
-    private static func parseWhen(_ w: EventsPage.Item.When) -> Double {
+    private static func parseWhen(_ w: EventsPage.Item.When) -> Double? {
         if let dt = w.dateTime {
             let iso = ISO8601DateFormatter()
             iso.formatOptions = [.withInternetDateTime]
@@ -533,7 +562,7 @@ enum CalendarAPI {
             f.dateFormat = "yyyy-MM-dd"
             if let d = f.date(from: day) { return d.timeIntervalSince1970 * 1000 }
         }
-        return 0
+        return nil
     }
 
     private struct EventsPage: Decodable {

@@ -6,7 +6,6 @@ struct TimeTapApp: App {
 
     init() {
         GoogleAuth.configure()
-        GoogleAuth.restore()
     }
 
     var body: some Scene {

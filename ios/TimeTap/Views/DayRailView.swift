@@ -9,7 +9,7 @@ struct DayRailView: View {
     var body: some View {
         let _ = tick
         GeometryReader { geo in
-            let now = Date().timeIntervalSince1970 * 1000
+            let now = store.clock()
             let rail = store.railItems(budget: max(geo.size.height - 44, 40), now: now)
             VStack(alignment: .leading, spacing: 6) {
                 Text(rail.startLabel)
@@ -22,6 +22,11 @@ struct DayRailView: View {
                         block(item, railWidth: geo.size.width - 24)
                     }
                 }
+                Spacer(minLength: 0)
+                Text("NOW ▲")
+                    .font(.system(size: 10, weight: .bold))
+                    .tracking(1.0)
+                    .foregroundStyle(Theme.accentOn)
             }
             .padding(12)
             .frame(width: geo.size.width, height: geo.size.height, alignment: .topLeading)
@@ -64,7 +69,7 @@ struct DayRailView: View {
         .padding(.horizontal, 8)
         .padding(.vertical, 6)
         .frame(height: item.height, alignment: item.note.isEmpty || inline ? .center : .topLeading)
-        .foregroundStyle(item.isGap ? Theme.mute : .white)
+        .foregroundStyle(item.isGap ? Theme.dim : .white)
         .background {
             if item.isGap {
                 GapFill()
@@ -75,7 +80,9 @@ struct DayRailView: View {
             }
         }
         .overlay {
-            if item.isOpen {
+            if item.isGap {
+                Rectangle().strokeBorder(Theme.mute, style: StrokeStyle(lineWidth: 1, dash: [4, 3]))
+            } else if item.isOpen {
                 Rectangle().strokeBorder(Theme.fg, lineWidth: 2)
             }
         }
@@ -120,7 +127,7 @@ private struct GapFill: View {
                 path.addLine(to: CGPoint(x: x + size.height, y: 0))
                 x += step
             }
-            ctx.stroke(path, with: .color(Theme.rule2), lineWidth: 1)
+            ctx.stroke(path, with: .color(Theme.mute), lineWidth: 1)
         }
     }
 }

@@ -29,6 +29,7 @@ struct CaptureView: View {
                             .frame(maxWidth: .infinity, alignment: .center)
                             .padding(.horizontal, 18)
                             .padding(.vertical, 8)
+                            .background(Theme.fail)
                     }
                     .buttonStyle(.plain)
                     .disabled(store.deadCount == 0)
@@ -108,20 +109,29 @@ struct CaptureView: View {
                     .accessibilityHint("Opens split sheet")
                 }
             }
-            Button {
-                finishNoteEdit()
-            } label: {
-                Text(store.open == nil ? "—" : elapsedLabel)
+            if store.open != nil {
+                Button {
+                    finishNoteEdit()
+                } label: {
+                    Text(elapsedLabel)
+                        .font(.system(size: 48, weight: .heavy))
+                        .foregroundStyle(isLong ? Theme.flag : Theme.accentOn)
+                        .monospacedDigit()
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .padding(.top, 8)
+                .accessibilityLabel(nowAccessibility)
+                .accessibilityHint("Dismisses the keyboard")
+            } else {
+                Text("—")
                     .font(.system(size: 48, weight: .heavy))
-                    .foregroundStyle(isLong ? Theme.flag : Theme.accentOn)
-                    .monospacedDigit()
+                    .foregroundStyle(Theme.accentOn)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .contentShape(Rectangle())
+                    .padding(.top, 8)
+                    .accessibilityLabel(nowAccessibility)
             }
-            .buttonStyle(.plain)
-            .padding(.top, 8)
-            .accessibilityLabel(nowAccessibility)
-            .accessibilityHint("Dismisses the keyboard")
             HStack(alignment: .firstTextBaseline) {
                 Text(store.nowKick)
                     .font(.system(size: 10, weight: .bold))
@@ -342,22 +352,24 @@ struct CaptureView: View {
                                 .tracking(1.2)
                                 .foregroundStyle(Theme.accentOn)
                         }
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 12)
+                        .frame(minHeight: 44)
+                        .overlay(Rectangle().strokeBorder(Theme.rule2, lineWidth: 2))
                     }
                 }
                 .buttonStyle(.plain)
                 .padding(.leading, 12)
-                .frame(maxWidth: store.sit == nil ? nil : .infinity, alignment: .leading)
-                .padding(.vertical, store.sit == nil ? 8 : 16)
-                .contentShape(Rectangle())
+                .padding(.vertical, 8)
                 .accessibilityLabel(store.sit == nil ? "Tap to sit" : "Sitting")
                 .accessibilityHint("Toggles sitting posture")
                 .accessibilityAddTraits(.isButton)
 
-                if store.sit == nil { Spacer() }
+                Spacer()
 
                 if let sit = store.sit {
                     Button(action: store.openSitEdit) {
-                        Text(Format.elapsed(Date().timeIntervalSince1970 * 1000 - sit.startMs))
+                        Text(Format.shortElapsed(store.clock() - sit.startMs))
                             .font(.system(size: 14, weight: .bold).monospacedDigit())
                             .padding(.horizontal, 12)
                             .padding(.vertical, 10)
@@ -365,7 +377,7 @@ struct CaptureView: View {
                     }
                     .buttonStyle(.plain)
                     .accessibilityLabel(
-                        "Adjust when sitting started, sitting for \(Format.elapsed(Date().timeIntervalSince1970 * 1000 - sit.startMs))"
+                        "Adjust when sitting started, sitting for \(Format.shortElapsed(store.clock() - sit.startMs))"
                     )
                     .padding(.trailing, 8)
                 }
@@ -379,6 +391,7 @@ struct CaptureView: View {
                     .padding(.trailing, 12)
                 }
             }
+            .padding(.top, 12)
             .overlay(alignment: .top) {
                 Rectangle().fill(Theme.rule2).frame(height: 2)
             }
@@ -388,12 +401,12 @@ struct CaptureView: View {
     private var elapsedLabel: String {
         guard let open = store.open else { return "0m" }
         _ = tick
-        return Format.elapsed(Date().timeIntervalSince1970 * 1000 - open.startMs)
+        return Format.shortElapsed(store.clock() - open.startMs)
     }
 
     private var isLong: Bool {
         guard let open = store.open else { return false }
-        let ms = Date().timeIntervalSince1970 * 1000 - open.startMs
+        let ms = store.clock() - open.startMs
         return ms >= Double(store.config?.longBlockMinutes ?? 90) * 60_000
     }
 
@@ -410,7 +423,8 @@ struct CaptureView: View {
             .tracking(1.2)
             .foregroundStyle(Theme.accentOn)
             .padding(.horizontal, 14)
-            .padding(.vertical, 10)
+            .padding(.vertical, 12)
+            .frame(minHeight: 44)
             .overlay(Rectangle().strokeBorder(Theme.rule2, lineWidth: 2))
     }
 

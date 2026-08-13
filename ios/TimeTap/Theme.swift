@@ -11,6 +11,7 @@ enum Theme {
     static let accent = Color(red: 0xec / 255, green: 0x30 / 255, blue: 0x13 / 255)
     static let accentOn = Color(red: 0xff / 255, green: 0x6a / 255, blue: 0x4a / 255)
     static let flag = Color(red: 0xc9 / 255, green: 0xa2 / 255, blue: 0x27 / 255)
+    static let fail = Color(red: 0x2a / 255, green: 0x16 / 255, blue: 0x13 / 255)
 
     static func hex(_ s: String) -> Color {
         var h = s.trimmingCharacters(in: .whitespacesAndNewlines)

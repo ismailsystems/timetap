@@ -200,8 +200,11 @@ final class UTests: TimeTapTestCase {
                 .appendingPathComponent("TimeTap/Views/SettingsView.swift"),
             encoding: .utf8
         )
-        XCTAssertTrue(text.contains("last write wins"))
-        XCTAssertTrue(text.contains("Categories you add here do not appear on the web app."))
+        XCTAssertTrue(text.contains("last write wins") || text.contains("later write replaces"))
+        XCTAssertTrue(
+            text.contains("Categories you add here do not appear on the web app.")
+            || text.contains("A category you add on the capture grid stays on this phone")
+        )
     }
 
     func testDeadLetterWarnsBeforeDiscard() throws {
@@ -256,5 +259,56 @@ final class UTests: TimeTapTestCase {
         XCTAssertEqual(store.open?.key, "MTG")
         XCTAssertEqual(store.open?.startMs, start)
         XCTAssertFalse(store.queue.contains { $0.type == "splitActual" })
+    }
+
+    func testRailKeepsNowMarker() throws {
+        let text = try String(
+            contentsOf: URL(fileURLWithPath: #filePath)
+                .deletingLastPathComponent()
+                .deletingLastPathComponent()
+                .appendingPathComponent("TimeTap/Views/DayRailView.swift"),
+            encoding: .utf8
+        )
+        XCTAssertTrue(text.contains("NOW ▲"))
+        XCTAssertTrue(text.contains("store.clock()"))
+        XCTAssertTrue(text.contains("dash:"))
+    }
+
+    func testColdStoreDoesNotClaimSynced() {
+        GoogleAuth.testHasSession = nil
+        let store = TapStore()
+        XCTAssertFalse(store.sessionReady)
+        XCTAssertTrue(store.syncLabel.contains("WAITING"))
+        XCTAssertFalse(store.syncLabel.contains("SYNCED"))
+    }
+
+    func testTapCategoryBeforeSessionReadyDoesNothing() {
+        GoogleAuth.testHasSession = nil
+        Credentials.planId = "p1"
+        Credentials.actualId = "a1"
+        Credentials.sittingId = "s1"
+        let store = TapStore()
+        store.tapCategory("DW")
+        XCTAssertNil(store.open)
+        XCTAssertTrue(store.queue.isEmpty)
+        XCTAssertFalse(store.showSignIn)
+    }
+
+    func testPickerAlwaysHasAWayOut() throws {
+        let text = try String(
+            contentsOf: URL(fileURLWithPath: #filePath)
+                .deletingLastPathComponent()
+                .deletingLastPathComponent()
+                .appendingPathComponent("TimeTap/Views/CalendarPickerView.swift"),
+            encoding: .utf8
+        )
+        XCTAssertTrue(text.contains("Sign out"))
+        XCTAssertTrue(text.contains("Button(\"Retry\")"))
+    }
+
+    func testPostReplyIdIsRead() {
+        let data = Data(#"{"id":"google-event-1","summary":"DW:"}"#.utf8)
+        XCTAssertEqual(CalendarAPI.createdEventId(from: data), "google-event-1")
+        XCTAssertNil(CalendarAPI.createdEventId(from: Data("{}".utf8)))
     }
 }

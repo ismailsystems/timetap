@@ -49,6 +49,7 @@ final class D1Tests: TimeTapTestCase {
 
     func testSignedOutTapDoesNotInsertAndShowsSignIn() {
         GoogleAuth.signOut()
+        GoogleAuth.testHasSession = false
         GoogleAuth.didAttemptCalendarWrite = false
         let store = TapStore()
         store.tapCategory("DW")

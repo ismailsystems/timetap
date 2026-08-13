@@ -20,7 +20,8 @@ struct SettingsView: View {
                     }
                 }
                 Section("This phone and the web app") {
-                    Text("If the web app and this phone both write, last write wins. Categories you add here do not appear on the web app.")
+                    Text("This phone and the web app both write Google Calendar. The later write replaces the earlier write on that event.")
+                    Text("A category you add on the capture grid stays on this phone. The web app does not show it.")
                 }
                 Section {
                     Button("Sign out", role: .destructive) {
