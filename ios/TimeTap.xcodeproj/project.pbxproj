@@ -9,6 +9,7 @@
 /* Begin PBXBuildFile section */
 		02FC0D91E87A14D4F678123C /* SplitSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 47B9719A4D5ACAE3A65E08CB /* SplitSheet.swift */; };
 		036E218AE8B64A72E79FA10F /* B4Tests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A110EC0051A7A1D87110C352 /* B4Tests.swift */; };
+		03749D68D801BE2CDF6B7AA3 /* R7Tests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 50A1BD01C683FF67F8F298F1 /* R7Tests.swift */; };
 		099D42E94F480B0F26A3C5B9 /* B3Tests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 18B8279D8F1187956ABD0783 /* B3Tests.swift */; };
 		155752CD3F60C3AC82969373 /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4E7744EE4EAB4173F4B3D188 /* Models.swift */; };
 		2D0897E0A6B3231F37BEB32F /* A4Tests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 72AB36F224AB7588E53018B4 /* A4Tests.swift */; };
@@ -66,6 +67,7 @@
 		47B9719A4D5ACAE3A65E08CB /* SplitSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SplitSheet.swift; sourceTree = "<group>"; };
 		49092CA9D4C73500509BB649 /* DayRailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DayRailView.swift; sourceTree = "<group>"; };
 		4E7744EE4EAB4173F4B3D188 /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
+		50A1BD01C683FF67F8F298F1 /* R7Tests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = R7Tests.swift; sourceTree = "<group>"; };
 		5B6E4BC029AB56DD7EB503AD /* C3Tests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = C3Tests.swift; sourceTree = "<group>"; };
 		5D9FAAEA0FBB3106BE727550 /* ApplyOps.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ApplyOps.swift; sourceTree = "<group>"; };
 		5E8BF97CDBFD4A1958452544 /* D2Tests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = D2Tests.swift; sourceTree = "<group>"; };
@@ -175,6 +177,7 @@
 				5B6E4BC029AB56DD7EB503AD /* C3Tests.swift */,
 				62372ECAE115ACC89B6A24D3 /* D1Tests.swift */,
 				5E8BF97CDBFD4A1958452544 /* D2Tests.swift */,
+				50A1BD01C683FF67F8F298F1 /* R7Tests.swift */,
 			);
 			path = TimeTapTests;
 			sourceTree = "<group>";
@@ -316,6 +319,7 @@
 				55E5C00C72D20DF5332F9921 /* C3Tests.swift in Sources */,
 				2EA116BE2281759FD8359C24 /* D1Tests.swift in Sources */,
 				FF50CD03EC10A6DA85165BC4 /* D2Tests.swift in Sources */,
+				03749D68D801BE2CDF6B7AA3 /* R7Tests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
