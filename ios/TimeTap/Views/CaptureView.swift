@@ -91,7 +91,7 @@ struct CaptureView: View {
 
     private var nowPanel: some View {
         VStack(alignment: .leading, spacing: 0) {
-            HStack(alignment: .center) {
+            HStack(alignment: .center, spacing: 8) {
                 Text(store.open.map { store.labelFor($0.key).uppercased() } ?? "NOTHING RUNNING")
                     .font(.system(size: 32, weight: .black))
                     .lineLimit(1)
@@ -107,6 +107,16 @@ struct CaptureView: View {
                     .buttonStyle(.plain)
                     .accessibilityLabel("SPLIT")
                     .accessibilityHint("Opens split sheet")
+                }
+                if store.open != nil || store.sit != nil {
+                    Button {
+                        finishNoteEdit()
+                        store.endDay()
+                    } label: {
+                        outlineChip("STOP")
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("End the day")
                 }
             }
             if store.open != nil {
@@ -208,7 +218,6 @@ struct CaptureView: View {
         return ScrollView {
             VStack(alignment: .leading, spacing: 0) {
                 ForEach(store.categories) { cat in
-                    Rectangle().fill(Theme.rule2.opacity(0.5)).frame(height: 1)
                     Button {
                         finishNoteEdit()
                         UIImpactFeedbackGenerator(style: .light).impactOccurred()
@@ -228,6 +237,7 @@ struct CaptureView: View {
                     }
                     .buttonStyle(.plain)
                     .frame(height: rowH)
+                    .overlay(alignment: .top) { Rectangle().fill(Theme.rule2.opacity(0.5)).frame(height: 1) }
                     .accessibilityLabel(cat.face)
                     .accessibilityAddTraits(store.open?.key == cat.key ? [.isSelected] : [])
                     .accessibilityValue(store.open?.key == cat.key ? elapsedLabel : "")
@@ -235,9 +245,9 @@ struct CaptureView: View {
                 }
 
                 if store.canAddCategory {
-                    Rectangle().fill(Theme.rule2.opacity(0.5)).frame(height: 1)
                     addRow
-                        .frame(maxWidth: .infinity, minHeight: rowH, maxHeight: rowH, alignment: .leading)
+                        .frame(maxWidth: .infinity, minHeight: rowH, maxHeight: rowH)
+                        .overlay(alignment: .top) { Rectangle().fill(Theme.rule2.opacity(0.5)).frame(height: 1) }
                         .id("add")
                 } else {
                     Text("That is \(store.config?.maxCategories ?? 10) categories already.")
@@ -246,6 +256,7 @@ struct CaptureView: View {
                         .padding(.leading, 12)
                         .padding(.trailing, 16)
                         .frame(maxWidth: .infinity, minHeight: rowH, maxHeight: rowH, alignment: .leading)
+                        .overlay(alignment: .top) { Rectangle().fill(Theme.rule2.opacity(0.5)).frame(height: 1) }
                 }
             }
         }
@@ -285,12 +296,14 @@ struct CaptureView: View {
                 naming = true
             } label: {
                 Text("+")
-                    .font(.system(size: 28, weight: .bold))
+                    .font(.system(size: 28, weight: .medium))
                     .foregroundStyle(Theme.mute)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .offset(y: -1)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
             .accessibilityLabel("Add a category")
         }
     }
@@ -349,57 +362,10 @@ struct CaptureView: View {
             }
 
             HStack(spacing: 0) {
-                Button(action: store.toggleSit) {
-                    if store.sit == nil {
-                        outlineChip("TAP TO SIT")
-                    } else {
-                        HStack(spacing: 10) {
-                            Circle()
-                                .fill(Theme.accent)
-                                .frame(width: 10, height: 10)
-                            Text("SITTING")
-                                .font(.system(size: 12, weight: .heavy))
-                                .tracking(1.2)
-                                .foregroundStyle(Theme.accentOn)
-                        }
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 12)
-                        .frame(minHeight: 44)
-                        .overlay(Rectangle().strokeBorder(Theme.rule2, lineWidth: 2))
-                    }
-                }
-                .buttonStyle(.plain)
-                .padding(.leading, 12)
-                .padding(.vertical, 8)
-                .accessibilityLabel(store.sit == nil ? "Tap to sit" : "Sitting")
-                .accessibilityHint("Toggles sitting posture")
-                .accessibilityAddTraits(.isButton)
-
-                Spacer()
-
-                if let sit = store.sit {
-                    Button(action: store.openSitEdit) {
-                        Text(Format.shortElapsed(store.clock() - sit.startMs))
-                            .font(.system(size: 14, weight: .bold).monospacedDigit())
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 10)
-                            .overlay(Rectangle().strokeBorder(Theme.rule2, lineWidth: 2))
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel(
-                        "Adjust when sitting started, sitting for \(Format.shortElapsed(store.clock() - sit.startMs))"
-                    )
-                    .padding(.trailing, 8)
-                }
-
-                if store.open != nil || store.sit != nil {
-                    Button(action: store.endDay) {
-                        outlineChip("STOP")
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel("End the day")
+                Spacer(minLength: 0)
+                sitChip
                     .padding(.trailing, 12)
-                }
+                    .padding(.vertical, 8)
             }
             .padding(.top, 12)
             .overlay(alignment: .top) {
@@ -425,6 +391,56 @@ struct CaptureView: View {
             return "Now \(store.labelFor(open.key)), \(elapsedLabel), since \(Format.clock(open.startMs))"
         }
         return "Nothing running, time is unlogged"
+    }
+
+    private var sitElapsed: String {
+        guard let sit = store.sit else { return "" }
+        _ = tick
+        return Format.shortElapsed(store.clock() - sit.startMs)
+    }
+
+    @ViewBuilder
+    private var sitChip: some View {
+        if store.sit == nil {
+            Button(action: store.toggleSit) {
+                outlineChip("TAP TO SIT")
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Tap to sit")
+            .accessibilityHint("Starts sitting")
+        } else {
+            HStack(spacing: 8) {
+                Button(action: store.toggleSit) {
+                    HStack(spacing: 8) {
+                        Circle()
+                            .fill(Theme.accent)
+                            .frame(width: 10, height: 10)
+                        Text("SITTING")
+                            .font(.system(size: 12, weight: .heavy))
+                            .tracking(1.2)
+                            .foregroundStyle(Theme.accentOn)
+                    }
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Sitting")
+                .accessibilityHint("Stops sitting")
+                Button(action: store.openSitEdit) {
+                    Text("· \(sitElapsed)")
+                        .font(.system(size: 12, weight: .heavy).monospacedDigit())
+                        .tracking(1.2)
+                        .foregroundStyle(Theme.accentOn)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Sitting for \(sitElapsed)")
+                .accessibilityHint("Adjust when sitting started")
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 12)
+            .frame(minHeight: 44)
+            .overlay(Rectangle().strokeBorder(Theme.rule2, lineWidth: 2))
+        }
     }
 
     private func outlineChip(_ title: String) -> some View {

@@ -10,27 +10,31 @@ struct DayRailView: View {
         let _ = tick
         GeometryReader { geo in
             let now = store.clock()
-            let rail = store.railItems(budget: max(geo.size.height - 44, 40), now: now)
             VStack(alignment: .leading, spacing: 6) {
-                Text(rail.startLabel)
+                Text(store.railItems(budget: 40, now: now).startLabel)
                     .font(Theme.font(10, weight: .semibold))
                     .foregroundStyle(Theme.mute)
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
-                VStack(spacing: 0) {
-                    ForEach(rail.items) { item in
-                        block(item, railWidth: geo.size.width - 24)
+                GeometryReader { bodyGeo in
+                    let rail = store.railItems(budget: max(bodyGeo.size.height, 40), now: now)
+                    VStack(spacing: 0) {
+                        ForEach(rail.items) { item in
+                            block(item, railWidth: geo.size.width - 24)
+                        }
                     }
+                    .frame(width: bodyGeo.size.width, height: bodyGeo.size.height, alignment: .topLeading)
                 }
-                Spacer(minLength: 0)
                 Text("NOW ▲")
                     .font(Theme.font(10, weight: .bold))
                     .tracking(1.0)
                     .foregroundStyle(Theme.accentOn)
+                    .padding(.bottom, 2)
             }
-            .padding(12)
+            .padding(.horizontal, 12)
+            .padding(.top, 12)
+            .padding(.bottom, 8)
             .frame(width: geo.size.width, height: geo.size.height, alignment: .topLeading)
-            .clipped()
         }
     }
 

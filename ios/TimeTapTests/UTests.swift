@@ -47,6 +47,15 @@ final class UTests: TimeTapTestCase {
         XCTAssertTrue(text.contains("TAP TO SIT"), "idle sit must look tappable")
         XCTAssertTrue(text.contains("outlineChip(\"SPLIT\")"))
         XCTAssertTrue(text.contains("outlineChip(\"STOP\")"))
+        XCTAssertTrue(text.contains("if store.open != nil || store.sit != nil"), "STOP sits with SPLIT on the category row")
+        XCTAssertTrue(text.contains("SITTING"), "sitting chip keeps its name")
+        XCTAssertTrue(text.contains("sitElapsed"), "sit duration lives inside the sitting chip")
+        XCTAssertTrue(text.contains("Spacer(minLength: 0)"), "sit chip is right-justified")
+        XCTAssertTrue(text.contains("offset(y: -1)"), "+ must sit on the visual centre of the add row")
+        XCTAssertFalse(
+            text.contains("padding(.trailing, 8)"),
+            "sit duration must not sit next to STOP as its own chip"
+        )
         XCTAssertTrue(text.contains("MARK IT"), "mark row must name the closed block")
         XCTAssertTrue(text.contains("padding(.bottom, 12)"), "UNDO must sit off TAP TO SIT")
         XCTAssertTrue(text.contains("categoryList(height:"), "category column must know its height")
@@ -281,6 +290,8 @@ final class UTests: TimeTapTestCase {
         XCTAssertTrue(text.contains("NOW ▲"))
         XCTAssertTrue(text.contains("store.clock()"))
         XCTAssertTrue(text.contains("dash:"))
+        XCTAssertTrue(text.contains("padding(.bottom, 2)"), "NOW ▲ must sit above the footer rule")
+        XCTAssertTrue(text.contains("bodyGeo.size.height"), "NOW ▲ keeps its own row so the blocks cannot clip it")
     }
 
     func testColdStoreDoesNotClaimSynced() {

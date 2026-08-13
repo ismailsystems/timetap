@@ -1,3 +1,5 @@
+## [2026-08-13 14:00] R12 | Capture chrome: NOW ▲ not clipped. + centred in its row. STOP next to SPLIT. Sit duration inside the sit chip. Sit chip right-justified.
+
 ## [2026-08-13 13:45] R11 | Screenshot: rail starts at first block (Path 2), not midnight. Persist POOP 1→5. Running row keeps the name. SET ASIDE is not RETRYING when the queue is empty.
 
 
