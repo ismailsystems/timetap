@@ -1,14 +1,53 @@
 # Factory State
 project: timetap
-stage: 6
-stage_name: FIXES-6 A1, A2 and B1 done; C1 and C2 wait on the human
-last_updated: 2026-07-29 (FIXES-6 authorised scope done)
-next_action: "THE HUMAN CHOOSES WHAT FOLLOWS. C1 and C2 are decision-gated and untouched; build either only if the human asks. Otherwise the next choices are review 7, the owed clean redeploy, daily use, proof video or explainer. Redesign is LIVE on the phone. Goldens still match a256bdf. Never point tests at a real calendar."
+stage: 5
+stage_name: Path 3 review 7 returned FIX FIRST; loop the boot-read hole
+last_updated: 2026-08-13
+next_action: "Work through factory/REVIEW-7.md P3-R7-1 (boot read + push staleGuard), P3-R7-2 (auth seam), P3-R7-3 (extra-category colour). Criteria first. Branch path-3-ios. Never point tests at a live calendar."
+path3_brief: factory/BRIEF-3.md
+path3_plan: factory/PLAN-3.md
+path3_handoff: factory/HANDOFF-3.md
+path3_progress: factory/progress-3.md
+path3_log: factory/log-3.md
+path3_review: factory/REVIEW-7.md
+old_stage_6: "FIXES-6 A1, A2 and B1 done; C1 and C2 wait on the human"
+old_next_action_5: "THE HUMAN CHOOSES WHAT FOLLOWS. C1 and C2 are decision-gated and untouched; build either only if the human asks. Otherwise the next choices are review 7, the owed clean redeploy, daily use, proof video or explainer. Redesign is LIVE on the phone. Goldens still match a256bdf. Never point tests at a real calendar."
 old_next_action_4: "WORK THROUGH factory/FIXES-5.md, in a fresh session. Read factory/REVIEW-5.md first — it holds the reproductions, and every one was reproduced twice before it was written down. THE THREE BLOCKING FAULTS ARE ALREADY FIXED AND COMMITTED (23dcc6e, 7c63226, 8253299) and FIXES-5 lists them so its letters make sense; what is left is nine should-fix and eleven cosmetic, grouped A to F, plus two items older than this round and two the record owes. FIVE DECISIONS ARE OPEN and they are marked *Decision first* in FIXES-5: the reflex double tap (B3), the undo chip (D1), and the three the review lists at its end. THE LIVE APP IS NOT AFFECTED: deployed version 30 is the pre-redesign build, and nothing since has been pushed. State: 1162 assertions green twice in all four contracted zones, lint clear on 20 rules, headless ok at both viewports and now at EVERY HOUR of the day, which it was not before. Optional and still not done: the proof video (auto-loom-proof) and the plain-language explainer (factory-explain, which also owes GUIDE.md Part 2 a correction carried over from round 1). BEFORE DEPLOYING, read the spreadsheet-formulas note below — it still holds, because nothing since has moved a column."
 old_next_action_3: "THE HUMAN ACCEPTS AND DEPLOYS. All 24 items in factory/FIXES-4.md are done, each written criterion-first and verified by running it; nine commits on main, nothing pushed. 1101 assertions green TWICE under all four contracted timezones, lint clear on 20 rules, headless ok at both viewports with three new phases. REVIEW-4's four blocking reproductions were re-run BY HAND at the end and printed gone — the record is in factory/log-2.md under 'The FIXES-4 pass'. Three decisions were put to the human before anything was built and all three were answered: STOP acts on one tap and the ribbon is the way back; the mis-tap merge stays out, to be judged in use; the Add row follows the design and sits at the end of the list. BEFORE DEPLOYING, read the spreadsheet-formulas note below — it still holds, because this pass changed no column. Optional and still not done: the proof video (auto-loom-proof) and the plain-language explainer (factory-explain, which also owes GUIDE.md Part 2 a correction carried over from round 1). A FIFTH REVIEW IS WORTH IT: this pass touched the undo path, the server op, the layout in three places and the lint rules, and no independent eye has seen any of it."
 old_next_action_2: "WORK THROUGH factory/FIXES-4.md, in a fresh session. Read factory/REVIEW-4.md first — it holds the reproductions. Three reviewers returned BROKEN, NOT DONE and MINOR DRIFT on the redesign; five faults block, and three of them break the redesign's own central claim that nothing is lost to one tap. Three decisions are open and are listed at the end of REVIEW-4; the STOP one should be settled before it is built. THE LIVE APP IS NOT AFFECTED: deployed version 30 is the pre-redesign build, and the redesign has never been pushed or deployed. The round-2 work below is complete and was accepted."
 old_next_action: "THE HUMAN ACCEPTS AND DEPLOYS. The work is 25 commits on factory/honest-record; main is untouched at a256bdf and nothing has been pushed. Read factory/REVIEW-3.md, above all its 'Decisions for you' — all five are answered and the answers are in progress-2.md. Then merge, deploy, and CHECK YOUR OWN SPREADSHEET FORMULAS: D1 added a rollup key, which moved 13 of the 22 columns the daily tab had. SETUP.md says which, and shows a formula that survives the next change. Optional and offered, not done: the proof video (auto-loom-proof) and the plain-language explainer (factory-explain, which also owes GUIDE.md Part 2 a correction carried over from round 1)."
 notes: |
+  PATH 3 REVIEWED — 2026-08-13.
+
+  factory/REVIEW-7.md. Verdict FIX FIRST. GAS 1196 / lint / headless / XCTest
+  86 green twice. Code.gs unharmed. Blocking: boot never lists Calendar;
+  staleGuard never pushed; cancel/sign-out pins testHasSession. Should-fix:
+  extra-category colorId empty, picker trap, SYNCING lie, liveFlush untested,
+  batch HTTP dead-letters the head op. Mini-handoff P3-R7-1/2/3. Do not ship.
+
+  ---
+  PATH 3 HANDOFF READY — 2026-08-12.
+
+  factory/HANDOFF-3.md compiled. progress-3.md and log-3.md created.
+  Pre-flight: 1196 passed / 0 failed, lint all clear. Branch path-3-ios
+  at 1f84fce. Human launches the loop. Do not start it from this session.
+
+  ---
+  PATH 3 TESTS DEFINED — 2026-08-12.
+
+  factory/PLAN-3.md now has a 28-assertion contract and Given/when/then
+  criteria on all 13 tasks. Next is factory-handoff (or factory-explain
+  first). Round 1/2 files are historical; do not rewrite them.
+
+  ---
+  PATH 3 PLAN WRITTEN — 2026-08-12.
+
+  factory/BRIEF-3.md accepted. factory/PLAN-3.md has 13 tasks in four
+  stages (A sign-in skeleton, B op machine, C rewire queue, D settings).
+  Acceptance criteria still pending factory-tests. Round 1/2 files are
+  historical; do not rewrite them. Path 2 is on main at 1f84fce.
+
+  ---
   FIXES-6 AUTHORISED SCOPE IS DONE — 2026-07-29.
 
   A1, A2 and B1 were each written criterion-first, watched fail, fixed, watched
