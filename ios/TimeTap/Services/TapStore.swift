@@ -152,13 +152,14 @@ final class TapStore: ObservableObject {
             return
         }
         let now = clock()
+        if let open, open.key == key, lastInsertFailed {
+            lastTapMs = now
+            retryLastInsert()
+            return
+        }
         if now - lastTapMs < 300 { return }
         lastTapMs = now
         if let open, open.key == key {
-            if lastInsertFailed {
-                retryLastInsert()
-                return
-            }
             if undo != nil { return }
             openSplit()
             return
