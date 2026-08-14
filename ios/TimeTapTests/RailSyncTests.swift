@@ -34,7 +34,7 @@ final class RailSyncTests: TimeTapTestCase {
             "TODAY row lost the Spacer that pushes sync trailing"
         )
         let sync = try XCTUnwrap(
-            today.range(of: "Text(store.syncLabel)"),
+            today.range(of: "Text(store.syncLabel.uppercased())"),
             "TODAY row lost the trailing sync label"
         )
         XCTAssertLessThan(
@@ -47,10 +47,19 @@ final class RailSyncTests: TimeTapTestCase {
             sync.lowerBound,
             "syncLabel must trail the TODAY Spacer"
         )
+        let beforeSync = today[..<sync.lowerBound]
+        XCTAssertTrue(
+            beforeSync.contains("Theme.font(11, weight: .bold)"),
+            "TODAY start label must be 11pt bold"
+        )
         let afterSync = today[sync.upperBound...]
         XCTAssertTrue(
-            afterSync.contains("Theme.font(10"),
-            "syncLabel font left Theme.font(10)"
+            afterSync.contains("Theme.font(11"),
+            "syncLabel font left Theme.font(11)"
+        )
+        XCTAssertTrue(
+            afterSync.contains("weight: .bold"),
+            "syncLabel must be bold"
         )
         XCTAssertTrue(
             afterSync.contains("store.syncFailed ? Theme.accentOn : Theme.mute"),
@@ -60,11 +69,17 @@ final class RailSyncTests: TimeTapTestCase {
             afterSync.contains("multilineTextAlignment(.trailing)"),
             "syncLabel lost trailing alignment"
         )
+        XCTAssertTrue(
+            today.contains("store.syncLabel.uppercased()"),
+            "sync status must render in all caps"
+        )
     }
 
     func testNowMarkerKeepsBottomPadding() throws {
         let text = try readIOS("TimeTap/Views/DayRailView.swift")
-        XCTAssertTrue(text.contains("NOW ▲"), "NOW ▲ marker left the day rail")
+        XCTAssertTrue(text.contains("Theme.font(11, weight: .bold)"), "TODAY, SYNCED, and NOW ▲ are 11pt bold")
+        XCTAssertFalse(text.contains("Theme.font(10, weight: .semibold)"), "chrome labels left 10pt semibold")
+        XCTAssertFalse(text.contains("Theme.font(10, weight: .bold)"), "NOW ▲ left 10pt")
         let now = try XCTUnwrap(text.range(of: "NOW ▲"), "NOW ▲ marker left the day rail")
         let pad = try XCTUnwrap(
             text.range(of: "padding(.bottom, 2)"),
@@ -75,12 +90,21 @@ final class RailSyncTests: TimeTapTestCase {
             pad.lowerBound,
             "NOW ▲ must keep padding(.bottom, 2) on the marker"
         )
+        XCTAssertTrue(text.contains("var nowRowHeight: CGFloat"), "NOW ▲ has its own row height")
+        XCTAssertTrue(text.contains("alignment: .topLeading"), "NOW ▲ lines up with the top of the gear")
+        XCTAssertTrue(
+            text[now.lowerBound...].contains("padding(.top, 12)"),
+            "NOW ▲ keeps a 12pt gap under the calendar"
+        )
+        XCTAssertFalse(text.contains("padding(.bottom, 8)"), "NOW ▲ must not sit on an 8pt rail inset")
+        XCTAssertFalse(text.contains("\"gearshape\""), "settings gear left the day rail")
+        XCTAssertFalse(text.contains("store.showSettings = true"), "settings gear left the day rail")
     }
 
     func testCaptureViewDoesNotShowSyncLabel() throws {
         let text = try readIOS("TimeTap/Views/CaptureView.swift")
         XCTAssertFalse(
-            text.contains("Text(store.syncLabel)"),
+            text.contains("Text(store.syncLabel"),
             "sync status returned to the NOW panel"
         )
     }

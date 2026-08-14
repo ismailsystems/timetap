@@ -186,8 +186,8 @@ final class TapStore: ObservableObject {
         if now - lastTapMs < 300 { return }
         lastTapMs = now
         if let open, open.key == key {
-            if undo != nil { return }
-            openSplit()
+            // Same-key tap stops. Split is a long press on the running row.
+            endDay()
             return
         }
 

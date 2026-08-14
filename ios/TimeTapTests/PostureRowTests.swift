@@ -9,7 +9,7 @@ final class PostureRowTests: TimeTapTestCase {
         ApplyOps.resetForTests()
     }
 
-    // MARK: - Sit-body source pins (sitChip .. outlineChip)
+    // MARK: - Sit-body source pins (sitChip .. markLabel)
 
     func testIdleLabelIsStandingNeverTapToSit() throws {
         let text = try captureText()
@@ -210,6 +210,41 @@ final class PostureRowTests: TimeTapTestCase {
             sit.lowerBound,
             "sitChip must sit after ForEach(store.categories)"
         )
+        XCTAssertLessThan(
+            sit.lowerBound,
+            text.range(of: "settingsRow")!.lowerBound,
+            "gear sits under NOT SITTING"
+        )
+        let list = try XCTUnwrap(
+            text.range(of: "private func categoryList"),
+            "categoryList is missing"
+        )
+        let addRow = try XCTUnwrap(
+            text.range(of: "private var addRow"),
+            "addRow is missing"
+        )
+        let column = text[list.lowerBound..<addRow.lowerBound]
+        XCTAssertTrue(
+            column.contains("categories.count + 2"),
+            "add, categories, and sit share one row height"
+        )
+        XCTAssertTrue(
+            column.contains("(height - nowH)"),
+            "list rows fill the space above the gear"
+        )
+        XCTAssertTrue(
+            column.contains("minHeight: rowH, maxHeight: rowH"),
+            "NOT SITTING uses the same row height as the category buttons"
+        )
+        XCTAssertTrue(
+            column.contains("minHeight: nowH, maxHeight: nowH"),
+            "the gear row uses nowH, not leftover scroll space"
+        )
+        XCTAssertLessThan(
+            column.range(of: "height - nowH - rowH")!.lowerBound,
+            column.range(of: "sitChip")!.lowerBound,
+            "sit sits under the category scroll so Poop cannot leave a gap"
+        )
         XCTAssertTrue(
             text.contains("Text(\"+\")"),
             "+ must be Text(\"+\")"
@@ -358,13 +393,13 @@ final class PostureRowTests: TimeTapTestCase {
             "private var sitChip is missing"
         )
         let end = try XCTUnwrap(
-            text.range(of: "private func outlineChip"),
-            "outlineChip is missing; sit-body slice ends there"
+            text.range(of: "private func markLabel"),
+            "markLabel is missing; sit-body slice ends there"
         )
         XCTAssertLessThan(
             start.lowerBound,
             end.lowerBound,
-            "sitChip must sit before outlineChip"
+            "sitChip must sit before markLabel"
         )
         return text[start.lowerBound..<end.lowerBound]
     }

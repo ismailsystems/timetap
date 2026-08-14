@@ -37,22 +37,28 @@ final class UTests: TimeTapTestCase {
         XCTAssertFalse(text.contains("Button(\"Done\")"), "keyboard Done bar is back")
         XCTAssertFalse(text.contains("axis: .vertical"), "note field must stay single-line so the key is Done")
         XCTAssertTrue(text.contains("showNoteField"), "note field must hide when idle")
-        XCTAssertTrue(text.contains("\"ADD NOTE\""), "empty note is a button, not an empty field")
-        XCTAssertTrue(text.contains("beginNoteEdit()"), "ADD NOTE and the rail still open the field")
-        XCTAssertTrue(text.contains("showAddNote"), "a saved note hides ADD NOTE")
-        XCTAssertTrue(text.contains("addNoteButton"), "ADD NOTE sits beside the duration")
+        XCTAssertFalse(text.contains("\"ADD NOTE\""), "ADD NOTE chip is gone")
+        XCTAssertTrue(text.contains("beginNoteEdit()"), "the rail and the running-row menu still open the field")
+        XCTAssertFalse(text.contains("showAddNote"), "ADD NOTE chip is gone")
+        XCTAssertFalse(text.contains("addNoteButton"), "ADD NOTE chip is gone")
         XCTAssertTrue(text.contains("editingNote || focus == .note"), "the field stays up only while editing")
         let nowPanel = text[
             text.range(of: "private var nowPanel")!.lowerBound
-                ..< text.range(of: "private var settingsButton")!.lowerBound
+                ..< text.range(of: "private var noteField")!.lowerBound
         ]
-        XCTAssertTrue(nowPanel.contains("addNoteButton"), "ADD NOTE is on the duration row")
+        XCTAssertFalse(nowPanel.contains("addNoteButton"), "ADD NOTE left the title row")
         XCTAssertTrue(nowPanel.contains("noteField"), "the field still opens under the duration")
         XCTAssertLessThan(
-            nowPanel.range(of: "headerActions")!.lowerBound,
-            nowPanel.range(of: "noteField")!.lowerBound,
-            "note field spans under STOP and SPLIT"
+            nowPanel.range(of: ".uppercased()")!.lowerBound,
+            nowPanel.range(of: "elapsedLabel")!.lowerBound,
+            "elapsed sits on the category label row"
         )
+        XCTAssertLessThan(
+            nowPanel.range(of: "elapsedLabel")!.lowerBound,
+            nowPanel.range(of: "noteField")!.lowerBound,
+            "note field sits under the title row"
+        )
+        XCTAssertFalse(nowPanel.contains("headerActions"), "NOW has no STOP/SPLIT column")
         XCTAssertTrue(text.contains("if let banner = store.banner"), "banner must stay in CaptureView")
         XCTAssertTrue(text.contains("multilineTextAlignment(.center)"), "banner must be centered at the top")
         XCTAssertTrue(text.contains("Text(\"+\")"), "New must be a plus, not a category row")
@@ -61,25 +67,15 @@ final class UTests: TimeTapTestCase {
         XCTAssertTrue(text.contains("NOT SITTING"), "idle sit names not sitting, like the Live Activity")
         XCTAssertFalse(text.contains("STANDING"), "idle sit must not say STANDING")
         XCTAssertFalse(text.contains("TAP TO SIT"), "idle sit is not a prompt")
-        XCTAssertTrue(text.contains("outlineChip(\"SPLIT\""))
-        XCTAssertTrue(text.contains("outlineChip(\"STOP\""))
-        XCTAssertTrue(text.contains("store.endDay()"))
-        XCTAssertTrue(text.contains("headerActions"))
-        XCTAssertFalse(text.contains("gridCellColumns"), "sit is not in the SPLIT/STOP cluster")
-        let header = text[
-            text.range(of: "private var headerActions")!.lowerBound
-                ..< text.range(of: "private var splitButton")!.lowerBound
-        ]
-        XCTAssertTrue(header.contains("VStack"), "STOP stacks above SPLIT")
-        XCTAssertLessThan(
-            header.range(of: "stopButton")!.lowerBound,
-            header.range(of: "splitButton")!.lowerBound,
-            "STOP sits above SPLIT"
-        )
-        XCTAssertLessThan(
-            text.range(of: "headerActions")!.lowerBound,
-            text.range(of: "private var footer")!.lowerBound
-        )
+        XCTAssertFalse(text.contains("outlineChip(\"SPLIT\""), "SPLIT chip is gone")
+        XCTAssertFalse(text.contains("outlineChip(\"STOP\""), "STOP chip is gone")
+        XCTAssertFalse(text.contains("headerActions"), "STOP/SPLIT column is gone")
+        XCTAssertFalse(text.contains("stopButton"), "STOP chip is gone")
+        XCTAssertFalse(text.contains("splitButton"), "SPLIT chip is gone")
+        XCTAssertTrue(text.contains("runningCategoryMenu(enabled: running)"), "split is a long press menu on the running row")
+        XCTAssertTrue(text.contains("store.openSplit()"), "long press still opens split")
+        XCTAssertTrue(text.contains("store.tapCategory(cat.key)"), "tap still goes through tapCategory")
+        XCTAssertFalse(text.contains("gridCellColumns"), "sit is not in a SPLIT/STOP cluster")
         let footer = text[
             text.range(of: "private var footer")!.lowerBound
                 ..< text.range(of: "private var elapsedLabel")!.lowerBound
@@ -106,16 +102,15 @@ final class UTests: TimeTapTestCase {
         XCTAssertTrue(text.contains("MARK IT"), "mark row must name the closed block")
         XCTAssertTrue(text.contains("padding(.bottom, 12)"), "UNDO must sit off the sit row")
         XCTAssertTrue(text.contains("categoryList(height:"), "category column must know its height")
-        XCTAssertGreaterThanOrEqual(
-            text.components(separatedBy: "overlay(alignment: .bottom)").count - 1,
-            2,
-            "dual column must close with the same bottom rule as the now panel"
+        XCTAssertFalse(
+            text.contains("overlay(alignment: .bottom)"),
+            "NOW and the dual column have no 2pt bottom rule"
         )
         XCTAssertTrue(text.contains("minHeight: 44") || text.contains("max(44"), "category rows need a 44pt floor")
         XCTAssertTrue(text.contains("Theme.postureSymbol"), "in-app sit uses the Live Activity figures")
         let sitBody = text[
             text.range(of: "private var sitChip")!.lowerBound
-                ..< text.range(of: "private func outlineChip")!.lowerBound
+                ..< text.range(of: "private func markLabel")!.lowerBound
         ]
         XCTAssertFalse(sitBody.contains("strokeBorder"), "sit is a list row, not a boxed chip")
         XCTAssertTrue(sitBody.contains("NOT SITTING"), "not sitting names not sitting")
@@ -130,15 +125,42 @@ final class UTests: TimeTapTestCase {
         let sit = text.range(of: "sitChip")!
         XCTAssertLessThan(add.lowerBound, forEach.lowerBound, "+ must sit on top of the category list")
         XCTAssertLessThan(forEach.lowerBound, sit.lowerBound, "sit must sit under the category list")
+        XCTAssertLessThan(
+            sit.lowerBound,
+            text.range(of: "settingsRow")!.lowerBound,
+            "gear sits under NOT SITTING"
+        )
+        XCTAssertTrue(text.contains("categories.count + 3"), "now-row height still counts the settings row")
+        XCTAssertTrue(text.contains("categories.count + 2"), "add, categories, and sit share one row height")
+        XCTAssertTrue(text.contains("gearshape"), "settings gear sits under the sit row")
+        XCTAssertTrue(text.contains("store.showSettings = true"), "gear opens settings")
+        XCTAssertTrue(
+            text.contains("alignment: .topTrailing"),
+            "settings gear sits on the top right"
+        )
+        XCTAssertTrue(text.contains("nowRowHeight: nowH"), "calendar ends on the sit row")
+        XCTAssertTrue(text.contains("let nowH = rowH - 25"), "NOW/gear row stays 25pt shorter than a list row")
+        XCTAssertTrue(text.contains("(height - nowH)"), "list rows fill the space above the gear")
+        XCTAssertTrue(text.contains("padding(.bottom, 5)"), "dual columns keep a 5pt bottom inset")
+        XCTAssertTrue(
+            text.contains("min(rowH * CGFloat(store.categories.count + 1), max(0, height - nowH - rowH))"),
+            "the category scroll must not leave a gap above NOT SITTING"
+        )
+        XCTAssertTrue(
+            text.contains("minHeight: nowH, maxHeight: nowH"),
+            "the gear row uses nowH"
+        )
+        XCTAssertTrue(
+            text.contains("categoryList(height: geo.size.height, nowH: nowH)"),
+            "category list receives the shared NOW/gear row height"
+        )
         XCTAssertTrue(text.contains("Theme.font("), "capture type must scale")
-        XCTAssertTrue(text.contains("running: store.open?.key == cat.key"), "running row must show elapsed")
+        XCTAssertTrue(text.contains("let running = store.open?.key == cat.key"), "running row must show elapsed")
         XCTAssertFalse(
             text.contains("Rectangle().fill(Theme.accent).frame(width: 4)"),
             "running category must not keep a red leading bar"
         )
         XCTAssertTrue(text.contains("openDeadDrawer()"), "SET ASIDE must open the set-aside list")
-        XCTAssertTrue(text.contains("gearshape"), "settings gear replaces the sync label")
-        XCTAssertTrue(text.contains("store.showSettings = true"), "gear opens settings")
         XCTAssertFalse(text.contains("GOOGLE CALENDAR"), "sync status is not a calendar label")
         XCTAssertFalse(text.contains("Text(store.syncLabel)"), "sync status sits on the rail, not in the now panel")
         XCTAssertFalse(text.contains("nowKick"), "nowKick is gone")
@@ -279,7 +301,7 @@ final class UTests: TimeTapTestCase {
         XCTAssertEqual(after.first { $0.name == "MEETINGS" }?.note, "Poop")
     }
 
-    func testSplitChipIsTheOnlyOpenSplitControl() throws {
+    func testSplitIsLongPressOnTheRunningCategory() throws {
         let text = try String(
             contentsOf: URL(fileURLWithPath: #filePath)
                 .deletingLastPathComponent()
@@ -287,8 +309,13 @@ final class UTests: TimeTapTestCase {
                 .appendingPathComponent("TimeTap/Views/CaptureView.swift"),
             encoding: .utf8
         )
-        XCTAssertTrue(text.contains("outlineChip(\"SPLIT\""))
+        XCTAssertFalse(text.contains("outlineChip(\"SPLIT\""), "SPLIT chip is gone")
+        XCTAssertTrue(text.contains("runningCategoryMenu(enabled: running)"))
         XCTAssertTrue(text.contains("store.openSplit()"))
+        XCTAssertTrue(text.contains(".contextMenu"))
+        XCTAssertTrue(text.contains("Button(\"Split\""))
+        XCTAssertTrue(text.contains("Button(\"Add note\""))
+        XCTAssertFalse(text.contains(".onLongPressGesture(perform: perform)"))
         XCTAssertFalse(text.contains("TAP TO SPLIT"), "mute TAP TO SPLIT chip is back")
         XCTAssertFalse(
             text.contains("if store.open != nil { store.openSplit() }"),
@@ -360,7 +387,7 @@ final class UTests: TimeTapTestCase {
         XCTAssertEqual(store.open?.key, "MTG")
     }
 
-    func testSecondSameKeyTapWithin300msDoesNotOpenSplit() {
+    func testSecondSameKeyTapWithin300msDoesNotStop() {
         GoogleAuth.testHasSession = true
         GoogleAuth.testAccessToken = "t"
         Credentials.planId = "p1"
@@ -372,8 +399,48 @@ final class UTests: TimeTapTestCase {
         store.tapCategory("DW")
         now += 100
         store.tapCategory("DW")
+        XCTAssertEqual(store.open?.key, "DW")
         XCTAssertNil(store.split)
         XCTAssertEqual(store.queue.filter { $0.type == "openActual" }.count, 1)
+        XCTAssertFalse(store.queue.contains { $0.type == "closeActual" })
+    }
+
+    func testTapCategorySameKeyCallsEndDayNotOpenSplit() throws {
+        let text = try String(
+            contentsOf: URL(fileURLWithPath: #filePath)
+                .deletingLastPathComponent()
+                .deletingLastPathComponent()
+                .appendingPathComponent("TimeTap/Services/TapStore.swift"),
+            encoding: .utf8
+        )
+        let start = try XCTUnwrap(text.range(of: "func tapCategory(_ key: String)"))
+        let end = try XCTUnwrap(text.range(of: "func retryLastInsert()"))
+        XCTAssertLessThan(start.lowerBound, end.lowerBound)
+        let tap = text[start.lowerBound..<end.lowerBound]
+        XCTAssertTrue(tap.contains("endDay()"), "same-key tap stops")
+        XCTAssertFalse(tap.contains("openSplit()"), "same-key tap must not split")
+    }
+
+    func testSameKeyTapAfter300msStopsAndLeavesSit() {
+        GoogleAuth.testHasSession = true
+        GoogleAuth.testAccessToken = "t"
+        Credentials.planId = "p1"
+        Credentials.actualId = "a1"
+        Credentials.sittingId = "s1"
+        var now: Double = 1_700_000_000_000
+        let store = TapStore()
+        store.clock = { now }
+        store.tapCategory("DW")
+        now += 300
+        store.toggleSit()
+        XCTAssertNotNil(store.sit)
+        now += 300
+        store.tapCategory("DW")
+        XCTAssertNil(store.open)
+        XCTAssertNotNil(store.sit)
+        XCTAssertNil(store.split)
+        XCTAssertTrue(store.queue.contains { $0.type == "closeActual" })
+        XCTAssertFalse(store.queue.contains { $0.type == "closeSit" })
     }
 
     func testLiveFlushSeamPostsDW() async {
@@ -477,11 +544,21 @@ final class UTests: TimeTapTestCase {
             encoding: .utf8
         )
         XCTAssertTrue(text.contains("NOW ▲"))
+        XCTAssertFalse(text.contains("\"gearshape\""), "settings gear left the day rail")
+        XCTAssertFalse(text.contains("store.showSettings = true"), "settings gear left the day rail")
         XCTAssertTrue(text.contains("store.clock()"))
         XCTAssertTrue(text.contains("dash:"))
         XCTAssertTrue(text.contains("padding(.bottom, 2)"), "NOW ▲ must sit above the footer rule")
+        XCTAssertTrue(text.contains("nowRowHeight"), "NOW ▲ shares the sit/gear row height")
+        XCTAssertTrue(text.contains("alignment: .topLeading"), "NOW ▲ lines up with the top of the gear")
+        let now = try XCTUnwrap(text.range(of: "NOW ▲"), "NOW ▲ left the day rail")
+        XCTAssertTrue(
+            text[now.lowerBound...].contains("padding(.top, 12)"),
+            "NOW ▲ keeps a 12pt gap under the calendar"
+        )
         XCTAssertTrue(text.contains("bodyGeo.size.height"), "NOW ▲ keeps its own row so the blocks cannot clip it")
         XCTAssertTrue(text.contains("store.syncLabel"), "sync status sits on the TODAY row")
+        XCTAssertTrue(text.contains("store.syncLabel.uppercased()"), "sync status is all caps")
         XCTAssertTrue(text.contains("multilineTextAlignment(.trailing)"), "sync status is right-justified")
     }
 

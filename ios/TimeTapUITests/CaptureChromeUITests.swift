@@ -10,21 +10,21 @@ final class CaptureChromeUITests: XCTestCase {
         app.launch()
     }
 
-    func testAddNoteSitsRightOfElapsedThenNoteFieldIsWide() {
+    func testNoteFieldOpensFromRailAndIsWide() {
         let elapsed = app.buttons["elapsed"]
-        let add = app.buttons["addNote"]
         XCTAssertTrue(elapsed.waitForExistence(timeout: 8), "elapsed is missing")
-        XCTAssertTrue(add.waitForExistence(timeout: 8), "ADD NOTE is missing")
-        XCTAssertGreaterThan(add.frame.minX, elapsed.frame.maxX - 1, "ADD NOTE must sit to the right of elapsed")
-        let overlapY = min(add.frame.maxY, elapsed.frame.maxY) - max(add.frame.minY, elapsed.frame.minY)
-        XCTAssertGreaterThan(overlapY, 0, "ADD NOTE and elapsed must share a row")
-        add.tap()
+        XCTAssertFalse(app.buttons["addNote"].exists, "ADD NOTE chip must be gone")
+        let open = app.buttons.matching(
+            NSPredicate(format: "label CONTAINS[c] %@", "open")
+        ).firstMatch
+        XCTAssertTrue(open.waitForExistence(timeout: 4), "open rail block is missing")
+        open.tap()
         let field = app.textFields["noteField"]
         XCTAssertTrue(field.waitForExistence(timeout: 4), "note field must open")
         XCTAssertGreaterThanOrEqual(
             field.frame.width,
             app.frame.width * 0.8,
-            "note field must span full width under STOP"
+            "note field must span full NOW width"
         )
     }
 

@@ -39,28 +39,26 @@ struct CaptureView: View {
                 GeometryReader { geo in
                     let screen = geo.size.width > 1 ? geo.size.width : UIScreen.main.bounds.width
                     let catW = min(max(catWidth + 24, 128), screen * 0.67)
-                    HStack(spacing: 0) {
+                    let rowH = max(44, geo.size.height / max(CGFloat(store.categories.count + 3), 1))
+                    let nowH = rowH - 25
+                    HStack(alignment: .bottom, spacing: 0) {
                         DayRailView(
                             tick: tick,
+                            nowRowHeight: nowH,
                             onOpenTap: beginNoteEdit,
                             onOtherTap: finishNoteEdit
                         )
-                            .frame(maxWidth: .infinity)
-                            .clipped()
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
                             .accessibilityElement(children: .contain)
-                            .overlay(alignment: .trailing) {
-                                Rectangle().fill(Theme.rule2).frame(width: 2)
-                            }
-                        categoryList(height: geo.size.height)
+                        categoryList(height: geo.size.height, nowH: nowH)
                             .frame(width: catW)
+                            .frame(maxHeight: .infinity)
                     }
                     .background(alignment: .topLeading) { categoryWidthProbe }
                     .onPreferenceChange(CatWidthKey.self) { catWidth = $0 }
                 }
                 .frame(maxHeight: .infinity)
-                .overlay(alignment: .bottom) {
-                    Rectangle().fill(Theme.rule2).frame(height: 2)
-                }
+                .padding(.bottom, 5)
                 footer
             }
             .foregroundStyle(Theme.fg)
@@ -94,86 +92,43 @@ struct CaptureView: View {
 
     private var nowPanel: some View {
         VStack(alignment: .leading, spacing: 8) {
-            HStack(alignment: .top, spacing: 8) {
-                VStack(alignment: .leading, spacing: 8) {
-                    HStack(alignment: .center, spacing: 8) {
-                        Text(store.open.map { store.labelFor($0.key).uppercased() } ?? "NOTHING RUNNING")
-                            .font(.system(size: 32, weight: .black))
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.6)
-                        Spacer(minLength: 8)
-                        settingsButton
-                    }
-                    HStack(alignment: .center, spacing: 12) {
-                        if store.open != nil {
-                            Button {
-                                finishNoteEdit()
-                            } label: {
-                                Text(elapsedLabel)
-                                    .font(.system(size: 48, weight: .heavy))
-                                    .foregroundStyle(isLong ? Theme.flag : Theme.accentOn)
-                                    .monospacedDigit()
-                                    .contentShape(Rectangle())
-                            }
-                            .buttonStyle(.plain)
-                            .accessibilityIdentifier("elapsed")
-                            .accessibilityLabel(nowAccessibility)
-                            .accessibilityHint("Dismisses the keyboard")
-                            if showAddNote {
-                                addNoteButton
-                            }
-                        } else {
-                            Text("—")
-                                .font(.system(size: 48, weight: .heavy))
-                                .foregroundStyle(Theme.accentOn)
-                                .accessibilityLabel(nowAccessibility)
-                        }
-                    }
-                }
+            HStack(alignment: .center, spacing: 12) {
+                Text(store.open.map { store.labelFor($0.key).uppercased() } ?? "NOTHING RUNNING")
+                    .font(.system(size: 32, weight: .black))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.6)
+                    .layoutPriority(0)
+                Spacer(minLength: 8)
                 if store.open != nil {
-                    headerActions
+                    Button {
+                        finishNoteEdit()
+                    } label: {
+                        Text(elapsedLabel)
+                            .font(.system(size: 48, weight: .heavy))
+                            .foregroundStyle(isLong ? Theme.flag : Theme.accentOn)
+                            .monospacedDigit()
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("elapsed")
+                    .accessibilityLabel(nowAccessibility)
+                    .accessibilityHint("Dismisses the keyboard")
+                    .layoutPriority(1)
+                } else {
+                    Text("—")
+                        .font(.system(size: 48, weight: .heavy))
+                        .foregroundStyle(Theme.accentOn)
+                        .accessibilityLabel(nowAccessibility)
                 }
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
             if showNoteField {
                 noteField
             }
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
         .padding(16)
         .padding(.horizontal, 2)
-        .overlay(alignment: .bottom) {
-            Rectangle().fill(Theme.rule2).frame(height: 2)
-        }
-    }
-
-    private var settingsButton: some View {
-        Button {
-            finishNoteEdit()
-            store.showSettings = true
-        } label: {
-            Image(systemName: "gearshape")
-                .font(.system(size: 16, weight: .semibold))
-                .foregroundStyle(Theme.dim)
-                .frame(width: 44, height: 44)
-                .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel("Settings")
-        .accessibilityHint("Opens settings")
-    }
-
-    private var addNoteButton: some View {
-        Button(action: beginNoteEdit) {
-            Text("ADD NOTE")
-                .font(.system(size: 12, weight: .heavy))
-                .tracking(1.2)
-                .foregroundStyle(Theme.dim)
-                .frame(minHeight: 44, alignment: .leading)
-                .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .accessibilityIdentifier("addNote")
-        .accessibilityLabel("Add note")
-        .accessibilityHint("Opens the note field")
     }
 
     private var noteField: some View {
@@ -194,49 +149,8 @@ struct CaptureView: View {
             .accessibilityLabel("Note for the running block")
     }
 
-    private var headerActions: some View {
-        VStack(spacing: 8) {
-            stopButton
-            splitButton
-        }
-        .containerRelativeFrame(.horizontal, alignment: .trailing) { width, _ in width / 4 }
-    }
-
-    private var splitButton: some View {
-        Button {
-            finishNoteEdit()
-            store.openSplit()
-        } label: {
-            outlineChip("SPLIT", fill: true)
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel("SPLIT")
-        .accessibilityHint("Opens split sheet")
-    }
-
-    private var stopButton: some View {
-        Button {
-            finishNoteEdit()
-            store.endDay()
-        } label: {
-            outlineChip("STOP", fill: true)
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel("Stop the running block")
-        .accessibilityHint("Does not stop sitting")
-    }
-
     private var showNoteField: Bool {
         store.open != nil && (editingNote || focus == .note)
-    }
-
-    private var showAddNote: Bool {
-        store.open != nil && !hasNote && !showNoteField
-    }
-
-    private var hasNote: Bool {
-        let text = store.open?.text ?? noteDraft
-        return !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
     private func beginNoteEdit() {
@@ -250,60 +164,76 @@ struct CaptureView: View {
         editingNote = false
     }
 
-    private func categoryList(height: CGFloat) -> some View {
+    @ViewBuilder
+    private func categoryList(height: CGFloat, nowH: CGFloat) -> some View {
         let n = CGFloat(store.categories.count + 2)
-        let rowH = max(44, height / max(n, 1))
-        return ScrollView {
-            VStack(alignment: .leading, spacing: 0) {
-                if store.canAddCategory {
-                    addRow
-                        .frame(maxWidth: .infinity, minHeight: rowH, maxHeight: rowH)
-                        .overlay(alignment: .top) { Rectangle().fill(Theme.rule2.opacity(0.5)).frame(height: 1) }
-                        .id("add")
-                } else {
-                    Text("That is \(store.config?.maxCategories ?? 10) categories already.")
-                        .font(Theme.font(12, weight: .semibold))
-                        .foregroundStyle(Theme.mute)
-                        .padding(.leading, 12)
-                        .padding(.trailing, 16)
-                        .frame(maxWidth: .infinity, minHeight: rowH, maxHeight: rowH, alignment: .leading)
-                        .overlay(alignment: .top) { Rectangle().fill(Theme.rule2.opacity(0.5)).frame(height: 1) }
-                }
+        let rowH = max(44, (height - nowH) / max(n, 1))
+        VStack(spacing: 0) {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 0) {
+                    if store.canAddCategory {
+                        addRow
+                            .frame(maxWidth: .infinity, minHeight: rowH, maxHeight: rowH)
+                            .id("add")
+                    } else {
+                        Text("That is \(store.config?.maxCategories ?? 10) categories already.")
+                            .font(Theme.font(12, weight: .semibold))
+                            .foregroundStyle(Theme.mute)
+                            .padding(.leading, 12)
+                            .padding(.trailing, 16)
+                            .frame(maxWidth: .infinity, minHeight: rowH, maxHeight: rowH, alignment: .leading)
+                            .overlay(alignment: .top) { Rectangle().fill(Theme.rule2.opacity(0.5)).frame(height: 1) }
+                    }
 
-                ForEach(store.categories) { cat in
-                    Button {
-                        finishNoteEdit()
-                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                        store.tapCategory(cat.key)
-                    } label: {
-                        categoryRow(
-                            face: cat.face,
-                            hex: cat.hex,
-                            dim: false,
-                            running: store.open?.key == cat.key,
-                            elapsed: elapsedLabel,
-                            long: store.open?.key == cat.key && isLong
-                        )
+                    ForEach(store.categories) { cat in
+                        let running = store.open?.key == cat.key
+                        Button {
+                            finishNoteEdit()
+                            if !running {
+                                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                            }
+                            store.tapCategory(cat.key)
+                        } label: {
+                            categoryRow(
+                                face: cat.face,
+                                hex: cat.hex,
+                                dim: false,
+                                running: running,
+                                elapsed: elapsedLabel,
+                                long: running && isLong
+                            )
                             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
                             .contentShape(Rectangle())
-                            .background(store.open?.key == cat.key ? Theme.panel : Color.clear)
+                            .background(running ? Theme.panel : Color.clear)
+                        }
+                        .buttonStyle(.plain)
+                        .frame(height: rowH)
+                        .overlay(alignment: .top) { Rectangle().fill(Theme.rule2.opacity(0.5)).frame(height: 1) }
+                        .accessibilityLabel(cat.face)
+                        .accessibilityAddTraits(running ? [.isSelected] : [])
+                        .accessibilityValue(running ? elapsedLabel : "")
+                        .runningCategoryMenu(enabled: running) {
+                            finishNoteEdit()
+                            store.openSplit()
+                        } addNote: {
+                            beginNoteEdit()
+                        }
+                        .id(cat.key)
                     }
-                    .buttonStyle(.plain)
-                    .frame(height: rowH)
-                    .overlay(alignment: .top) { Rectangle().fill(Theme.rule2.opacity(0.5)).frame(height: 1) }
-                    .accessibilityLabel(cat.face)
-                    .accessibilityAddTraits(store.open?.key == cat.key ? [.isSelected] : [])
-                    .accessibilityValue(store.open?.key == cat.key ? elapsedLabel : "")
-                    .id(cat.key)
                 }
-
-                sitChip
-                    .frame(maxWidth: .infinity, minHeight: rowH, maxHeight: rowH)
-                    .overlay(alignment: .top) { Rectangle().fill(Theme.rule2.opacity(0.5)).frame(height: 1) }
-                    .id("sit")
             }
+            .scrollDisabled(rowH > 44.5)
+            .frame(height: min(rowH * CGFloat(store.categories.count + 1), max(0, height - nowH - rowH)))
+
+            sitChip
+                .frame(maxWidth: .infinity, minHeight: rowH, maxHeight: rowH)
+                .overlay(alignment: .top) { Rectangle().fill(Theme.rule2.opacity(0.5)).frame(height: 1) }
+                .id("sit")
+            settingsRow
+                .frame(maxWidth: .infinity, minHeight: nowH, maxHeight: nowH)
+                .overlay(alignment: .top) { Rectangle().fill(Theme.rule2.opacity(0.5)).frame(height: 1) }
+                .id("settings")
         }
-        .scrollDisabled(rowH > 44.5)
         .frame(maxHeight: .infinity)
         .onChange(of: store.scrollToKey) { _, _ in
             store.scrollToKey = nil
@@ -432,6 +362,25 @@ struct CaptureView: View {
         return Format.shortElapsed(store.clock() - start)
     }
 
+    private var settingsRow: some View {
+        Button {
+            finishNoteEdit()
+            store.showSettings = true
+        } label: {
+            Image(systemName: "gearshape")
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundStyle(Theme.dim)
+                .frame(width: 44, height: 44, alignment: .top)
+            .padding(.top, 12)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
+            .padding(.trailing, 16)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Settings")
+        .accessibilityHint("Opens settings")
+    }
+
     @ViewBuilder
     private var sitChip: some View {
         let sitting = store.sit != nil
@@ -482,17 +431,6 @@ struct CaptureView: View {
         }
     }
 
-    private func outlineChip(_ title: String, fill: Bool = false) -> some View {
-        Text(title)
-            .font(.system(size: 12, weight: .heavy))
-            .tracking(1.2)
-            .foregroundStyle(Theme.accentOn)
-            .padding(.horizontal, 14)
-            .padding(.vertical, 12)
-            .frame(maxWidth: fill ? .infinity : nil, minHeight: 44)
-            .overlay(Rectangle().strokeBorder(Theme.rule2, lineWidth: 2))
-    }
-
     private func markLabel(_ m: String) -> String {
         switch m {
         case "+": return "Mark good"
@@ -512,7 +450,7 @@ struct CaptureView: View {
                 .frame(width: 8, height: 18)
                 .accessibilityHidden(true)
             Text(face)
-                .font(Theme.font(20, weight: .semibold))
+                .font(Theme.font(20, weight: running ? .bold : .semibold))
                 .fontWidth(.standard)
                 .lineLimit(1)
                 .minimumScaleFactor(0.6)
@@ -580,6 +518,28 @@ struct CaptureView: View {
             naming = false
             addDraft = ""
             focus = nil
+        }
+    }
+}
+
+private extension View {
+    @ViewBuilder
+    func runningCategoryMenu(
+        enabled: Bool,
+        split: @escaping () -> Void,
+        addNote: @escaping () -> Void
+    ) -> some View {
+        if enabled {
+            self
+                .contextMenu {
+                    Button("Split", action: split)
+                    Button("Add note", action: addNote)
+                }
+                .accessibilityAction(named: "Split", split)
+                .accessibilityAction(named: "Add note", addNote)
+                .accessibilityHint("Stops the running block. Does not stop sitting. Long press for split and add note.")
+        } else {
+            self
         }
     }
 }
