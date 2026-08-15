@@ -17,6 +17,9 @@ struct RootView: View {
         .sheet(isPresented: $store.showSettings) {
             SettingsView()
                 .environmentObject(store)
+                #if os(macOS)
+                .frame(minWidth: 420, minHeight: 320)
+                #endif
         }
         #if os(macOS)
         .sheet(isPresented: $store.showSignIn) {

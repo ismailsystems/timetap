@@ -86,15 +86,18 @@ struct CaptureView: View {
             set: { if !$0 { store.split = nil } }
         )) {
             SplitSheet().environmentObject(store)
+                .frame(minWidth: 480, minHeight: 420)
         }
         .sheet(isPresented: Binding(
             get: { store.sitEdit != nil },
             set: { if !$0 { store.sitEdit = nil } }
         )) {
             SitEditSheet().environmentObject(store)
+                .frame(minWidth: 480, minHeight: 360)
         }
         .sheet(isPresented: $store.showDead) {
             DeadLetterSheet().environmentObject(store)
+                .frame(minWidth: 480, minHeight: 360)
         }
         #else
         .fullScreenCover(isPresented: Binding(
@@ -149,10 +152,15 @@ struct CaptureView: View {
             .focused($focus, equals: .note)
             #if os(iOS)
             .submitLabel(.done)
-            #endif
-            .onSubmit { finishNoteEdit() }
             .padding(11)
             .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+            #else
+            .textFieldStyle(.plain)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .frame(maxWidth: .infinity, minHeight: 28, alignment: .leading)
+            #endif
+            .onSubmit { finishNoteEdit() }
             .background(Theme.panel2)
             .onChange(of: noteDraft) { _, val in
                 store.noteChanged(val)

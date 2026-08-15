@@ -5,6 +5,31 @@ import SwiftUI
 enum MacCommandHub {
     static weak var store: TapStore?
     static var openMain: (() -> Void)?
+
+    @MainActor
+    static func showMain() {
+        NSApp.activate(ignoringOtherApps: true)
+        if let window = mainWindow() {
+            if window.isMiniaturized { window.deminiaturize(nil) }
+            window.collectionBehavior.insert(.moveToActiveSpace)
+            window.makeKeyAndOrderFront(nil)
+        } else {
+            openMain?()
+        }
+    }
+
+    @MainActor
+    private static func mainWindow() -> NSWindow? {
+        let candidates = NSApp.windows.filter { window in
+            guard window.canBecomeMain, !(window is NSPanel) else { return false }
+            let id = window.identifier?.rawValue ?? ""
+            if id.localizedCaseInsensitiveContains("settings") { return false }
+            if window.title == "Settings" { return false }
+            return true
+        }
+        return candidates.first { ($0.identifier?.rawValue ?? "").hasPrefix("main") }
+            ?? candidates.first
+    }
 }
 
 struct MacCommands: Commands {
@@ -19,6 +44,9 @@ struct MacCommands: Commands {
                 ])
             }
         }
+        CommandGroup(replacing: .newItem) {}
+        CommandGroup(replacing: .printItem) {}
+        CommandGroup(replacing: .help) {}
         CommandMenu("Capture") {
             Button("Distracted") { store.toggleDistract() }
                 .keyboardShortcut("d")
@@ -37,7 +65,7 @@ struct MacCommands: Commands {
             }
         }
         CommandGroup(after: .windowArrangement) {
-            Button("Show TimeTap") { MacCommandHub.openMain?() }
+            Button("Show TimeTap") { MacCommandHub.showMain() }
         }
     }
 

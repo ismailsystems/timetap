@@ -183,6 +183,13 @@ final class MacPollTests: TimeTapTestCase {
         let phone = slice(text, from: "#else", to: "#endif")
         XCTAssertTrue(phone.contains("titleBar"), "titleBar is in the #else")
         XCTAssertTrue(text.contains("private var titleBar"), "iPhone title bar must stay in the file")
+        XCTAssertTrue(text.contains("minHeight: 28"), "Mac note field must use a desktop height")
+        XCTAssertTrue(
+            text.contains(".frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)"),
+            "iPhone note field must keep the 44pt floor"
+        )
+        XCTAssertTrue(text.contains("minWidth: 480, minHeight: 420"), "Split sheet must size for a desktop")
+        XCTAssertTrue(text.contains("minWidth: 480, minHeight: 360"), "Sit and dead-letter sheets must size for a desktop")
     }
 
     private func iosSource(_ relative: String) throws -> String {

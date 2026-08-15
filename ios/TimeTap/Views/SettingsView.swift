@@ -70,6 +70,9 @@ struct SettingsView: View {
             }
         }
         .preferredColorScheme(.dark)
+        #if os(macOS)
+        .frame(minWidth: 420, minHeight: 320)
+        #endif
         #if os(iOS)
         .presentationDetents([.medium, .large])
         .presentationDragIndicator(.visible)

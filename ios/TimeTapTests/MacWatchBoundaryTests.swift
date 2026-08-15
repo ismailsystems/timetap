@@ -64,6 +64,23 @@ final class MacWatchBoundaryTests: TimeTapTestCase {
         )
         XCTAssertTrue(text.contains("WindowGroup(id: \"main\")"), "Show TimeTap must reopen id main")
         XCTAssertTrue(text.contains("windowToolbarStyle(.unified)"), "Mac window must use a unified toolbar")
+        XCTAssertTrue(
+            text.contains("allowsAutomaticWindowTabbing = false"),
+            "Mac must not merge capture windows into tabs"
+        )
+        XCTAssertTrue(text.contains("defaultPosition(.center)"), "the first window must open centered")
+        XCTAssertTrue(
+            text.contains("windowResizability(.contentMinSize)"),
+            "the window must not shrink below the capture floor"
+        )
+        XCTAssertTrue(
+            text.contains("MacCommandHub.showMain()"),
+            "dock reopen must front the existing window"
+        )
+        XCTAssertTrue(
+            text.contains("minWidth: 420, minHeight: 320"),
+            "the Settings scene must have a desktop floor"
+        )
     }
 
     func testTimeTapMacTargetExcludesLiveActivityAndPhoneApp() throws {
@@ -100,12 +117,28 @@ final class MacWatchBoundaryTests: TimeTapTestCase {
             text.contains("Format.shortElapsed"),
             "menu bar extra must show live elapsed"
         )
+        XCTAssertTrue(text.contains("statusClicked"), "left click must have a click handler")
+        XCTAssertTrue(text.contains("leftMouseUp"), "left click must show the window")
+        XCTAssertTrue(text.contains("rightMouseUp"), "right click must show the menu")
+        XCTAssertTrue(
+            text.contains("MacCommandHub.showMain()"),
+            "status item must front the existing window"
+        )
+        XCTAssertFalse(text.contains("item.menu ="), "a permanent menu steals the left click")
         XCTAssertFalse(text.contains("WCSession"), "menu bar extra must not touch WCSession")
     }
 
     func testMacCommandsHasChildLabelShortcutsAndAbout() throws {
         let text = try iosSource("TimeTapMac/MacCommands.swift")
         XCTAssertTrue(text.contains("About timetap"), "Mac app menu must offer About timetap")
+        XCTAssertTrue(
+            text.contains("CommandGroup(replacing: .newItem)"),
+            "File > New Window must not spawn a second capture window"
+        )
+        XCTAssertTrue(
+            text.contains("MacCommandHub.showMain()"),
+            "Show TimeTap must front the existing window"
+        )
         let shortcuts = slice(text, from: "ForEach(Array(leaves.prefix(9)", to: "CommandGroup(after:")
         XCTAssertTrue(
             shortcuts.contains("Button(child.label)"),

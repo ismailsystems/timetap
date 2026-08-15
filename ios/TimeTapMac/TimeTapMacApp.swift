@@ -6,9 +6,13 @@ final class MacAppDelegate: NSObject, NSApplicationDelegate {
         false
     }
 
-    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
-        if !flag { MacCommandHub.openMain?() }
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows _: Bool) -> Bool {
+        MacCommandHub.showMain()
         return true
+    }
+
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        NSWindow.allowsAutomaticWindowTabbing = false
     }
 }
 
@@ -52,11 +56,14 @@ struct TimeTapMacApp: App {
                 .background(MacWindowOpener())
         }
         .defaultSize(width: 1100, height: 720)
+        .defaultPosition(.center)
+        .windowResizability(.contentMinSize)
         .windowToolbarStyle(.unified)
         .commands { MacCommands(store: store) }
         Settings {
             SettingsView()
                 .environmentObject(store)
+                .frame(minWidth: 420, minHeight: 320)
         }
     }
 }

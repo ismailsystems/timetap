@@ -1,4 +1,7 @@
 import SwiftUI
+#if canImport(AppKit)
+import AppKit
+#endif
 
 struct DayRailView: View {
     @EnvironmentObject private var store: TapStore
@@ -102,6 +105,11 @@ struct DayRailView: View {
         .onTapGesture {
             if item.isOpen { onOpenTap() } else { onOtherTap() }
         }
+        #if os(macOS)
+        .onHover { inside in
+            if inside { NSCursor.pointingHand.push() } else { NSCursor.pop() }
+        }
+        #endif
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(railLabel(item))
         .accessibilityAddTraits(.isButton)

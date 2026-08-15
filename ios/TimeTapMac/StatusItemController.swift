@@ -11,6 +11,7 @@ final class StatusItemController: NSObject, NSMenuDelegate {
     private static let shared = StatusItemController()
     private var store: TapStore?
     private var item: NSStatusItem?
+    private let menu = NSMenu()
     private var sub: AnyCancellable?
     private var tick: Timer?
 
@@ -18,10 +19,22 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         self.store = store
         if item == nil {
             let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
-            let menu = NSMenu()
             menu.autoenablesItems = false
             menu.delegate = self
-            item.menu = menu
+            if let button = item.button {
+                button.target = self
+                button.action = #selector(statusClicked)
+                button.sendAction(on: [.leftMouseUp, .rightMouseUp])
+                button.font = NSFont.monospacedDigitSystemFont(
+                    ofSize: NSFont.smallSystemFontSize,
+                    weight: .regular
+                )
+                if let image = NSImage(systemSymbolName: "clock", accessibilityDescription: "TimeTap") {
+                    image.isTemplate = true
+                    button.image = image
+                    button.imagePosition = .imageLeading
+                }
+            }
             self.item = item
         }
         sub = store.objectWillChange.sink { [weak self] _ in
@@ -41,13 +54,30 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         rebuild(menu)
     }
 
+    @objc private func statusClicked() {
+        guard let event = NSApp.currentEvent else {
+            MacCommandHub.showMain()
+            return
+        }
+        if event.type == .rightMouseUp || event.modifierFlags.contains(.control) {
+            showMenu()
+        } else {
+            MacCommandHub.showMain()
+        }
+    }
+
+    private func showMenu() {
+        guard let button = item?.button else { return }
+        rebuild(menu)
+        menu.popUp(positioning: nil, at: NSPoint(x: 0, y: button.bounds.height + 4), in: button)
+    }
+
     private func refresh() {
         guard let store else { return }
         item?.button?.title = barTitle(store)
         item?.button?.setAccessibilityLabel(
             store.open == nil ? "TimeTap, nothing running" : "TimeTap, \(barTitle(store))"
         )
-        if let menu = item?.menu { rebuild(menu) }
     }
 
     private func barTitle(_ store: TapStore) -> String {
@@ -130,13 +160,7 @@ final class StatusItemController: NSObject, NSMenuDelegate {
     }
 
     @objc private func showWindow() {
-        NSApp.activate(ignoringOtherApps: true)
-        if let window = NSApp.windows.first(where: \.canBecomeMain) {
-            if window.isMiniaturized { window.deminiaturize(nil) }
-            window.makeKeyAndOrderFront(nil)
-        } else {
-            MacCommandHub.openMain?()
-        }
+        MacCommandHub.showMain()
     }
 
     @objc private func quitApp() {
