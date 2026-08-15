@@ -184,6 +184,7 @@ final class MacPollTests: TimeTapTestCase {
         XCTAssertTrue(phone.contains("titleBar"), "titleBar is in the #else")
         XCTAssertTrue(text.contains("private var titleBar"), "iPhone title bar must stay in the file")
         XCTAssertTrue(text.contains("minHeight: 28"), "Mac note field must use a desktop height")
+        XCTAssertTrue(text.contains("onExitCommand"), "Escape must leave the Mac note field")
         XCTAssertTrue(
             text.contains(".frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)"),
             "iPhone note field must keep the 44pt floor"

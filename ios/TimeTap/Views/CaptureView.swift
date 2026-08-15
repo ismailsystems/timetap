@@ -161,6 +161,9 @@ struct CaptureView: View {
             .frame(maxWidth: .infinity, minHeight: 28, alignment: .leading)
             #endif
             .onSubmit { finishNoteEdit() }
+            #if os(macOS)
+            .onExitCommand { finishNoteEdit() }
+            #endif
             .background(Theme.panel2)
             .onChange(of: noteDraft) { _, val in
                 store.noteChanged(val)
@@ -170,7 +173,11 @@ struct CaptureView: View {
             }
             .accessibilityIdentifier("noteField")
             .accessibilityLabel("Note for the running block")
+            #if os(macOS)
+            .accessibilityHint("Saves as you type. Press Return or Escape to leave the field.")
+            #else
             .accessibilityHint("Saves as you type. Press Return to leave the field.")
+            #endif
     }
 
     private var showNoteField: Bool {
