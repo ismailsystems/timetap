@@ -1,6 +1,12 @@
 import Foundation
 import GoogleSignIn
+
+#if canImport(UIKit)
 import UIKit
+#endif
+#if canImport(AppKit)
+import AppKit
+#endif
 
 enum GoogleAuth {
     static let calendarScope = "https://www.googleapis.com/auth/calendar"
@@ -37,13 +43,22 @@ enum GoogleAuth {
     @MainActor
     static func signInFromKeyWindow() async throws {
         lastSignInCancelled = false
-        guard let presenting = topViewController() else { return }
         do {
+            #if canImport(UIKit)
+            guard let presenting = topViewController() else { return }
             _ = try await GIDSignIn.sharedInstance.signIn(
                 withPresenting: presenting,
                 hint: nil,
                 additionalScopes: [calendarScope]
             )
+            #elseif canImport(AppKit)
+            guard let nsWindow = NSApp.keyWindow else { return }
+            _ = try await GIDSignIn.sharedInstance.signIn(
+                withPresenting: nsWindow,
+                hint: nil,
+                additionalScopes: [calendarScope]
+            )
+            #endif
             followSDKSession()
             try requireCalendarScope()
         } catch {
@@ -116,6 +131,7 @@ enum GoogleAuth {
             && ns.code == GIDSignInError.canceled.rawValue
     }
 
+    #if canImport(UIKit)
     @MainActor
     private static func topViewController() -> UIViewController? {
         let scenes = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
@@ -127,4 +143,5 @@ enum GoogleAuth {
         }
         return top
     }
+    #endif
 }
