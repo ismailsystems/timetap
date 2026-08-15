@@ -4,6 +4,7 @@ enum ApplyOps {
     static var nowMs: Double = Date().timeIntervalSince1970 * 1000
     static var actual: FakeCalendar?
     static var sitting: FakeCalendar?
+    static var plan: FakeCalendar?
     static var timeZone = TimeZone.current
     static var readError: String?
     static let msMin: Double = 60_000
@@ -13,6 +14,7 @@ enum ApplyOps {
         nowMs = Date().timeIntervalSince1970 * 1000
         actual = nil
         sitting = nil
+        plan = nil
         timeZone = TimeZone.current
         readError = nil
     }
@@ -64,14 +66,28 @@ enum ApplyOps {
             let q = Grammar.parseTitle(e.title)
             if q?.key == "UNLOGGED" { return nil }
             if let evA, e.startMs == evA.startMs { return nil }
-            return TodayBlock(key: q?.key ?? TT.unfiledKey, startMs: e.startMs, endMs: e.endMs)
+            return TodayBlock(
+                key: q?.key ?? TT.unfiledKey,
+                startMs: e.startMs, endMs: e.endMs,
+                distractedMs: Grammar.readDistract(e.description)
+            )
+        }
+        var planToday: [TodayBlock]?
+        if let cp = plan {
+            planToday = cp.events(from: dayLo, to: dayHi).compactMap { e in
+                if e.isAllDay { return nil }
+                guard let q = Grammar.parseTitle(e.title) else { return nil }
+                return TodayBlock(
+                    key: q.key, startMs: e.startMs, endMs: e.endMs, text: q.text
+                )
+            }
         }
         var evS = findOpen(cs)
         evS = staleGuard(cs, evS, isActual: false)
         let sit: SitBlock? = evS.map { SitBlock(ref: refOf($0), startMs: $0.startMs) }
         return ServerState(
             nowMs: nowMs, tz: timeZone.identifier, open: open, sit: sit,
-            notes: [], today: today
+            notes: [], today: today, planToday: planToday
         )
     }
 
@@ -280,6 +296,11 @@ enum ApplyOps {
         // Vacuity: remove `!closed ||` and the stretch criterion goes red.
         if !closed || p.mark == "?" { endEventAt(ev, op.endMs ?? nowMs) }
         ev.title = Grammar.buildTitle(p.key, text, op.mark)
+        if let d = op.distractedMs, d > 0 {
+            ev.description = Grammar.stampDistract(
+                ev.description, distractedMs: d, blockMs: ev.endMs - ev.startMs
+            )
+        }
         writeDesc(ev, ref: op.ref ?? "", isOpen: false)
     }
 
