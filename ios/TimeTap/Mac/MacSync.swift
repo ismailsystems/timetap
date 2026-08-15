@@ -23,6 +23,7 @@ enum TimeTapRuntime {
     }
 
     static var isUnderTest: Bool {
-        NSClassFromString("XCTestCase") != nil
+        ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
+            || NSClassFromString("XCTestCase") != nil
     }
 }
