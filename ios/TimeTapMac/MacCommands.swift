@@ -3,6 +3,7 @@ import SwiftUI
 /// App init should set `MacCommandHub.store = store`.
 enum MacCommandHub {
     static weak var store: TapStore?
+    static var openMain: (() -> Void)?
 }
 
 struct MacCommands: Commands {
@@ -25,6 +26,9 @@ struct MacCommands: Commands {
     private func proposeLeaf(_ n: Int) {
         let leaves = MacCommandHub.store?.groups.flatMap(\.children) ?? []
         guard leaves.indices.contains(n - 1) else { return }
-        MacCommandHub.store?.propose(leaves[n - 1].label)
+        let label = leaves[n - 1].label
+        if MacCommandHub.store?.open?.key != label {
+            MacCommandHub.store?.propose(label)
+        }
     }
 }

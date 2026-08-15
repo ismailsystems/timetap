@@ -267,8 +267,6 @@ struct CaptureView: View {
     }
 
     #if os(macOS)
-    private let macDigitKeys: [KeyEquivalent] = ["1", "2", "3", "4", "5", "6", "7", "8", "9"]
-
     private var macChrome: some View {
         HStack(spacing: 10) {
             Menu("Category") {
@@ -280,20 +278,16 @@ struct CaptureView: View {
             Button("Distracted") {
                 store.toggleDistract()
             }
-            .keyboardShortcut("d")
             .disabled(store.open == nil)
             .fontWeight(store.distracted ? .bold : .regular)
             .foregroundStyle(store.distracted ? Theme.accentOn : Theme.fg)
+            Button(store.sit != nil ? "Stand" : "Sit") {
+                store.toggleSit()
+            }
             Button("Stop") {
                 store.endDay()
             }
-            .keyboardShortcut(".")
             .disabled(store.open == nil)
-            ForEach(Array(store.categories.prefix(9).enumerated()), id: \.element.id) { i, child in
-                Button(child.label) { macPropose(child.label) }
-                    .keyboardShortcut(macDigitKeys[i])
-            }
-            .hidden()
         }
         .padding(.horizontal, 18)
         .padding(.vertical, 4)

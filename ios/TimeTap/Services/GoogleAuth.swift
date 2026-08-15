@@ -45,14 +45,20 @@ enum GoogleAuth {
         lastSignInCancelled = false
         do {
             #if canImport(UIKit)
-            guard let presenting = topViewController() else { return }
+            guard let presenting = topViewController() else {
+                throw CalendarHTTPError(status: 503, message: "No window to present Google Sign-In")
+            }
             _ = try await GIDSignIn.sharedInstance.signIn(
                 withPresenting: presenting,
                 hint: nil,
                 additionalScopes: [calendarScope]
             )
             #elseif canImport(AppKit)
-            guard let nsWindow = NSApp.keyWindow else { return }
+            guard let nsWindow = NSApp.keyWindow
+                ?? NSApp.windows.first(where: { $0.isVisible && $0.canBecomeKey })
+            else {
+                throw CalendarHTTPError(status: 503, message: "No window to present Google Sign-In")
+            }
             _ = try await GIDSignIn.sharedInstance.signIn(
                 withPresenting: nsWindow,
                 hint: nil,

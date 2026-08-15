@@ -107,6 +107,11 @@ final class StatusItemController: NSObject, NSMenuDelegate {
 
     @objc private func showWindow() {
         NSApp.activate(ignoringOtherApps: true)
-        NSApp.windows.first { $0.isVisible || $0.canBecomeMain }?.makeKeyAndOrderFront(nil)
+        if let window = NSApp.windows.first(where: \.canBecomeMain) {
+            if window.isMiniaturized { window.deminiaturize(nil) }
+            window.makeKeyAndOrderFront(nil)
+        } else {
+            MacCommandHub.openMain?()
+        }
     }
 }

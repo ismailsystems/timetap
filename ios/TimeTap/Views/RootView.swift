@@ -43,8 +43,10 @@ struct RootView: View {
             store.startCalendarPoll()
         }
         .onDisappear {
+            #if os(iOS)
             if TimeTapRuntime.isUISmoke || TimeTapRuntime.isUnderTest { return }
             store.stopCalendarPoll()
+            #endif
         }
         .onChange(of: scenePhase) { _, phase in
             if TimeTapRuntime.isUISmoke || TimeTapRuntime.isUnderTest { return }

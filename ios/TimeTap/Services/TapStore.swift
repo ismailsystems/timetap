@@ -1172,7 +1172,7 @@ final class TapStore: ObservableObject {
     }
 
     private func adoptServerState(_ st: ServerState, gen: Int) -> Bool {
-        if gen != localGen || !queue.isEmpty { return false }
+        if gen != localGen || !queue.isEmpty || pendingKey != nil { return false }
         let wasRef = open?.ref
         let wasSit = sit?.ref
         open = st.open

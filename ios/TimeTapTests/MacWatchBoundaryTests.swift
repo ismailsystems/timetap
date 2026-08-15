@@ -58,6 +58,18 @@ final class MacWatchBoundaryTests: TimeTapTestCase {
             text.contains("WatchConnectivity"),
             "Mac app must not import WatchConnectivity"
         )
+        XCTAssertTrue(
+            text.contains("applicationShouldTerminateAfterLastWindowClosed"),
+            "closing the last window must keep the menu bar extra alive"
+        )
+        XCTAssertTrue(text.contains("WindowGroup(id: \"main\")"), "Show TimeTap must reopen id main")
+    }
+
+    func testTimeTapMacTargetExcludesLiveActivityAndPhoneApp() throws {
+        let yml = try iosSource("project.yml")
+        let mac = slice(yml, from: "  TimeTapMac:\n", to: "  TimeTapMacTests:")
+        XCTAssertTrue(mac.contains("- TimeTapApp.swift"), "TimeTapMac must exclude TimeTapApp.swift")
+        XCTAssertTrue(mac.contains("- LiveActivity"), "TimeTapMac must exclude LiveActivity")
     }
 
     func testWatchBridgeAppliesProposeToggleDistractAndEndDay() throws {
