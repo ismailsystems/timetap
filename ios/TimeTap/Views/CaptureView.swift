@@ -31,14 +31,24 @@ struct CaptureView: View {
                     .disabled(store.deadCount == 0)
                     .accessibilityLabel(banner)
                 }
-                titleBar
                 #if os(macOS)
-                macChrome
+                if store.open != nil {
+                    noteField
+                        .padding(.horizontal, 18)
+                        .padding(.vertical, 8)
+                }
+                #else
+                titleBar
                 #endif
                 GeometryReader { _ in
                     HStack(alignment: .top, spacing: 0) {
                         DayRailView(source: .plan, tick: tick)
                             .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        #if os(macOS)
+                        Rectangle()
+                            .fill(Theme.rule2)
+                            .frame(width: 1)
+                        #endif
                         DayRailView(
                             source: .actual,
                             tick: tick,
@@ -53,6 +63,10 @@ struct CaptureView: View {
                 footer
             }
             .foregroundStyle(Theme.fg)
+            #if os(macOS)
+            .navigationTitle(store.open.map { store.labelFor($0.key) } ?? "timetap")
+            .toolbar { macToolbar }
+            #endif
             #if os(iOS)
             .ignoresSafeArea(.keyboard, edges: focus == nil ? .bottom : [])
             .toolbar(.hidden, for: .navigationBar)
@@ -235,7 +249,11 @@ struct CaptureView: View {
             }
             .padding(.leading, 12)
             .padding(.trailing, 16)
+            #if os(macOS)
+            .padding(.vertical, 6)
+            #else
             .padding(.vertical, 8)
+            #endif
             .frame(maxWidth: .infinity, alignment: .leading)
             .contentShape(Rectangle())
             .background(Theme.panel)
@@ -267,30 +285,33 @@ struct CaptureView: View {
     }
 
     #if os(macOS)
-    private var macChrome: some View {
-        HStack(spacing: 10) {
-            Menu("Category") {
+    @ToolbarContentBuilder
+    private var macToolbar: some ToolbarContent {
+        ToolbarItemGroup(placement: .automatic) {
+            Menu {
                 ForEach(store.categories) { child in
                     Button(child.label) { macPropose(child.label) }
                 }
+            } label: {
+                Label(store.open.map { store.labelFor($0.key) } ?? "Category", systemImage: "square.grid.2x2")
             }
+            .help("Switch the running category")
             .accessibilityLabel("Category")
-            Button("Distracted") {
+            Button(store.distracted ? "On task" : "Distracted") {
                 store.toggleDistract()
             }
             .disabled(store.open == nil)
-            .fontWeight(store.distracted ? .bold : .regular)
-            .foregroundStyle(store.distracted ? Theme.accentOn : Theme.fg)
+            .help("Toggle distracted time. Does not change the category.")
             Button(store.sit != nil ? "Stand" : "Sit") {
                 store.toggleSit()
             }
+            .help("Toggle sitting")
             Button("Stop") {
                 store.endDay()
             }
             .disabled(store.open == nil)
+            .help("Close the running block")
         }
-        .padding(.horizontal, 18)
-        .padding(.vertical, 4)
     }
 
     private func macPropose(_ label: String) {

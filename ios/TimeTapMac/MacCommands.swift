@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 /// App init should set `MacCommandHub.store = store`.
@@ -8,25 +9,41 @@ enum MacCommandHub {
 
 struct MacCommands: Commands {
     var body: some Commands {
+        CommandGroup(replacing: .appInfo) {
+            Button("About timetap") {
+                NSApp.orderFrontStandardAboutPanel(options: [
+                    .applicationName: "timetap",
+                    .credits: NSAttributedString(string: "PLAN on the left. ACTUAL on the right.")
+                ])
+            }
+        }
         CommandMenu("Capture") {
             Button("Distracted") { MacCommandHub.store?.toggleDistract() }
                 .keyboardShortcut("d")
+                .disabled(MacCommandHub.store?.open == nil)
             Button("Stop") { MacCommandHub.store?.endDay() }
                 .keyboardShortcut(".")
-            Button("Sit") { MacCommandHub.store?.toggleSit() }
-                .keyboardShortcut("s")
-            Divider()
-            ForEach(1...9, id: \.self) { n in
-                Button("Category \(n)") { proposeLeaf(n) }
-                    .keyboardShortcut(KeyEquivalent(Character(String(n))))
+                .disabled(MacCommandHub.store?.open == nil)
+            Button(MacCommandHub.store?.sit != nil ? "Stand" : "Sit") {
+                MacCommandHub.store?.toggleSit()
             }
+            .keyboardShortcut("s")
+            Divider()
+            ForEach(Array(leaves.prefix(9).enumerated()), id: \.offset) { i, child in
+                Button(child.label) { propose(child.label) }
+                    .keyboardShortcut(KeyEquivalent(Character(String(i + 1))))
+            }
+        }
+        CommandGroup(after: .windowArrangement) {
+            Button("Show TimeTap") { MacCommandHub.openMain?() }
         }
     }
 
-    private func proposeLeaf(_ n: Int) {
-        let leaves = MacCommandHub.store?.groups.flatMap(\.children) ?? []
-        guard leaves.indices.contains(n - 1) else { return }
-        let label = leaves[n - 1].label
+    private var leaves: [Category] {
+        MacCommandHub.store?.groups.flatMap(\.children) ?? []
+    }
+
+    private func propose(_ label: String) {
         if MacCommandHub.store?.open?.key != label {
             MacCommandHub.store?.propose(label)
         }

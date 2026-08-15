@@ -171,6 +171,20 @@ final class MacPollTests: TimeTapTestCase {
         XCTAssertFalse(text.contains("WatchBridge"), "Mac app must not activate WatchBridge")
     }
 
+    func testCaptureViewUsesMacToolbarNotTitleBar() throws {
+        let text = try iosSource("TimeTap/Views/CaptureView.swift")
+        XCTAssertTrue(text.contains("#if os(macOS)"), "Mac chrome is behind os(macOS)")
+        XCTAssertTrue(text.contains("macToolbar"), "Mac capture must use a toolbar")
+        XCTAssertTrue(text.contains(".toolbar { macToolbar }"), "Mac must attach macToolbar")
+        let toolbar = slice(text, from: ".navigationTitle", to: "#if os(iOS)")
+        XCTAssertTrue(toolbar.contains(".toolbar { macToolbar }"), "macToolbar is in the macOS toolbar block")
+        let mac = slice(text, from: "#if os(macOS)", to: "#else")
+        XCTAssertFalse(mac.contains("titleBar"), "Mac must not render the iPhone title bar")
+        let phone = slice(text, from: "#else", to: "#endif")
+        XCTAssertTrue(phone.contains("titleBar"), "titleBar is in the #else")
+        XCTAssertTrue(text.contains("private var titleBar"), "iPhone title bar must stay in the file")
+    }
+
     private func iosSource(_ relative: String) throws -> String {
         try String(
             contentsOf: URL(fileURLWithPath: #filePath)

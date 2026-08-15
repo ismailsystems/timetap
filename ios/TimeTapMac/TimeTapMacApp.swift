@@ -52,6 +52,7 @@ struct TimeTapMacApp: App {
                 .background(MacWindowOpener())
         }
         .defaultSize(width: 1100, height: 720)
+        .windowToolbarStyle(.unified)
         .commands { MacCommands() }
         Settings {
             SettingsView()

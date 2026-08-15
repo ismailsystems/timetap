@@ -63,6 +63,7 @@ final class MacWatchBoundaryTests: TimeTapTestCase {
             "closing the last window must keep the menu bar extra alive"
         )
         XCTAssertTrue(text.contains("WindowGroup(id: \"main\")"), "Show TimeTap must reopen id main")
+        XCTAssertTrue(text.contains("windowToolbarStyle(.unified)"), "Mac window must use a unified toolbar")
     }
 
     func testTimeTapMacTargetExcludesLiveActivityAndPhoneApp() throws {
@@ -93,7 +94,27 @@ final class MacWatchBoundaryTests: TimeTapTestCase {
         let text = try iosSource("TimeTapMac/StatusItemController.swift")
         XCTAssertTrue(text.contains("toggleSit"), "menu bar extra must offer Sit")
         XCTAssertTrue(text.contains("Show TimeTap"), "menu bar extra must offer Show TimeTap")
+        XCTAssertTrue(text.contains("Quit timetap"), "menu bar extra must offer Quit")
+        XCTAssertTrue(text.contains("barTitle"), "menu bar extra must build a live title")
+        XCTAssertTrue(
+            text.contains("Format.shortElapsed"),
+            "menu bar extra must show live elapsed"
+        )
         XCTAssertFalse(text.contains("WCSession"), "menu bar extra must not touch WCSession")
+    }
+
+    func testMacCommandsHasChildLabelShortcutsAndAbout() throws {
+        let text = try iosSource("TimeTapMac/MacCommands.swift")
+        XCTAssertTrue(text.contains("About timetap"), "Mac app menu must offer About timetap")
+        let shortcuts = slice(text, from: "ForEach(Array(leaves.prefix(9)", to: "CommandGroup(after:")
+        XCTAssertTrue(
+            shortcuts.contains("Button(child.label)"),
+            "Capture menu must bind real child.label shortcuts"
+        )
+        XCTAssertTrue(
+            shortcuts.contains(".keyboardShortcut"),
+            "child labels must have keyboard shortcuts"
+        )
     }
 
     func testMacSyncNeverActivatesWCSession() throws {

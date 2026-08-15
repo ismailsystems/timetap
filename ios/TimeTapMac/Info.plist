@@ -17,5 +17,11 @@
 	</array>
 	<key>LSMinimumSystemVersion</key>
 	<string>14.0</string>
+	<key>LSApplicationCategoryType</key>
+	<string>public.app-category.productivity</string>
+	<key>NSHumanReadableCopyright</key>
+	<string>Copyright © 2026</string>
+	<key>CFBundleName</key>
+	<string>timetap</string>
 </dict>
 </plist>

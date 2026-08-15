@@ -12,6 +12,7 @@ final class StatusItemController: NSObject, NSMenuDelegate {
     private var store: TapStore?
     private var item: NSStatusItem?
     private var sub: AnyCancellable?
+    private var tick: Timer?
 
     private func attach(_ store: TapStore) {
         self.store = store
@@ -26,6 +27,13 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         sub = store.objectWillChange.sink { [weak self] _ in
             Task { @MainActor in self?.refresh() }
         }
+        if tick == nil {
+            let timer = Timer(timeInterval: 1, repeats: true) { [weak self] _ in
+                Task { @MainActor in self?.refresh() }
+            }
+            RunLoop.main.add(timer, forMode: .common)
+            tick = timer
+        }
         refresh()
     }
 
@@ -35,8 +43,15 @@ final class StatusItemController: NSObject, NSMenuDelegate {
 
     private func refresh() {
         guard let store else { return }
-        item?.button?.title = store.open.map { store.labelFor($0.key) } ?? "TT"
+        item?.button?.title = barTitle(store)
         if let menu = item?.menu { rebuild(menu) }
+    }
+
+    private func barTitle(_ store: TapStore) -> String {
+        guard let open = store.open else { return "TT" }
+        let face = store.labelFor(open.key)
+        let elapsed = Format.shortElapsed(store.clock() - open.startMs)
+        return store.distracted ? "\(face) · \(elapsed) · off" : "\(face) · \(elapsed)"
     }
 
     private func rebuild(_ menu: NSMenu) {
@@ -52,6 +67,7 @@ final class StatusItemController: NSObject, NSMenuDelegate {
             let row = NSMenuItem(title: cat.label, action: #selector(propose(_:)), keyEquivalent: "")
             row.target = self
             row.representedObject = cat.label
+            row.state = store.open?.key == cat.label ? .on : .off
             menu.addItem(row)
         }
 
@@ -74,16 +90,21 @@ final class StatusItemController: NSObject, NSMenuDelegate {
 
         let stop = NSMenuItem(title: "Stop", action: #selector(endDay), keyEquivalent: ".")
         stop.target = self
+        stop.isEnabled = store.open != nil
         menu.addItem(stop)
 
         menu.addItem(.separator())
         let show = NSMenuItem(title: "Show TimeTap", action: #selector(showWindow), keyEquivalent: "")
         show.target = self
         menu.addItem(show)
+
+        let quit = NSMenuItem(title: "Quit timetap", action: #selector(quitApp), keyEquivalent: "q")
+        quit.target = self
+        menu.addItem(quit)
     }
 
     private func statusLine(_ store: TapStore) -> String {
-        guard let open = store.open else { return "TT" }
+        guard let open = store.open else { return "Nothing running" }
         let face = store.labelFor(open.key)
         return "\(face) \(Format.elapsed(store.clock() - open.startMs))"
     }
@@ -113,5 +134,9 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         } else {
             MacCommandHub.openMain?()
         }
+    }
+
+    @objc private func quitApp() {
+        NSApp.terminate(nil)
     }
 }
