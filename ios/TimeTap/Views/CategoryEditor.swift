@@ -82,6 +82,17 @@ struct CategoryEditor: View {
                                 }
                             }
                         }
+                        .contextMenu {
+                            if !one {
+                                Button("Delete", role: .destructive) {
+                                    deleteTarget = .child(child.label)
+                                }
+                            } else if store.groups.count > 1 {
+                                Button("Delete", role: .destructive) {
+                                    deleteTarget = .group(group.label)
+                                }
+                            }
+                        }
                     }
                     HStack {
                         TextField("Add child", text: Binding(

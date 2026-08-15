@@ -5,6 +5,7 @@ struct DeadLetterSheet: View {
     @State private var armedToken: String?
     @State private var armTask: Task<Void, Never>?
     @State private var armedAt: TimeInterval = 0
+    @State private var confirmToken: String?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -44,6 +45,26 @@ struct DeadLetterSheet: View {
         }
         .foregroundStyle(Theme.fg)
         .background(Theme.ground.ignoresSafeArea())
+        #if os(macOS)
+        .confirmationDialog(
+            "Discard this set-aside write?",
+            isPresented: Binding(
+                get: { confirmToken != nil },
+                set: { if !$0 { confirmToken = nil } }
+            ),
+            titleVisibility: .visible
+        ) {
+            Button("Discard", role: .destructive) {
+                if let token = confirmToken {
+                    store.discardDead(token: token)
+                }
+                confirmToken = nil
+            }
+            Button("Cancel", role: .cancel) { confirmToken = nil }
+        } message: {
+            Text("This is the only record it ever happened.")
+        }
+        #endif
     }
 
     private func deadRow(_ e: DeadEntry) -> some View {
@@ -62,7 +83,11 @@ struct DeadLetterSheet: View {
                 .font(.system(size: 12, weight: .medium))
                 .foregroundStyle(Theme.accentOn)
             Button {
+                #if os(macOS)
+                confirmToken = e.token
+                #else
                 armOrDiscard(e.token)
+                #endif
             } label: {
                 Text(armedToken == e.token ? "TAP AGAIN TO DISCARD" : "DISCARD")
                     .font(.system(size: 12, weight: .heavy))

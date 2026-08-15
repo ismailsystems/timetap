@@ -14,9 +14,7 @@ struct CalendarPickerView: View {
                 form
             } else {
                 NavigationStack { form }
-                    #if os(iOS)
-                    .interactiveDismissDisabled()
-                    #endif
+                    .interactiveDismissDisabled(!Credentials.hasCalendarIds)
             }
         }
         .preferredColorScheme(.dark)

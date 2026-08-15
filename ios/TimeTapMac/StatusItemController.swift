@@ -85,13 +85,13 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         let sit = NSMenuItem(
             title: store.sit != nil ? "Stand" : "Sit",
             action: #selector(toggleSit),
-            keyEquivalent: "s"
+            keyEquivalent: ""
         )
         sit.target = self
         sit.state = store.sit != nil ? .on : .off
         menu.addItem(sit)
 
-        let stop = NSMenuItem(title: "Stop", action: #selector(endDay), keyEquivalent: ".")
+        let stop = NSMenuItem(title: "Stop", action: #selector(endDay), keyEquivalent: "")
         stop.target = self
         stop.isEnabled = store.open != nil
         menu.addItem(stop)

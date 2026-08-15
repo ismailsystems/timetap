@@ -48,9 +48,7 @@ struct SignInView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         #endif
         .preferredColorScheme(.dark)
-        #if os(iOS)
         .interactiveDismissDisabled()
-        #endif
     }
 
     private func startSignIn() {

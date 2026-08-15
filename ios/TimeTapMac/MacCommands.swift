@@ -8,6 +8,8 @@ enum MacCommandHub {
 }
 
 struct MacCommands: Commands {
+    @ObservedObject var store: TapStore
+
     var body: some Commands {
         CommandGroup(replacing: .appInfo) {
             Button("About timetap") {
@@ -18,18 +20,16 @@ struct MacCommands: Commands {
             }
         }
         CommandMenu("Capture") {
-            Button("Distracted") { MacCommandHub.store?.toggleDistract() }
+            Button("Distracted") { store.toggleDistract() }
                 .keyboardShortcut("d")
-                .disabled(MacCommandHub.store?.open == nil)
-            Button("Stop") { MacCommandHub.store?.endDay() }
-                .keyboardShortcut(".")
-                .disabled(MacCommandHub.store?.open == nil)
+                .disabled(store.open == nil)
+            Button("Stop") { store.endDay() }
+                .disabled(store.open == nil)
                 .accessibilityLabel("Stop the running block")
                 .accessibilityHint("Does not stop sitting")
-            Button(MacCommandHub.store?.sit != nil ? "Stand" : "Sit") {
-                MacCommandHub.store?.toggleSit()
+            Button(store.sit != nil ? "Stand" : "Sit") {
+                store.toggleSit()
             }
-            .keyboardShortcut("s")
             Divider()
             ForEach(Array(leaves.prefix(9).enumerated()), id: \.offset) { i, child in
                 Button(child.label) { propose(child.label) }
@@ -42,12 +42,12 @@ struct MacCommands: Commands {
     }
 
     private var leaves: [Category] {
-        MacCommandHub.store?.groups.flatMap(\.children) ?? []
+        store.groups.flatMap(\.children)
     }
 
     private func propose(_ label: String) {
-        if MacCommandHub.store?.open?.key != label {
-            MacCommandHub.store?.propose(label)
+        if store.open?.key != label {
+            store.propose(label)
         }
     }
 }

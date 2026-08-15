@@ -5,6 +5,7 @@ struct SitEditSheet: View {
     @State private var armed = false
     @State private var armTask: Task<Void, Never>?
     @State private var armedAt: TimeInterval = 0
+    @State private var confirmDelete = false
 
     var body: some View {
         if let s = store.sitEdit {
@@ -68,7 +69,7 @@ struct SitEditSheet: View {
                 .buttonStyle(.plain)
                 .padding(.bottom, 16)
 
-                Button(role: .destructive, action: armOrDelete) {
+                Button(role: .destructive, action: requestDelete) {
                     Text(armed ? "TAP AGAIN TO DELETE" : "DELETE SITTING")
                         .font(.system(size: 12, weight: .heavy))
                         .tracking(1.2)
@@ -82,7 +83,25 @@ struct SitEditSheet: View {
             .foregroundStyle(Theme.fg)
             .background(Theme.ground.ignoresSafeArea())
             .onDisappear { disarm() }
+            #if os(macOS)
+            .confirmationDialog(
+                "Delete this sitting block?",
+                isPresented: $confirmDelete,
+                titleVisibility: .visible
+            ) {
+                Button("Delete sitting", role: .destructive) { store.deleteSit() }
+                Button("Cancel", role: .cancel) { confirmDelete = false }
+            }
+            #endif
         }
+    }
+
+    private func requestDelete() {
+        #if os(macOS)
+        confirmDelete = true
+        #else
+        armOrDelete()
+        #endif
     }
 
     private func armOrDelete() {
