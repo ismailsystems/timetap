@@ -18,6 +18,16 @@ struct RootView: View {
             SettingsView()
                 .environmentObject(store)
         }
+        #if os(macOS)
+        .sheet(isPresented: $store.showSignIn) {
+            SignInView()
+                .environmentObject(store)
+        }
+        .sheet(isPresented: $store.showPicker) {
+            CalendarPickerView()
+                .environmentObject(store)
+        }
+        #else
         .fullScreenCover(isPresented: $store.showSignIn) {
             SignInView()
                 .environmentObject(store)
@@ -26,13 +36,24 @@ struct RootView: View {
             CalendarPickerView()
                 .environmentObject(store)
         }
+        #endif
         .onAppear {
-            if TimeTapApp.isUISmoke { return }
+            if TimeTapRuntime.isUISmoke { return }
             GoogleAuth.restore { store.boot() }
+            store.startCalendarPoll()
+        }
+        .onDisappear {
+            if TimeTapRuntime.isUISmoke { return }
+            store.stopCalendarPoll()
         }
         .onChange(of: scenePhase) { _, phase in
-            if TimeTapApp.isUISmoke { return }
-            if phase == .active { store.refreshOnReturn() }
+            if TimeTapRuntime.isUISmoke { return }
+            if phase == .active {
+                store.pollActive = true
+                store.refreshOnReturn()
+            } else {
+                store.pollActive = false
+            }
         }
         .onOpenURL { url in
             _ = GoogleAuth.handleURL(url)
