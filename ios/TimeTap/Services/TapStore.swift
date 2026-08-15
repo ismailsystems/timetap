@@ -1,7 +1,9 @@
 import Foundation
 import SwiftUI
 import Combine
+#if canImport(UIKit)
 import UIKit
+#endif
 
 @MainActor
 final class TapStore: ObservableObject {
@@ -25,6 +27,8 @@ final class TapStore: ObservableObject {
     @Published var addingCategory = false
     /// False until `bootAsync` finishes. Tests that pin `testHasSession` start ready.
     var sessionReady = false
+    /// RootView sets this from scenePhase. True while the window is frontmost.
+    var pollActive = true
     var lastInsertFailed = false
 
     @Published var undoLabel: String?
@@ -100,6 +104,7 @@ final class TapStore: ObservableObject {
     private var noteTask: Task<Void, Never>?
     private var flushTask: Task<Void, Never>?
     private var retryTask: Task<Void, Never>?
+    private var pollTask: Task<Void, Never>?
     private var flushing = false
     private var localGen = 0
     private var lastStateAt = Date()
@@ -170,6 +175,26 @@ final class TapStore: ObservableObject {
                 > Double(config?.staleOpenHours ?? 5) * 3_600_000
         } ?? false
         if overdue || runaway { await loadServerState() }
+    }
+
+    func startCalendarPoll() {
+        guard pollTask == nil else { return }
+        pollTask = Task { [weak self] in
+            while !Task.isCancelled {
+                let ns = MacSync.pollNs(active: self?.pollActive ?? true)
+                try? await Task.sleep(nanoseconds: ns)
+                guard !Task.isCancelled else { return }
+                guard let self else { return }
+                if self.sessionReady && Credentials.isConfigured {
+                    await self.refreshOnReturnNow()
+                }
+            }
+        }
+    }
+
+    func stopCalendarPoll() {
+        pollTask?.cancel()
+        pollTask = nil
     }
 
     // MARK: - Capture actions
@@ -324,7 +349,9 @@ final class TapStore: ObservableObject {
         }
 
         if didStop {
+            #if canImport(UIKit)
             UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+            #endif
         }
         unreadableOpen = false
         persist()
