@@ -108,7 +108,9 @@ struct CategoryEditor: View {
         .scrollContentBackground(.hidden)
         .background(Theme.ground)
         .navigationTitle("Categories")
+        #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
+        #endif
         .alert("Rename", isPresented: Binding(
             get: { renameTarget != nil },
             set: { if !$0 { renameTarget = nil } }
