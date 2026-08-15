@@ -261,6 +261,14 @@ Path 2 keeps Calendar writes in Apps Script and puts a SwiftUI capture UI on
 the phone. It needs a script property `API_TOKEN` and a second web-app
 deployment with access **Anyone** (anonymous). Full steps: [ios/README.md](ios/README.md).
 
+### Native Mac client (optional)
+
+Same capture UI, on a Mac. Bundle ID `app.timetap.mac`. Sign in with Google;
+if the iOS OAuth client does not work on macOS, mint a macOS client in GCP
+project `timetap-505402`. Calendar is the sync bus — the Mac, the phone and
+the Watch all write the same three calendars. The Watch still pairs with the
+iPhone, not the Mac. Full steps: [ios/README.md](ios/README.md).
+
 ---
 
 ## 7. Required Google Calendar settings
