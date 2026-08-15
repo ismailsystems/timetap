@@ -758,7 +758,7 @@ final class UTests: TimeTapTestCase {
         let store = TapStore()
         store.clock = { now }
         let (label, items) = store.railItems(budget: 400, now: now)
-        XCTAssertTrue(label.hasPrefix("TODAY · "))
+        XCTAssertTrue(label.hasPrefix("ACTUAL · "))
         XCTAssertEqual(items.count, 1)
         XCTAssertTrue(items[0].isGap)
         XCTAssertEqual(items[0].name, "UNLOGGED")
@@ -780,9 +780,12 @@ final class UTests: TimeTapTestCase {
             TodayBlock(ref: "a", key: "Deep work", startMs: first, endMs: first + 120_000)
         ]
         let (label, items) = store.railItems(budget: 400, now: first + 120_000)
-        XCTAssertEqual(items.first?.name, "DEEP WORK")
-        XCTAssertFalse(items.contains { $0.isGap && $0.ms > 8 * 3_600_000 })
-        XCTAssertEqual(label, "TODAY · \(Format.clock(first))")
+        XCTAssertTrue(items.contains { $0.name == "DEEP WORK" })
+        XCTAssertEqual(label, "ACTUAL · \(Format.clock(first))")
+        XCTAssertFalse(
+            label.contains(Format.clock(dayStart)),
+            "the ACTUAL label must start at the first block, not midnight"
+        )
     }
 
     func testLavenderPOOPMigratesToBanana() {
