@@ -162,6 +162,7 @@ struct CaptureView: View {
             }
             .accessibilityIdentifier("noteField")
             .accessibilityLabel("Note for the running block")
+            .accessibilityHint("Saves as you type. Press Return to leave the field.")
     }
 
     private var showNoteField: Bool {
@@ -263,16 +264,21 @@ struct CaptureView: View {
         .accessibilityAddTraits(.isSelected)
         .accessibilityValue(sitting ? "SITTING" : "NOT SITTING")
         .accessibilityLabel(sitting ? "Sitting for \(postureElapsed)" : "Not sitting for \(postureElapsed)")
-        .accessibilityHint(
-            sitting
-                ? "Stops sitting. Long press to adjust when sitting started."
-                : "Starts sitting"
-        )
+        .accessibilityHint(sitHint(sitting))
         .contextMenu {
             if sitting {
                 Button("Adjust sitting start") { store.openSitEdit() }
             }
         }
+    }
+
+    private func sitHint(_ sitting: Bool) -> String {
+        if !sitting { return "Starts sitting" }
+        #if os(macOS)
+        return "Stops sitting. Control-click to adjust when sitting started."
+        #else
+        return "Stops sitting. Long press to adjust when sitting started."
+        #endif
     }
 
     private func markLabel(_ m: String) -> String {
@@ -302,6 +308,9 @@ struct CaptureView: View {
             }
             .disabled(store.open == nil)
             .help("Toggle distracted time. Does not change the category.")
+            .accessibilityLabel("Distracted")
+            .accessibilityValue(store.distracted ? "On" : "Off")
+            .accessibilityHint("Toggles distracted time on the running block")
             Button(store.sit != nil ? "Stand" : "Sit") {
                 store.toggleSit()
             }
@@ -311,6 +320,8 @@ struct CaptureView: View {
             }
             .disabled(store.open == nil)
             .help("Close the running block")
+            .accessibilityLabel("Stop the running block")
+            .accessibilityHint("Does not stop sitting")
         }
     }
 
