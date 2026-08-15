@@ -718,13 +718,19 @@ final class TapStore: ObservableObject {
                 let isOpen = source == .actual && (open.map { o in
                     (b.ref != nil && b.ref == o.ref) || (b.ref == nil && b.startMs == o.startMs && b.endMs == now)
                 } ?? false)
+                let distract = isOpen ? currentDistractedMs() : (b.distractedMs ?? 0)
+                var note = b.text
+                if source == .actual, distract > 0 {
+                    let pct = Grammar.onTaskPercent(distractedMs: distract, blockMs: ms)
+                    note = note.isEmpty ? "\(pct)%" : "\(note) · \(pct)%"
+                }
                 raw.append((
                     (cat?.face ?? id).uppercased(),
                     ms,
                     cat?.hex,
                     false,
                     isOpen,
-                    b.text
+                    note
                 ))
                 prevEnd = max(prevEnd, b.endMs)
             }
