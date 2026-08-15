@@ -20,6 +20,9 @@ struct CalendarPickerView: View {
             }
         }
         .preferredColorScheme(.dark)
+        #if os(macOS)
+        .frame(minWidth: 360, minHeight: 280)
+        #endif
         .task { await load() }
     }
 

@@ -3,6 +3,9 @@ import SwiftUI
 struct SettingsView: View {
     @EnvironmentObject private var store: TapStore
     @Environment(\.dismiss) private var dismiss
+    #if os(macOS)
+    @Environment(\.isPresented) private var isPresented
+    #endif
 
     var body: some View {
         NavigationStack {
@@ -51,10 +54,19 @@ struct SettingsView: View {
             .navigationBarTitleDisplayMode(.inline)
             #endif
             .toolbar {
+                #if os(macOS)
+                if isPresented {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("Close") { dismiss() }
+                            .accessibilityHint("Returns to capture")
+                    }
+                }
+                #else
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Close") { dismiss() }
                         .accessibilityHint("Returns to capture")
                 }
+                #endif
             }
         }
         .preferredColorScheme(.dark)
