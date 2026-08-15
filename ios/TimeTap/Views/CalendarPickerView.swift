@@ -14,10 +14,13 @@ struct CalendarPickerView: View {
                 form
             } else {
                 NavigationStack { form }
-                    .interactiveDismissDisabled()
+                    .interactiveDismissDisabled(!Credentials.hasCalendarIds)
             }
         }
         .preferredColorScheme(.dark)
+        #if os(macOS)
+        .frame(minWidth: 360, minHeight: 280)
+        #endif
         .task { await load() }
     }
 
@@ -44,7 +47,9 @@ struct CalendarPickerView: View {
         .scrollContentBackground(.hidden)
         .background(Theme.ground)
         .navigationTitle("Calendars")
+        #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
+        #endif
         .toolbar {
             if !embedded {
                 ToolbarItem(placement: .cancellationAction) {

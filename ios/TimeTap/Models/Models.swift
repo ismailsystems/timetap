@@ -210,19 +210,29 @@ struct SitBlock: Codable, Equatable {
     var startMs: Double
 }
 
+enum RailSource: String, Codable {
+    case plan
+    case actual
+}
+
 struct TodayBlock: Codable, Equatable {
     var ref: String? = nil
     var key: String
     var startMs: Double
     var endMs: Double
     var text: String = ""
+    var distractedMs: Double? = nil
 
-    init(ref: String? = nil, key: String, startMs: Double, endMs: Double, text: String = "") {
+    init(
+        ref: String? = nil, key: String, startMs: Double, endMs: Double,
+        text: String = "", distractedMs: Double? = nil
+    ) {
         self.ref = ref
         self.key = Grammar.resolve(key)
         self.startMs = startMs
         self.endMs = endMs
         self.text = text
+        self.distractedMs = distractedMs
     }
 
     init(from decoder: Decoder) throws {
@@ -232,6 +242,7 @@ struct TodayBlock: Codable, Equatable {
         startMs = try c.decode(Double.self, forKey: .startMs)
         endMs = try c.decode(Double.self, forKey: .endMs)
         text = try c.decodeIfPresent(String.self, forKey: .text) ?? ""
+        distractedMs = try c.decodeIfPresent(Double.self, forKey: .distractedMs)
     }
 }
 
@@ -256,6 +267,10 @@ struct ServerState: Codable {
     var sit: SitBlock?
     var notes: [String]?
     var today: [TodayBlock]?
+    var planToday: [TodayBlock]?
+    var distracted: Bool? = nil
+    var distractedAccruedMs: Double? = nil
+    var distractStartMs: Double? = nil
 }
 
 struct ApplyResult: Codable {
@@ -296,6 +311,7 @@ struct Op: Codable, Identifiable, Equatable {
     var sitRef: String? = nil
     var sitStartMs: Double? = nil
     var killSitRef: String? = nil
+    var distractedMs: Double? = nil
     var tries: Int? = nil
 
     static func uid() -> String {

@@ -15,6 +15,9 @@ enum TT {
     static let longBlockMinutes = 90
     static let openToken = "#open"
     static let refPrefix = "#ref:"
+    static let distractedPrefix = "#distracted:"
+    static let ontaskPrefix = "#ontask:"
+    static let distractLivePrefix = "#distractlive:"
     static let unloggedTitle = "UNLOGGED -"
     static let unfiledKey = "UNFILED"
     static let sitTitle = "SIT"
@@ -107,6 +110,73 @@ enum Grammar {
         d = d.trimmingCharacters(in: .whitespacesAndNewlines)
         let tail = TT.refPrefix + ref + (isOpen ? "\n" + TT.openToken : "")
         return d.isEmpty ? tail : d + "\n" + tail
+    }
+
+    static func onTaskPercent(distractedMs: Double, blockMs: Double) -> Int {
+        if blockMs <= 0 { return 100 }
+        let raw = ((blockMs - distractedMs) / blockMs * 100).rounded()
+        return min(100, max(0, Int(raw)))
+    }
+
+    static func stampDistract(_ description: String, distractedMs: Double, blockMs: Double) -> String {
+        var d = description
+        d = d.replacingOccurrences(
+            of: NSRegularExpression.escapedPattern(for: TT.distractedPrefix) + "[0-9.]*",
+            with: "",
+            options: .regularExpression
+        )
+        d = d.replacingOccurrences(
+            of: NSRegularExpression.escapedPattern(for: TT.ontaskPrefix) + "[0-9.]*",
+            with: "",
+            options: .regularExpression
+        )
+        d = d.replacingOccurrences(
+            of: NSRegularExpression.escapedPattern(for: TT.distractLivePrefix) + "[0-9,]*",
+            with: "",
+            options: .regularExpression
+        )
+        d = d.replacingOccurrences(of: #"[ \t]+\n"#, with: "\n", options: .regularExpression)
+        d = d.replacingOccurrences(of: #"\n{3,}"#, with: "\n\n", options: .regularExpression)
+        d = d.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard distractedMs > 0 else { return d }
+        let ms = Int(distractedMs.rounded())
+        let pct = onTaskPercent(distractedMs: distractedMs, blockMs: blockMs)
+        let tail = TT.distractedPrefix + "\(ms)\n" + TT.ontaskPrefix + "\(pct)"
+        return d.isEmpty ? tail : d + "\n" + tail
+    }
+
+    static func readDistract(_ description: String) -> Double? {
+        guard let m = match(
+            NSRegularExpression.escapedPattern(for: TT.distractedPrefix) + "([0-9]+(?:\\.[0-9]+)?)",
+            description
+        ) else { return nil }
+        return Double(m[1])
+    }
+
+    /// Live distract on an open event. `startMs == 0` means the toggle is off.
+    static func stampLiveDistract(
+        _ description: String, accruedMs: Double, startMs: Double
+    ) -> String {
+        var d = description
+        d = d.replacingOccurrences(
+            of: NSRegularExpression.escapedPattern(for: TT.distractLivePrefix) + "[0-9,]*",
+            with: "",
+            options: .regularExpression
+        )
+        d = d.replacingOccurrences(of: #"[ \t]+\n"#, with: "\n", options: .regularExpression)
+        d = d.replacingOccurrences(of: #"\n{3,}"#, with: "\n\n", options: .regularExpression)
+        d = d.trimmingCharacters(in: .whitespacesAndNewlines)
+        let tail = TT.distractLivePrefix
+            + "\(Int(accruedMs.rounded())),\(Int(startMs.rounded()))"
+        return d.isEmpty ? tail : d + "\n" + tail
+    }
+
+    static func readLiveDistract(_ description: String) -> (accruedMs: Double, startMs: Double)? {
+        guard let m = match(
+            NSRegularExpression.escapedPattern(for: TT.distractLivePrefix) + "([0-9]+),([0-9]+)",
+            description
+        ) else { return nil }
+        return (Double(m[1]) ?? 0, Double(m[2]) ?? 0)
     }
 
     static var extraColors: [String: String] = [:]

@@ -1,7 +1,9 @@
 import Foundation
 import SwiftUI
 import Combine
+#if canImport(UIKit)
 import UIKit
+#endif
 
 @MainActor
 final class TapStore: ObservableObject {
@@ -11,6 +13,8 @@ final class TapStore: ObservableObject {
     /// Start of the current not-sitting bout. Feeds the Live Activity standing timer.
     var standStartMs: Double?
     @Published var today: [TodayBlock] = []
+    @Published var planToday: [TodayBlock] = []
+    @Published var distracted = false
     @Published var queue: [Op] = []
     @Published var dead: [DeadEntry] = []
     @Published var syncLabel = "synced"
@@ -23,6 +27,8 @@ final class TapStore: ObservableObject {
     @Published var addingCategory = false
     /// False until `bootAsync` finishes. Tests that pin `testHasSession` start ready.
     var sessionReady = false
+    /// RootView sets this from scenePhase. True while the window is frontmost.
+    var pollActive = true
     var lastInsertFailed = false
 
     @Published var undoLabel: String?
@@ -98,6 +104,7 @@ final class TapStore: ObservableObject {
     private var noteTask: Task<Void, Never>?
     private var flushTask: Task<Void, Never>?
     private var retryTask: Task<Void, Never>?
+    private var pollTask: Task<Void, Never>?
     private var flushing = false
     private var localGen = 0
     private var lastStateAt = Date()
@@ -111,6 +118,8 @@ final class TapStore: ObservableObject {
     private var persistBroken = false
     private var catByKey: [String: Category] = [:]
     private var blocks: [String: BlockMeta] = [:]
+    private var distractStartMs: Double?
+    private var distractedAccruedMs: Double = 0
 
     private let queueKey = "tt.queue.v1"
     private let stateKey = "tt.state.v1"
@@ -166,6 +175,45 @@ final class TapStore: ObservableObject {
                 > Double(config?.staleOpenHours ?? 5) * 3_600_000
         } ?? false
         if overdue || runaway { await loadServerState() }
+    }
+
+    /// Calendar is the Mac ↔ iPhone ↔ Watch bus. Load on every tick.
+    func syncFromCalendar() async {
+        defer { syncLiveActivity() }
+        guard Credentials.isConfigured, config != nil else { return }
+        if !queue.isEmpty {
+            await flushNow()
+        }
+        if queue.isEmpty {
+            await loadServerState()
+        }
+    }
+
+    func startCalendarPoll() {
+        guard pollTask == nil else { return }
+        pollTask = Task { [weak self] in
+            while !Task.isCancelled {
+                if let self, self.sessionReady && Credentials.isConfigured {
+                    await self.syncFromCalendar()
+                    break
+                }
+                try? await Task.sleep(nanoseconds: 200_000_000)
+            }
+            while !Task.isCancelled {
+                let ns = MacSync.pollNs(active: self?.pollActive ?? true)
+                try? await Task.sleep(nanoseconds: ns)
+                guard !Task.isCancelled else { return }
+                guard let self else { return }
+                if self.sessionReady && Credentials.isConfigured {
+                    await self.syncFromCalendar()
+                }
+            }
+        }
+    }
+
+    func stopCalendarPoll() {
+        pollTask?.cancel()
+        pollTask = nil
     }
 
     // MARK: - Capture actions
@@ -247,14 +295,16 @@ final class TapStore: ObservableObject {
         if let cur = open {
             let dur = now - cur.startMs
             let m = markFor(key: cur.key, durMs: dur)
+            let d = takeDistractedMs()
             _ = enqueue(Op(
                 id: Op.uid(), type: "closeActual", ts: now,
-                ref: cur.ref, key: cur.key, text: cur.text, mark: m.mark, endMs: now
+                ref: cur.ref, key: cur.key, text: cur.text, mark: m.mark, endMs: now,
+                distractedMs: d
             ))
             if m.strip {
                 pending = MarkStrip(ref: cur.ref, key: cur.key, durMs: dur, hintMs: cur.startMs)
             }
-            railClosed(cur, endMs: now)
+            railClosed(cur, endMs: now, distractedMs: d)
         }
 
         let ref = Op.uid()
@@ -303,11 +353,13 @@ final class TapStore: ObservableObject {
             didStop = true
             let dur = now - cur.startMs
             let m = markFor(key: cur.key, durMs: dur)
+            let d = takeDistractedMs()
             _ = enqueue(Op(
                 id: Op.uid(), type: "closeActual", ts: now,
-                ref: cur.ref, key: cur.key, text: cur.text, mark: m.mark, endMs: now
+                ref: cur.ref, key: cur.key, text: cur.text, mark: m.mark, endMs: now,
+                distractedMs: d
             ))
-            railClosed(cur, endMs: now)
+            railClosed(cur, endMs: now, distractedMs: d)
             pending = m.strip
                 ? MarkStrip(ref: cur.ref, key: cur.key, durMs: dur, hintMs: cur.startMs)
                 : nil
@@ -316,12 +368,60 @@ final class TapStore: ObservableObject {
         }
 
         if didStop {
+            #if canImport(UIKit)
             UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+            #endif
         }
         unreadableOpen = false
         persist()
         flush()
         syncLiveActivity()
+    }
+
+    func toggleDistract() {
+        guard open != nil else { return }
+        if distracted {
+            if let start = distractStartMs {
+                distractedAccruedMs += clock() - start
+            }
+            distractStartMs = nil
+            distracted = false
+        } else {
+            distractStartMs = clock()
+            distracted = true
+        }
+        persist()
+        enqueueLiveDistract()
+    }
+
+    private func enqueueLiveDistract() {
+        guard let cur = open else { return }
+        queue = queue.filter { !($0.type == "setDistract" && $0.ref == cur.ref) }
+        _ = enqueue(Op(
+            id: Op.uid(), type: "setDistract",
+            ts: clock(),
+            ref: cur.ref,
+            startMs: distracted ? (distractStartMs ?? 0) : 0,
+            hintMs: cur.startMs,
+            distractedMs: distractedAccruedMs
+        ))
+        flush()
+    }
+
+    func currentDistractedMs() -> Double {
+        var ms = distractedAccruedMs
+        if distracted, let start = distractStartMs {
+            ms += clock() - start
+        }
+        return ms
+    }
+
+    private func takeDistractedMs() -> Double {
+        let d = currentDistractedMs()
+        distracted = false
+        distractedAccruedMs = 0
+        distractStartMs = nil
+        return d
     }
 
     func toggleSit() {
@@ -635,71 +735,85 @@ final class TapStore: ObservableObject {
     // MARK: - Rail
 
     func railItems(budget: CGFloat, now: Double) -> (startLabel: String, items: [RailItem]) {
+        railItems(source: .actual, budget: budget, now: now)
+    }
+
+    func railItems(source: RailSource, budget: CGFloat, now: Double) -> (startLabel: String, items: [RailItem]) {
         let dayStart = Format.dayStartMs(now)
-        var blocks = today.filter { $0.endMs > dayStart }
-        if let open {
-            blocks.append(TodayBlock(
-                ref: open.ref, key: open.key, startMs: open.startMs, endMs: now, text: open.text
-            ))
+        let windowEnd = max(
+            now,
+            planToday.map(\.endMs).max() ?? now,
+            today.map(\.endMs).max() ?? now
+        )
+        let span = max(windowEnd - dayStart, 60_000)
+
+        var blocks: [TodayBlock]
+        switch source {
+        case .plan:
+            blocks = planToday.filter { $0.endMs > dayStart }
+        case .actual:
+            blocks = today.filter { $0.endMs > dayStart }
+            if let open {
+                blocks.append(TodayBlock(
+                    ref: open.ref, key: open.key, startMs: open.startMs, endMs: now, text: open.text
+                ))
+            }
         }
         blocks.sort { $0.startMs < $1.startMs }
 
-        var raw: [(name: String, ms: Double, hex: String?, gap: Bool, open: Bool, floor: CGFloat, note: String)] = []
-        var prevEnd: Double?
+        let gapName = source == .actual ? "UNLOGGED" : "—"
+        var raw: [(name: String, ms: Double, hex: String?, gap: Bool, open: Bool, note: String)] = []
+        var prevEnd = dayStart
         if blocks.isEmpty {
-            raw.append(("UNLOGGED", max(now - dayStart, 1), nil, true, false, 20, ""))
+            raw.append((gapName, max(now - dayStart, 1), nil, true, false, ""))
             prevEnd = now
         } else {
             for b in blocks {
-                if let pe = prevEnd, b.startMs - pe > gapMs {
-                    raw.append(("UNLOGGED", b.startMs - pe, nil, true, false, 20, ""))
+                let start = max(b.startMs, dayStart)
+                if start - prevEnd > gapMs {
+                    raw.append((gapName, start - prevEnd, nil, true, false, ""))
                 }
                 let id = Grammar.resolve(b.key)
                 let cat = catByKey[id]
-                let ms = b.endMs - max(b.startMs, dayStart)
-                let isOpen = open.map { o in
+                let ms = b.endMs - start
+                let isOpen = source == .actual && (open.map { o in
                     (b.ref != nil && b.ref == o.ref) || (b.ref == nil && b.startMs == o.startMs && b.endMs == now)
-                } ?? false
+                } ?? false)
+                let distract = isOpen ? currentDistractedMs() : (b.distractedMs ?? 0)
+                var note = b.text
+                if source == .actual, distract > 0 {
+                    let pct = Grammar.onTaskPercent(distractedMs: distract, blockMs: ms)
+                    note = note.isEmpty ? "\(pct)%" : "\(note) · \(pct)%"
+                }
                 raw.append((
                     (cat?.face ?? id).uppercased(),
                     ms,
                     cat?.hex,
                     false,
                     isOpen,
-                    26,
-                    b.text
+                    note
                 ))
-                prevEnd = max(prevEnd ?? b.endMs, b.endMs)
+                prevEnd = max(prevEnd, b.endMs)
             }
         }
-        if open == nil, let pe = prevEnd, now - pe > 5000 {
-            raw.append(("UNLOGGED", now - pe, nil, true, false, 20, ""))
+        if source == .actual, open == nil, now - prevEnd > 5000 {
+            raw.append(("UNLOGGED", now - prevEnd, nil, true, false, ""))
+        } else if source == .plan, now - prevEnd > 5000 {
+            raw.append(("—", now - prevEnd, nil, true, false, ""))
         }
-
-        let labelStart = blocks.isEmpty
-            ? dayStart
-            : max(blocks[0].startMs, dayStart)
-        let span = max(now - labelStart, 60_000)
 
         let px = budget / span
-        let share = budget / CGFloat(max(1, raw.count))
-        var heights = raw.map { max(CGFloat($0.ms) * px, min($0.floor, share)) }
-        let total = heights.reduce(0, +)
-        if total > budget {
-            let k = budget / total
-            heights = heights.map { $0 * k }
-        }
-
-        let items = zip(raw.indices, zip(raw, heights)).map { idx, pair in
-            let (r, h) = pair
-            return RailItem(
+        let items = raw.enumerated().map { idx, r in
+            RailItem(
                 id: "\(idx)",
                 name: r.name, ms: r.ms, hex: r.hex,
-                isGap: r.gap, isOpen: r.open, height: max(h, 1),
+                isGap: r.gap, isOpen: r.open, height: max(CGFloat(r.ms) * px, 1),
                 note: r.note
             )
         }
-        return ("TODAY · \(Format.clock(labelStart))", items)
+        let labelStart = blocks.isEmpty ? dayStart : max(blocks[0].startMs, dayStart)
+        let prefix = source == .plan ? "PLAN" : "ACTUAL"
+        return ("\(prefix) · \(Format.clock(labelStart))", items)
     }
 
     func labelFor(_ key: String) -> String { catByKey[Grammar.resolve(key)]?.face ?? Grammar.resolve(key) }
@@ -1058,12 +1172,22 @@ final class TapStore: ObservableObject {
     }
 
     private func adoptServerState(_ st: ServerState, gen: Int) -> Bool {
-        if gen != localGen || !queue.isEmpty { return false }
+        if gen != localGen || !queue.isEmpty || pendingKey != nil { return false }
         let wasRef = open?.ref
         let wasSit = sit?.ref
         open = st.open
         sit = st.sit
         today = st.today ?? []
+        planToday = st.planToday ?? []
+        if let flag = st.distracted {
+            distracted = flag
+            distractedAccruedMs = st.distractedAccruedMs ?? 0
+            distractStartMs = st.distractStartMs
+        } else if wasRef != open?.ref {
+            distracted = false
+            distractedAccruedMs = 0
+            distractStartMs = nil
+        }
         if wasRef != open?.ref || wasSit != sit?.ref {
             closeBlockSheets()
         }
@@ -1332,10 +1456,13 @@ final class TapStore: ObservableObject {
         return (nil, false)
     }
 
-    private func railClosed(_ block: OpenBlock, endMs: Double) {
+    private func railClosed(_ block: OpenBlock, endMs: Double, distractedMs: Double? = nil) {
         let dayStart = Format.dayStartMs(endMs)
         today = today.filter { $0.startMs >= dayStart }
-        today.append(TodayBlock(ref: block.ref, key: block.key, startMs: block.startMs, endMs: endMs, text: block.text))
+        today.append(TodayBlock(
+            ref: block.ref, key: block.key, startMs: block.startMs, endMs: endMs,
+            text: block.text, distractedMs: distractedMs
+        ))
     }
 
     private func railReopen(_ ref: String) {
@@ -1553,8 +1680,12 @@ final class TapStore: ObservableObject {
             open = st.open
             sit = st.sit
             today = st.today ?? []
+            planToday = st.planToday ?? []
             standStartMs = st.standStartMs
             lastUsed = st.lastUsed ?? [:]
+            distracted = st.distracted ?? false
+            distractedAccruedMs = st.distractedAccruedMs ?? 0
+            distractStartMs = st.distractStartMs
         }
         if let data = UserDefaults.standard.data(forKey: deadKey),
            let d = try? JSONDecoder().decode([DeadEntry].self, from: data) {
@@ -1580,7 +1711,11 @@ final class TapStore: ObservableObject {
     }
 
     private func persist() {
-        let st = Persisted(open: open, sit: sit, today: today, standStartMs: standStartMs, lastUsed: lastUsed)
+        let st = Persisted(
+            open: open, sit: sit, today: today, standStartMs: standStartMs, lastUsed: lastUsed,
+            planToday: planToday, distracted: distracted,
+            distractedAccruedMs: distractedAccruedMs, distractStartMs: distractStartMs
+        )
         if let data = try? JSONEncoder().encode(st) {
             UserDefaults.standard.set(data, forKey: stateKey)
         }
@@ -1654,5 +1789,9 @@ final class TapStore: ObservableObject {
         var today: [TodayBlock]?
         var standStartMs: Double?
         var lastUsed: [String: String]?
+        var planToday: [TodayBlock]?
+        var distracted: Bool?
+        var distractedAccruedMs: Double?
+        var distractStartMs: Double?
     }
 }

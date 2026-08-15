@@ -17,7 +17,20 @@ struct RootView: View {
         .sheet(isPresented: $store.showSettings) {
             SettingsView()
                 .environmentObject(store)
+                #if os(macOS)
+                .frame(minWidth: 420, minHeight: 320)
+                #endif
         }
+        #if os(macOS)
+        .sheet(isPresented: $store.showSignIn) {
+            SignInView()
+                .environmentObject(store)
+        }
+        .sheet(isPresented: $store.showPicker) {
+            CalendarPickerView()
+                .environmentObject(store)
+        }
+        #else
         .fullScreenCover(isPresented: $store.showSignIn) {
             SignInView()
                 .environmentObject(store)
@@ -26,13 +39,26 @@ struct RootView: View {
             CalendarPickerView()
                 .environmentObject(store)
         }
+        #endif
         .onAppear {
-            if TimeTapApp.isUISmoke { return }
+            if TimeTapRuntime.isUISmoke || TimeTapRuntime.isUnderTest { return }
             GoogleAuth.restore { store.boot() }
+            store.startCalendarPoll()
+        }
+        .onDisappear {
+            #if os(iOS)
+            if TimeTapRuntime.isUISmoke || TimeTapRuntime.isUnderTest { return }
+            store.stopCalendarPoll()
+            #endif
         }
         .onChange(of: scenePhase) { _, phase in
-            if TimeTapApp.isUISmoke { return }
-            if phase == .active { store.refreshOnReturn() }
+            if TimeTapRuntime.isUISmoke || TimeTapRuntime.isUnderTest { return }
+            if phase == .active {
+                store.pollActive = true
+                Task { await store.syncFromCalendar() }
+            } else {
+                store.pollActive = false
+            }
         }
         .onOpenURL { url in
             _ = GoogleAuth.handleURL(url)

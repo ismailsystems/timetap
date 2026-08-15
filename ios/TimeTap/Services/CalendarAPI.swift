@@ -117,6 +117,7 @@ enum CalendarAPI {
     static var didFlush = false
     static var testListedActual: FakeCalendar?
     static var testListedSitting: FakeCalendar?
+    static var testListedPlan: FakeCalendar?
     static var skipStatePush = false
     static var didPushState = false
     static var testStateError: String?
@@ -134,6 +135,7 @@ enum CalendarAPI {
         didFlush = false
         testListedActual = nil
         testListedSitting = nil
+        testListedPlan = nil
         skipStatePush = false
         didPushState = false
         testStateError = nil
@@ -278,7 +280,7 @@ enum CalendarAPI {
         }
     }
 
-    /// List ACTUAL + SITTING, run getState (staleGuard mutates), push the diff.
+    /// List PLAN (read) + ACTUAL + SITTING, run getState (staleGuard mutates), push the diff.
     static func refreshState() async throws -> ServerState {
         try await serial.run { try await refreshStateBody() }
     }
@@ -294,6 +296,7 @@ enum CalendarAPI {
         if let listed = testListedActual {
             ApplyOps.actual = cloneCalendar(listed)
             ApplyOps.sitting = cloneCalendar(testListedSitting ?? FakeCalendar())
+            ApplyOps.plan = cloneCalendar(testListedPlan ?? FakeCalendar())
             let beforeA = (ApplyOps.actual?.events ?? []).map(copyEvent)
             let st = try ApplyOps.getState()
             noteStaleClose(before: beforeA, after: ApplyOps.actual?.events ?? [])
@@ -317,12 +320,15 @@ enum CalendarAPI {
         let hi = now + 24 * 3_600_000
         let actual = FakeCalendar()
         let sitting = FakeCalendar()
+        let plan = FakeCalendar()
         actual.events = try await listEvents(calendarId: Credentials.actualId, from: lo, to: hi, token: token)
         sitting.events = try await listEvents(calendarId: Credentials.sittingId, from: lo, to: hi, token: token)
+        plan.events = try await listEvents(calendarId: Credentials.planId, from: lo, to: hi, token: token)
         let beforeA = actual.events.map(copyEvent)
         let beforeS = sitting.events.map(copyEvent)
         ApplyOps.actual = actual
         ApplyOps.sitting = sitting
+        ApplyOps.plan = plan
         ApplyOps.nowMs = now
         let st = try ApplyOps.getState()
         noteStaleClose(before: beforeA, after: actual.events)
@@ -387,12 +393,15 @@ enum CalendarAPI {
         let hi = now + 24 * 3_600_000
         let actual = FakeCalendar()
         let sitting = FakeCalendar()
+        let plan = FakeCalendar()
         actual.events = try await listEvents(calendarId: Credentials.actualId, from: lo, to: hi, token: token)
         sitting.events = try await listEvents(calendarId: Credentials.sittingId, from: lo, to: hi, token: token)
+        plan.events = try await listEvents(calendarId: Credentials.planId, from: lo, to: hi, token: token)
         let beforeA = actual.events.map(copyEvent)
         let beforeS = sitting.events.map(copyEvent)
         ApplyOps.actual = actual
         ApplyOps.sitting = sitting
+        ApplyOps.plan = plan
         let result = ApplyOps.apply(ops)
         try await pushDiff(calendarId: Credentials.actualId, before: beforeA, after: actual.events, token: token)
         try await pushDiff(calendarId: Credentials.sittingId, before: beforeS, after: sitting.events, token: token)

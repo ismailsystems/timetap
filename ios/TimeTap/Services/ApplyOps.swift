@@ -4,6 +4,7 @@ enum ApplyOps {
     static var nowMs: Double = Date().timeIntervalSince1970 * 1000
     static var actual: FakeCalendar?
     static var sitting: FakeCalendar?
+    static var plan: FakeCalendar?
     static var timeZone = TimeZone.current
     static var readError: String?
     static let msMin: Double = 60_000
@@ -13,6 +14,7 @@ enum ApplyOps {
         nowMs = Date().timeIntervalSince1970 * 1000
         actual = nil
         sitting = nil
+        plan = nil
         timeZone = TimeZone.current
         readError = nil
     }
@@ -58,20 +60,44 @@ enum ApplyOps {
                 ?? ParsedTitle(key: TT.unfiledKey, text: evA.title, mark: nil)
             open = OpenBlock(ref: refOf(evA), key: p.key, text: p.text, startMs: evA.startMs)
         }
+        var distracted: Bool?
+        var distractedAccruedMs: Double?
+        var distractStartMs: Double?
+        if let evA, let live = Grammar.readLiveDistract(evA.description) {
+            distracted = live.startMs > 0
+            distractedAccruedMs = live.accruedMs
+            distractStartMs = live.startMs > 0 ? live.startMs : nil
+        }
         let dayLo = localMidnightMs(nowMs)
         let dayHi = addLocalDays(dayLo, 1)
         let today: [TodayBlock] = ca.events(from: dayLo, to: dayHi).compactMap { e in
             let q = Grammar.parseTitle(e.title)
             if q?.key == "UNLOGGED" { return nil }
             if let evA, e.startMs == evA.startMs { return nil }
-            return TodayBlock(key: q?.key ?? TT.unfiledKey, startMs: e.startMs, endMs: e.endMs)
+            return TodayBlock(
+                key: q?.key ?? TT.unfiledKey,
+                startMs: e.startMs, endMs: e.endMs,
+                distractedMs: Grammar.readDistract(e.description)
+            )
+        }
+        var planToday: [TodayBlock]?
+        if let cp = plan {
+            planToday = cp.events(from: dayLo, to: dayHi).compactMap { e in
+                if e.isAllDay { return nil }
+                guard let q = Grammar.parseTitle(e.title) else { return nil }
+                return TodayBlock(
+                    key: q.key, startMs: e.startMs, endMs: e.endMs, text: q.text
+                )
+            }
         }
         var evS = findOpen(cs)
         evS = staleGuard(cs, evS, isActual: false)
         let sit: SitBlock? = evS.map { SitBlock(ref: refOf($0), startMs: $0.startMs) }
         return ServerState(
             nowMs: nowMs, tz: timeZone.identifier, open: open, sit: sit,
-            notes: [], today: today
+            notes: [], today: today, planToday: planToday,
+            distracted: distracted, distractedAccruedMs: distractedAccruedMs,
+            distractStartMs: distractStartMs
         )
     }
 
@@ -102,6 +128,7 @@ enum ApplyOps {
         case "recategorize": opRecategorize(op)
         case "setMark": opSetMark(op)
         case "setText": opSetText(op)
+        case "setDistract": opSetDistract(op)
         case "splitActual": opSplitActual(op)
         case "openSit": opOpenSit(op)
         case "closeSit": opCloseSit(op)
@@ -154,7 +181,7 @@ enum ApplyOps {
             ev.title = Grammar.buildTitle(p.key, p.text, "?")
         }
         endEventAt(ev, boundEnd)
-        writeDesc(ev, ref: refOf(ev), isOpen: false)
+        sealClosed(ev, ref: refOf(ev))
 
         if isActual && now - boundEnd >= msMin {
             let un = cal.createEvent(
@@ -217,6 +244,21 @@ enum ApplyOps {
         ev.description = Grammar.writeDesc(ev.description, ref: ref, isOpen: isOpen)
     }
 
+    /// Close an ACTUAL event. Always strip `#distractlive`. Keep accrued time when present.
+    static func sealClosed(_ ev: CalEvent, ref: String, distractedMs: Double = 0) {
+        var d = distractedMs
+        if d <= 0, let live = Grammar.readLiveDistract(ev.description) {
+            d = live.accruedMs
+            if live.startMs > 0 {
+                d += max(0, ev.endMs - live.startMs)
+            }
+        }
+        ev.description = Grammar.stampDistract(
+            ev.description, distractedMs: d, blockMs: ev.endMs - ev.startMs
+        )
+        writeDesc(ev, ref: ref, isOpen: false)
+    }
+
     static func refOf(_ ev: CalEvent) -> String {
         let pat = NSRegularExpression.escapedPattern(for: TT.refPrefix) + "([A-Za-z0-9]+)"
         if let m = Grammar.match(pat, ev.description) { return m[1] }
@@ -242,7 +284,7 @@ enum ApplyOps {
         let newest = open[open.count - 1]
         for j in 0..<(open.count - 1) {
             endEventAt(open[j], newest.startMs)
-            writeDesc(open[j], ref: refOf(open[j]), isOpen: false)
+            sealClosed(open[j], ref: refOf(open[j]))
         }
         return newest
     }
@@ -258,7 +300,7 @@ enum ApplyOps {
         if findByRef(cal, op.ref, hintMs: op.startMs) != nil { return }
         if let prev = findOpen(cal), refOf(prev) != op.ref {
             endEventAt(prev, op.startMs ?? nowMs)
-            writeDesc(prev, ref: refOf(prev), isOpen: false)
+            sealClosed(prev, ref: refOf(prev))
         }
         let start = op.startMs ?? nowMs
         let ev = cal.createEvent(
@@ -280,6 +322,9 @@ enum ApplyOps {
         // Vacuity: remove `!closed ||` and the stretch criterion goes red.
         if !closed || p.mark == "?" { endEventAt(ev, op.endMs ?? nowMs) }
         ev.title = Grammar.buildTitle(p.key, text, op.mark)
+        ev.description = Grammar.stampDistract(
+            ev.description, distractedMs: op.distractedMs ?? 0, blockMs: ev.endMs - ev.startMs
+        )
         writeDesc(ev, ref: op.ref ?? "", isOpen: false)
     }
 
@@ -303,6 +348,17 @@ enum ApplyOps {
         guard let ev = findByRef(cal, op.ref, hintMs: op.hintMs) else { return }
         guard let p = Grammar.parseTitle(ev.title) else { return }
         ev.title = Grammar.buildTitle(p.key, op.text ?? "", p.mark)
+    }
+
+    private static func opSetDistract(_ op: Op) {
+        guard let cal = actual else { return }
+        guard let ev = findByRef(cal, op.ref, hintMs: op.hintMs ?? op.startMs) else { return }
+        ev.description = Grammar.stampLiveDistract(
+            ev.description,
+            accruedMs: op.distractedMs ?? 0,
+            startMs: op.startMs ?? 0
+        )
+        writeDesc(ev, ref: op.ref ?? "", isOpen: isOpen(ev))
     }
 
     private static func opSplitActual(_ op: Op) {

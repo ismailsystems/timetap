@@ -1,0 +1,192 @@
+import XCTest
+@testable import TimeTap
+
+/// Watch radios through the iPhone. The Mac uses Calendar as the sync bus
+/// and never activates WCSession.
+final class MacWatchBoundaryTests: TimeTapTestCase {
+    func testTimeTapMacSourcesExcludeWatchBridge() throws {
+        let yml = try iosSource("project.yml")
+        let mac = slice(yml, from: "  TimeTapMac:\n", to: "  TimeTapMacTests:")
+        XCTAssertTrue(mac.contains("platform: macOS"), "TimeTapMac must stay a macOS target")
+        XCTAssertTrue(
+            mac.contains("Watch/WatchBridge.swift"),
+            "TimeTapMac sources must name Watch/WatchBridge.swift"
+        )
+        XCTAssertTrue(
+            mac.contains("- Watch/WatchBridge.swift"),
+            "TimeTapMac sources must exclude Watch/WatchBridge.swift"
+        )
+        let ios = slice(yml, from: "  TimeTap:\n", to: "  TimeTapWatch:")
+        XCTAssertFalse(
+            ios.contains("Watch/WatchBridge.swift"),
+            "the iPhone target must keep WatchBridge"
+        )
+    }
+
+    func testWatchCompanionIsIPhoneNotMac() throws {
+        let plist = try iosSource("TimeTapWatch/Info.plist")
+        XCTAssertTrue(
+            plist.contains("<key>WKCompanionAppBundleIdentifier</key>"),
+            "Watch Info.plist must name a companion"
+        )
+        XCTAssertTrue(
+            plist.contains("<string>app.timetap.ios</string>"),
+            "Watch companions the iPhone, not the Mac"
+        )
+        XCTAssertFalse(
+            plist.contains("app.timetap.mac"),
+            "Watch must not companion the Mac bundle"
+        )
+
+        let yml = try iosSource("project.yml")
+        let watch = slice(yml, from: "  TimeTapWatch:\n", to: "  TimeTapWatchWidgets:")
+        XCTAssertTrue(
+            watch.contains("WKCompanionAppBundleIdentifier: app.timetap.ios"),
+            "project.yml must keep WKCompanionAppBundleIdentifier: app.timetap.ios"
+        )
+        XCTAssertFalse(
+            watch.contains("app.timetap.mac"),
+            "Watch project settings must not companion the Mac"
+        )
+    }
+
+    func testTimeTapMacAppHasNoWatchConnectivity() throws {
+        let text = try iosSource("TimeTapMac/TimeTapMacApp.swift")
+        XCTAssertFalse(text.contains("WCSession"), "Mac app must not touch WCSession")
+        XCTAssertFalse(text.contains("WatchBridge"), "Mac app must not start WatchBridge")
+        XCTAssertFalse(
+            text.contains("WatchConnectivity"),
+            "Mac app must not import WatchConnectivity"
+        )
+        XCTAssertTrue(
+            text.contains("applicationShouldTerminateAfterLastWindowClosed"),
+            "closing the last window must keep the menu bar extra alive"
+        )
+        XCTAssertTrue(text.contains("WindowGroup(id: \"main\")"), "Show TimeTap must reopen id main")
+        XCTAssertTrue(text.contains("windowToolbarStyle(.unified)"), "Mac window must use a unified toolbar")
+        XCTAssertTrue(
+            text.contains("allowsAutomaticWindowTabbing = false"),
+            "Mac must not merge capture windows into tabs"
+        )
+        XCTAssertTrue(text.contains("defaultPosition(.center)"), "the first window must open centered")
+        XCTAssertTrue(
+            text.contains("windowResizability(.contentMinSize)"),
+            "the window must not shrink below the capture floor"
+        )
+        XCTAssertTrue(
+            text.contains("MacCommandHub.showMain()"),
+            "dock reopen must front the existing window"
+        )
+        XCTAssertTrue(
+            text.contains("minWidth: 420, minHeight: 320"),
+            "the Settings scene must have a desktop floor"
+        )
+    }
+
+    func testTimeTapMacTargetExcludesLiveActivityAndPhoneApp() throws {
+        let yml = try iosSource("project.yml")
+        let mac = slice(yml, from: "  TimeTapMac:\n", to: "  TimeTapMacTests:")
+        XCTAssertTrue(mac.contains("- TimeTapApp.swift"), "TimeTapMac must exclude TimeTapApp.swift")
+        XCTAssertTrue(mac.contains("- LiveActivity"), "TimeTapMac must exclude LiveActivity")
+    }
+
+    func testWatchBridgeAppliesProposeToggleDistractAndEndDay() throws {
+        let text = try iosSource("TimeTap/Watch/WatchBridge.swift")
+        XCTAssertTrue(text.contains("store.propose"), "WatchBridge must call store.propose")
+        XCTAssertTrue(
+            text.contains("store.toggleDistract()"),
+            "WatchBridge must call store.toggleDistract"
+        )
+        XCTAssertTrue(text.contains("store.endDay()"), "WatchBridge must call store.endDay")
+        let apply = slice(text, from: "private func apply(", to: "nonisolated func session(")
+        XCTAssertTrue(apply.contains("store.propose"), "apply must call store.propose")
+        XCTAssertTrue(
+            apply.contains("store.toggleDistract()"),
+            "apply must call store.toggleDistract"
+        )
+        XCTAssertTrue(apply.contains("store.endDay()"), "apply must call store.endDay")
+    }
+
+    func testStatusItemHasSitAndShow() throws {
+        let text = try iosSource("TimeTapMac/StatusItemController.swift")
+        XCTAssertTrue(text.contains("toggleSit"), "menu bar extra must offer Sit")
+        XCTAssertTrue(text.contains("Show TimeTap"), "menu bar extra must offer Show TimeTap")
+        XCTAssertTrue(text.contains("Quit timetap"), "menu bar extra must offer Quit")
+        XCTAssertTrue(text.contains("barTitle"), "menu bar extra must build a live title")
+        XCTAssertTrue(
+            text.contains("Format.shortElapsed"),
+            "menu bar extra must show live elapsed"
+        )
+        XCTAssertTrue(text.contains("statusClicked"), "left click must have a click handler")
+        XCTAssertTrue(text.contains("leftMouseUp"), "left click must show the window")
+        XCTAssertTrue(text.contains("rightMouseUp"), "right click must show the menu")
+        XCTAssertTrue(
+            text.contains("MacCommandHub.showMain()"),
+            "status item must front the existing window"
+        )
+        XCTAssertTrue(
+            text.contains("revealIfNeeded"),
+            "Sign-In, picker, and mark strip must open the window"
+        )
+        XCTAssertFalse(text.contains("item.menu ="), "a permanent menu steals the left click")
+        XCTAssertFalse(text.contains("WCSession"), "menu bar extra must not touch WCSession")
+    }
+
+    func testMacCommandsHasChildLabelShortcutsAndAbout() throws {
+        let text = try iosSource("TimeTapMac/MacCommands.swift")
+        XCTAssertTrue(text.contains("About timetap"), "Mac app menu must offer About timetap")
+        XCTAssertTrue(
+            text.contains("CommandGroup(replacing: .newItem)"),
+            "File > New Window must not spawn a second capture window"
+        )
+        XCTAssertTrue(
+            text.contains("MacCommandHub.showMain()"),
+            "Show TimeTap must front the existing window"
+        )
+        XCTAssertTrue(
+            text.contains("revealIfNeeded"),
+            "Capture menu must open the window for Sign-In and mark strip"
+        )
+        let shortcuts = slice(text, from: "ForEach(Array(leaves.prefix(9)", to: "CommandGroup(after:")
+        XCTAssertTrue(
+            shortcuts.contains("Button(child.label)"),
+            "Capture menu must bind real child.label shortcuts"
+        )
+        XCTAssertTrue(
+            shortcuts.contains(".keyboardShortcut"),
+            "child labels must have keyboard shortcuts"
+        )
+    }
+
+    func testMacSyncNeverActivatesWCSession() throws {
+        let text = try iosSource("TimeTap/Mac/MacSync.swift")
+        XCTAssertTrue(
+            text.contains("never activates WCSession")
+                || text.contains("The Mac never activates WCSession"),
+            "MacSync must say the Mac never activates WCSession"
+        )
+        XCTAssertTrue(
+            text.contains("Calendar is the sync bus")
+                || text.contains("Calendar"),
+            "MacSync must name Calendar as the sync bus"
+        )
+    }
+
+    private func iosSource(_ relative: String) throws -> String {
+        try String(
+            contentsOf: URL(fileURLWithPath: #filePath)
+                .deletingLastPathComponent()
+                .deletingLastPathComponent()
+                .appendingPathComponent(relative),
+            encoding: .utf8
+        )
+    }
+
+    private func slice(_ text: String, from: String, to: String? = nil) -> String {
+        let start = text.range(of: from)!.lowerBound
+        let end = to.flatMap {
+            text.range(of: $0, range: start..<text.endIndex)?.lowerBound
+        } ?? text.endIndex
+        return String(text[start..<end])
+    }
+}

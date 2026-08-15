@@ -190,69 +190,35 @@ final class PostureRowTests: TimeTapTestCase {
         let text = try captureText()
         XCTAssertFalse(text.contains("private var addRow"), "add row left the capture grid")
         XCTAssertFalse(text.contains("Text(\"+\")"), "add lives in Settings")
-        let forEach = try XCTUnwrap(
-            text.range(of: "ForEach(store.groups)"),
-            "group ForEach is missing"
-        )
+        XCTAssertFalse(text.contains("ForEach(store.groups)"), "category column is gone")
+        XCTAssertFalse(text.contains("categoryList"), "category column is gone")
+        XCTAssertFalse(text.contains("settingsRow"), "gear left the capture chrome")
+        XCTAssertFalse(text.contains("groups.count + 1"), "sit is not a category row")
         let sit = try XCTUnwrap(
             text.range(of: "sitChip"),
             "sitChip usage is missing"
-        )
-        XCTAssertLessThan(
-            forEach.lowerBound,
-            sit.lowerBound,
-            "sitChip must sit after ForEach(store.groups)"
-        )
-        XCTAssertFalse(text.contains("settingsRow"), "gear left the category column")
-        let list = try XCTUnwrap(
-            text.range(of: "private func categoryList"),
-            "categoryList is missing"
-        )
-        let footerAt = try XCTUnwrap(
-            text.range(of: "private var footer"),
-            "footer is missing"
-        )
-        let column = text[list.lowerBound..<footerAt.lowerBound]
-        XCTAssertTrue(
-            column.contains("groups.count + 1"),
-            "groups and sit share one row height"
-        )
-        XCTAssertTrue(
-            column.contains("height - rowH"),
-            "list rows fill the space above NOT SITTING"
-        )
-        XCTAssertTrue(
-            column.contains("minHeight: rowH, maxHeight: rowH"),
-            "NOT SITTING uses the same row height as the category buttons"
-        )
-        XCTAssertFalse(
-            column.contains("nowH"),
-            "the gear row left the category column"
-        )
-        XCTAssertLessThan(
-            column.range(of: "height - rowH")!.lowerBound,
-            column.range(of: "sitChip")!.lowerBound,
-            "sit sits under the category scroll so Poop cannot leave a gap"
         )
         let footerStart = try XCTUnwrap(
             text.range(of: "private var footer"),
             "footer is missing"
         )
         let footerEnd = try XCTUnwrap(
-            text.range(of: "private var elapsedLabel"),
-            "elapsedLabel is missing"
+            text.range(of: "private var postureElapsed"),
+            "postureElapsed is missing"
         )
         XCTAssertLessThan(footerStart.lowerBound, footerEnd.lowerBound)
         let footer = text[footerStart.lowerBound..<footerEnd.lowerBound]
-        XCTAssertFalse(
+        XCTAssertTrue(
             footer.contains("sitChip"),
-            "footer must not contain sitChip"
+            "sitChip sits in the footer"
         )
-        XCTAssertLessThan(
+        XCTAssertGreaterThan(
             sit.lowerBound,
             footerStart.lowerBound,
-            "sitChip usage must sit in the category list, not the footer"
+            "sitChip usage must sit in the footer, not a category column"
         )
+        XCTAssertTrue(text.contains("source: .plan"), "left rail is PLAN")
+        XCTAssertTrue(text.contains("source: .actual"), "right rail is ACTUAL")
     }
 
     func testCaptureViewDoesNotMentionLiveActivity() throws {

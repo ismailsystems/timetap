@@ -31,6 +31,7 @@ struct TimeTapApp: App {
             store.banner = nil
         }
         _store = StateObject(wrappedValue: store)
+        WatchBridge.start(store: store)
         LiveActivityDarwin.observe(
             toggleSit: { Task { await store.handleSitIntent() } },
             stopSit: { Task { await store.handleStopSitIntent() } },

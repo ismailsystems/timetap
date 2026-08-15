@@ -3,6 +3,9 @@ import SwiftUI
 struct SettingsView: View {
     @EnvironmentObject private var store: TapStore
     @Environment(\.dismiss) private var dismiss
+    #if os(macOS)
+    @Environment(\.isPresented) private var isPresented
+    #endif
 
     var body: some View {
         NavigationStack {
@@ -13,7 +16,11 @@ struct SettingsView: View {
                     }
                     .accessibilityHint("Opens the category list")
                 } footer: {
+                    #if os(macOS)
+                    Text("A category you add in Settings stays on this Mac. The web app does not show it.")
+                    #else
                     Text("A category you add in Settings stays on this phone. The web app does not show it.")
+                    #endif
                 }
 
                 Section {
@@ -43,17 +50,33 @@ struct SettingsView: View {
             .background(Theme.ground)
             .foregroundStyle(Theme.fg)
             .navigationTitle("Settings")
+            #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
+            #endif
             .toolbar {
+                #if os(macOS)
+                if isPresented {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("Close") { dismiss() }
+                            .accessibilityHint("Returns to capture")
+                    }
+                }
+                #else
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Close") { dismiss() }
                         .accessibilityHint("Returns to capture")
                 }
+                #endif
             }
         }
         .preferredColorScheme(.dark)
+        #if os(macOS)
+        .frame(minWidth: 420, minHeight: 320)
+        #endif
+        #if os(iOS)
         .presentationDetents([.medium, .large])
         .presentationDragIndicator(.visible)
+        #endif
     }
 
     private func calendarRow(_ title: String, id: String) -> some View {
