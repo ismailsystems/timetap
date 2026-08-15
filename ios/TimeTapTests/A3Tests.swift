@@ -24,9 +24,9 @@ final class A3Tests: TimeTapTestCase {
 
     func testOpenActualDWWritesPath2Event() throws {
         let t: Double = 1_700_000_000_000
-        let ev = try CalendarAPI.openActual(key: "DW", at: t, ref: "abcdefghijklmnop")
+        let ev = try CalendarAPI.openActual(key: "Deep work", at: t, ref: "abcdefghijklmnop")
         XCTAssertEqual(fake.events.count, 1)
-        XCTAssertEqual(ev.title, "DW:")
+        XCTAssertEqual(ev.title, "Deep work:")
         XCTAssertEqual(ev.colorId, "9")
         XCTAssertNotNil(ev.description.range(of: #"#ref:[A-Za-z0-9]{16}"#, options: .regularExpression))
         XCTAssertTrue(ev.description.contains("#open"))
@@ -45,11 +45,11 @@ final class A3Tests: TimeTapTestCase {
         ApplyOps.sitting = FakeCalendar()
         ApplyOps.nowMs = t
         _ = ApplyOps.apply([
-            Op(id: "o1", type: "openActual", ref: "abcdefghijklmnop", key: "DW", startMs: t)
+            Op(id: "o1", type: "openActual", ref: "abcdefghijklmnop", key: "Deep work", startMs: t)
         ])
         XCTAssertEqual(fake.events.count, 1)
         let ev = fake.events[0]
-        XCTAssertEqual(ev.title, "DW:")
+        XCTAssertEqual(ev.title, "Deep work:")
         XCTAssertEqual(ev.colorId, "9")
         XCTAssertNotNil(ev.description.range(of: #"#ref:[A-Za-z0-9]{16}"#, options: .regularExpression))
         XCTAssertTrue(ev.description.contains("#open"))
@@ -61,7 +61,7 @@ final class A3Tests: TimeTapTestCase {
         Credentials.actualId = ""
         await MainActor.run {
             let store = TapStore()
-            store.tapCategory("DW")
+            store.tapCategory("Deep work")
             XCTAssertTrue(fake.events.isEmpty)
             XCTAssertEqual(store.banner, "Pick PLAN, ACTUAL and SITTING calendars first.")
         }
@@ -71,12 +71,12 @@ final class A3Tests: TimeTapTestCase {
         fake.failInsert = true
         await MainActor.run {
             let store = TapStore()
-            store.tapCategory("DW")
+            store.tapCategory("Deep work")
             XCTAssertTrue(fake.events.isEmpty)
             XCTAssertTrue(store.lastInsertFailed)
             XCTAssertFalse(store.syncLabel.contains("synced"))
             fake.failInsert = false
-            store.tapCategory("DW")
+            store.tapCategory("Deep work")
             XCTAssertEqual(fake.events.count, 1)
             XCTAssertFalse(store.lastInsertFailed)
         }

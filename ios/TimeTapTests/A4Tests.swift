@@ -27,12 +27,12 @@ final class A4Tests: TimeTapTestCase {
             Credentials.resetForTests()
             let store = TapStore()
             XCTAssertEqual(
-                store.categories.map(\.key),
-                ["DW", "MTG", "ADM", "BODY", "REL", "FRAG", "POOP"]
+                store.categories.map(\.label),
+                ["Deep work", "Meetings", "Admin", "Zone 2", "Lifting", "Walking", "People", "Fragments", "Poop"]
             )
-            XCTAssertEqual(store.categories.first { $0.key == "DW" }?.color, "9")
-            XCTAssertEqual(store.categories.first { $0.key == "DW" }?.hex, "#3f51b5")
-            let poop = store.categories.first { $0.key == "POOP" }
+            XCTAssertEqual(store.categories.first { $0.label == "Deep work" }?.color, "9")
+            XCTAssertEqual(store.categories.first { $0.label == "Deep work" }?.hex, "#3f51b5")
+            let poop = store.categories.first { $0.label == "Poop" }
             XCTAssertEqual(poop?.color, "5")
             XCTAssertEqual(poop?.hex, "#f6bf26")
         }

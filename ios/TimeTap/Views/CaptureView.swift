@@ -5,13 +5,18 @@ struct CaptureView: View {
     @EnvironmentObject private var store: TapStore
     @State private var noteDraft = ""
     @State private var tick = Date()
-    @State private var naming = false
-    @State private var addDraft = ""
     @State private var catWidth: CGFloat = 96
     @State private var editingNote = false
+    @State private var scrubGroup: String?
+    @State private var scrubPick: String?
+    @State private var scrubOrigin: String?
+    @State private var scrubLocked = false
+    @State private var rowTouchAt: Date?
+    @State private var colW: CGFloat = 160
+    @State private var chipAteTap = false
     @FocusState private var focus: Field?
 
-    private enum Field: Hashable { case note, add }
+    private enum Field: Hashable { case note }
 
     private let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
 
@@ -35,22 +40,19 @@ struct CaptureView: View {
                     .disabled(store.deadCount == 0)
                     .accessibilityLabel(banner)
                 }
-                nowPanel
+                titleBar
                 GeometryReader { geo in
                     let screen = geo.size.width > 1 ? geo.size.width : UIScreen.main.bounds.width
                     let catW = min(max(catWidth + 24, 128), screen * 0.67)
-                    let rowH = max(44, geo.size.height / max(CGFloat(store.categories.count + 3), 1))
-                    let nowH = rowH - 25
-                    HStack(alignment: .bottom, spacing: 0) {
+                    HStack(alignment: .top, spacing: 0) {
                         DayRailView(
                             tick: tick,
-                            nowRowHeight: nowH,
                             onOpenTap: beginNoteEdit,
                             onOtherTap: finishNoteEdit
                         )
                             .frame(maxWidth: .infinity, maxHeight: .infinity)
                             .accessibilityElement(children: .contain)
-                        categoryList(height: geo.size.height, nowH: nowH)
+                        categoryList(height: geo.size.height)
                             .frame(width: catW)
                             .frame(maxHeight: .infinity)
                     }
@@ -90,45 +92,33 @@ struct CaptureView: View {
         }
     }
 
-    private var nowPanel: some View {
+    private var titleBar: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(alignment: .center, spacing: 12) {
-                Text(store.open.map { store.labelFor($0.key).uppercased() } ?? "NOTHING RUNNING")
-                    .font(.system(size: 32, weight: .black))
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.6)
-                    .layoutPriority(0)
-                Spacer(minLength: 8)
-                if store.open != nil {
-                    Button {
-                        finishNoteEdit()
-                    } label: {
-                        Text(elapsedLabel)
-                            .font(.system(size: 48, weight: .heavy))
-                            .foregroundStyle(isLong ? Theme.flag : Theme.accentOn)
-                            .monospacedDigit()
-                            .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityIdentifier("elapsed")
-                    .accessibilityLabel(nowAccessibility)
-                    .accessibilityHint("Dismisses the keyboard")
-                    .layoutPriority(1)
-                } else {
-                    Text("—")
-                        .font(.system(size: 48, weight: .heavy))
-                        .foregroundStyle(Theme.accentOn)
-                        .accessibilityLabel(nowAccessibility)
+                Text("TimeTap")
+                    .font(Theme.rowFont(22, weight: .bold))
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                Button {
+                    finishNoteEdit()
+                    store.showSettings = true
+                } label: {
+                    Image(systemName: "gearshape")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(Theme.dim)
+                        .frame(width: 44, height: 44)
+                        .contentShape(Rectangle())
                 }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Settings")
+                .accessibilityHint("Opens settings")
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
             if showNoteField {
                 noteField
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(16)
-        .padding(.horizontal, 2)
+        .padding(.horizontal, 18)
+        .padding(.vertical, 12)
     }
 
     private var noteField: some View {
@@ -165,146 +155,33 @@ struct CaptureView: View {
     }
 
     @ViewBuilder
-    private func categoryList(height: CGFloat, nowH: CGFloat) -> some View {
-        let n = CGFloat(store.categories.count + 2)
-        let rowH = max(44, (height - nowH) / max(n, 1))
+    private func categoryList(height: CGFloat) -> some View {
+        let n = CGFloat(store.groups.count + 1)
+        let rowH = max(44, height / max(n, 1))
         VStack(spacing: 0) {
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
-                    if store.canAddCategory {
-                        addRow
-                            .frame(maxWidth: .infinity, minHeight: rowH, maxHeight: rowH)
-                            .id("add")
-                    } else {
-                        Text("That is \(store.config?.maxCategories ?? 10) categories already.")
-                            .font(Theme.font(12, weight: .semibold))
-                            .foregroundStyle(Theme.mute)
-                            .padding(.leading, 12)
-                            .padding(.trailing, 16)
-                            .frame(maxWidth: .infinity, minHeight: rowH, maxHeight: rowH, alignment: .leading)
-                            .overlay(alignment: .top) { Rectangle().fill(Theme.rule2.opacity(0.5)).frame(height: 1) }
-                    }
-
-                    ForEach(store.categories) { cat in
-                        let running = store.open?.key == cat.key
-                        Button {
-                            finishNoteEdit()
-                            if !running {
-                                UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                            }
-                            store.tapCategory(cat.key)
-                        } label: {
-                            categoryRow(
-                                face: cat.face,
-                                hex: cat.hex,
-                                dim: false,
-                                running: running,
-                                elapsed: elapsedLabel,
-                                long: running && isLong
-                            )
-                            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
-                            .contentShape(Rectangle())
-                            .background(running ? Theme.panel : Color.clear)
-                        }
-                        .buttonStyle(.plain)
-                        .frame(height: rowH)
-                        .overlay(alignment: .top) { Rectangle().fill(Theme.rule2.opacity(0.5)).frame(height: 1) }
-                        .accessibilityLabel(cat.face)
-                        .accessibilityAddTraits(running ? [.isSelected] : [])
-                        .accessibilityValue(running ? elapsedLabel : "")
-                        .runningCategoryMenu(enabled: running) {
-                            finishNoteEdit()
-                            store.openSplit()
-                        } addNote: {
-                            beginNoteEdit()
-                        }
-                        .id(cat.key)
+                    ForEach(store.groups) { group in
+                        groupRow(group, rowH: rowH)
                     }
                 }
             }
             .scrollDisabled(rowH > 44.5)
-            .frame(height: min(rowH * CGFloat(store.categories.count + 1), max(0, height - nowH - rowH)))
+            .frame(height: min(rowH * CGFloat(store.groups.count), max(0, height - rowH)))
 
             sitChip
                 .frame(maxWidth: .infinity, minHeight: rowH, maxHeight: rowH)
                 .overlay(alignment: .top) { Rectangle().fill(Theme.rule2.opacity(0.5)).frame(height: 1) }
                 .id("sit")
-            settingsRow
-                .frame(maxWidth: .infinity, minHeight: nowH, maxHeight: nowH)
-                .overlay(alignment: .top) { Rectangle().fill(Theme.rule2.opacity(0.5)).frame(height: 1) }
-                .id("settings")
         }
         .frame(maxHeight: .infinity)
         .onChange(of: store.scrollToKey) { _, _ in
             store.scrollToKey = nil
         }
-        .onChange(of: naming) { _, on in
-            if on { focus = .add }
-        }
-    }
-
-    @ViewBuilder
-    private var addRow: some View {
-        if naming {
-            HStack(spacing: 10) {
-                RoundedRectangle(cornerRadius: 2, style: .continuous)
-                    .fill(Theme.rule2)
-                    .frame(width: 8, height: 18)
-                TextField("name it", text: $addDraft)
-                    .font(Theme.font(20, weight: .semibold))
-                    .fontWidth(.standard)
-                    .textInputAutocapitalization(.words)
-                    .autocorrectionDisabled()
-                    .focused($focus, equals: .add)
-                    .submitLabel(.done)
-                    .onSubmit { commitAdd() }
-                    .onAppear { focus = .add }
-                    .disabled(store.addingCategory)
-            }
-            .padding(.leading, 12)
-            .padding(.trailing, 16)
-            .padding(.vertical, 8)
-        } else {
-            Button {
-                naming = true
-            } label: {
-                Text("+")
-                    .font(.system(size: 28, weight: .medium))
-                    .foregroundStyle(Theme.mute)
-                    .offset(y: -1)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
-                    .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .accessibilityLabel("Add a category")
-        }
     }
 
     private var footer: some View {
         VStack(spacing: 0) {
-            if let label = store.undoLabel {
-                Button(action: store.takeUndo) {
-                    HStack {
-                        Text(label)
-                            .font(.system(size: 12, weight: .heavy))
-                            .tracking(1.0)
-                        Spacer()
-                        Text("UNDO · \(store.undoSecondsLeft)")
-                            .font(.system(size: 12, weight: .heavy))
-                            .monospacedDigit()
-                    }
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 18)
-                    .padding(.vertical, 14)
-                    .background(Theme.accent)
-                }
-                .buttonStyle(.plain)
-                .padding(.bottom, 12)
-                .accessibilityLabel("Undo: \(label)")
-                .accessibilityHint("Available for \(store.undoSecondsLeft) seconds")
-            }
-
             if let strip = store.markStrip {
                 VStack(spacing: 0) {
                     Text("\(store.labelFor(strip.key).uppercased()) · \(Format.elapsed(strip.durMs)) — MARK IT")
@@ -348,37 +225,11 @@ struct CaptureView: View {
         return ms >= Double(store.config?.longBlockMinutes ?? 90) * 60_000
     }
 
-    private var nowAccessibility: String {
-        if let open = store.open {
-            return "Now \(store.labelFor(open.key)), \(elapsedLabel), since \(Format.clock(open.startMs))"
-        }
-        return "Nothing running, time is unlogged"
-    }
-
     private var postureElapsed: String {
         _ = tick
         let start = store.sit?.startMs ?? store.standStartMs
         guard let start else { return "0m" }
         return Format.shortElapsed(store.clock() - start)
-    }
-
-    private var settingsRow: some View {
-        Button {
-            finishNoteEdit()
-            store.showSettings = true
-        } label: {
-            Image(systemName: "gearshape")
-                .font(.system(size: 16, weight: .semibold))
-                .foregroundStyle(Theme.dim)
-                .frame(width: 44, height: 44, alignment: .top)
-            .padding(.top, 12)
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
-            .padding(.trailing, 16)
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel("Settings")
-        .accessibilityHint("Opens settings")
     }
 
     @ViewBuilder
@@ -395,14 +246,14 @@ struct CaptureView: View {
                     .frame(width: 18, height: 18)
                     .accessibilityHidden(true)
                 Text(sitting ? "SITTING" : "NOT SITTING")
-                    .font(Theme.font(20, weight: .semibold))
+                    .font(Theme.rowFont(20, weight: .semibold))
                     .fontWidth(.standard)
                     .lineLimit(1)
                     .minimumScaleFactor(0.6)
                     .foregroundStyle(Theme.fg)
                 Spacer(minLength: 4)
                 Text(postureElapsed)
-                    .font(Theme.font(12, weight: .bold).monospacedDigit())
+                    .font(Theme.rowFont(12, weight: .bold).monospacedDigit())
                     .foregroundStyle(Theme.dim)
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
@@ -440,29 +291,234 @@ struct CaptureView: View {
         }
     }
 
+    @ViewBuilder
+    private func groupRow(_ group: CategoryGroup, rowH: CGFloat) -> some View {
+        let runningChild = store.open.flatMap { open in
+            group.children.first { $0.label == open.key }
+        }
+        let pendingChild = store.pendingKey.flatMap { key in
+            group.children.first { $0.label == key }
+        }
+        let running = runningChild != nil
+        let fallback = store.pickFromGroup(group, hover: nil) ?? group.label
+        let preview = scrubGroup == group.label ? scrubPick : nil
+        let faceLabel = preview ?? pendingChild?.label ?? runningChild?.label ?? fallback
+        let faceChild = group.children.first { $0.label == faceLabel }
+        let groupWord = group.children.count > 1 ? group.label : nil
+        let stopIndex = group.children.firstIndex { $0.label == faceLabel } ?? 0
+        let scrubbing = preview != nil
+        let pending = pendingChild != nil
+        categoryRow(
+            face: faceChild?.face ?? group.label,
+            group: groupWord,
+            hex: faceChild?.hex ?? group.hex,
+            dim: false,
+            running: running,
+            elapsed: elapsedLabel,
+            long: running && isLong,
+            stops: group.children.count,
+            stopIndex: stopIndex,
+            scrubbing: scrubbing,
+            pending: pending && !scrubbing
+        )
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+        .contentShape(Rectangle())
+        .background {
+            selectedFill(
+                hex: faceChild?.hex ?? group.hex,
+                on: running || pendingChild != nil || scrubbing,
+                heavy: scrubbing
+            )
+        }
+        .frame(height: rowH)
+        .overlay(alignment: .top) { Rectangle().fill(Theme.rule2.opacity(0.5)).frame(height: 1) }
+        .background {
+            GeometryReader { g in
+                Color.clear.task(id: g.size.width) { colW = g.size.width }
+            }
+        }
+        .simultaneousGesture(
+            DragGesture(minimumDistance: 0)
+                .onChanged { value in
+                    if rowTouchAt == nil { rowTouchAt = Date() }
+                    updateScrub(group, translation: value.translation)
+                }
+                .onEnded { value in
+                    finishRowGesture(group, value: value, rowH: rowH, running: running)
+                }
+        )
+        .accessibilityLabel(groupWord.map { "\($0), \(faceLabel)" } ?? group.label)
+        .accessibilityAddTraits((running || pendingChild != nil) ? [.isSelected] : [])
+        .accessibilityValue(running ? elapsedLabel : "")
+        .accessibilityHint(rowHint(group, running: running, fallback: fallback))
+        .accessibilityAction {
+            finishNoteEdit()
+            if store.open?.key != fallback { store.propose(fallback) }
+        }
+        .accessibilityActions {
+            ForEach(group.children) { child in
+                Button(child.label) {
+                    finishNoteEdit()
+                    if store.open?.key != child.label { store.propose(child.label) }
+                }
+            }
+        }
+        .runningCategoryMenu(enabled: running, stop: {
+            finishNoteEdit()
+            if let key = store.open?.key { store.propose(key) }
+        }, split: {
+            finishNoteEdit()
+            store.openSplit()
+        }, addNote: {
+            beginNoteEdit()
+        })
+        .id(group.label)
+    }
+
+    private func rowHint(_ group: CategoryGroup, running: Bool, fallback: String) -> String {
+        if group.children.count < 2 {
+            return running ? "Long press to stop \(fallback)." : "Starts \(fallback)."
+        }
+        if running {
+            let next = store.neighbor(in: group, of: fallback, step: 1)
+            return "Swipe to switch child. Long press to stop. Next is \(next)."
+        }
+        return "Starts \(fallback). Slide to pick a child."
+    }
+
+    private func originLabel(for group: CategoryGroup, fallback: String) -> String {
+        if let pending = store.pendingKey, group.children.contains(where: { $0.label == pending }) {
+            return pending
+        }
+        if let running = store.open?.key, group.children.contains(where: { $0.label == running }) {
+            return running
+        }
+        return fallback
+    }
+
+    private func updateScrub(_ group: CategoryGroup, translation: CGSize) {
+        guard group.children.count > 1 else { return }
+        let fallback = store.pickFromGroup(group, hover: nil) ?? group.label
+        if scrubOrigin == nil {
+            scrubOrigin = originLabel(for: group, fallback: fallback)
+        }
+        let dx = translation.width
+        let dy = translation.height
+        if !scrubLocked {
+            guard abs(dx) >= 14, abs(dx) > 1.5 * abs(dy) else { return }
+            scrubLocked = true
+        }
+        let kids = group.children.map(\.label)
+        let origin = kids.firstIndex(of: scrubOrigin ?? fallback) ?? 0
+        let n = kids.count
+        let raw = origin + Int((dx / 56).rounded())
+        let i = ((raw % n) + n) % n
+        let pick = kids[i]
+        if scrubPick != pick {
+            UISelectionFeedbackGenerator().selectionChanged()
+        }
+        scrubGroup = group.label
+        scrubPick = pick
+    }
+
+    private func finishRowGesture(
+        _ group: CategoryGroup, value: DragGesture.Value, rowH: CGFloat, running: Bool
+    ) {
+        let dx = value.translation.width
+        let dy = value.translation.height
+        let kids = group.children.map(\.label)
+        let fallback = store.pickFromGroup(group, hover: nil) ?? group.label
+        let origin = scrubOrigin ?? originLabel(for: group, fallback: fallback)
+        let scrubChanged = scrubLocked && scrubPick != nil && scrubPick != origin
+        let onRow = value.location.y >= -32 && value.location.y <= rowH + 32
+        let pendingHere = store.pendingKey.map { kids.contains($0) } ?? false
+        let inChip = value.location.x >= max(colW, 88) - 100
+        let longPress = Date().timeIntervalSince(rowTouchAt ?? Date()) >= 0.5
+        defer {
+            clearScrub()
+            chipAteTap = false
+        }
+        finishNoteEdit()
+        if chipAteTap || (pendingHere && inChip && !scrubChanged) {
+            store.cancelPending()
+            return
+        }
+        guard kids.count > 1 else {
+            if onRow, !(running && longPress) {
+                resolveTap(fallback, pendingHere: pendingHere, inChip: inChip)
+            }
+            return
+        }
+        if !onRow && !scrubChanged { return }
+        if scrubChanged, let commit = scrubPick {
+            if store.open?.key == commit {
+                store.cancelPending()
+            } else {
+                proposeFromRow(commit)
+            }
+            return
+        }
+        let isFlick = abs(value.velocity.width) > 700
+            && abs(dx) >= 28 && abs(dx) < 56
+            && abs(dx) > 1.5 * abs(dy)
+        if isFlick {
+            proposeFromRow(store.neighbor(in: group, of: origin, step: value.velocity.width < 0 ? 1 : -1))
+            return
+        }
+        if onRow, !(running && longPress) {
+            resolveTap(fallback, pendingHere: pendingHere, inChip: inChip)
+        }
+    }
+
+    private func resolveTap(_ pick: String, pendingHere: Bool, inChip: Bool) {
+        if pendingHere, inChip {
+            store.cancelPending()
+            return
+        }
+        proposeFromRow(pick)
+    }
+
+    private func proposeFromRow(_ key: String) {
+        if store.open?.key == key { return }
+        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        store.propose(key)
+    }
+
+    private func clearScrub() {
+        scrubGroup = nil
+        scrubPick = nil
+        scrubOrigin = nil
+        scrubLocked = false
+        rowTouchAt = nil
+    }
+
     private func categoryRow(
-        face: String, hex: String?, dim: Bool,
-        running: Bool = false, elapsed: String = "", long: Bool = false
+        face: String, group: String? = nil, hex: String?, dim: Bool,
+        running: Bool = false, elapsed: String = "", long: Bool = false,
+        stops: Int = 1, stopIndex: Int = 0, scrubbing: Bool = false,
+        pending: Bool = false
     ) -> some View {
         HStack(spacing: 10) {
             RoundedRectangle(cornerRadius: 2, style: .continuous)
                 .fill(hex.map { Theme.hex($0) } ?? Theme.rule2)
-                .frame(width: 8, height: 18)
+                .frame(width: 8, height: group == nil ? 18 : 28)
                 .accessibilityHidden(true)
-            Text(face)
-                .font(Theme.font(20, weight: running ? .bold : .semibold))
-                .fontWidth(.standard)
-                .lineLimit(1)
-                .minimumScaleFactor(0.6)
-                .foregroundStyle(long ? Theme.flag : (dim ? Theme.dim : Theme.fg))
-            if running {
+            nameStack(
+                face: face, group: group, running: running, dim: dim, long: long,
+                stops: stops, stopIndex: stopIndex, scrubbing: scrubbing
+            )
+            if pending || running {
                 Spacer(minLength: 4)
-                Text(elapsed)
-                    .font(Theme.font(12, weight: .bold).monospacedDigit())
-                    .foregroundStyle(long ? Theme.flag : Theme.dim)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.7)
-                    .layoutPriority(0)
+                if pending {
+                    pendingFuse
+                } else {
+                    Text(elapsed)
+                        .font(Theme.rowFont(12, weight: .bold).monospacedDigit())
+                        .foregroundStyle(long ? Theme.flag : Theme.fg)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.7)
+                        .layoutPriority(0)
+                }
             }
         }
         .padding(.leading, 12)
@@ -470,26 +526,111 @@ struct CaptureView: View {
         .padding(.vertical, 8)
     }
 
+    @ViewBuilder
+    private func nameStack(
+        face: String, group: String?, running: Bool, dim: Bool, long: Bool,
+        stops: Int, stopIndex: Int, scrubbing: Bool
+    ) -> some View {
+        let child = Text(face)
+            .font(Theme.rowFont(20, weight: running ? .bold : .semibold))
+            .fontWidth(.standard)
+            .lineLimit(1)
+            .minimumScaleFactor(0.6)
+            .foregroundStyle(long ? Theme.flag : (dim ? Theme.dim : Theme.fg))
+        if let group {
+            VStack(alignment: .leading, spacing: 2) {
+                HStack(alignment: .firstTextBaseline, spacing: 6) {
+                    Text(group)
+                        .font(Theme.rowFont(11, weight: .regular))
+                        .tracking(0.4)
+                        .foregroundStyle(Theme.dim)
+                        .lineLimit(1)
+                    if stops > 1 {
+                        childDots(stops: stops, stopIndex: stopIndex, lit: scrubbing)
+                    }
+                }
+                child
+            }
+        } else {
+            child
+        }
+    }
+
+    @ViewBuilder
+    private var pendingFuse: some View {
+        let n = store.undoSecondsLeft
+        let body = Text("CANCEL · \(n)")
+            .font(Theme.rowFont(12, weight: .heavy))
+            .monospacedDigit()
+            .foregroundStyle(Theme.fg)
+            .lineLimit(1)
+            .minimumScaleFactor(0.7)
+            .frame(minWidth: 72, minHeight: 44, alignment: .trailing)
+            .contentShape(Rectangle())
+        Button {
+            chipAteTap = true
+            store.cancelPending()
+        } label: {
+            body
+        }
+        .buttonStyle(.plain)
+        .highPriorityGesture(
+            TapGesture().onEnded {
+                chipAteTap = true
+                store.cancelPending()
+            }
+        )
+        .accessibilityLabel("Cancel: \(store.undoLabel ?? "")")
+        .accessibilityHint("Available for \(n) seconds")
+    }
+
+    private func childDots(stops: Int, stopIndex: Int, lit: Bool) -> some View {
+        HStack(spacing: 3) {
+            ForEach(0..<stops, id: \.self) { i in
+                let on = i == stopIndex
+                Circle()
+                    .fill(on ? Theme.fg : Theme.dim.opacity(0.45))
+                    .frame(width: on && lit ? 8 : 6, height: on && lit ? 8 : 6)
+            }
+        }
+        .accessibilityHidden(true)
+    }
+
+    @ViewBuilder
+    private func selectedFill(hex: String?, on: Bool, heavy: Bool = false) -> some View {
+        if on {
+            Theme.panel.overlay(hex.map { Theme.hex($0).opacity(heavy ? 0.20 : 0.15) } ?? Color.clear)
+        } else {
+            Color.clear
+        }
+    }
+
     private var categoryWidthProbe: some View {
         VStack(alignment: .leading, spacing: 0) {
-            ForEach(store.categories) { cat in
-                categoryRow(face: cat.face, hex: cat.hex, dim: false)
+            ForEach(store.groups) { group in
+                categoryRow(face: group.label, hex: group.hex, dim: false)
                     .fixedSize()
                     .background(
                         GeometryReader { g in
                             Color.clear.preference(key: CatWidthKey.self, value: g.size.width)
                         }
                     )
-                categoryRow(
-                    face: cat.face, hex: cat.hex, dim: false,
-                    running: true, elapsed: "12h00", long: false
-                )
+                ForEach(group.children) { cat in
+                    categoryRow(
+                        face: cat.face,
+                        group: group.children.count > 1 ? group.label : nil,
+                        hex: cat.hex, dim: false,
+                        running: true, elapsed: "12h00", long: false,
+                        stops: group.children.count,
+                        stopIndex: 0
+                    )
                     .fixedSize()
                     .background(
                         GeometryReader { g in
                             Color.clear.preference(key: CatWidthKey.self, value: g.size.width)
                         }
                     )
+                }
             }
         }
         .fixedSize()
@@ -498,46 +639,27 @@ struct CaptureView: View {
         .accessibilityHidden(true)
     }
 
-    private func commitFocus() {
-        if focus == .add {
-            commitAdd()
-        } else {
-            focus = nil
-        }
-    }
-
-    private func commitAdd() {
-        let name = addDraft.trimmingCharacters(in: .whitespacesAndNewlines)
-        if name.isEmpty {
-            naming = false
-            addDraft = ""
-            focus = nil
-            return
-        }
-        store.addCategory(label: name) {
-            naming = false
-            addDraft = ""
-            focus = nil
-        }
-    }
 }
 
 private extension View {
     @ViewBuilder
     func runningCategoryMenu(
         enabled: Bool,
+        stop: @escaping () -> Void,
         split: @escaping () -> Void,
         addNote: @escaping () -> Void
     ) -> some View {
         if enabled {
             self
                 .contextMenu {
+                    Button("Stop", action: stop)
                     Button("Split", action: split)
                     Button("Add note", action: addNote)
                 }
+                .accessibilityAction(named: "Stop", stop)
                 .accessibilityAction(named: "Split", split)
                 .accessibilityAction(named: "Add note", addNote)
-                .accessibilityHint("Stops the running block. Does not stop sitting. Long press for split and add note.")
+                .accessibilityHint("Does not stop sitting. Long press for stop, split, and add note.")
         } else {
             self
         }

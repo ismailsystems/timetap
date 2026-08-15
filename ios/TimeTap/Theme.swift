@@ -23,8 +23,15 @@ enum Theme {
         return Color(red: rgb.r, green: rgb.g, blue: rgb.b)
     }
 
+    /// Category rows and the TimeTap title sit 10% above the design size.
+    static let typeBump: CGFloat = 1.1
+
     static func font(_ size: CGFloat, weight: Font.Weight = .regular) -> Font {
         .system(size: UIFontMetrics.default.scaledValue(for: size), weight: weight)
+    }
+
+    static func rowFont(_ size: CGFloat, weight: Font.Weight = .regular) -> Font {
+        font(size * typeBump, weight: weight)
     }
 
     /// Pale fills (FRAG / REL / POOP yellow) get dark text. Dark fills stay white.

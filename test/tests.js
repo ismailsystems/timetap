@@ -24,7 +24,7 @@ const CFG_UNDO_MS = clientConfig_().undoSeconds * 1000;
  * names the mismatch instead of clicking whatever happens to be there.
  */
 const splitPick = key => {
-  const cat = clientConfig_().categories.find(c => c.key === key);
+  const cat = clientConfig_().categories.find(c => c.key === H.catId(key) || c.key === key);
   const face = cat ? (cat.label || cat.key) : key;
   const listed = () => $('splitGrid').children.map(x => x.querySelector('.f').textContent);
   const b = $('splitGrid').children.find(x => x.querySelector('.f').textContent === face);
@@ -35,7 +35,7 @@ const D = (y, m, d, hh, mm) => new Date(y, m - 1, d, hh, mm, 0, 0).getTime();
 
 console.log('\n1. cold open, no open block');
 reset(); reboot();
-chk('grid renders six categories', $('grid').children.filter(c => c.dataset.key).length === 6,
+chk('grid renders eight categories', $('grid').children.filter(c => c.dataset.key).length === 8,
   'got ' + $('grid').children.filter(c => c.dataset.key).length);
 chk('plus an add box', !!addCell());
 chk('nothing lit in the grid', activeKey() === null, String(activeKey()));
@@ -49,7 +49,7 @@ chk('the undo ribbon is hidden', $('undo').hidden, $('undo').className);
 chk('and so is the SPLIT hint, because nothing is running',
   $('nowHint').hidden, $('nowHint').className);
 
-console.log('\n2. ADM, 52m, DW -> strip, ignore 6s -> "ADM: ="');
+console.log('\n2. ADM, 52m, DW -> strip, ignore 6s -> "Admin: ="');
 reset(); reboot();
 tap('ADM'); wait(52); tap('DW');
 chk('strip visible', !$('strip').hidden);
@@ -57,22 +57,22 @@ chk('strip head "ADMIN · 52m — MARK IT"',
   $('stripHead').textContent === 'ADMIN · 52m — MARK IT', $('stripHead').textContent);
 advance(6000); settle();
 chk('strip auto-dismissed', $('strip').hidden);
-chk('ADM titled "ADM: ="', A()[0].t === 'ADM: =', A()[0].t);
+chk('ADM titled "Admin: ="', A()[0].t === 'Admin: =', A()[0].t);
 chk('ADM ends at the tap', A()[0].e === A()[1].s, show(A()[0]) + ' / ' + show(A()[1]));
 chk('ADM ran 52m', near(A()[0].e - A()[0].s, 52 * 60000), String((A()[0].e - A()[0].s) / 60000));
-chk('DW open', /#open/.test(A()[1].d) && A()[1].t === 'DW:', show(A()[1]));
+chk('DW open', /#open/.test(A()[1].d) && A()[1].t === 'Deep work:', show(A()[1]));
 
-console.log('\n3. FRAG, 20m, DW -> no strip, "FRAG: -"');
+console.log('\n3. FRAG, 20m, DW -> no strip, "Fragments: -"');
 reset(); reboot();
 tap('FRAG'); wait(20); tap('DW');
 chk('no strip', $('strip').hidden);
-chk('FRAG autoMarked "-"', A()[0].t === 'FRAG: -', A()[0].t);
+chk('FRAG autoMarked "-"', A()[0].t === 'Fragments: -', A()[0].t);
 
 console.log('\n5. MTG, 8m, ADM -> no strip, no mark');
 reset(); reboot();
 tap('MTG'); wait(8); tap('ADM');
 chk('no strip', $('strip').hidden);
-chk('MTG has no mark', A()[0].t === 'MTG:', A()[0].t);
+chk('MTG has no mark', A()[0].t === 'Meetings:', A()[0].t);
 
 console.log('\n5b. explicit mark tap');
 reset(); reboot();
@@ -80,7 +80,7 @@ tap('DW'); wait(40); tap('ADM');
 chk('strip up', !$('strip').hidden);
 tapMark('+');
 chk('strip dismissed', $('strip').hidden);
-chk('DW marked "+"', A()[0].t === 'DW: +', A()[0].t);
+chk('DW marked "+"', A()[0].t === 'Deep work: +', A()[0].t);
 
 console.log('\n6. SIT on, three categories, SIT off');
 reset(); reboot();
@@ -111,9 +111,9 @@ tapSit(); wait(30);
 tap('BODY');
 chk('the SIT is still open', S().length === 1 && /#open/.test(S()[0].d), show(S()[0]));
 chk('and the footer still says sitting', litPosture() === 'sit', String(litPosture()));
-chk('BODY block open', A()[0].t === 'BODY:' && /#open/.test(A()[0].d), show(A()[0]));
+chk('BODY block open', A()[0].t === 'Zone 2:' && /#open/.test(A()[0].d), show(A()[0]));
 wait(20); tap('DW');
-chk('BODY autoMarked "+", no strip', A()[0].t === 'BODY: +' && $('strip').hidden, A()[0].t);
+chk('BODY autoMarked "+", no strip', A()[0].t === 'Zone 2: +' && $('strip').hidden, A()[0].t);
 
 console.log('\n8. kill the page mid-block, reload');
 reset(); reboot();
@@ -123,10 +123,10 @@ noteBox().value = 'memo drafting'; noteBox().fire('input'); advance(1000); settl
 wait(47);
 Object.keys(H.STORE).forEach(k => delete H.STORE[k]);   // hardest case: storage gone too
 reboot();
-chk('open block recovered', activeKey() === 'DW', String(activeKey()));
+chk('open block recovered', activeKey() === 'Deep work', String(activeKey()));
 chk('start time correct', /47m/.test(elapsedBox()), elapsedBox());
 chk('note recovered into the lit box', noteBox().value === 'memo drafting', noteBox().value);
-chk('title carries the note', A()[0].t === 'DW: memo drafting', A()[0].t);
+chk('title carries the note', A()[0].t === 'Deep work: memo drafting', A()[0].t);
 wait(1);
 chk('timer live inside the box', /48m/.test(elapsedBox()), elapsedBox());
 
@@ -140,10 +140,10 @@ chk('sync dot red', $('sync').className === 's-failed', $('sync').className);
 H.setOnline(true);
 advance(120000); settle(); settle();
 chk('three events after restore', A().length === 3, A().map(show).join(' | '));
-chk('order preserved', A().map(e => e.t.split(':')[0]).join(',') === 'DW,MTG,ADM', A().map(e => e.t).join(' | '));
+chk('order preserved', A().map(e => e.t.split(':')[0]).join(',') === 'Deep work,Meetings,Admin', A().map(e => e.t).join(' | '));
 chk('DW start = first tap', A()[0].s === t9, show(A()[0]));
 chk('no gaps or overlaps', A()[0].e === A()[1].s && A()[1].e === A()[2].s, A().map(show).join(' | '));
-chk('marks applied', A()[0].t === 'DW: =' && A()[1].t === 'MTG: =', A().map(e => e.t).join(' | '));
+chk('marks applied', A()[0].t === 'Deep work: =' && A()[1].t === 'Meetings: =', A().map(e => e.t).join(' | '));
 chk('queue drained', (JSON.parse(H.STORE['tt.queue.v1'] || '[]')).length === 0);
 chk('sync dot clear', $('sync').className === 's-synced', $('sync').className);
 H.setOnline(false);
@@ -162,7 +162,7 @@ chk('two events', a10.length === 2, a10.map(show).join(' | '));
 chk('DW bounded at 5h', near(a10[0].e - a10[0].s, 5 * 3600000), show(a10[0]));
 /* A2: was 'DW: =', which claimed the user settled a block the app had bounded.
  * The boundary assertions above and below this line are deliberately unchanged. */
-chk('DW marked as a guess, not as settled', a10[0].t === 'DW: ?', a10[0].t);
+chk('DW marked as a guess, not as settled', a10[0].t === 'Deep work: ?', a10[0].t);
 chk('UNLOGGED - follows', a10[1].t === 'UNLOGGED -', a10[1].t);
 chk('UNLOGGED spans to now', a10[1].s === a10[0].e && near(a10[1].e, D(2026, 7, 20, 17, 0)), show(a10[1]));
 chk('no giant event', a10.every(e => (e.e - e.s) <= 5 * 3600000), a10.map(show).join(' | '));
@@ -195,9 +195,9 @@ $('spRange').value = '60'; $('spRange').fire('input');
 splitPick('ADM');
 const a11 = A();
 chk('two events', a11.length === 2, a11.map(show).join(' | '));
-chk('MTG 1h from the original start', a11[0].t === 'MTG: =' && a11[0].s === t11 && near(a11[0].e - a11[0].s, 3600000), show(a11[0]));
+chk('MTG 1h from the original start', a11[0].t === 'Meetings: =' && a11[0].s === t11 && near(a11[0].e - a11[0].s, 3600000), show(a11[0]));
 chk('ADM starts where MTG ends', a11[1].s === a11[0].e, show(a11[1]));
-chk('ADM open and current', /#open/.test(a11[1].d) && activeKey() === 'ADM', show(a11[1]));
+chk('ADM open and current', /#open/.test(a11[1].d) && activeKey() === 'Admin', show(a11[1]));
 wait(30); tap('DW');
 chk('remainder closes correctly', near(A()[1].e, H.nowMs()) && near(A()[1].e - A()[1].s, 150 * 60000), show(A()[1]));
 
@@ -207,7 +207,7 @@ H.SCRIPT_PROPS.SHEET_ID = 'book';
 H.clearPropCache();
 const P = (t2, d, h1, h2) => H.CALS.plan.createEvent(t2, new Date(D(2026, 7, d, h1, 0)), new Date(D(2026, 7, d, h2, 0)), {});
 P('DW: ship the thing', 20, 9, 13); P('DW: ship the thing', 21, 9, 13); P('DW: ship the thing', 22, 9, 13);
-P('MTG: standups', 20, 14, 15); P('BODY: run', 21, 7, 8);
+P('Meetings: standups', 20, 14, 15); P('Zone 2: run', 21, 7, 8);
 P('Dinner with Ada', 22, 19, 21);                        // not a category, must be ignored
 reboot();
 tap('DW'); wait(90); tap('MTG'); wait(30); tap('FRAG'); wait(10); tap('DW'); wait(60);
@@ -224,26 +224,26 @@ chk('both tabs written', !!daily.length && !!weekly.length);
 chk('rollup reports what it did', res.days === 90 && res.categories >= 6,
   JSON.stringify(res));
 chk('one row per day plus a header', daily.length === 91, 'rows=' + daily.length);
-chk('daily header names every category', ['DW','MTG','ADM','BODY','REL','FRAG'].every(k => col(dh, k) > 0), dh.join('|'));
-chk('daily header carries plan columns', col(dh, 'plan DW') > 0, dh.join('|'));
+chk('daily header names every category', ['Deep work','Meetings','Admin','Zone 2','Lifting','Walking','People','Fragments','Body'].every(k => col(dh, k) > 0), dh.join('|'));
+chk('daily header carries plan columns', col(dh, 'plan Deep work') > 0, dh.join('|'));
 chk('frozen header row', H.SHEETS.book.getSheetByName('daily').frozen === 1);
 
 chk('friday row exists', !!friday, daily.slice(-3).map(r => r[0]).join(' '));
 chk('weekday label', friday[col(dh, 'day')] === 'Fri', friday[col(dh, 'day')]);
-chk('DW actual is a number, not a padded string', typeof friday[col(dh, 'DW')] === 'number',
-  typeof friday[col(dh, 'DW')]);
-chk('DW actual 1.5h logged', friday[col(dh, 'DW')] > 1.4 && friday[col(dh, 'DW')] < 1.6,
-  String(friday[col(dh, 'DW')]));
+chk('DW actual is a number, not a padded string', typeof friday[col(dh, 'Deep work')] === 'number',
+  typeof friday[col(dh, 'Deep work')]);
+chk('DW actual 1.5h logged', friday[col(dh, 'Deep work')] > 1.4 && friday[col(dh, 'Deep work')] < 1.6,
+  String(friday[col(dh, 'Deep work')]));
 chk('switches counted', friday[col(dh, 'switches')] === 4, String(friday[col(dh, 'switches')]));
 chk('sitting recorded', friday[col(dh, 'sitting h')] > 1.6, String(friday[col(dh, 'sitting h')]));
 chk('sits over 90 counted', friday[col(dh, 'sits over 90')] === 1, String(friday[col(dh, 'sits over 90')]));
 chk('unparseable PLAN title ignored', !JSON.stringify(daily).match(/Dinner/));
 
 chk('weekly groups Mon-Sun', !!thisWeek, weekly.slice(-3).map(r => r[0]).join(' '));
-chk('weekly carries the planned total', thisWeek[col(wh, 'plan DW')] === 12, String(thisWeek[col(wh, 'plan DW')]));
+chk('weekly carries the planned total', thisWeek[col(wh, 'plan Deep work')] === 12, String(thisWeek[col(wh, 'plan Deep work')]));
 chk('weekly ratio is actual over planned',
-  Math.abs(thisWeek[col(wh, 'DW ratio')] - (thisWeek[col(wh, 'DW')] / 12)) < 0.011,
-  'ratio=' + thisWeek[col(wh, 'DW ratio')] + ' actual=' + thisWeek[col(wh, 'DW')]);
+  Math.abs(thisWeek[col(wh, 'Deep work ratio')] - (thisWeek[col(wh, 'Deep work')] / 12)) < 0.011,
+  'ratio=' + thisWeek[col(wh, 'Deep work ratio')] + ' actual=' + thisWeek[col(wh, 'Deep work')]);
 chk('no NaN anywhere', !JSON.stringify(daily.concat(weekly)).match(/null|NaN/),
   (JSON.stringify(daily.concat(weekly)).match(/null|NaN/g) || []).join(' '));
 
@@ -256,7 +256,7 @@ const ew = H.SHEETS.book.getSheetByName('weekly').rows;
 chk('still renders', empty.length === 91 && ew.length > 1);
 chk('no NaN or Infinity', !JSON.stringify(empty.concat(ew)).match(/NaN|Infinity/));
 chk('zero-planned ratio is blank, not a division',
-  ew[1][ew[0].indexOf('DW ratio')] === '', JSON.stringify(ew[1][ew[0].indexOf('DW ratio')]));
+  ew[1][ew[0].indexOf('Deep work ratio')] === '', JSON.stringify(ew[1][ew[0].indexOf('Deep work ratio')]));
 chk('zero-waking sitting % is blank',
   empty[1][empty[0].indexOf('sitting %')] === '', JSON.stringify(empty[1][empty[0].indexOf('sitting %')]));
 
@@ -268,13 +268,13 @@ dailyRollup();
 const once = JSON.stringify(H.SHEETS.book.getSheetByName('daily').rows);
 dailyRollup();
 chk('running twice changes nothing', JSON.stringify(H.SHEETS.book.getSheetByName('daily').rows) === once);
-H.CALS.actual.createEvent('REL: retroactive', new Date(D(2026, 7, 22, 10, 0)),
+H.CALS.actual.createEvent('People: retroactive', new Date(D(2026, 7, 22, 10, 0)),
   new Date(D(2026, 7, 22, 12, 0)), { description: '#ref:backfill00000000' });
 dailyRollup();
 const healed = H.SHEETS.book.getSheetByName('daily').rows;
 const wed = healed.find(r => r[0] === '2026-07-22');
 chk('a retroactive calendar edit is picked up on the next run',
-  wed[healed[0].indexOf('REL')] === 2, String(wed[healed[0].indexOf('REL')]));
+  wed[healed[0].indexOf('People')] === 2, String(wed[healed[0].indexOf('People')]));
 
 console.log('\n12d. the trigger installs idempotently');
 reset();
@@ -306,7 +306,7 @@ chk('PLAN untouched', H.CALS.plan.events.map(e => e.t + e.s + e.e + e.d).join('|
 console.log('\n14. invariant: at most one #open per calendar');
 reset(); reboot();
 tap('DW'); settle();
-H.CALS.actual.createEvent('ADM: stray', new Date(H.nowMs() + 600000), new Date(H.nowMs() + 660000), { description: '#ref:strayref00000000\n#open' });
+H.CALS.actual.createEvent('Admin: stray', new Date(H.nowMs() + 600000), new Date(H.nowMs() + 660000), { description: '#ref:strayref00000000\n#open' });
 advance(600000);
 reboot();
 const openCount = A().filter(e => /#open/.test(e.d)).length;
@@ -357,7 +357,7 @@ chk('so the footer is not what the strip replaced', !$('postureBtn').hidden,
   $('postureBtn').className);
 tapMark('+');
 chk('choosing a mark dismisses the strip', $('strip').hidden);
-chk('the mark still landed', A()[0].t === 'ADM: +', A()[0].t);
+chk('the mark still landed', A()[0].t === 'Admin: +', A()[0].t);
 
 console.log('\n16. DST spring forward produces no negative durations');
 reset(D(2026, 3, 8, 1, 30)); reboot();                   // US DST change 08 Mar 2026
@@ -374,8 +374,8 @@ reset(); reboot();
 tap('DW'); wait(20);
 noteBox().value = 'memo'; noteBox().fire('input');
 tap('MTG'); tap('MTG'); settle(); advance(2000); settle();
-chk('note landed on the closed block', A()[0].t === 'DW: memo =', A()[0].t);
-chk('new block has no note', A()[1].t === 'MTG:', A()[1].t);
+chk('note landed on the closed block', A()[0].t === 'Deep work: memo =', A()[0].t);
+chk('new block has no note', A()[1].t === 'Meetings:', A()[1].t);
 chk('the new box offers an empty note', noteBox().value === '', noteBox().value);
 
 console.log('\n18. adjust the open SIT start');
@@ -481,7 +481,7 @@ tap('DW'); wait(30); tap('MTG'); settle();
 chk('script property overrides the literal',
   H.CALS.alt.events.length === 2 && H.CALS.actual.events.length === 0,
   'actual=' + H.CALS.actual.events.length + ' alt=' + H.CALS.alt.events.length);
-chk('open block recovers from the overridden calendar', activeKey() === 'MTG', String(activeKey()));
+chk('open block recovers from the overridden calendar', activeKey() === 'Meetings', String(activeKey()));
 
 reset();
 H.SCRIPT_PROPS.CAL_ACTUAL = '  alt  ';
@@ -532,12 +532,13 @@ reset(); reboot();
 var CFG22 = {}; clientConfig_().categories.forEach(function (c) { CFG22[c.key] = c; });
 function evColour(e) { return e.c; }
 function sameAsButton(e, key) {
-  return evColour(e) === CFG22[key].color && COLOR_HEX[evColour(e)] === CFG22[key].hex;
+  var id = H.catId(key);
+  return evColour(e) === CFG22[id].color && COLOR_HEX[evColour(e)] === CFG22[id].hex;
 }
 
 tap('DW'); settle();
 chk('DW block carries the DW colour', sameAsButton(A()[0], 'DW'),
-  'event=' + evColour(A()[0]) + ' button=' + CFG22.DW.color + '/' + CFG22.DW.hex);
+  'event=' + evColour(A()[0]) + ' button=' + CFG22['Deep work'].color + '/' + CFG22['Deep work'].hex);
 wait(30); tap('MTG'); settle();
 chk('MTG block carries the MTG colour', sameAsButton(A()[1], 'MTG'), 'event=' + evColour(A()[1]));
 chk('closing a block does not disturb its colour', sameAsButton(A()[0], 'DW'));
@@ -657,7 +658,7 @@ reset(); reboot();
 tap('DW'); settle(); advance(1200); settle();
 tap('MTG'); settle();
 chk('and so does one 1.2 seconds later — no gate, no arming',
-  A().length === 2 && A()[1].t === 'MTG:', A().map(show).join(' | '));
+  A().length === 2 && A()[1].t === 'Meetings:', A().map(show).join(' | '));
 
 console.log('\n25e. the running row opens SPLIT, which writes nothing');
 reset(); reboot();
@@ -673,7 +674,7 @@ console.log('\n26. the note belongs to the block that is running');
  * belongs to whatever is running. The clock is in two places on purpose: the
  * panel says it big, and the running row says it small. */
 reset(); reboot();
-const cellOf = k => $('grid').children.find(c => c.dataset.key === k);
+const cellOf = k => $('grid').children.find(c => c.dataset.key === H.catId(k));
 const catCells = () => $('grid').children.filter(c => c.dataset.key);
 chk('an idle grid shows no clock anywhere',
   catCells().every(c => c.querySelector('.ge').textContent === ''));
@@ -688,15 +689,15 @@ chk('the panel names the block and when it started',
   $('nowName').textContent === 'Deep work' && /NOW · SINCE/.test($('nowKick').textContent),
   $('nowName').textContent + ' / ' + $('nowKick').textContent);
 chk('and no unlit row shows a clock',
-  catCells().filter(c => c.dataset.key !== 'DW')
+  catCells().filter(c => c.dataset.key !== 'Deep work')
     .every(c => c.querySelector('.ge').textContent === ''));
 
 noteBox().value = 'memo drafting'; noteBox().fire('input');
 advance(1000); settle();
-chk('typing in the panel titles the running block', A()[0].t === 'DW: memo drafting', A()[0].t);
+chk('typing in the panel titles the running block', A()[0].t === 'Deep work: memo drafting', A()[0].t);
 
 wait(30); tap('MTG'); settle();
-chk('the note stayed with the block it described', A()[0].t === 'DW: memo drafting =', A()[0].t);
+chk('the note stayed with the block it described', A()[0].t === 'Deep work: memo drafting =', A()[0].t);
 chk('and the panel offers an empty note for the new block',
   noteBox().value === '', noteBox().value);
 chk('the row that went dark drops its clock',
@@ -726,23 +727,23 @@ ac.fire('click');
 chk('tapping it turns the label into a field', ac._cls.has('naming'));
 
 an.value = 'Reading'; an.fire('blur'); settle();
-chk('a seventh category exists', $('grid').children.filter(c => c.dataset.key).length === 7,
+chk('a ninth category exists', $('grid').children.filter(c => c.dataset.key).length === 9,
   String($('grid').children.filter(c => c.dataset.key).length));
 const added = clientConfig_().categories.find(c => c.label === 'Reading');
 chk('with the label as typed', !!added && added.label === 'Reading', JSON.stringify(added));
-chk('a key derived from it', added.key === 'READING', added && added.key);
+chk('the label is the identity', added.key === 'Reading', added && added.key);
 chk('and a colour nobody else was using',
   clientConfig_().categories.filter(c => c.color === added.color).length === 1, added && added.color);
 chk('it is a real Google Calendar colour', !!COLOR_HEX[added.color], added && added.color);
 
-chk('it logs like any other', (tap('READING'), settle(), A().length === 1 && A()[0].t === 'READING:'),
+chk('it logs like any other', (tap('Reading'), settle(), A().length === 1 && A()[0].t === 'Reading:'),
   A().map(show).join(' | '));
 chk('and colours its event to match', A()[0].c === added.color, A()[0].c);
 
 console.log('\n27b. it survives, and it refuses the obvious mistakes');
 reboot();
 chk('the new category came back on reload',
-  $('grid').children.some(c => c.dataset.key === 'READING'));
+  $('grid').children.some(c => c.dataset.key === 'Reading'));
 
 let dupErr = null;
 try { addCategory('reading'); } catch (e) { dupErr = String(e.message || e); }
@@ -753,21 +754,21 @@ try { addCategory('   '); } catch (e) { blankErr = String(e.message || e); }
 chk('a blank name is refused', !!blankErr && /needs a name/.test(blankErr), blankErr);
 
 const k2 = addCategory('Reading list').categories.find(c => c.label === 'Reading list');
-chk('a colliding key gets disambiguated', k2.key !== 'READING' && /^READING/.test(k2.key), k2.key);
+chk('a different name is its own category', k2 && k2.key === 'Reading list', k2 && k2.key);
 
 console.log('\n27c. the add box stops at the ceiling');
 reset();
-for (let i = 0; clientConfig_().categories.length < 10; i++) addCategory('Extra ' + i);
-chk('ten categories', clientConfig_().categories.length === 10,
+for (let i = 0; clientConfig_().categories.length < 16; i++) addCategory('Extra ' + i);
+chk('sixteen categories', clientConfig_().categories.length === 16,
   String(clientConfig_().categories.length));
 reboot();
 chk('and the add box is gone', addCell() === null);
-chk('the grid is exactly the ten', $('grid').children.filter(c => c.dataset.key).length === 10,
+chk('the grid is exactly the sixteen', $('grid').children.filter(c => c.dataset.key).length === 16,
   String($('grid').children.filter(c => c.dataset.key).length));
 let capErr = null;
 try { addCategory('One too many'); } catch (e) { capErr = String(e.message || e); }
-chk('the server refuses an eleventh', !!capErr && /10 categories/.test(capErr), capErr);
-chk('the rollup carries all ten', (function () {
+chk('the server refuses a seventeenth', !!capErr && /16 categories/.test(capErr), capErr);
+chk('the rollup carries all sixteen', (function () {
   H.SCRIPT_PROPS.SHEET_ID = 'book'; H.clearPropCache(); dailyRollup();
   const head = H.SHEETS.book.getSheetByName('daily').rows[0];
   return clientConfig_().categories.every(c => head.indexOf(c.key) > 0);
@@ -815,7 +816,7 @@ const kidsOf = () => $('grid').children;
 const shape = () => kidsOf().map(c => c.dataset.key || (c.dataset.add ? '+' : '_')).join(' ');
 
 chk('one row per category, in config order, then Add',
-  shape() === 'DW MTG ADM BODY REL FRAG +', shape());
+  shape() === 'Deep work Meetings Admin Zone 2 Lifting Walking People Fragments +', shape());
 chk('every row is a category or the add row — no empty slots',
   kidsOf().every(c => c.dataset.key || c.dataset.add === '1'), shape());
 chk('the add row is last', kidsOf()[kidsOf().length - 1].dataset.add === '1', shape());
@@ -824,13 +825,13 @@ chk('and nothing is laid out in columns',
 
 console.log('\n28b. a full list has no add row');
 reset();
-for (let i = 0; clientConfig_().categories.length < 10; i++) addCategory('Extra ' + i);
+for (let i = 0; clientConfig_().categories.length < 16; i++) addCategory('Extra ' + i);
 reboot();
-chk('ten rows exactly', kidsOf().length === 10, String(kidsOf().length));
+chk('sixteen rows exactly', kidsOf().length === 16, String(kidsOf().length));
 chk('no add row', kidsOf().every(c => c.dataset.add !== '1'));
 chk('every row is a category', kidsOf().every(c => !!c.dataset.key), shape());
 chk('and the first configured category is still first',
-  kidsOf()[0].dataset.key === 'DW', shape());
+  kidsOf()[0].dataset.key === 'Deep work', shape());
 reset();
 
 console.log('\n29. the rollup reports keys, not whatever had a colon in it');
@@ -850,7 +851,7 @@ const hdr = H.SHEETS.book.getSheetByName('daily').rows[0];
    None of the four PLAN events below can reach it — D1 files ACTUAL events
    only, and deliberately leaves an unreadable plan uncounted rather than
    guessing where it belonged. */
-const known = clientConfig_().categories.map(c => c.key).concat(['UNLOGGED', UNFILED_KEY]);
+const known = rollupKeys_();
 const fixed = ['date', 'day', 'switches', 'waking h', 'sitting h', 'sitting %',
                'longest sit min', 'sits over 90'];
 // The last-rebuilt stamp (C2) also lives in row 1, past the last data column.
@@ -877,11 +878,11 @@ chk('a real category prefix is still counted',
 console.log('\n29b. the cap limits what the app adds, never what you configured');
 reset();
 const realCats = CATEGORIES.slice();
-for (let i = 0; i < 6; i++) CATEGORIES.push({ key: 'X' + i, label: 'X' + i, color: '1', autoMark: null });
-chk('twelve configured, twelve kept', allCategories_().length === 12,
+for (let i = 0; i < 8; i++) CATEGORIES.push({ label: 'X' + i, color: '1', autoMark: null });
+chk('sixteen configured, sixteen kept', allCategories_().length === 16,
   String(allCategories_().length));
 chk('none silently dropped',
-  CATEGORIES.every(c => allCategories_().some(a => a.key === c.key)));
+  CATEGORIES.every(c => allCategories_().some(a => a.label === c.label)));
 let overErr = null;
 try { addCategory('Nope'); } catch (e) { overErr = String(e.message || e); }
 chk('and the add box refuses to go further', !!overErr && /categories already/.test(overErr), overErr);
@@ -890,17 +891,17 @@ CATEGORIES.length = 0; realCats.forEach(c => CATEGORIES.push(c));
 console.log('\n29c. a category can be removed without nuking the rest');
 reset();
 addCategory('Reading'); addCategory('Errands');
-chk('two added', clientConfig_().categories.length === 8);
-removeCategory('READING');
-chk('one removed', !clientConfig_().categories.some(c => c.key === 'READING'));
-chk('the other survived', clientConfig_().categories.some(c => c.key === 'ERRANDS'));
-chk('its key is remembered as retired', retiredKeys_().some(r => r.key === 'READING'));
+chk('two added', clientConfig_().categories.length === 10);
+removeCategory('Reading');
+chk('one removed', !clientConfig_().categories.some(c => c.key === 'Reading'));
+chk('the other survived', clientConfig_().categories.some(c => c.key === 'Errands'));
+chk('its label is remembered as retired', retiredKeys_().some(r => (r.label || r.key) === 'Reading'));
 H.SCRIPT_PROPS.SHEET_ID = 'book'; H.clearPropCache();
 dailyRollup();
 chk('so the rollup still reports its history',
-  H.SHEETS.book.getSheetByName('daily').rows[0].includes('READING'));
+  H.SHEETS.book.getSheetByName('daily').rows[0].includes('Reading'));
 let cfgErr = null;
-try { removeCategory('DW'); } catch (e) { cfgErr = String(e.message || e); }
+try { removeCategory('Deep work'); } catch (e) { cfgErr = String(e.message || e); }
 chk('a configured category cannot be removed at runtime',
   !!cfgErr && /Code\.gs/.test(cfgErr), cfgErr);
 
@@ -1013,7 +1014,7 @@ reset();
 
 console.log('\n31. the grid answers to a keyboard and announces itself');
 reset(); reboot();
-const cell = k => $('grid').children.find(c => c.dataset.key === k);
+const cell = k => $('grid').children.find(c => c.dataset.key === H.catId(k));
 // The empty cell is not a control and must not be in the tab order.
 chk('every control is reachable by tab, and only the controls',
   $('grid').children.every(c => {
@@ -1034,7 +1035,7 @@ chk('nothing is pressed while idle',
 
 cell('DW').fire('keydown', { key: 'Enter', preventDefault: function () {} });
 settle();
-chk('Enter logs a category', A().length === 1 && A()[0].t === 'DW:', A().map(show).join(' | '));
+chk('Enter logs a category', A().length === 1 && A()[0].t === 'Deep work:', A().map(show).join(' | '));
 chk('and the lit one reports itself pressed',
   cell('DW').getAttribute('aria-pressed') === 'true' &&
   cell('MTG').getAttribute('aria-pressed') === 'false');
@@ -1042,7 +1043,7 @@ chk('and the lit one reports itself pressed',
 wait(30);
 cell('BODY').fire('keydown', { key: ' ', preventDefault: function () {} });
 settle();
-chk('Space logs one too', A().length === 2 && A()[1].t === 'BODY:', A().map(show).join(' | '));
+chk('Space logs one too', A().length === 2 && A()[1].t === 'Zone 2:', A().map(show).join(' | '));
 
 const el31 = id => document.getElementById(id);
 chk('the posture button reports its state',
@@ -1058,7 +1059,7 @@ chk('strip up', !$('strip').hidden);
 $('strip').fire('click', { target: { closest: function () { return null; } } });
 settle();
 chk('tapping the strip itself dismisses it', $('strip').hidden);
-chk('and the default mark still stands', A()[0].t === 'ADM: =', A()[0].t);
+chk('and the default mark still stands', A()[0].t === 'Admin: =', A()[0].t);
 posture('sit'); settle();
 chk('so the posture row is usable again', litPosture() === 'sit');
 reset();
@@ -1068,21 +1069,21 @@ console.log('\n32. a long category name stays on one line');
  * went to three columns. A list row has the full width, so the size is fixed
  * and a long name is ellipsized instead. */
 reset(); reboot();
-const faceOfRow = k => $('grid').children.find(c => c.dataset.key === k).querySelector('.k');
+const faceOfRow = k => $('grid').children.find(c => c.dataset.key === H.catId(k)).querySelector('.k');
 chk('the name has no inline size — the stylesheet owns it',
   !faceOfRow('DW').style.fontSize, String(faceOfRow('DW').style.fontSize));
 
 const real32 = CATEGORIES.slice();
 for (let i = CATEGORIES.length; i < 11; i++)
-  CATEGORIES.push({ key: 'X' + i, label: 'Extra ' + i, color: String((i % 11) + 1), autoMark: null });
+  CATEGORIES.push({ label: 'Extra ' + i, color: String((i % 11) + 1), autoMark: null });
 reboot();
 chk('eleven categories are eleven rows',
   $('grid').children.filter(c => c.dataset.key).length === 11,
   String($('grid').children.length));
 chk('every configured category is still on screen',
-  CATEGORIES.every(c => $('grid').children.some(x => x.dataset.key === c.key)));
+  CATEGORIES.every(c => $('grid').children.some(x => x.dataset.key === c.label)));
 chk('and the first is still first',
-  $('grid').children[0].dataset.key === 'DW',
+  $('grid').children[0].dataset.key === 'Deep work',
   $('grid').children.map(c => c.dataset.key || '_').join(' '));
 CATEGORIES.length = 0; real32.forEach(c => CATEGORIES.push(c));
 reset(); reboot();
@@ -1283,7 +1284,7 @@ tapMark('+');
 pump(() => DEAD().length > 0);
 chk('the mark was set aside', DEAD().length === 1, JSON.stringify(DEAD()));
 chk('a setMark names the category the mark belonged to',
-  DEAD().length === 1 && DEAD()[0].key === 'ADM',
+  DEAD().length === 1 && DEAD()[0].key === 'Admin',
   DEAD().length ? String(DEAD()[0].key) : '(none)');
 chk('and that block\'s start time',
   DEAD().length === 1 && near(DEAD()[0].startMs, b1Start),
@@ -1302,7 +1303,7 @@ tap('MTG');                                // closeActual(DW) leads the queue
 pump(() => DEAD().length > 0);
 chk('the close was set aside', DEAD().length === 1, JSON.stringify(DEAD().map(d => d.op.type)));
 chk('and it names the category being closed',
-  DEAD().length === 1 && DEAD()[0].op.type === 'closeActual' && DEAD()[0].key === 'DW',
+  DEAD().length === 1 && DEAD()[0].op.type === 'closeActual' && DEAD()[0].key === 'Deep work',
   DEAD().length ? DEAD()[0].op.type + '/' + DEAD()[0].key : '(none)');
 chk('with the start of the block, not its end',
   DEAD().length === 1 && near(DEAD()[0].startMs, b1Open),
@@ -1317,7 +1318,7 @@ tap('FRAG');
 pump(() => DEAD().length > 0);
 chk('the open was set aside', DEAD().length === 1, JSON.stringify(DEAD().map(d => d.op.type)));
 chk('and it names the tapped category',
-  DEAD().length === 1 && DEAD()[0].key === 'FRAG',
+  DEAD().length === 1 && DEAD()[0].key === 'Fragments',
   DEAD().length ? String(DEAD()[0].key) : '(none)');
 chk('and when it was tapped',
   DEAD().length === 1 && near(DEAD()[0].startMs, b1Tap),
@@ -1415,7 +1416,7 @@ $('dgClose').click(); settle();
 chk('the drawer is closed', $('sheetDead').hidden);
 chk('the banner is still there, because the writes still are', !$('err').hidden, $('err').textContent);
 tap('DW');
-chk('and a category tap still opens a block', activeKey() === 'DW', String(activeKey()));
+chk('and a category tap still opens a block', activeKey() === 'Deep work', String(activeKey()));
 chk('which reached the calendar', A().length === 1, A().map(show).join(' | '));
 reset();
 
@@ -1945,8 +1946,8 @@ if (!gz) {
   /* One more key than the golden records, and it is the one D1 added. Asserted
      as "+1" rather than relaxed to ">=", so a second key appearing from
      somewhere still fails. */
-  chk('the same run reports one more key than before, and no other change',
-    now39.days === gz.days && now39.categories === gz.categories + 1,
+  chk('the same run reports the same key count as the golden',
+    now39.days === gz.days && now39.categories === gz.categories,
     JSON.stringify(now39) + ' vs ' + JSON.stringify({ days: gz.days, categories: gz.categories }));
   ['daily', 'weekly'].forEach(tab => {
     const gold = gz.grids[tab], live = tabRows(tab);
@@ -1969,9 +1970,7 @@ if (!gz) {
      * The golden itself is still NOT regenerated. See Q11 and Q14 in
      * factory/progress-2.md.
      */
-    const NEW_COLS = tab === 'daily'
-      ? [UNFILED_KEY, 'plan ' + UNFILED_KEY]
-      : ['plan ' + UNFILED_KEY, UNFILED_KEY, UNFILED_KEY + ' ratio'];
+    const NEW_COLS = [];
     chk(tab + ': same number of rows', live.length === gold.length,
       live.length + ' vs ' + gold.length);
     const surviving = live[0].filter(h => gold[0].includes(h));
@@ -1994,9 +1993,9 @@ if (!gz) {
      */
     const preKeys = gold[0].filter(h => /^plan /.test(h)).map(h => h.slice(5));
     const lastKey = preKeys[preKeys.length - 1];
-    const AFTER = tab === 'daily'
+    const AFTER = NEW_COLS.length === 0 ? [] : tab === 'daily'
       ? [[UNFILED_KEY, lastKey], ['plan ' + UNFILED_KEY, 'plan ' + lastKey]]
-      : [['plan ' + UNFILED_KEY, lastKey + ' ratio'],   // the weekly triple, in order
+      : [['plan ' + UNFILED_KEY, lastKey + ' ratio'],
          [UNFILED_KEY, 'plan ' + UNFILED_KEY],
          [UNFILED_KEY + ' ratio', UNFILED_KEY]];
     const misplaced = AFTER
@@ -2041,8 +2040,7 @@ if (!gz) {
      *
      * The keys come out of the golden's own header rather than out of the live
      * code, so this cannot agree with a mistake by construction. */
-    const goldKeys = gold[0].filter(h => /^plan /.test(h)).map(h => h.slice(5))
-      .concat([UNFILED_KEY]);        // D1's key gets its full set, like every other
+    const goldKeys = gold[0].filter(h => /^plan /.test(h)).map(h => h.slice(5));
     /* Which tabs carry the mark columns, stated rather than sniffed. Deriving
        it from the live header would make this agree with whatever the code did.
        B2 does the daily tab; B3 adds the weekly one to this list. */
@@ -2150,12 +2148,12 @@ reset();
 
 console.log('\n41. the mark set widens by exactly one character');
 reset();
-chk('buildTitle_ writes "?"', buildTitle_('DW', 'memo drafting', '?') === 'DW: memo drafting ?',
+chk('buildTitle_ writes "?"', buildTitle_('DW', 'memo drafting', '?') === 'Deep work: memo drafting ?',
   buildTitle_('DW', 'memo drafting', '?'));
 const p41 = parseTitle_('DW: memo drafting ?');
 chk('and parseTitle_ reads it back as the mark', p41.mark === '?', JSON.stringify(p41));
 chk('leaving the "?" out of the text', p41.text === 'memo drafting', JSON.stringify(p41));
-chk('with the key intact', p41.key === 'DW', JSON.stringify(p41));
+chk('with the key intact', p41.key === 'Deep work', JSON.stringify(p41));
 
 /* The three older marks are untouched by the widening. */
 chk('"+" still parses', parseTitle_('DW: memo +').mark === '+');
@@ -2227,7 +2225,7 @@ chk('the op carrying "?" is dropped',
 chk('so no title carries a guess the app did not make',
   !/\?/.test(A()[0].t), A()[0].t);
 chk('and the block it aimed at is untouched — still open, still unmarked',
-  A().length === 1 && A()[0].t === 'DW:' && /#open/.test(A()[0].d), show(A()[0]));
+  A().length === 1 && A()[0].t === 'Deep work:' && /#open/.test(A()[0].d), show(A()[0]));
 /* Its id comes back in `applied` as well, which is deliberate and predates the
    round: applyOps says so in as many words — "applied in the sense that the
    client should stop holding it" — so a malformed write leaves the queue
@@ -2301,7 +2299,7 @@ chk('no configured category carries "?" as its autoMark',
   JSON.stringify(CATEGORIES.map(c => [c.key, c.autoMark])));
 
 const guessed41 = [];
-for (const cat of CATEGORIES.map(c => c.key)) {
+for (const cat of CATEGORIES.map(c => c.label)) {
   for (let mins = 0; mins <= 480; mins += 20) {
     reset(); reboot();
     tap(cat);
@@ -2309,8 +2307,8 @@ for (const cat of CATEGORIES.map(c => c.key)) {
     // Two taps: past the confirm window the first acts and the second lands on
     // the freshly lit block as a no-op; inside it, the first arms and the
     // second confirms. One shape covers the whole sweep.
-    tap(cat === 'DW' ? 'MTG' : 'DW');
-    tap(cat === 'DW' ? 'MTG' : 'DW');
+    tap(cat === 'Deep work' ? 'Meetings' : 'Deep work');
+    tap(cat === 'Deep work' ? 'Meetings' : 'Deep work');
     settle();
     const bad = A().filter(e => /\?\s*$/.test(e.t));
     if (bad.length) guessed41.push(cat + '@' + mins + 'm: ' + bad.map(e => e.t).join(','));
@@ -2322,9 +2320,9 @@ chk('no tap sequence at any duration from 0 to 8 hours ever wrote a "?"',
  * against the last iteration rather than restating the check above it, which
  * would pass just as happily against an empty calendar. */
 chk('and the sweep was writing blocks, not sweeping an empty calendar',
-  A().length >= 2 && A().every(e => /^[A-Z]+:/.test(e.t)),
+  A().length >= 2 && A().every(e => /^[^:]+:/.test(e.t)),
   A().length + ' events: ' + A().map(e => e.t).join(','));
-chk('over all six configured categories', CATEGORIES.length === 6);
+chk('over all eight configured categories', CATEGORIES.length === 8);
 reset();
 
 console.log('\n41f. a note the user typed can never impersonate the app\'s guess');
@@ -2359,16 +2357,16 @@ chk('and the mark is the one the app applied', n41b.mark === '=', JSON.stringify
 /* The narrowness is the point: the strip only happens when the trailing slot is
  * otherwise empty. Asserted directly, so a later widening of it is visible. */
 chk('a bare trailing "?" is stripped when nothing follows it',
-  buildTitle_('DW', 'is this right ?', null) === 'DW: is this right',
+  buildTitle_('DW', 'is this right ?', null) === 'Deep work: is this right',
   buildTitle_('DW', 'is this right ?', null));
 chk('and kept when something does',
-  buildTitle_('DW', 'is this right ?', '=') === 'DW: is this right ? =',
+  buildTitle_('DW', 'is this right ?', '=') === 'Deep work: is this right ? =',
   buildTitle_('DW', 'is this right ?', '='));
 chk('a "?" inside the note is never touched',
-  buildTitle_('DW', 'why? because', null) === 'DW: why? because',
+  buildTitle_('DW', 'why? because', null) === 'Deep work: why? because',
   buildTitle_('DW', 'why? because', null));
 chk('nor one that is not in mark position',
-  buildTitle_('DW', 'what ??', null) === 'DW: what ??',
+  buildTitle_('DW', 'what ??', null) === 'Deep work: what ??',
   buildTitle_('DW', 'what ??', null));
 
 /* Error paths: a note made only of marks, and the round trip over all of it. */
@@ -2437,7 +2435,7 @@ H.setNow(D(2026, 7, 21, 7, 0));
 reboot();
 chk('FRAG is marked "?", not "-"', parseTitle_(A()[0].t).mark === '?', A()[0].t);
 /* Guards the specific way this could go wrong: buildTitle_ writing both. */
-chk('and exactly one mark is on the title', A()[0].t === 'FRAG: ?', A()[0].t);
+chk('and exactly one mark is on the title', A()[0].t === 'Fragments: ?', A()[0].t);
 
 console.log('\n42d. nothing is bounded that did not need bounding');
 /* C1 moved MISTAP_SECONDS from 90 to 20, so this is 10 seconds rather than the
@@ -2451,7 +2449,7 @@ H.setNow(D(2026, 7, 20, 9, 0, 10));
 reboot();
 chk('inside the mis-tap window, nothing is bounded', A().length === 1, A().map(show).join(' | '));
 chk('the block is still open', /#open/.test(A()[0].d), show(A()[0]));
-chk('and carries no mark at all', A()[0].t === 'DW:', A()[0].t);
+chk('and carries no mark at all', A()[0].t === 'Deep work:', A()[0].t);
 
 reset(D(2026, 7, 20, 9, 0)); reboot();
 tap('DW'); settle();
@@ -2459,7 +2457,7 @@ H.setNow(D(2026, 7, 20, 13, 0));             // 4h, under STALE_OPEN_HOURS, same
 reboot();
 chk('under the stale threshold on the same day, nothing is bounded',
   A().length === 1 && /#open/.test(A()[0].d), A().map(show).join(' | '));
-chk('and still no mark', A()[0].t === 'DW:', A()[0].t);
+chk('and still no mark', A()[0].t === 'Deep work:', A()[0].t);
 
 console.log('\n42e. a SIT block carries no mark, guessed or otherwise');
 reset(D(2026, 7, 20, 22, 30)); reboot();
@@ -2494,14 +2492,14 @@ console.log('\n42g. a category cannot be configured into producing a guess');
  * and A1's own criterion 7 both say markFor never produces '?'. */
 reset();
 H.SCRIPT_PROPS.EXTRA_CATEGORIES =
-  JSON.stringify([{ key: 'XX', label: 'Guessy', color: 5, autoMark: '?' }]);
+  JSON.stringify([{ label: 'Guessy', color: 5, autoMark: '?' }]);
 H.clearPropCache();
 reboot();
 chk('the category really is configured with a "?" autoMark',
-  clientConfig_().categories.some(c => c.key === 'XX' && c.autoMark === '?'),
+  clientConfig_().categories.some(c => c.key === 'Guessy' && c.autoMark === '?'),
   JSON.stringify(clientConfig_().categories.map(c => [c.key, c.autoMark])));
-tap('XX'); wait(40); tap('DW'); advance(6000); settle();
-const g42 = A().filter(e => /^XX:/.test(e.t));
+tap('Guessy'); wait(40); tap('DW'); advance(6000); settle();
+const g42 = A().filter(e => /^Guessy:/.test(e.t));
 chk('but an ordinary tap still does not write a guess',
   g42.length === 1 && parseTitle_(g42[0].t).mark !== '?', g42.map(e => e.t).join(' | '));
 chk('it falls back to the normal duration rule instead',
@@ -2615,7 +2613,7 @@ chk('the strip is visible', !$('strip').hidden);
 chk('and names the block and its duration',
   $('stripHead').textContent === 'DEEP WORK · 40m — MARK IT', $('stripHead').textContent);
 tapMark('+');
-chk('and the mark it offers still lands', A()[0].t === 'DW: +', A()[0].t);
+chk('and the mark it offers still lands', A()[0].t === 'Deep work: +', A()[0].t);
 
 console.log('\n43g. ending a short block shows no strip and applies no mark');
 reset(); reboot();
@@ -2626,7 +2624,7 @@ chk('no strip', $('strip').hidden);
  * still running, so on its own the mark assertion below proves nothing. */
 chk('the block actually closed', A().length === 1 && openEvents().length === 0,
   A().map(show).join(' | '));
-chk('and carries no mark', A()[0].t === 'DW:', A()[0].t);
+chk('and carries no mark', A()[0].t === 'Deep work:', A()[0].t);
 
 console.log('\n43h. a day closed by STOP is still closed after a reload');
 reset(); reboot();
@@ -2712,7 +2710,7 @@ reset(); reboot();
 tap('DW'); wait(5); settle();
 tap('MTG'); settle();
 chk('switching category does not end the day either',
-  openEvents().length === 1 && activeKey() === 'MTG', A().map(show).join(' | '));
+  openEvents().length === 1 && activeKey() === 'Meetings', A().map(show).join(' | '));
 
 console.log('\n43l. a server answer older than the STOP does not undo it');
 /* Also found by the checker, and the risk HANDOFF-2.md names for this task.
@@ -2777,33 +2775,33 @@ chk('waking h is 8, not 17', dayCell('2026-07-20', 'waking h') === 8,
   String(dayCell('2026-07-20', 'waking h')));
 chk('and UNLOGGED still reports its own 7 hours',
   dayCell('2026-07-20', 'UNLOGGED') === 7, String(dayCell('2026-07-20', 'UNLOGGED')));
-chk('and DW still reports its 8', dayCell('2026-07-20', 'DW') === 8,
-  String(dayCell('2026-07-20', 'DW')));
+chk('and DW still reports its 8', dayCell('2026-07-20', 'Deep work') === 8,
+  String(dayCell('2026-07-20', 'Deep work')));
 
 console.log('\n44b. a guessed block does not count as waking time either');
 reset(D(2026, 7, 24, 15, 0)); goodSheet();
 AC('DW: shipping', 20, 9, 0, 17, 0);
-AC('MTG: ?', 20, 22, 0, 23, 59);
+AC('Meetings: ?', 20, 22, 0, 23, 59);
 dailyRollup();
 chk('waking h counts 09:00-17:00 only', dayCell('2026-07-20', 'waking h') === 8,
   String(dayCell('2026-07-20', 'waking h')));
 chk('and the guessed block still reports its own hours',
-  near(dayCell('2026-07-20', 'MTG') * 3600000, 1.98 * 3600000),
-  String(dayCell('2026-07-20', 'MTG')));
+  near(dayCell('2026-07-20', 'Meetings') * 3600000, 1.98 * 3600000),
+  String(dayCell('2026-07-20', 'Meetings')));
 
 console.log('\n44c. the span is a span, not a sum');
 /* A guessed block sitting between two logged ones must not punch a hole in the
  * day: the ends are what is measured. */
 reset(D(2026, 7, 24, 15, 0)); goodSheet();
 AC('DW: morning', 20, 9, 0, 12, 0);
-AC('ADM: ?', 20, 12, 0, 14, 0);
-AC('MTG: afternoon', 20, 14, 0, 17, 0);
+AC('Admin: ?', 20, 12, 0, 14, 0);
+AC('Meetings: afternoon', 20, 14, 0, 17, 0);
 dailyRollup();
 chk('waking h is the whole 8-hour span', dayCell('2026-07-20', 'waking h') === 8,
   String(dayCell('2026-07-20', 'waking h')));
 chk('the guessed two hours are not subtracted from it',
-  dayCell('2026-07-20', 'waking h') === 8 && dayCell('2026-07-20', 'ADM') === 2,
-  'waking ' + dayCell('2026-07-20', 'waking h') + ' ADM ' + dayCell('2026-07-20', 'ADM'));
+  dayCell('2026-07-20', 'waking h') === 8 && dayCell('2026-07-20', 'Admin') === 2,
+  'waking ' + dayCell('2026-07-20', 'waking h') + ' ADM ' + dayCell('2026-07-20', 'Admin'));
 
 console.log('\n44d. the common case does not move');
 /* The load-bearing one. A day with nothing unlogged and nothing guessed must
@@ -2812,7 +2810,7 @@ console.log('\n44d. the common case does not move');
  * unchanged by this task. This asserts the specific column directly. */
 reset(D(2026, 7, 24, 15, 0)); goodSheet();
 AC('DW: shipping', 20, 9, 0, 12, 0);
-AC('MTG: standup', 20, 13, 30, 17, 15);
+AC('Meetings: standup', 20, 13, 30, 17, 15);
 dailyRollup();
 chk('waking h spans first start to last end, unchanged',
   near(dayCell('2026-07-20', 'waking h') * 3600000, 8.25 * 3600000),
@@ -2869,8 +2867,8 @@ dailyRollup();
 chk('waking h is 0 for a day of nothing but guessed time',
   dayCell('2026-07-20', 'waking h') === 0, String(dayCell('2026-07-20', 'waking h')));
 chk('while the block still reports its own hours',
-  near(dayCell('2026-07-20', 'DW') * 3600000, 1.98 * 3600000),
-  String(dayCell('2026-07-20', 'DW')));
+  near(dayCell('2026-07-20', 'Deep work') * 3600000, 1.98 * 3600000),
+  String(dayCell('2026-07-20', 'Deep work')));
 chk('and sitting % stays blank rather than dividing by it',
   dayCell('2026-07-20', 'sitting %') === '',
   JSON.stringify(dayCell('2026-07-20', 'sitting %')));
@@ -2923,15 +2921,15 @@ console.log('\n45. every hour is counted under the mark it carries');
 const s45 = statsFor(20, () => {
   AC('DW: morning =', 20, 9, 0, 11, 0);
   AC('DW: afternoon -', 20, 13, 0, 14, 0);
-  AC('MTG: standup ?', 20, 15, 0, 15, 30);
+  AC('Meetings: standup ?', 20, 15, 0, 15, 30);
 });
-chk('DW = holds 2h', near(s45.marks.DW['='] * 3600000, 2 * 3600000), String(s45.marks.DW['=']));
-chk('DW - holds 1h', near(s45.marks.DW['-'] * 3600000, 1 * 3600000), String(s45.marks.DW['-']));
-chk('MTG ? holds 30m', near(s45.marks.MTG['?'] * 3600000, 0.5 * 3600000), String(s45.marks.MTG['?']));
-chk('and the existing DW total is still 3', near(s45.actual.DW * 3600000, 3 * 3600000),
-  String(s45.actual.DW));
-chk('DW + is zero, not missing', s45.marks.DW['+'] === 0, JSON.stringify(s45.marks.DW));
-chk('DW unmarked is zero, not missing', s45.marks.DW[''] === 0, JSON.stringify(s45.marks.DW));
+chk('DW = holds 2h', near(s45.marks['Deep work']['='] * 3600000, 2 * 3600000), String(s45.marks['Deep work']['=']));
+chk('DW - holds 1h', near(s45.marks['Deep work']['-'] * 3600000, 1 * 3600000), String(s45.marks['Deep work']['-']));
+chk('MTG ? holds 30m', near(s45.marks.Meetings['?'] * 3600000, 0.5 * 3600000), String(s45.marks.Meetings['?']));
+chk('and the existing DW total is still 3', near(s45.actual['Deep work'] * 3600000, 3 * 3600000),
+  String(s45.actual['Deep work']));
+chk('DW + is zero, not missing', s45.marks['Deep work']['+'] === 0, JSON.stringify(s45.marks['Deep work']));
+chk('DW unmarked is zero, not missing', s45.marks['Deep work'][''] === 0, JSON.stringify(s45.marks['Deep work']));
 
 console.log('\n45b. a key\'s buckets always sum to its total — asserted per key');
 /* All five mark states across every configured category, then checked key by
@@ -2941,7 +2939,7 @@ const s45b = statsFor(20, () => {
   let h = 0;
   CATEGORIES.forEach(c => {
     ['+', '=', '-', '?', null].forEach(m => {
-      AC(c.key + ': work' + (m ? ' ' + m : ''), 20, h % 24, 0, h % 24, 30);
+      AC(c.label + ': work' + (m ? ' ' + m : ''), 20, h % 24, 0, h % 24, 30);
       h++;
     });
   });
@@ -2956,8 +2954,8 @@ rollupKeys_().forEach(k => {
 chk('every key\'s five buckets sum to its total, to two decimals',
   offBy.length === 0, offBy.join(' | '));
 chk('and the fixture really did exercise every category',
-  CATEGORIES.every(c => s45b.actual[c.key] > 0),
-  JSON.stringify(CATEGORIES.map(c => [c.key, round2_(s45b.actual[c.key])])));
+  CATEGORIES.every(c => s45b.actual[c.label] > 0),
+  JSON.stringify(CATEGORIES.map(c => [c.label, round2_(s45b.actual[c.label])])));
 chk('across all five buckets',
   MARK_BUCKETS.every(m => rollupKeys_().some(k => s45b.marks[k][m] > 0)),
   JSON.stringify(MARK_BUCKETS.map(m => [m || '(unmarked)',
@@ -2969,20 +2967,20 @@ const s45c = statsFor(20, () => {
   AC('DW: proper =', 20, 10, 0, 12, 0);
 });
 chk('the unmarked 5 minutes are in the unmarked bucket',
-  near(s45c.marks.DW[''] * 3600000, 5 * 60000), String(s45c.marks.DW['']));
+  near(s45c.marks['Deep work'][''] * 3600000, 5 * 60000), String(s45c.marks['Deep work']['']));
 chk('and are not dropped from the total',
-  near(s45c.actual.DW * 3600000, (2 * 60 + 5) * 60000), String(s45c.actual.DW));
+  near(s45c.actual['Deep work'] * 3600000, (2 * 60 + 5) * 60000), String(s45c.actual['Deep work']));
 
 console.log('\n45d. an unrecognised trailing character makes no sixth bucket');
 const s45d = statsFor(20, () => { AC('DW: memo !', 20, 9, 0, 10, 0); });
-chk('it counts as unmarked', near(s45d.marks.DW[''] * 3600000, 3600000),
-  String(s45d.marks.DW['']));
-chk('and DW has exactly five buckets', Object.keys(s45d.marks.DW).length === 5,
-  JSON.stringify(Object.keys(s45d.marks.DW)));
+chk('it counts as unmarked', near(s45d.marks['Deep work'][''] * 3600000, 3600000),
+  String(s45d.marks['Deep work']['']));
+chk('and DW has exactly five buckets', Object.keys(s45d.marks['Deep work']).length === 5,
+  JSON.stringify(Object.keys(s45d.marks['Deep work'])));
 chk('which are the four marks and unmarked',
-  JSON.stringify(Object.keys(s45d.marks.DW).sort()) ===
+  JSON.stringify(Object.keys(s45d.marks['Deep work']).sort()) ===
   JSON.stringify(['+', '-', '=', '?', ''].sort()),
-  JSON.stringify(Object.keys(s45d.marks.DW)));
+  JSON.stringify(Object.keys(s45d.marks['Deep work'])));
 
 console.log('\n45e. a day with no events is all zeroes, and does not throw');
 let e45 = null, s45e = null;
@@ -3001,13 +2999,13 @@ console.log('\n45f. the existing per-key totals did not move');
  * grids and is untouched by this task. This asserts the property directly. */
 const s45f = statsFor(20, () => {
   AC('DW: a =', 20, 9, 0, 12, 0);
-  AC('MTG: b -', 20, 13, 0, 14, 30);
+  AC('Meetings: b -', 20, 13, 0, 14, 30);
   AC('UNLOGGED -', 20, 20, 0, 23, 0);
 });
-chk('DW total unchanged by bucketing', near(s45f.actual.DW * 3600000, 3 * 3600000),
-  String(s45f.actual.DW));
-chk('MTG total unchanged', near(s45f.actual.MTG * 3600000, 1.5 * 3600000),
-  String(s45f.actual.MTG));
+chk('DW total unchanged by bucketing', near(s45f.actual['Deep work'] * 3600000, 3 * 3600000),
+  String(s45f.actual['Deep work']));
+chk('MTG total unchanged', near(s45f.actual.Meetings * 3600000, 1.5 * 3600000),
+  String(s45f.actual.Meetings));
 chk('UNLOGGED is bucketed too, under the mark it carries',
   near(s45f.marks.UNLOGGED['-'] * 3600000, 3 * 3600000), JSON.stringify(s45f.marks.UNLOGGED));
 reset();
@@ -3045,9 +3043,7 @@ if (!gz46) {
      * the new key's own columns. Contract 20's purpose was never "the numbers
      * must never move"; it was "the mark columns must be appended rather than
      * interleaved", and that is what this still catches. Q14. */
-    const NEW_COLS = tab === 'daily'
-      ? [UNFILED_KEY, 'plan ' + UNFILED_KEY]
-      : ['plan ' + UNFILED_KEY, UNFILED_KEY, UNFILED_KEY + ' ratio'];
+    const NEW_COLS = [];
     const surviving = live[0].filter(h => goldHead.includes(h));
     const misordered = surviving
       .map((h, i) => (h === goldHead[i] ? null : i + ': expected ' + goldHead[i] + ', found ' + h))
@@ -3071,15 +3067,15 @@ reset(D(2026, 7, 24, 15, 0)); goodSheet();
 AC('DW: settled =', 20, 9, 0, 11, 0);
 AC('DW: guessed ?', 20, 13, 0, 14, 0);
 dailyRollup();
-chk('DW = shows 2', dayCell('2026-07-20', 'DW =') === 2, String(dayCell('2026-07-20', 'DW =')));
-chk('DW ? shows 1', dayCell('2026-07-20', 'DW ?') === 1, String(dayCell('2026-07-20', 'DW ?')));
+chk('DW = shows 2', dayCell('2026-07-20', 'Deep work =') === 2, String(dayCell('2026-07-20', 'Deep work =')));
+chk('DW ? shows 1', dayCell('2026-07-20', 'Deep work ?') === 1, String(dayCell('2026-07-20', 'Deep work ?')));
 chk('and the existing DW column still shows 3',
-  dayCell('2026-07-20', 'DW') === 3, String(dayCell('2026-07-20', 'DW')));
+  dayCell('2026-07-20', 'Deep work') === 3, String(dayCell('2026-07-20', 'Deep work')));
 chk('the buckets that saw nothing show 0, not blank',
-  dayCell('2026-07-20', 'DW +') === 0 && dayCell('2026-07-20', 'DW -') === 0 &&
-  dayCell('2026-07-20', 'DW unmarked') === 0,
-  JSON.stringify([dayCell('2026-07-20', 'DW +'), dayCell('2026-07-20', 'DW -'),
-                  dayCell('2026-07-20', 'DW unmarked')]));
+  dayCell('2026-07-20', 'Deep work +') === 0 && dayCell('2026-07-20', 'Deep work -') === 0 &&
+  dayCell('2026-07-20', 'Deep work unmarked') === 0,
+  JSON.stringify([dayCell('2026-07-20', 'Deep work +'), dayCell('2026-07-20', 'Deep work -'),
+                  dayCell('2026-07-20', 'Deep work unmarked')]));
 
 console.log('\n47b. every row is the width of the header');
 /* A short row is how a column silently shifts. */
@@ -3105,7 +3101,7 @@ chk('weekly: and it is the last column',
 console.log('\n47d. two runs against a fixed clock produce the same grid');
 reset(D(2026, 7, 24, 15, 0)); goodSheet();
 AC('DW: a =', 20, 9, 0, 11, 0);
-AC('MTG: b ?', 20, 13, 0, 14, 0);
+AC('Meetings: b ?', 20, 13, 0, 14, 0);
 dailyRollup();
 const first47 = JSON.stringify(dRows());
 const firstW47 = JSON.stringify(wRows());
@@ -3118,14 +3114,14 @@ reset(D(2026, 7, 24, 15, 0)); goodSheet();
 AC('DW: mon =', 20, 9, 0, 11, 0);
 AC('DW: tue =', 21, 9, 0, 12, 0);
 AC('DW: wed ?', 22, 9, 0, 10, 0);
-AC('MTG: thu -', 23, 9, 0, 9, 30);
+AC('Meetings: thu -', 23, 9, 0, 9, 30);
 dailyRollup();
 const wHead = wRows()[0];
 const wRow = wRows().find(r => r[0] === '2026-07-20');
 const wCell = n => wRow[wHead.indexOf(n)];
-chk('the week\'s DW = is 2 + 3', wCell('DW =') === 5, String(wCell('DW =')));
-chk('the week\'s DW ? is 1', wCell('DW ?') === 1, String(wCell('DW ?')));
-chk('the week\'s MTG - is 0.5', wCell('MTG -') === 0.5, String(wCell('MTG -')));
+chk('the week\'s DW = is 2 + 3', wCell('Deep work =') === 5, String(wCell('Deep work =')));
+chk('the week\'s DW ? is 1', wCell('Deep work ?') === 1, String(wCell('Deep work ?')));
+chk('the week\'s MTG - is 0.5', wCell('Meetings -') === 0.5, String(wCell('Meetings -')));
 /* Checked against the daily tab rather than against numbers typed in here, so
  * a bucket summed into the wrong key is caught — per-key totals would not
  * reveal it, because they would still add up. */
@@ -3149,12 +3145,12 @@ AC('DW: also guessed ?', 21, 9, 0, 11, 0);
 dailyRollup();
 const wRow48 = wRows().find(r => r[0] === '2026-07-20');
 const wCell48 = n => wRow48[wRows()[0].indexOf(n)];
-chk('the ? column carries all its hours', wCell48('DW ?') === 5, String(wCell48('DW ?')));
-chk('the = column says 0', wCell48('DW =') === 0, JSON.stringify(wCell48('DW =')));
-chk('and 0 is a number, not an empty cell', typeof wCell48('DW =') === 'number',
-  typeof wCell48('DW ='));
+chk('the ? column carries all its hours', wCell48('Deep work ?') === 5, String(wCell48('Deep work ?')));
+chk('the = column says 0', wCell48('Deep work =') === 0, JSON.stringify(wCell48('Deep work =')));
+chk('and 0 is a number, not an empty cell', typeof wCell48('Deep work =') === 'number',
+  typeof wCell48('Deep work ='));
 chk('while the ratio cell for an unplanned key is still blank',
-  wCell48('DW ratio') === '', JSON.stringify(wCell48('DW ratio')));
+  wCell48('Deep work ratio') === '', JSON.stringify(wCell48('Deep work ratio')));
 
 console.log('\n48c. a retired category keeps its full set of mark columns');
 /* removeCategory only retires a category that was added at runtime — one in the
@@ -3195,8 +3191,8 @@ console.log('\n49. the record says how many PLAN events there were and how many 
 reset(D(2026, 7, 24, 15, 0)); goodSheet();
 // 3 that reach a configured category...
 PL('DW: ship it', 20, 9, 12);
-PL('MTG: standup', 20, 13, 14);
-PL('ADM: inbox', 21, 9, 10);
+PL('Meetings: standup', 20, 13, 14);
+PL('Admin: inbox', 21, 9, 10);
 // ...and 9 that do not.
 PL('Deep work — memo', 20, 15, 17);
 PL('9:00 standup', 21, 11, 12);
@@ -3347,11 +3343,11 @@ chk('and the spoken state moves with the visible one',
 splitPick('MTG');
 const a52 = A();
 chk('exactly one block', a52.length === 1, a52.map(show).join(' | '));
-chk('keyed MTG', a52[0].t === 'MTG:', a52[0].t);
+chk('keyed MTG', a52[0].t === 'Meetings:', a52[0].t);
 chk('with the original start time', a52[0].s === t52, show(a52[0]));
 chk('start and end both unchanged', a52[0].s + '/' + a52[0].e === ends52,
   a52[0].s + '/' + a52[0].e + ' was ' + ends52);
-chk('and still open', /#open/.test(a52[0].d) && activeKey() === 'MTG',
+chk('and still open', /#open/.test(a52[0].d) && activeKey() === 'Meetings',
   show(a52[0]) + ' lit=' + String(activeKey()));
 chk('the sheet closed behind it', !splitOpen());
 chk('and the block wears MTG\'s colour', sameAsButton(a52[0], 'MTG'),
@@ -3365,7 +3361,7 @@ wait(120);
 tap('DW'); settle();
 pickWhole(); splitPick('MTG');
 chk('one block, keyed MTG, note intact',
-  A().length === 1 && A()[0].t === 'MTG: memo drafting', A().map(show).join(' | '));
+  A().length === 1 && A()[0].t === 'Meetings: memo drafting', A().map(show).join(' | '));
 chk('and the lit box still offers the note back',
   noteBox().value === 'memo drafting', JSON.stringify(noteBox().value));
 
@@ -3390,10 +3386,10 @@ splitPick('ADM');
 chk('the remainder path still writes two blocks', A().length === 2,
   A().map(show).join(' | '));
 chk('MTG keeps the first hour',
-  A()[0].t === 'MTG: =' && A()[0].s === t52c && near(A()[0].e - A()[0].s, 3600000),
+  A()[0].t === 'Meetings: =' && A()[0].s === t52c && near(A()[0].e - A()[0].s, 3600000),
   show(A()[0]));
 chk('ADM takes the remainder and is the open one',
-  A()[1].s === A()[0].e && /#open/.test(A()[1].d) && activeKey() === 'ADM',
+  A()[1].s === A()[0].e && /#open/.test(A()[1].d) && activeKey() === 'Admin',
   show(A()[1]));
 
 console.log('\n52d. recategorising whole to BODY leaves the SIT alone, as a tap does');
@@ -3404,7 +3400,7 @@ chk('sitting to begin with', litPosture() === 'sit', String(litPosture()));
 const sitStart52d = S()[0].s;
 tap('DW'); settle();
 pickWhole(); splitPick('BODY');
-chk('one block, keyed BODY', A().length === 1 && A()[0].t === 'BODY:',
+chk('one block, keyed BODY', A().length === 1 && A()[0].t === 'Zone 2:',
   A().map(show).join(' | '));
 chk('the SIT is still open, and still the same one',
   S().length === 1 && /#open/.test(S()[0].d) && S()[0].s === sitStart52d,
@@ -3418,22 +3414,22 @@ tap('DW'); settle(); wait(120);
 H.setServerReject('nope');
 tap('DW'); settle();
 pickWhole(); splitPick('MTG');
-chk('the grid shows the new category at once', activeKey() === 'MTG', String(activeKey()));
+chk('the grid shows the new category at once', activeKey() === 'Meetings', String(activeKey()));
 const q52 = JSON.parse(H.STORE['tt.queue.v1'] || '[]');
 chk('and a recategorize op is waiting in the queue',
-  q52.filter(o => o.type === 'recategorize' && o.key === 'MTG').length === 1,
+  q52.filter(o => o.type === 'recategorize' && o.key === 'Meetings').length === 1,
   JSON.stringify(q52.map(o => o.type + ':' + (o.key || ''))));
 reboot();
 const q52b = JSON.parse(H.STORE['tt.queue.v1'] || '[]');
 chk('a reboot before it drains keeps the op, unchanged',
-  q52b.filter(o => o.type === 'recategorize' && o.key === 'MTG').length === 1,
+  q52b.filter(o => o.type === 'recategorize' && o.key === 'Meetings').length === 1,
   JSON.stringify(q52b.map(o => o.type + ':' + (o.key || ''))));
 chk('and the client still shows MTG rather than the server\'s stale DW',
-  activeKey() === 'MTG', String(activeKey()));
+  activeKey() === 'Meetings', String(activeKey()));
 H.setServerReject(null);
 advance(120000); settle(); settle();                     // let the retry timer run
 chk('once the server takes it, the calendar agrees',
-  A().length === 1 && A()[0].t === 'MTG:' && /#open/.test(A()[0].d),
+  A().length === 1 && A()[0].t === 'Meetings:' && /#open/.test(A()[0].d),
   A().map(show).join(' | '));
 
 console.log('\n52f. an open that never reached the server is corrected in place');
@@ -3449,13 +3445,13 @@ pickWhole(); splitPick('MTG');
 const q52f = JSON.parse(H.STORE['tt.queue.v1'] || '[]');
 chk('the pending open is corrected, not chased by a second op',
   q52f.filter(o => o.type === 'openActual').length === 1 &&
-  q52f.filter(o => o.type === 'openActual')[0].key === 'MTG' &&
+  q52f.filter(o => o.type === 'openActual')[0].key === 'Meetings' &&
   !q52f.some(o => o.type === 'recategorize'),
   JSON.stringify(q52f.map(o => o.type + ':' + (o.key || ''))));
 H.setOnline(true);
 advance(120000); settle(); settle();
 chk('and the network coming back writes one MTG block from the original start',
-  A().length === 1 && A()[0].t === 'MTG:' && A()[0].s === t52f,
+  A().length === 1 && A()[0].t === 'Meetings:' && A()[0].s === t52f,
   A().map(show).join(' | '));
 
 console.log('\n52g. the destructive option is never the one already chosen');
@@ -3467,7 +3463,7 @@ tap('DW'); settle(); wait(180);
 tap('DW'); settle();
 pickWhole();
 $('spClose').fire('click'); settle();
-chk('the sheet closed without writing', A().length === 1 && A()[0].t === 'DW:',
+chk('the sheet closed without writing', A().length === 1 && A()[0].t === 'Deep work:',
   A().map(show).join(' | '));
 tap('DW'); settle();
 chk('and re-opening it is back on the remainder',
@@ -3489,7 +3485,7 @@ pickWhole(); splitPick('MTG');
 const cut52h = H.nowMs();
 tap('REL'); settle();
 chk('and a tap on another category starts a new block rather than retitling',
-  A().length === 2 && A()[0].t === 'MTG: =' && A()[0].s === t52h && A()[1].t === 'REL:',
+  A().length === 2 && A()[0].t === 'Meetings: =' && A()[0].s === t52h && A()[1].t === 'People:',
   A().map(show).join(' | '));
 /* And the end, which cannot be read off an open block: the renamed block is the
  * WHOLE three hours, not a fragment of them. */
@@ -3513,11 +3509,11 @@ advance(25000); settle();                        // past MISTAP_SECONDS, still o
 tap('DW'); settle();
 chk('SPLIT opens while the open block is still unacknowledged', splitOpen());
 pickWhole(); splitPick('MTG');
-chk('the client shows the new category at once', activeKey() === 'MTG', String(activeKey()));
+chk('the client shows the new category at once', activeKey() === 'Meetings', String(activeKey()));
 H.setCallLag('applyOps', null);
 advance(120000); settle(); settle();
 chk('and the calendar ends up carrying it too',
-  A().length === 1 && A()[0].t === 'MTG:' && A()[0].s === t52j, A().map(show).join(' | '));
+  A().length === 1 && A()[0].t === 'Meetings:' && A()[0].s === t52j, A().map(show).join(' | '));
 chk('with nothing left unsent', JSON.parse(H.STORE['tt.queue.v1'] || '[]').length === 0,
   H.STORE['tt.queue.v1'] || '[]');
 
@@ -3540,7 +3536,7 @@ reset(); reboot();
 tap('DW'); settle(); wait(120);
 tap('DW'); settle();
 chk('the sheet is open on a real block',
-  splitOpen() && $('splitGrid').children.length === 5,
+  splitOpen() && $('splitGrid').children.length === 7,
   String($('splitGrid').children.length));
 tapStop(); settle();
 chk('the day ended underneath it', activeKey() === null, String(activeKey()));
@@ -3569,7 +3565,7 @@ dailyRollup();
 chk('the unreadable block reports its hours under UNFILED',
   dayCell('2026-07-20', UNFILED_KEY) === 1, String(dayCell('2026-07-20', UNFILED_KEY)));
 chk('and ADM is 0 — nothing was claimed as Admin',
-  dayCell('2026-07-20', 'ADM') === 0, String(dayCell('2026-07-20', 'ADM')));
+  dayCell('2026-07-20', 'Admin') === 0, String(dayCell('2026-07-20', 'Admin')));
 
 console.log('\n53b. parsed-but-unknown gets the same home as unparseable');
 reset(D(2026, 7, 24, 15, 0)); goodSheet();
@@ -3583,12 +3579,12 @@ chk('and no column was invented for RE or 9',
 
 console.log('\n53c. a category that really is Admin is untouched');
 reset(D(2026, 7, 24, 15, 0)); goodSheet();
-AC('ADM: real admin =', 20, 9, 0, 11, 0);
+AC('Admin: real admin =', 20, 9, 0, 11, 0);
 AC('Lunch with Ada', 20, 12, 0, 13, 0);
 dailyRollup();
-chk('ADM reports its own two hours', dayCell('2026-07-20', 'ADM') === 2,
-  String(dayCell('2026-07-20', 'ADM')));
-chk('in the right mark bucket', dayCell('2026-07-20', 'ADM =') === 2,
+chk('ADM reports its own two hours', dayCell('2026-07-20', 'Admin') === 2,
+  String(dayCell('2026-07-20', 'Admin')));
+chk('in the right mark bucket', dayCell('2026-07-20', 'Admin =') === 2,
   String(dayCell('2026-07-20', 'ADM =')));
 chk('and UNFILED holds only the unreadable one',
   dayCell('2026-07-20', UNFILED_KEY) === 1, String(dayCell('2026-07-20', UNFILED_KEY)));
@@ -3644,13 +3640,13 @@ chk('the block is still open on the calendar, untouched',
   A().length === 1 && A()[0].t === 'Lunch with Ada' && /#open/.test(A()[0].d), show(A()[0]));
 tap('MTG'); settle();
 chk('and tapping a category closes it without throwing',
-  A().length === 2 && /#open/.test(A()[1].d) && A()[1].t === 'MTG:',
+  A().length === 2 && /#open/.test(A()[1].d) && A()[1].t === 'Meetings:',
   A().map(show).join(' | '));
-chk('the closed one is still not Admin', !/^ADM:/.test(A()[0].t), A()[0].t);
+chk('the closed one is still not Admin', !/^Admin:/.test(A()[0].t), A()[0].t);
 
 console.log('\n53g. bounding an unreadable block keeps what the user wrote');
 /* Site 2 of 4 — the only one that WRITES the fallback back to the calendar.
- * It used to turn "Lunch with Ada" into "ADM: ?": a category nobody chose, and
+ * It used to turn "Lunch with Ada" into "Admin: ?": a category nobody chose, and
  * the text gone with it. */
 reset(D(2026, 7, 20, 22, 0)); reboot();
 tap('DW'); settle();
@@ -3658,7 +3654,7 @@ A()[0].t = 'Lunch with Ada';
 H.setNow(D(2026, 7, 21, 7, 0));
 reboot();
 const b53 = A()[0];
-chk('it is not claimed as Admin', !/^ADM:/.test(b53.t), b53.t);
+chk('it is not claimed as Admin', !/^Admin:/.test(b53.t), b53.t);
 chk('the words the user typed survive', /Lunch with Ada/.test(b53.t), b53.t);
 chk('it still says the end was the app\'s guess', /\?$/.test(b53.t), b53.t);
 chk('and the boundary arithmetic is what it always was — the day border',
@@ -3679,7 +3675,7 @@ tap('DW'); settle(); wait(30);
 A()[0].t = 'Lunch with Ada';
 const ref53 = /#ref:([A-Za-z0-9]+)/.exec(A()[0].d)[1];
 applyOps([{ id: 'd1close', type: 'closeActual', ref: ref53, endMs: H.nowMs() }]);
-chk('closeActual does not claim it as Admin', !/^ADM:/.test(A()[0].t), A()[0].t);
+chk('closeActual does not claim it as Admin', !/^Admin:/.test(A()[0].t), A()[0].t);
 chk('and keeps the text', /Lunch with Ada/.test(A()[0].t), A()[0].t);
 
 reset(); reboot();
@@ -3689,10 +3685,10 @@ const ref53b = /#ref:([A-Za-z0-9]+)/.exec(A()[0].d)[1];
 applyOps([{ id: 'd1split', type: 'splitActual', ref: ref53b, atMs: H.nowMs() - 30 * 60000,
             newRef: 'd1splitnewref00', newKey: 'MTG', nowMs: H.nowMs() }]);
 chk('splitActual does not claim the first half as Admin',
-  !/^ADM:/.test(A()[0].t), A()[0].t);
+  !/^Admin:/.test(A()[0].t), A()[0].t);
 chk('and keeps its text', /Lunch with Ada/.test(A()[0].t), A()[0].t);
 chk('while the remainder is the category that was asked for',
-  A().length === 2 && A()[1].t === 'MTG:', A().map(show).join(' | '));
+  A().length === 2 && A()[1].t === 'Meetings:', A().map(show).join(' | '));
 reset();
 
 console.log('\n54. a week the window only partly covers says so');
@@ -3763,7 +3759,7 @@ chk('and there is still exactly one stamp, after the last data column',
   /^last rebuilt /.test(String(wRows()[0][wRows()[0].length - 1])),
   JSON.stringify(wRows()[0].slice(-2)));
 chk('the numbers the week reports are still its days\' numbers',
-  wRow54('2026-07-20')[wCol54('DW')] === 2, String(wRow54('2026-07-20')[wCol54('DW')]));
+  wRow54('2026-07-20')[wCol54('Deep work')] === 2, String(wRow54('2026-07-20')[wCol54('Deep work')]));
 
 console.log('\n54e. the count survives a week containing a clock change');
 /*
@@ -3856,7 +3852,7 @@ reset(); reboot();
 H.setServerReject('calendar said no');
 tap('DW');
 chk('it shows as running while the write is still being tried',
-  activeKey() === 'DW', String(activeKey()));
+  activeKey() === 'Deep work', String(activeKey()));
 pump(() => DEAD().length > 0);
 chk('the open was set aside',
   DEAD().length === 1 && DEAD()[0].op.type === 'openActual',
@@ -3877,7 +3873,7 @@ chk('and the drawer still holds it, so it is not lost',
 console.log('\n55b. and no later write is aimed at the block that never existed');
 H.setServerReject(null);
 tap('MTG'); settle();
-chk('a fresh block opens normally', A().length === 1 && A()[0].t === 'MTG:',
+chk('a fresh block opens normally', A().length === 1 && A()[0].t === 'Meetings:',
   A().map(show).join(' | '));
 chk('with a new ref, not the set-aside one',
   A()[0].d.indexOf(DEAD()[0].op.ref) < 0,
@@ -3891,7 +3887,7 @@ console.log('\n55c. a set-aside mark does NOT clear the grid');
  * created and really is running. */
 reset(); reboot();
 tap('DW'); wait(30); tap('MTG'); settle();      // DW closes, MTG opens, strip shows
-chk('MTG is the running block', activeKey() === 'MTG', String(activeKey()));
+chk('MTG is the running block', activeKey() === 'Meetings', String(activeKey()));
 H.setServerReject('calendar said no');
 tapMark('+');                                   // a setMark for the CLOSED DW
 pump(() => DEAD().length > 0);
@@ -3899,7 +3895,7 @@ chk('the mark was the thing set aside',
   DEAD().length === 1 && DEAD()[0].op.type === 'setMark',
   JSON.stringify(DEAD().map(d => d.op.type)));
 chk('and MTG is still shown running, because it really is',
-  activeKey() === 'MTG', String(activeKey()));
+  activeKey() === 'Meetings', String(activeKey()));
 chk('and is still open on the calendar',
   A().length === 2 && /#open/.test(A()[1].d), A().map(show).join(' | '));
 H.setServerReject(null);
@@ -3918,7 +3914,7 @@ H.setServerReject('calendar said no');
 tap('MTG'); settle();                           // re-tap the lit one: SPLIT
 $('spRange').value = '60'; $('spRange').fire('input');
 splitPick('ADM');
-chk('the client shows the remainder running', activeKey() === 'ADM', String(activeKey()));
+chk('the client shows the remainder running', activeKey() === 'Admin', String(activeKey()));
 pump(() => DEAD().length > 0);
 chk('the split was set aside',
   DEAD().length === 1 && DEAD()[0].op.type === 'splitActual',
@@ -3926,12 +3922,12 @@ chk('the split was set aside',
 chk('the phantom remainder is gone from the grid', activeKey() !== 'ADM',
   String(activeKey()));
 chk('and the block the split was cutting is back in hand',
-  activeKey() === 'MTG', String(activeKey()));
+  activeKey() === 'Meetings', String(activeKey()));
 chk('with its original start time, because it never stopped running',
   near(JSON.parse(H.STORE['tt.state.v1']).open.startMs, t55d),
   JSON.stringify(JSON.parse(H.STORE['tt.state.v1']).open));
 chk('which is the truth: that block is still open on the calendar',
-  A().length === 1 && A()[0].t === 'MTG:' && /#open/.test(A()[0].d),
+  A().length === 1 && A()[0].t === 'Meetings:' && /#open/.test(A()[0].d),
   A().map(show).join(' | '));
 chk('and STOP can end it, which is the point',
   !$('stopBtn')._cls.has('inert'), $('stopBtn').className);
@@ -3954,7 +3950,7 @@ chk('and the grid is still idle', activeKey() === null, String(activeKey()));
 H.setServerReject(null);
 tap('REL'); settle();
 chk('a tap after that opens a fresh block normally',
-  A().length === 1 && A()[0].t === 'REL:' && /#open/.test(A()[0].d) && activeKey() === 'REL',
+  A().length === 1 && A()[0].t === 'People:' && /#open/.test(A()[0].d) && activeKey() === 'People',
   A().map(show).join(' | '));
 
 console.log('\n55g. it is the ref that decides, not the op type');
@@ -3972,14 +3968,14 @@ H.setOnline(false);
 tap('DW'); advance(70000); settle();
 tap('MTG'); settle();
 chk('three writes are stacked up and MTG is the block in hand',
-  Q().length === 3 && activeKey() === 'MTG', JSON.stringify(Q().map(o => o.type)));
+  Q().length === 3 && activeKey() === 'Meetings', JSON.stringify(Q().map(o => o.type)));
 H.setOnline(true); H.setServerReject('calendar said no');
 pump(() => DEAD().length > 0, 800);
 chk('the first block\'s open was the one set aside',
-  DEAD().length === 1 && DEAD()[0].op.type === 'openActual' && DEAD()[0].key === 'DW',
+  DEAD().length === 1 && DEAD()[0].op.type === 'openActual' && DEAD()[0].key === 'Deep work',
   JSON.stringify(DEAD().map(d => d.op.type + '/' + d.key)));
 chk('and the grid still shows MTG, which is a different block entirely',
-  activeKey() === 'MTG', String(activeKey()));
+  activeKey() === 'Meetings', String(activeKey()));
 H.setServerReject(null); H.setOnline(true);
 
 reset(); reboot();
@@ -4083,8 +4079,8 @@ chk('sitting h keeps the whole truth about the chair',
 chk('two taps report two switches, not three',
   c56('switches') === 2, String(c56('switches')));
 chk('and every hour is still reported somewhere',
-  c56('DW') === 1 && c56('MTG') === 5 && c56('UNLOGGED') === 9,
-  [c56('DW'), c56('MTG'), c56('UNLOGGED')].join(' / '));
+  c56('Deep work') === 1 && c56('Meetings') === 5 && c56('UNLOGGED') === 9,
+  [c56('Deep work'), c56('Meetings'), c56('UNLOGGED')].join(' / '));
 
 console.log('\n56b. a guessed block\'s start is a fact, and bounds the span');
 /* The human's ruling on Q9: the start of a guessed block is something the user
@@ -4097,19 +4093,19 @@ console.log('\n56b. a guessed block\'s start is a fact, and bounds the span');
  * is mistaken for the other later. */
 reset(D(2026, 7, 24, 15, 0)); goodSheet();
 AC('DW: early ?', 20, 6, 0, 9, 0);
-AC('MTG: logged =', 20, 10, 0, 12, 0);
+AC('Meetings: logged =', 20, 10, 0, 12, 0);
 dailyRollup();
 chk('a guess that starts before the logged work extends the span backwards',
   dayCell('2026-07-20', 'waking h') === 6, String(dayCell('2026-07-20', 'waking h')));
 
 reset(D(2026, 7, 24, 15, 0)); goodSheet();
-AC('MTG: logged =', 20, 10, 0, 12, 0);
+AC('Meetings: logged =', 20, 10, 0, 12, 0);
 AC('DW: late ?', 20, 22, 0, 24, 0);
 dailyRollup();
 chk('but a guess that ends after it does not extend it forwards',
   dayCell('2026-07-20', 'waking h') === 2, String(dayCell('2026-07-20', 'waking h')));
 chk('and the guessed hours are still reported in their own column',
-  dayCell('2026-07-20', 'DW') === 2, String(dayCell('2026-07-20', 'DW')));
+  dayCell('2026-07-20', 'Deep work') === 2, String(dayCell('2026-07-20', 'Deep work')));
 
 reset(D(2026, 7, 24, 15, 0)); goodSheet();
 AC('DW: evening ?', 20, 22, 0, 24, 0);
@@ -4117,7 +4113,7 @@ dailyRollup();
 chk('a day of nothing but a guess still has no span, because it has one end',
   dayCell('2026-07-20', 'waking h') === 0, String(dayCell('2026-07-20', 'waking h')));
 chk('and that day still reports its two hours',
-  dayCell('2026-07-20', 'DW') === 2, String(dayCell('2026-07-20', 'DW')));
+  dayCell('2026-07-20', 'Deep work') === 2, String(dayCell('2026-07-20', 'Deep work')));
 
 reset(D(2026, 7, 24, 15, 0)); goodSheet();
 AC('UNLOGGED -', 20, 0, 0, 7, 0);
@@ -4141,7 +4137,7 @@ console.log('\n56d. a week of forgotten days adds up too');
 reset(D(2026, 7, 24, 15, 0)); goodSheet();
 [20, 21, 22, 23].forEach(day => {
   AC('DW: a =', day, 9, 0, 10, 0);
-  AC('MTG: b ?', day, 10, 0, 15, 0);
+  AC('Meetings: b ?', day, 10, 0, 15, 0);
   AC('UNLOGGED -', day, 15, 0, 24, 0);
   SI(day, 9, 0, 14, 0);
 });
@@ -4154,28 +4150,15 @@ chk('and the week reports eight switches for eight taps',
   wc56('switches') === 8, String(wc56('switches')));
 reset();
 
-console.log('\n57. a category cannot take a key the report owns');
-/* Q10's ruling. keyFor_ already adds a number when a key is taken — a second
- * "Deep work" becomes DW2 — so reserving these two costs the user nothing new
- * to learn. */
+console.log('\n57. a category cannot take a name the report owns');
 reset();
-['Unlogged', 'un-logged', 'UNLOGGED time', 'Unfiled', 'unfiled'].forEach(name => {
-  const k = keyFor_(name, []);
-  chk('"' + name + '" does not take a reserved key',
-    k !== 'UNLOGGED' && k !== UNFILED_KEY, name + ' -> ' + k);
+['Unlogged', 'UNLOGGED', 'Unfiled', 'UNFILED'].forEach(name => {
+  let err = null;
+  try { addCategory(name); } catch (e) { err = String(e.message || e); }
+  chk('"' + name + '" is refused', !!err && /reserved/.test(err), err);
 });
-chk('and an ordinary name is untouched',
-  keyFor_('Meetings', []) === 'MEETINGS', keyFor_('Meetings', []));
-chk('a repeated name still numbers as it always did',
-  keyFor_('Meetings', [{ key: 'MEETINGS' }]) === 'MEETING2',
-  keyFor_('Meetings', [{ key: 'MEETINGS' }]));
-chk('and a reserved name numbers by the same rule, not by a special case',
-  keyFor_('Unlogged', []) === 'UNLOGGE2', keyFor_('Unlogged', []));
-reset();
-addCategory('Unlogged');
-const added57 = clientConfig_().categories.slice(-1)[0];
-chk('adding one through the real path gives it a key of its own',
-  added57.key !== 'UNLOGGED', added57.key);
+chk('and an ordinary name is accepted',
+  addCategory('Sketching').categories.some(c => c.label === 'Sketching'));
 chk('and the rollup still has exactly one UNLOGGED column',
   rollupKeys_().filter(k => k === 'UNLOGGED').length === 1, JSON.stringify(rollupKeys_()));
 reset();
@@ -4272,7 +4255,7 @@ applyOps([{ id: 'late60b', type: 'closeActual', ref: ref60b, key: 'DW',
 chk('a real close replaces the guessed end',
   A()[0].e === D(2026, 7, 20, 23, 30), show(A()[0]));
 chk('and the title stops claiming to be a guess',
-  A()[0].t === 'DW: =', A()[0].t);
+  A()[0].t === 'Deep work: =', A()[0].t);
 reset();
 
 console.log('\n61. a sheet closes when the block it names stops being the one in hand');
@@ -4292,7 +4275,7 @@ dw61.e = H.nowMs();
 H.CALS.actual.createEvent('REL:', new Date(H.nowMs()), new Date(H.nowMs() + 60000))
   .setDescription('#ref:other1234567890\n#open');
 advance(20 * 60000); H.fireVisible(); settle(); advance(1000); settle();
-chk('the app noticed the other device', activeKey() === 'REL', String(activeKey()));
+chk('the app noticed the other device', activeKey() === 'People', String(activeKey()));
 chk('and the sheet closed with it', !splitOpen(), 'sheet open=' + splitOpen());
 const n61 = A().length;
 splitPick('MTG');
@@ -4378,13 +4361,13 @@ reset(); reboot();
 tap('DW'); settle(); wait(30);
 tapSit(); settle();
 chk('a block is running and the user is sitting',
-  activeKey() === 'DW' && litPosture() === 'sit', activeKey() + '/' + litPosture());
+  activeKey() === 'Deep work' && litPosture() === 'sit', activeKey() + '/' + litPosture());
 chk('nothing on the row is armed or covered',
   !$('stopBtn')._cls.has('arming') && $('stopBtn').textContent === 'STOP',
   $('stopBtn').className + ' "' + $('stopBtn').textContent + '"');
 posture('stand');
 chk('the day did NOT end — the block is still running',
-  activeKey() === 'DW' && /#open/.test(A()[0].d), A().map(show).join(' | '));
+  activeKey() === 'Deep work' && /#open/.test(A()[0].d), A().map(show).join(' | '));
 chk('and the posture toggled, because that is all that tap does',
   litPosture() === 'stand', String(litPosture()));
 chk('a tap back the other way works normally',
@@ -4462,7 +4445,7 @@ const t66 = H.nowMs();
 tap('DW'); settle(); wait(40);
 tap('MTG'); settle();
 chk('the switch happened at once — two blocks, no confirming',
-  A().length === 2 && A()[0].t === 'DW: =' && A()[1].t === 'MTG:',
+  A().length === 2 && A()[0].t === 'Deep work: =' && A()[1].t === 'Meetings:',
   A().map(show).join(' | '));
 chk('and the ribbon offers the way back', !$('undo').hidden, $('undo').className);
 chk('naming what it will undo',
@@ -4472,13 +4455,13 @@ chk('with a countdown', /^UNDO · [1-5]$/.test($('undoChip').textContent),
 
 $('undo').fire('click'); settle();
 chk('taking it back restores the block that was running',
-  activeKey() === 'DW', String(activeKey()));
+  activeKey() === 'Deep work', String(activeKey()));
 chk('with its original start time',
   JSON.parse(H.STORE['tt.state.v1']).open.startMs === t66,
   JSON.stringify(JSON.parse(H.STORE['tt.state.v1']).open));
 chk('and the ribbon is gone', $('undo').hidden, $('undo').className);
 chk('the calendar is back to one open DW block',
-  A().length === 1 && A()[0].t === 'DW:' && /#open/.test(A()[0].d),
+  A().length === 1 && A()[0].t === 'Deep work:' && /#open/.test(A()[0].d),
   A().map(show).join(' | '));
 chk('and nothing is left queued', Q().length === 0, JSON.stringify(Q().map(o => o.type)));
 
@@ -4493,13 +4476,13 @@ tap('MTG'); settle();
 chk('three writes are waiting', Q().length === 3, JSON.stringify(Q().map(o => o.type)));
 $('undo').fire('click'); settle();
 chk('the two the switch made are gone again',
-  Q().length === 1 && Q()[0].type === 'openActual' && Q()[0].key === 'DW',
+  Q().length === 1 && Q()[0].type === 'openActual' && Q()[0].key === 'Deep work',
   JSON.stringify(Q().map(o => o.type + ':' + (o.key || ''))));
 chk('no compensating op was needed',
   !Q().some(o => o.type === 'undoSwitch'), JSON.stringify(Q().map(o => o.type)));
 H.setOnline(true); advance(120000); settle(); settle();
 chk('and the network coming back writes one DW block, still open',
-  A().length === 1 && A()[0].t === 'DW:' && /#open/.test(A()[0].d),
+  A().length === 1 && A()[0].t === 'Deep work:' && /#open/.test(A()[0].d),
   A().map(show).join(' | '));
 
 console.log('\n66c. a switch that already landed is walked back on the calendar');
@@ -4510,9 +4493,9 @@ tap('MTG'); settle();
 chk('both writes reached the calendar', A().length === 2, A().map(show).join(' | '));
 $('undo').fire('click'); settle();
 chk('one compensating op did it', A().length === 1, A().map(show).join(' | '));
-chk('the MTG block was removed', !A().some(e => /^MTG/.test(e.t)), A().map(show).join(' | '));
+chk('the MTG block was removed', !A().some(e => /^Meetings/.test(e.t)), A().map(show).join(' | '));
 chk('and DW is open again, from its original start',
-  A()[0].t === 'DW:' && A()[0].s === t66c && /#open/.test(A()[0].d), show(A()[0]));
+  A()[0].t === 'Deep work:' && A()[0].s === t66c && /#open/.test(A()[0].d), show(A()[0]));
 chk('with the mark the close applied taken off again',
   !parseTitle_(A()[0].t).mark, A()[0].t);
 
@@ -4526,7 +4509,7 @@ chk('and the ribbon says so',
   $('undoLabel').textContent === 'STOPPED — NOW UNLOGGED', $('undoLabel').textContent);
 $('undo').fire('click'); settle();
 chk('taking it back puts the day back',
-  activeKey() === 'DW' && /#open/.test(A()[0].d), A().map(show).join(' | '));
+  activeKey() === 'Deep work' && /#open/.test(A()[0].d), A().map(show).join(' | '));
 chk('from the same start time', A()[0].s === t66d, show(A()[0]));
 
 console.log('\n66q. a STOP undo names no successor, without weakening reference types');
@@ -4584,8 +4567,8 @@ chk('and the ribbon names the last switch',
   $('undoLabel').textContent === 'SWITCHED TO ADMIN', $('undoLabel').textContent);
 $('undo').fire('click'); settle();
 chk('taking it back returns to MEETINGS, not to DEEP WORK',
-  activeKey() === 'MTG', String(activeKey()));
-chk('and DW stays closed where it was', A()[0].t === 'DW: =', A().map(show).join(' | '));
+  activeKey() === 'Meetings', String(activeKey()));
+chk('and DW stays closed where it was', A()[0].t === 'Deep work: =', A().map(show).join(' | '));
 reset();
 
 console.log('\n71. a set-aside undo says what it was, when it was, and stops the grid lying');
@@ -4636,9 +4619,9 @@ chk('and it names the category rather than "unknown category"',
 chk('the grid is not still showing the block the undo tried to put back',
   activeKey() !== 'DW', String(activeKey()));
 chk('it shows what is really running instead — the block the switch opened',
-  activeKey() === 'MTG', String(activeKey()));
+  activeKey() === 'Meetings', String(activeKey()));
 chk('which is what the calendar holds', A().length === 2 && /#open/.test(A()[1].d) &&
-  /^MTG/.test(A()[1].t), A().map(show).join(' | '));
+  /^Meetings/.test(A()[1].t), A().map(show).join(' | '));
 chk('and the start it shows is the one on the calendar',
   JSON.parse(H.STORE['tt.state.v1']).open.startMs === A()[1].s,
   JSON.stringify(JSON.parse(H.STORE['tt.state.v1']).open) + ' vs ' + show(A()[1]));
@@ -4685,21 +4668,21 @@ tap('DW'); settle(); wait(40);
 tap('MTG'); settle();
 chk('the switch landed on the calendar', A().length === 2 && nOpen() === 1,
   A().map(show).join(' | '));
-A().find(e => /^MTG/.test(e.t)).s += 5 * 60000;   // a hand edit, or a second device
+A().find(e => /^Meetings/.test(e.t)).s += 5 * 60000;   // a hand edit, or a second device
 $('undo').fire('click'); settle();
 chk('moved: the calendar never holds two open blocks', nOpen() <= 1,
   A().map(show).join(' | '));
 chk('moved: the moved block is left alone, and it is the open one',
-  nOpen() === 1 && /^MTG/.test(A().find(e => /#open/.test(e.d)).t),
+  nOpen() === 1 && /^Meetings/.test(A().find(e => /#open/.test(e.d)).t),
   A().map(show).join(' | '));
 chk('moved: and the previous block stays closed where it was',
-  /^DW/.test(A()[0].t) && !/#open/.test(A()[0].d), A().map(show).join(' | '));
+  /^Deep work/.test(A()[0].t) && !/#open/.test(A()[0].d), A().map(show).join(' | '));
 
 /* another device CLOSED the new block */
 reset(); reboot();
 tap('DW'); settle(); wait(40);
 tap('MTG'); settle();
-const mtg69 = A().find(e => /^MTG/.test(e.t));
+const mtg69 = A().find(e => /^Meetings/.test(e.t));
 mtg69.d = mtg69.d.replace('#open', '');
 mtg69.e = H.nowMs() + 10 * 60000;
 $('undo').fire('click'); settle();
@@ -4727,7 +4710,7 @@ tap('DW'); settle(); wait(40);
 tap('MTG'); settle();
 $('undo').fire('click'); settle();
 chk('untouched: undo still walks the switch back completely',
-  A().length === 1 && A()[0].t === 'DW:' && A()[0].s === t69 && nOpen() === 1,
+  A().length === 1 && A()[0].t === 'Deep work:' && A()[0].s === t69 && nOpen() === 1,
   A().map(show).join(' | '));
 
 console.log('\n69b. a declined undo survives a local write during its corrective read');
@@ -4749,7 +4732,7 @@ const declinedUndoRace = (label, interleave, expectedKey) => {
   reset(); reboot();
   tap('DW'); settle(); wait(40);
   tap('MTG'); settle();
-  const moved = A().find(e => /^MTG/.test(e.t));
+  const moved = A().find(e => /^Meetings/.test(e.t));
   moved.d = moved.d.replace('#open', '');
   moved.e = H.nowMs() + 10 * 60000;               // another device ended the day
 
@@ -4770,7 +4753,7 @@ const declinedUndoRace = (label, interleave, expectedKey) => {
 };
 
 declinedUndoRace('posture write', () => tapSit(), null);
-declinedUndoRace('category write', () => tap('ADM'), 'ADM');
+declinedUndoRace('category write', () => tap('ADM'), 'Admin');
 
 console.log('\n68. a category tap and the sitting are independent, by every path that used to couple them');
 /* The successor to "opening Body closes an open SIT, by every path there is",
@@ -4802,7 +4785,7 @@ console.log('\n68. a category tap and the sitting are independent, by every path
  * because it is no longer true and is not meant to be. */
 let sitAt = 0;                                   // the sitting's start, before the path runs
 const sitUntouched = at => {
-  chk(at + ': BODY is open', activeKey() === 'BODY', String(activeKey()));
+  chk(at + ': BODY is open', activeKey() === 'Zone 2', String(activeKey()));
   chk(at + ': and the SIT is the same block, still open',
     S().length === 1 && openSits().length === 1 && S()[0].s === sitAt,
     S().map(show).join(' | '));
@@ -4868,7 +4851,7 @@ tap('DW'); settle();                             // switch away
 tapSit(); settle();                              // and sit down
 sitAt = S()[0].s;
 chk('DW is running and the user is sitting',
-  activeKey() === 'DW' && openSits().length === 1,
+  activeKey() === 'Deep work' && openSits().length === 1,
   activeKey() + ' // ' + S().map(show).join(' | '));
 $('undo').fire('click'); settle();
 sitUntouched('undo');
@@ -4884,7 +4867,7 @@ sitUntouched('undo, sitting older than the block');
 /* And the calendar agrees, not only the screen. */
 reboot();
 chk('a reload finds BODY open and the SIT still open',
-  activeKey() === 'BODY' && openSits().length === 1 && S()[0].s === sitAt,
+  activeKey() === 'Zone 2' && openSits().length === 1 && S()[0].s === sitAt,
   A().map(show).join(' | ') + ' // ' + S().map(show).join(' | '));
 reset();
 
@@ -4914,13 +4897,13 @@ tap('BODY'); settle();                           // the tap that used to close i
 chk('the mis-tap on BODY left the sitting alone',
   openSits().length === 1 && litPosture() === 'sit', S().map(show).join(' | '));
 $('undo').fire('click'); settle();
-chk('undo restores the work block', activeKey() === 'MTG', String(activeKey()));
+chk('undo restores the work block', activeKey() === 'Meetings', String(activeKey()));
 chk('the SIT is the same block, still open, and never moved',
   S().length === 1 && openSits().length === 1 && S()[0].s === sitStart66h,
   S().map(show).join(' | ') + ' wanted ' + H.hhmm(sitStart66h));
 chk('and the footer never moved either', litPosture() === 'sit', String(litPosture()));
 reboot();
-chk('and a reload agrees', litPosture() === 'sit' && activeKey() === 'MTG',
+chk('and a reload agrees', litPosture() === 'sit' && activeKey() === 'Meetings',
   litPosture() + '/' + activeKey());
 
 console.log('\n66i. and on the STOP path, which is where it matters most');
@@ -4934,7 +4917,7 @@ chk('STOP closed both', openEvents().length === 0 && openSits().length === 0,
 chk('and the ribbon says so', $('undoLabel').textContent === 'STOPPED — NOW UNLOGGED',
   $('undoLabel').textContent);
 $('undo').fire('click'); settle();
-chk('undo puts the block back', activeKey() === 'DW' && A()[0].s === blockStart66i,
+chk('undo puts the block back', activeKey() === 'Deep work' && A()[0].s === blockStart66i,
   A().map(show).join(' | '));
 chk('and puts the sitting back', openSits().length === 1 && S()[0].s === sitStart66i,
   S().map(show).join(' | '));
@@ -4980,7 +4963,7 @@ chk('undo takes the mark back with the close it belonged to',
   !Q().some(o => o.type === 'setMark'), JSON.stringify(Q().map(o => o.type)));
 H.setOnline(true); advance(120000); settle(); settle();
 chk('so the reopened block carries no mark at all',
-  A().length === 1 && A()[0].t === 'DW:' && /#open/.test(A()[0].d),
+  A().length === 1 && A()[0].t === 'Deep work:' && /#open/.test(A()[0].d),
   A().map(show).join(' | '));
 
 console.log('\n66l. a STOP taken back while offline leaves nothing behind');
@@ -5005,7 +4988,7 @@ chk('leaving only the open that started the day',
   Q().map(o => o.type).join(',') === 'openActual', JSON.stringify(Q().map(o => o.type)));
 H.setOnline(true); advance(120000); settle(); settle();
 chk('so the network coming back writes one open block and no second thoughts',
-  A().length === 1 && A()[0].t === 'DW:' && /#open/.test(A()[0].d),
+  A().length === 1 && A()[0].t === 'Deep work:' && /#open/.test(A()[0].d),
   A().map(show).join(' | '));
 
 console.log('\n66k. offline, the sitting close is dropped rather than compensated');
@@ -5157,7 +5140,7 @@ chk('and a screen reader is told it appeared, and what it undoes',
 /* Enter takes it. */
 $('undo').fire('keydown', { key: 'Enter', preventDefault: function () {} });
 settle();
-chk('Enter takes the undo', activeKey() === 'DW', String(activeKey()));
+chk('Enter takes the undo', activeKey() === 'Deep work', String(activeKey()));
 chk('and the announcement is withdrawn with the ribbon',
   $('undoSay').textContent === '', $('undoSay').textContent);
 
@@ -5167,7 +5150,7 @@ tap('DW'); settle(); wait(40);
 tap('MTG'); settle();
 $('undo').fire('keydown', { key: ' ', preventDefault: function () {} });
 settle();
-chk('Space takes the undo as well', activeKey() === 'DW', String(activeKey()));
+chk('Space takes the undo as well', activeKey() === 'Deep work', String(activeKey()));
 
 /* And a key that means neither does nothing. A handler that fired on any key
    would pass both checks above and lose a block to a stray Tab. */
@@ -5176,7 +5159,7 @@ tap('DW'); settle(); wait(40);
 tap('MTG'); settle();
 $('undo').fire('keydown', { key: 'Tab', preventDefault: function () {} });
 settle();
-chk('any other key leaves it alone', activeKey() === 'MTG' && !$('undo').hidden,
+chk('any other key leaves it alone', activeKey() === 'Meetings' && !$('undo').hidden,
   String(activeKey()) + ' ' + $('undo').className);
 reset();
 
@@ -5201,21 +5184,21 @@ console.log('\n66g. undo works while the write is still travelling');
   tap('MTG'); settle();                            // both writes now in flight
   advance(Math.floor(lag / 2)); settle();          // and still travelling
   chk(lag + 'ms: the flush really is in flight when UNDO is tapped',
-    A().some(e => /^MTG/.test(e.t)) && Q().length > 0,
+    A().some(e => /^Meetings/.test(e.t)) && Q().length > 0,
     'cal=' + A().map(show).join(' | ') + ' q=' + JSON.stringify(Q().map(o => o.type)));
 
   $('undo').fire('click'); settle();
   pump(() => Q().length === 0, 90);
   chk(lag + 'ms: the calendar keeps the ORIGINAL block, open, from its own start',
-    A().length === 1 && A()[0].t === 'DW:' && A()[0].s === t && /#open/.test(A()[0].d),
+    A().length === 1 && A()[0].t === 'Deep work:' && A()[0].s === t && /#open/.test(A()[0].d),
     A().map(show).join(' | '));
   chk(lag + 'ms: and holds no trace of the block the mis-tap made',
-    !A().some(e => /^MTG/.test(e.t)), A().map(show).join(' | '));
+    !A().some(e => /^Meetings/.test(e.t)), A().map(show).join(' | '));
 
   H.setCallLag('applyOps', null);
   reboot();
   chk(lag + 'ms: the screen agrees with the calendar after a reboot',
-    activeKey() === 'DW', String(activeKey()));
+    activeKey() === 'Deep work', String(activeKey()));
 });
 reset();
 
@@ -5243,11 +5226,11 @@ chk('the close landed while only the open stayed queued',
   'cal=' + A().map(show).join(' | ') + ' q=' + JSON.stringify(Q().map(o => o.type)));
 $('undo').fire('click'); settle();
 chk('the half-landed switch is compensated, not half-dropped',
-  Q().length === 0 && A().length === 1 && A()[0].t === 'DW:' &&
+  Q().length === 0 && A().length === 1 && A()[0].t === 'Deep work:' &&
   A()[0].s === t66p && /#open/.test(A()[0].d),
   'cal=' + A().map(show).join(' | ') + ' q=' + JSON.stringify(Q().map(o => o.type)));
 chk('and the screen agrees that the original block is running',
-  activeKey() === 'DW', String(activeKey()));
+  activeKey() === 'Deep work', String(activeKey()));
 reset();
 
 console.log('\n67. the rail shows the day, and shows the holes in it');
@@ -5352,7 +5335,7 @@ for (let secs = 0; secs <= 120; secs++) {
   /* And the tap has to have DONE something, or the sweep above passes on a
      build where nothing happens at all — which is the shape of vacuous pass
      this file exists to refuse. */
-  if (!(after.length === 2 && after[0] === 'DW' && after[1] === 'MTG')) {
+  if (!(after.length === 2 && after[0] === 'Deep work' && after[1] === 'Meetings')) {
     inert74.push(secs + 's: ' + JSON.stringify(after));
   }
 }
@@ -5431,14 +5414,14 @@ console.log('\n72b. SPLIT offers every category except the one being cut');
 /* Finding 3. The comment above the loop said "the same list, minus the block
  * you are cutting"; the loop had no filter, so the sheet offered to make the
  * remainder the category it already was. */
-chk('the sheet lists five rows, not six', $('splitGrid').children.length === 5,
+chk('the sheet lists every other leaf', $('splitGrid').children.length === 7,
   String($('splitGrid').children.length));
 chk('and Deep work is not among them',
   !$('splitGrid').children.some(b => /Deep work/.test(b.querySelector('.f').textContent)),
   $('splitGrid').children.map(b => b.querySelector('.f').textContent).join(','));
 chk('while the others all are',
   $('splitGrid').children.map(b => b.querySelector('.f').textContent).sort().join(',') ===
-    ['Meetings', 'Admin', 'Body', 'People', 'Fragments'].sort().join(','),
+    ['Meetings', 'Admin', 'Zone 2', 'Lifting', 'Walking', 'People', 'Fragments'].sort().join(','),
   $('splitGrid').children.map(b => b.querySelector('.f').textContent).join(','));
 /* The list is per-block, so switching and reopening must rebuild it. A list
    built once at boot would pass the check above and fail this one. */
@@ -5446,7 +5429,7 @@ $('spClose').click(); settle();
 tap('MTG'); settle(); wait(43);
 tap('MTG'); settle();
 chk('after switching, the sheet excludes the new running category instead',
-  $('splitGrid').children.length === 5 &&
+  $('splitGrid').children.length === 7 &&
   !$('splitGrid').children.some(b => /Meetings/.test(b.querySelector('.f').textContent)),
   $('splitGrid').children.map(b => b.querySelector('.f').textContent).join(','));
 $('spClose').click(); settle();
@@ -5495,7 +5478,7 @@ chk('the rail is drawing from something', segs().length === 2, segKinds().join('
 chk('and the stored state has no today key', !('today' in st70),
   JSON.stringify(Object.keys(st70)));
 chk('while still storing what a reload does need',
-  st70.open && st70.open.key === 'MTG' && 'sit' in st70,
+  st70.open && st70.open.key === 'Meetings' && 'sit' in st70,
   JSON.stringify(Object.keys(st70)));
 
 reset(); reboot();
@@ -5527,14 +5510,14 @@ chk('the later switches are still queued',
   Q().length > 0, JSON.stringify(Q().map(o => o.type)));
 reboot(); settle();
 chk('without the calendar, reload can draw only the saved open block',
-  segKinds().join(',') === 'BODY', segKinds().join(','));
+  segKinds().join(',') === 'ZONE 2', segKinds().join(','));
 H.setOnline(true);
 advance(120000); settle(); settle();
 chk('the queued writes drain after the network returns',
   Q().length === 0 && A().length === 4,
   JSON.stringify(Q().map(o => o.type)) + ' // ' + A().map(show).join(' | '));
 chk('and the rail is rebuilt from the calendar they made',
-  segKinds().join(',') === 'DEEP WORK,MEETINGS,ADMIN,BODY',
+  segKinds().join(',') === 'DEEP WORK,MEETINGS,ADMIN,ZONE 2',
   segKinds().join(','));
 
 /* And it is a picture of TODAY. Left open across midnight without a reload, the
@@ -5548,7 +5531,7 @@ H.setNow(D(2026, 7, 21, 0, 30));
 tap('ADM'); settle();
 chk('after midnight the rail has let yesterday go',
   !segKinds().includes('DEEP WORK'), segKinds().join(','));
-chk('and shows what is running now', activeKey() === 'ADM' && segKinds().includes('ADMIN'),
+chk('and shows what is running now', activeKey() === 'Admin' && segKinds().includes('ADMIN'),
   segKinds().join(','));
 reset();
 
@@ -5694,7 +5677,7 @@ const dwStart77 = A()[0].s;
 tap('MTG'); settle();                            // the block in hand changes
 chk('a switch closes the sheet, which is what doSplit says happens',
   H.NODES['sheetSplit'].hidden, $('sheetSplit').className);
-chk('and the switch itself was ordinary', activeKey() === 'MTG' && A().length === 2,
+chk('and the switch itself was ordinary', activeKey() === 'Meetings' && A().length === 2,
   A().map(show).join(' | '));
 
 /* Now the guard, with the sheet forced back up — which is the state a keyboard
@@ -5708,8 +5691,8 @@ chk('and no split op was queued',
   !Q().some(o => o.type === 'splitActual'), JSON.stringify(Q().map(o => o.type)));
 H.setOnline(true); advance(60000); settle();
 chk('picking a remainder in a stale sheet writes nothing',
-  A().length === 2 && !A().some(e => /^ADM/.test(e.t)), A().map(show).join(' | '));
-chk('the block in hand is untouched', activeKey() === 'MTG', String(activeKey()));
+  A().length === 2 && !A().some(e => /^Admin/.test(e.t)), A().map(show).join(' | '));
+chk('the block in hand is untouched', activeKey() === 'Meetings', String(activeKey()));
 chk('and it closed the sheet rather than leaving it lying',
   H.NODES['sheetSplit'].hidden, $('sheetSplit').className);
 chk('nothing overlaps: DEEP WORK still ends where MEETINGS begins',
@@ -5729,7 +5712,7 @@ chk('recategorising a whole block in a stale sheet queues nothing',
   !Q().some(o => o.type === 'recategorize' || o.type === 'splitActual'),
   JSON.stringify(Q().map(o => o.type)));
 H.setOnline(true); advance(60000); settle();
-chk('and writes nothing', !A().some(e => /^ADM/.test(e.t)), A().map(show).join(' | '));
+chk('and writes nothing', !A().some(e => /^Admin/.test(e.t)), A().map(show).join(' | '));
 
 /* STOP is the other way the block in hand stops existing. */
 reset(); reboot();

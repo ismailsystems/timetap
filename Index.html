@@ -490,9 +490,23 @@
   var K_BLOCKS = 'tt.blocks.v1';
   var MS_MIN = 60000;
 
-  var CATS = CFG.categories;
+  var CATS = [];
   var catByKey = {};
-  CATS.forEach(function (c) { catByKey[c.key] = c; });
+  function adoptCats(cats) {
+    CATS = (cats || []).map(function (c) {
+      var label = c.label || c.key;
+      return {
+        label: label,
+        key: label,
+        color: c.color,
+        hex: c.hex,
+        autoMark: c.autoMark || null
+      };
+    });
+    catByKey = {};
+    CATS.forEach(function (c) { catByKey[c.key] = c; });
+  }
+  adoptCats(CFG.categories);
 
   /* ── state ─────────────────────────────────────────────────── */
 
@@ -1247,9 +1261,23 @@
     saveState(); render(); flush();
   }
 
+  var LEGACY_ALIASES = {
+    DW: 'Deep work', MTG: 'Meetings', ADM: 'Admin',
+    BODY: 'Body', REL: 'People', FRAG: 'Fragments', POOP: 'Poop'
+  };
+  function canonLabel(key) {
+    if (!key) return key;
+    if (LEGACY_ALIASES[key]) return LEGACY_ALIASES[key];
+    if (catByKey[key]) return key;
+    var low = String(key).toLowerCase();
+    var k;
+    for (k in catByKey) if (k.toLowerCase() === low) return k;
+    return key;
+  }
   function labelFor(key) {
-    var c = catByKey[key];
-    return c ? faceOf(c) : key;
+    var id = canonLabel(key);
+    var c = catByKey[id];
+    return c ? faceOf(c) : id;
   }
 
   /**
@@ -1731,9 +1759,7 @@
         .withSuccessHandler(function (cfg) {
           hideErr();
           CFG.categories = cfg.categories;
-          CATS = CFG.categories;
-          catByKey = {};
-          CATS.forEach(function (c) { catByKey[c.key] = c; });
+          adoptCats(CFG.categories);
           buildGrid();
           render();
         })

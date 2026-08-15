@@ -247,15 +247,15 @@ final class LASyncTests: TimeTapTestCase {
         var now: Double = 1_700_000_000_000
         let store = TapStore()
         store.clock = { now }
-        store.tapCategory("DW")
+        store.tapCategory("Deep work")
         await store.flushNow()
-        XCTAssertEqual(store.open?.key, "DW")
+        XCTAssertEqual(store.open?.key, "Deep work")
         now += 120_000
         store.openSplit()
         store.setSplitWhole(false)
         store.setSplitMinutes(1)
-        store.doSplit(key: "MTG")
-        XCTAssertEqual(store.open?.key, "MTG", "doSplit must change the running key")
+        store.doSplit(key: "Meetings")
+        XCTAssertEqual(store.open?.key, "Meetings", "doSplit must change the running key")
     }
 
     func testApplySitEditSyncsAfterPersistFlush() throws {
@@ -309,7 +309,7 @@ final class LASyncTests: TimeTapTestCase {
             "empty state has no block"
         )
         XCTAssertFalse(
-            RunningBlockAttributes.ContentState(key: "DW").hasBlock,
+            RunningBlockAttributes.ContentState(key: "Deep work").hasBlock,
             "key without startMs has no block"
         )
         XCTAssertFalse(
@@ -317,7 +317,7 @@ final class LASyncTests: TimeTapTestCase {
             "startMs without key has no block"
         )
         XCTAssertTrue(
-            RunningBlockAttributes.ContentState(key: "DW", startMs: 1).hasBlock,
+            RunningBlockAttributes.ContentState(key: "Deep work", startMs: 1).hasBlock,
             "hasBlock is startMs != nil && key != nil"
         )
     }
@@ -361,10 +361,10 @@ final class LASyncTests: TimeTapTestCase {
     func testContentStateDecoderDefaultsSittingFalse() throws {
         let missing = try JSONDecoder().decode(
             RunningBlockAttributes.ContentState.self,
-            from: Data(#"{"key":"DW","startMs":1700000000000}"#.utf8)
+            from: Data(#"{"key":"Deep work","startMs":1700000000000}"#.utf8)
         )
         XCTAssertFalse(missing.sitting, "sitting defaults false if missing")
-        XCTAssertEqual(missing.key, "DW")
+        XCTAssertEqual(missing.key, "Deep work")
         XCTAssertEqual(missing.startMs, 1_700_000_000_000)
         let empty = try JSONDecoder().decode(
             RunningBlockAttributes.ContentState.self,
@@ -404,7 +404,7 @@ final class LASyncTests: TimeTapTestCase {
         var now: Double = 1_700_000_000_000
         let store = TapStore()
         store.clock = { now }
-        store.tapCategory("DW")
+        store.tapCategory("Deep work")
         now += 1_000
         store.toggleSit()
         now += 60_000

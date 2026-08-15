@@ -385,14 +385,14 @@ const PLAN_DOCS = ['SETUP.md', 'README.md'];
 const CATEGORY_KEYS = (() => {
   const block = codeNoComments.match(/var CATEGORIES\s*=\s*\[([\s\S]*?)\];/);
   if (!block) return [];
-  return (block[1].match(/key:\s*'([A-Za-z0-9_]+)'/g) || [])
-    .map(m => m.replace(/.*'([A-Za-z0-9_]+)'.*/, '$1'));
+  return (block[1].match(/label:\s*'([^']+)'/g) || [])
+    .map(m => m.replace(/.*'([^']+)'.*/, '$1'));
 })();
 const planBad = [];
 // If this list is empty the two checks below would pass while comparing
 // nothing, which is the failure mode this whole file exists to avoid.
 if (!CATEGORY_KEYS.length) {
-  planBad.push('could not read any key out of the CATEGORIES array in Code.gs, ' +
+  planBad.push('could not read any label out of the CATEGORIES array in Code.gs, ' +
                'so the example check below would have passed vacuously');
 }
 PLAN_DOCS.forEach(rel => {
@@ -404,23 +404,23 @@ PLAN_DOCS.forEach(rel => {
      sentence fails the moment someone reflows a paragraph — which reads as
      "the docs stopped saying it" when they still do. */
   const flat = text.replace(/\s+/g, ' ');
-  if (!/title begins with a category key and a colon/i.test(flat)) {
+  if (!/title begins with a category label and a colon/i.test(flat)) {
     planBad.push(rel + ' does not say that a PLAN event only counts if its ' +
-                 'title begins with a category key and a colon');
+                 'title begins with a category label and a colon');
   }
-  // A worked example: some KEY, then a colon, then words.
-  const examples = (flat.match(/`([A-Za-z0-9_]+):\s[^`]+`/g) || [])
-    .map(m => m.replace(/^`([A-Za-z0-9_]+):[\s\S]*$/, '$1'));
+  // A worked example: a configured label, then a colon, then words.
+  const examples = (flat.match(/`([^:`]{1,24}):\s[^`]{1,80}`/g) || [])
+    .map(m => m.replace(/^`([^:]+):[\s\S]*$/, '$1'));
   const good = examples.filter(k => CATEGORY_KEYS.indexOf(k) >= 0);
   if (!examples.length) {
     planBad.push(rel + ' states the rule but shows no worked example of a title');
   } else if (!good.length) {
     planBad.push(rel + ' shows examples (' + examples.join(', ') +
-                 ') but none uses a key CATEGORIES defines (' +
+                 ') but none uses a label CATEGORIES defines (' +
                  CATEGORY_KEYS.join(', ') + ')');
   }
 });
-check('the docs say how a PLAN event has to be titled, and show a real key', planBad,
+check('the docs say how a PLAN event has to be titled, and show a real label', planBad,
   'a plan written any other way counts toward nothing, and the sheet cannot say why');
 
 /*

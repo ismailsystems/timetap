@@ -33,13 +33,13 @@ final class B3Tests: TimeTapTestCase {
         let t = local(2026, 1, 15, 10)
         let at = t + 600_000
         _ = ApplyOps.apply([
-            Op(id: "o1", type: "openActual", ref: dw, key: "DW", startMs: t),
-            Op(id: "c1", type: "closeActual", ref: dw, key: "DW", mark: "=", endMs: at),
-            Op(id: "o2", type: "openActual", ref: mtg, key: "MTG", startMs: at),
+            Op(id: "o1", type: "openActual", ref: dw, key: "Deep work", startMs: t),
+            Op(id: "c1", type: "closeActual", ref: dw, key: "Deep work", mark: "=", endMs: at),
+            Op(id: "o2", type: "openActual", ref: mtg, key: "Meetings", startMs: at),
         ])
         _ = ApplyOps.apply([
             Op(id: "u1", type: "undoSwitch", atMs: at, nowMs: at + 1_000,
-               newRef: mtg, prevRef: dw, prevKey: "DW", prevStartMs: t),
+               newRef: mtg, prevRef: dw, prevKey: "Deep work", prevStartMs: t),
         ])
         XCTAssertNil(actual.events.first { $0.description.contains(mtg) })
         let pe = actual.events.first { $0.description.contains(dw) }!
@@ -52,15 +52,15 @@ final class B3Tests: TimeTapTestCase {
         let t = local(2026, 1, 15, 10)
         let at = t + 600_000
         _ = ApplyOps.apply([
-            Op(id: "o1", type: "openActual", ref: dw, key: "DW", startMs: t),
-            Op(id: "c1", type: "closeActual", ref: dw, key: "DW", mark: "=", endMs: at),
-            Op(id: "o2", type: "openActual", ref: mtg, key: "MTG", startMs: at),
+            Op(id: "o1", type: "openActual", ref: dw, key: "Deep work", startMs: t),
+            Op(id: "c1", type: "closeActual", ref: dw, key: "Deep work", mark: "=", endMs: at),
+            Op(id: "o2", type: "openActual", ref: mtg, key: "Meetings", startMs: at),
         ])
         let ne = actual.events.first { $0.description.contains(mtg) }!
         ne.startMs = at + 1
         _ = ApplyOps.apply([
             Op(id: "u1", type: "undoSwitch", atMs: at, nowMs: at + 1_000,
-               newRef: mtg, prevRef: dw, prevKey: "DW", prevStartMs: t),
+               newRef: mtg, prevRef: dw, prevKey: "Deep work", prevStartMs: t),
         ])
         XCTAssertNotNil(actual.events.first { $0.description.contains(mtg) })
         let pe = actual.events.first { $0.description.contains(dw) }!
@@ -72,15 +72,15 @@ final class B3Tests: TimeTapTestCase {
         let t = local(2026, 1, 15, 10)
         let at = t + 600_000
         _ = ApplyOps.apply([
-            Op(id: "o1", type: "openActual", ref: dw, key: "DW", startMs: t),
+            Op(id: "o1", type: "openActual", ref: dw, key: "Deep work", startMs: t),
             Op(id: "s1", type: "openSit", ref: sit, startMs: t),
-            Op(id: "c1", type: "closeActual", ref: dw, key: "DW", mark: "=", endMs: at),
+            Op(id: "c1", type: "closeActual", ref: dw, key: "Deep work", mark: "=", endMs: at),
             Op(id: "c2", type: "closeSit", ref: sit, endMs: at),
         ])
         let beforeActual = actual.events.count
         _ = ApplyOps.apply([
             Op(id: "u1", type: "undoSwitch", atMs: at, nowMs: at + 1_000,
-               newRef: nil, prevRef: dw, prevKey: "DW", prevStartMs: t, sitRef: sit, sitStartMs: t),
+               newRef: nil, prevRef: dw, prevKey: "Deep work", prevStartMs: t, sitRef: sit, sitStartMs: t),
         ])
         XCTAssertEqual(actual.events.count, beforeActual)
         XCTAssertTrue(actual.events[0].description.contains("#open"))
@@ -92,13 +92,13 @@ final class B3Tests: TimeTapTestCase {
         let at = t + 600_000
         let kill = "killkillkillkill"
         _ = ApplyOps.apply([
-            Op(id: "o1", type: "openActual", ref: dw, key: "DW", startMs: t),
-            Op(id: "c1", type: "closeActual", ref: dw, key: "DW", mark: "=", endMs: at),
+            Op(id: "o1", type: "openActual", ref: dw, key: "Deep work", startMs: t),
+            Op(id: "c1", type: "closeActual", ref: dw, key: "Deep work", mark: "=", endMs: at),
             Op(id: "s1", type: "openSit", ref: kill, startMs: at),
         ])
         _ = ApplyOps.apply([
             Op(id: "u1", type: "undoSwitch", atMs: at, nowMs: at + 1_000,
-               newRef: nil, prevRef: dw, prevKey: "DW", prevStartMs: t, killSitRef: kill),
+               newRef: nil, prevRef: dw, prevKey: "Deep work", prevStartMs: t, killSitRef: kill),
         ])
         XCTAssertTrue(sitting.events.isEmpty)
         XCTAssertTrue(actual.events[0].description.contains("#open"))
@@ -108,7 +108,7 @@ final class B3Tests: TimeTapTestCase {
         let start = local(2026, 1, 15, 22)
         let now = local(2026, 1, 16, 7)
         ApplyOps.nowMs = now
-        _ = ApplyOps.apply([Op(id: "o1", type: "openActual", ref: dw, key: "DW", startMs: start)])
+        _ = ApplyOps.apply([Op(id: "o1", type: "openActual", ref: dw, key: "Deep work", startMs: start)])
         let ev = ApplyOps.findOpen(actual)
         _ = ApplyOps.staleGuard(actual, ev, isActual: true)
         let dwEv = actual.events.first { $0.description.contains(dw) }!
@@ -125,7 +125,7 @@ final class B3Tests: TimeTapTestCase {
         let start = local(2026, 1, 15, 22)
         let now = local(2026, 1, 16, 7)
         ApplyOps.nowMs = now
-        _ = ApplyOps.apply([Op(id: "o1", type: "openActual", ref: dw, key: "BODY", startMs: start)])
+        _ = ApplyOps.apply([Op(id: "o1", type: "openActual", ref: dw, key: "Zone 2", startMs: start)])
         _ = ApplyOps.staleGuard(actual, ApplyOps.findOpen(actual), isActual: true)
         XCTAssertTrue(actual.events[0].title.hasSuffix("?"))
         XCTAssertFalse(actual.events[0].title.contains("+"))
@@ -135,7 +135,7 @@ final class B3Tests: TimeTapTestCase {
         let start = local(2026, 1, 15, 23, 59) + 55_000
         let now = local(2026, 1, 16, 0, 0) + 5_000
         ApplyOps.nowMs = now
-        _ = ApplyOps.apply([Op(id: "o1", type: "openActual", ref: dw, key: "DW", startMs: start)])
+        _ = ApplyOps.apply([Op(id: "o1", type: "openActual", ref: dw, key: "Deep work", startMs: start)])
         let left = ApplyOps.staleGuard(actual, ApplyOps.findOpen(actual), isActual: true)
         XCTAssertNotNil(left)
         XCTAssertTrue(actual.events[0].description.contains("#open"))
@@ -146,7 +146,7 @@ final class B3Tests: TimeTapTestCase {
         let start = local(2026, 1, 15, 23, 59) + 50_000
         let now = local(2026, 1, 16, 0, 0) + 15_000
         ApplyOps.nowMs = now
-        _ = ApplyOps.apply([Op(id: "o1", type: "openActual", ref: dw, key: "DW", startMs: start)])
+        _ = ApplyOps.apply([Op(id: "o1", type: "openActual", ref: dw, key: "Deep work", startMs: start)])
         let left = ApplyOps.staleGuard(actual, ApplyOps.findOpen(actual), isActual: true)
         XCTAssertNil(left, "GAS MISTAP is 20s; 25s across midnight must bound")
         XCTAssertTrue(actual.events[0].title.hasSuffix("?"))
@@ -170,13 +170,13 @@ final class B3Tests: TimeTapTestCase {
     func testStopClosesBothOpensNothing() {
         let t = local(2026, 1, 15, 10)
         _ = ApplyOps.apply([
-            Op(id: "o1", type: "openActual", ref: dw, key: "DW", startMs: t),
+            Op(id: "o1", type: "openActual", ref: dw, key: "Deep work", startMs: t),
             Op(id: "s1", type: "openSit", ref: sit, startMs: t),
         ])
         let nA = actual.events.count
         let nS = sitting.events.count
         _ = ApplyOps.apply([
-            Op(id: "c1", type: "closeActual", ref: dw, key: "DW", mark: "=", endMs: t + 60_000),
+            Op(id: "c1", type: "closeActual", ref: dw, key: "Deep work", mark: "=", endMs: t + 60_000),
             Op(id: "c2", type: "closeSit", ref: sit, endMs: t + 60_000),
         ])
         XCTAssertEqual(actual.events.count, nA)
@@ -191,7 +191,7 @@ final class B3Tests: TimeTapTestCase {
         let t = local(2026, 1, 15, 10)
         _ = ApplyOps.apply([Op(id: "s1", type: "openSit", ref: sit, startMs: t)])
         let before = sitting.events[0].description
-        _ = ApplyOps.apply([Op(id: "o1", type: "openActual", ref: mtg, key: "MTG", startMs: t + 60_000)])
+        _ = ApplyOps.apply([Op(id: "o1", type: "openActual", ref: mtg, key: "Meetings", startMs: t + 60_000)])
         XCTAssertEqual(sitting.events.count, 1)
         XCTAssertEqual(sitting.events[0].description, before)
         XCTAssertTrue(sitting.events[0].description.contains("#open"))
@@ -201,11 +201,11 @@ final class B3Tests: TimeTapTestCase {
         let t = local(2026, 1, 15, 10)
         let at = t + 600_000
         let u = Op(id: "u1", type: "undoSwitch", atMs: at, nowMs: at + 1_000,
-                   newRef: mtg, prevRef: dw, prevKey: "DW", prevStartMs: t)
+                   newRef: mtg, prevRef: dw, prevKey: "Deep work", prevStartMs: t)
         _ = ApplyOps.apply([
-            Op(id: "o1", type: "openActual", ref: dw, key: "DW", startMs: t),
-            Op(id: "c1", type: "closeActual", ref: dw, key: "DW", mark: "=", endMs: at),
-            Op(id: "o2", type: "openActual", ref: mtg, key: "MTG", startMs: at),
+            Op(id: "o1", type: "openActual", ref: dw, key: "Deep work", startMs: t),
+            Op(id: "c1", type: "closeActual", ref: dw, key: "Deep work", mark: "=", endMs: at),
+            Op(id: "o2", type: "openActual", ref: mtg, key: "Meetings", startMs: at),
             u, u,
         ])
         XCTAssertEqual(actual.events.filter { $0.description.contains(mtg) }.count, 0)

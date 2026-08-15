@@ -3,12 +3,12 @@ import XCTest
 
 final class B1Tests: TimeTapTestCase {
     func testBuildTitleQuestionMark() {
-        XCTAssertEqual(Grammar.buildTitle("DW", "memo drafting", "?"), "DW: memo drafting ?")
+        XCTAssertEqual(Grammar.buildTitle("DW", "memo drafting", "?"), "Deep work: memo drafting ?")
     }
 
     func testParseTitleQuestionMark() {
         let p = Grammar.parseTitle("DW: memo drafting ?")
-        XCTAssertEqual(p?.key, "DW")
+        XCTAssertEqual(p?.key, "Deep work")
         XCTAssertEqual(p?.text, "memo drafting")
         XCTAssertEqual(p?.mark, "?")
     }
@@ -53,12 +53,12 @@ final class B1Tests: TimeTapTestCase {
 
     func testCategoryColours() {
         let want: [(String, String, String)] = [
-            ("DW", "9", "#3f51b5"),
-            ("MTG", "3", "#8e24aa"),
-            ("ADM", "8", "#616161"),
-            ("BODY", "10", "#0b8043"),
-            ("REL", "6", "#f4511e"),
-            ("FRAG", "4", "#e67c73"),
+            ("Deep work", "9", "#3f51b5"),
+            ("Meetings", "3", "#8e24aa"),
+            ("Admin", "8", "#616161"),
+            ("Zone 2", "10", "#0b8043"),
+            ("People", "6", "#f4511e"),
+            ("Fragments", "4", "#e67c73"),
         ]
         for (key, id, hex) in want {
             XCTAssertEqual(Grammar.colorId(for: key), id, key)
@@ -71,14 +71,14 @@ final class B1Tests: TimeTapTestCase {
         XCTAssertEqual(TT.mistapSeconds, 20)
         XCTAssertEqual(TT.staleOpenHours, 5)
         XCTAssertEqual(TT.undoSeconds, 5)
-        XCTAssertEqual(TT.maxCategories, 10)
+        XCTAssertEqual(TT.maxCategories, 16)
         XCTAssertEqual(TT.maxOpTries, 5)
     }
 
     func testSeedHasSixPlusPOOP() throws {
-        let keys = ClientConfig.seed.categories.map(\.key)
-        XCTAssertEqual(keys, ["DW", "MTG", "ADM", "BODY", "REL", "FRAG", "POOP"])
-        XCTAssertEqual(ClientConfig.seed.categories.first { $0.key == "POOP" }?.color, "5")
+        let keys = ClientConfig.seed.categories.map(\.label)
+        XCTAssertEqual(keys, ["Deep work", "Meetings", "Admin", "Zone 2", "Lifting", "Walking", "People", "Fragments", "Poop"])
+        XCTAssertEqual(ClientConfig.seed.categories.first { $0.label == "Poop" }?.color, "5")
         let gs = try String(
             contentsOf: URL(fileURLWithPath: #filePath)
                 .deletingLastPathComponent()

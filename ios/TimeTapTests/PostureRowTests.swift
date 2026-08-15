@@ -186,72 +186,53 @@ final class PostureRowTests: TimeTapTestCase {
 
     // MARK: - Placement
 
-    func testSitChipSitsAfterCategoriesAndAddRowNotInFooter() throws {
+    func testSitChipSitsAfterCategoriesNotInFooter() throws {
         let text = try captureText()
-        let add = try XCTUnwrap(
-            text.range(of: "if store.canAddCategory"),
-            "add row is missing"
-        )
+        XCTAssertFalse(text.contains("private var addRow"), "add row left the capture grid")
+        XCTAssertFalse(text.contains("Text(\"+\")"), "add lives in Settings")
         let forEach = try XCTUnwrap(
-            text.range(of: "ForEach(store.categories)"),
-            "category ForEach is missing"
+            text.range(of: "ForEach(store.groups)"),
+            "group ForEach is missing"
         )
         let sit = try XCTUnwrap(
             text.range(of: "sitChip"),
             "sitChip usage is missing"
         )
         XCTAssertLessThan(
-            add.lowerBound,
-            forEach.lowerBound,
-            "add/+ row must sit above the category list"
-        )
-        XCTAssertLessThan(
             forEach.lowerBound,
             sit.lowerBound,
-            "sitChip must sit after ForEach(store.categories)"
+            "sitChip must sit after ForEach(store.groups)"
         )
-        XCTAssertLessThan(
-            sit.lowerBound,
-            text.range(of: "settingsRow")!.lowerBound,
-            "gear sits under NOT SITTING"
-        )
+        XCTAssertFalse(text.contains("settingsRow"), "gear left the category column")
         let list = try XCTUnwrap(
             text.range(of: "private func categoryList"),
             "categoryList is missing"
         )
-        let addRow = try XCTUnwrap(
-            text.range(of: "private var addRow"),
-            "addRow is missing"
+        let footerAt = try XCTUnwrap(
+            text.range(of: "private var footer"),
+            "footer is missing"
         )
-        let column = text[list.lowerBound..<addRow.lowerBound]
+        let column = text[list.lowerBound..<footerAt.lowerBound]
         XCTAssertTrue(
-            column.contains("categories.count + 2"),
-            "add, categories, and sit share one row height"
+            column.contains("groups.count + 1"),
+            "groups and sit share one row height"
         )
         XCTAssertTrue(
-            column.contains("(height - nowH)"),
-            "list rows fill the space above the gear"
+            column.contains("height - rowH"),
+            "list rows fill the space above NOT SITTING"
         )
         XCTAssertTrue(
             column.contains("minHeight: rowH, maxHeight: rowH"),
             "NOT SITTING uses the same row height as the category buttons"
         )
-        XCTAssertTrue(
-            column.contains("minHeight: nowH, maxHeight: nowH"),
-            "the gear row uses nowH, not leftover scroll space"
+        XCTAssertFalse(
+            column.contains("nowH"),
+            "the gear row left the category column"
         )
         XCTAssertLessThan(
-            column.range(of: "height - nowH - rowH")!.lowerBound,
+            column.range(of: "height - rowH")!.lowerBound,
             column.range(of: "sitChip")!.lowerBound,
             "sit sits under the category scroll so Poop cannot leave a gap"
-        )
-        XCTAssertTrue(
-            text.contains("Text(\"+\")"),
-            "+ must be Text(\"+\")"
-        )
-        XCTAssertTrue(
-            text.contains("offset(y: -1)"),
-            "+ must use offset(y: -1)"
         )
         let footerStart = try XCTUnwrap(
             text.range(of: "private var footer"),
@@ -358,7 +339,7 @@ final class PostureRowTests: TimeTapTestCase {
         let store = TapStore()
         store.clock = { now }
         XCTAssertTrue(store.sessionReady, "sessionReady is true after TapStore.init")
-        store.tapCategory("DW")
+        store.tapCategory("Deep work")
         now += 1_000
         store.toggleSit()
         now += 60_000

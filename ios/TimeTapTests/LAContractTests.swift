@@ -153,16 +153,16 @@ final class LAContractTests: TimeTapTestCase {
 
     func testContentStateHasBlockAndTimerRanges() throws {
         XCTAssertFalse(RunningBlockAttributes.ContentState().hasBlock)
-        XCTAssertFalse(RunningBlockAttributes.ContentState(key: "DW").hasBlock)
+        XCTAssertFalse(RunningBlockAttributes.ContentState(key: "Deep work").hasBlock)
         XCTAssertFalse(RunningBlockAttributes.ContentState(startMs: 1_700_000_000_000).hasBlock)
         XCTAssertTrue(
-            RunningBlockAttributes.ContentState(key: "DW", startMs: 1_700_000_000_000).hasBlock
+            RunningBlockAttributes.ContentState(key: "Deep work", startMs: 1_700_000_000_000).hasBlock
         )
         let startMs: Double = 1_700_000_000_000
         let sitMs: Double = 1_700_000_010_000
         let standMs: Double = 1_700_000_060_000
         let block = RunningBlockAttributes.ContentState(
-            key: "DW", startMs: startMs, sitting: true, sitStartMs: sitMs, standStartMs: standMs
+            key: "Deep work", startMs: startMs, sitting: true, sitStartMs: sitMs, standStartMs: standMs
         )
         let timer = try XCTUnwrap(block.timerRange)
         XCTAssertEqual(timer.lowerBound.timeIntervalSince1970, startMs / 1000)
@@ -176,7 +176,7 @@ final class LAContractTests: TimeTapTestCase {
         )
         XCTAssertEqual(block.postureTimerRange, block.sitTimerRange)
         let stand = RunningBlockAttributes.ContentState(
-            key: "DW", startMs: startMs, sitting: false, sitStartMs: sitMs, standStartMs: standMs
+            key: "Deep work", startMs: startMs, sitting: false, sitStartMs: sitMs, standStartMs: standMs
         )
         XCTAssertNil(stand.sitTimerRange)
         XCTAssertEqual(
@@ -196,7 +196,7 @@ final class LAContractTests: TimeTapTestCase {
         var now: Double = 1_700_000_000_000
         let store = TapStore()
         store.clock = { now }
-        store.tapCategory("DW")
+        store.tapCategory("Deep work")
         now += 1_000
         store.toggleSit()
         now += 60_000

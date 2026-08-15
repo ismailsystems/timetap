@@ -47,7 +47,7 @@ final class A1Tests: TimeTapTestCase {
             XCTAssertFalse(Credentials.isConfigured)
             let store = TapStore()
             let before = store.queue.filter { $0.type == "openActual" }.count
-            store.tapCategory("DW")
+            store.tapCategory("Deep work")
             let after = store.queue.filter { $0.type == "openActual" }.count
             XCTAssertEqual(before, after)
             XCTAssertTrue(store.showSignIn)

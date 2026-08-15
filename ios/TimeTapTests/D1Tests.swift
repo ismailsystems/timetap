@@ -22,7 +22,7 @@ final class D1Tests: TimeTapTestCase {
         XCTAssertTrue(CalendarAPI.confirm(plan: "p1", actual: "a2", sitting: "s1"))
         XCTAssertEqual(Credentials.actualId, "a2")
         let store = TapStore()
-        store.tapCategory("DW")
+        store.tapCategory("Deep work")
         await store.flushNow()
         XCTAssertEqual(actual.events.count, 1)
         XCTAssertEqual(actual.events[0].calendarId, "a2")
@@ -52,7 +52,7 @@ final class D1Tests: TimeTapTestCase {
         GoogleAuth.testHasSession = false
         GoogleAuth.didAttemptCalendarWrite = false
         let store = TapStore()
-        store.tapCategory("DW")
+        store.tapCategory("Deep work")
         XCTAssertTrue(store.showSignIn)
         XCTAssertTrue(actual.events.isEmpty)
         XCTAssertTrue(store.queue.isEmpty)

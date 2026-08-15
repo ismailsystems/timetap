@@ -11,8 +11,8 @@ final class CaptureChromeUITests: XCTestCase {
     }
 
     func testNoteFieldOpensFromRailAndIsWide() {
-        let elapsed = app.buttons["elapsed"]
-        XCTAssertTrue(elapsed.waitForExistence(timeout: 8), "elapsed is missing")
+        XCTAssertTrue(app.staticTexts["TimeTap"].waitForExistence(timeout: 8), "title is missing")
+        XCTAssertFalse(app.buttons["elapsed"].exists, "elapsed left the title")
         XCTAssertFalse(app.buttons["addNote"].exists, "ADD NOTE chip must be gone")
         let open = app.buttons.matching(
             NSPredicate(format: "label CONTAINS[c] %@", "open")

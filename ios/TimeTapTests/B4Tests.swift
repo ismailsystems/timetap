@@ -22,32 +22,32 @@ final class B4Tests: TimeTapTestCase {
 
     func testOpenAndTodayDecode() throws {
         _ = ApplyOps.apply([
-            Op(id: "o1", type: "openActual", ref: dw, key: "DW", startMs: t),
-            Op(id: "c1", type: "closeActual", ref: dw, key: "DW", mark: "=", endMs: t + 600_000),
-            Op(id: "o2", type: "openActual", ref: mtg, key: "MTG", startMs: t + 600_000),
-            Op(id: "c2", type: "closeActual", ref: mtg, key: "MTG", mark: "=", endMs: t + 1_200_000),
-            Op(id: "o3", type: "openActual", ref: adm, key: "DW", startMs: t + 1_200_000),
+            Op(id: "o1", type: "openActual", ref: dw, key: "Deep work", startMs: t),
+            Op(id: "c1", type: "closeActual", ref: dw, key: "Deep work", mark: "=", endMs: t + 600_000),
+            Op(id: "o2", type: "openActual", ref: mtg, key: "Meetings", startMs: t + 600_000),
+            Op(id: "c2", type: "closeActual", ref: mtg, key: "Meetings", mark: "=", endMs: t + 1_200_000),
+            Op(id: "o3", type: "openActual", ref: adm, key: "Deep work", startMs: t + 1_200_000),
         ])
         let st = try ApplyOps.getState()
-        XCTAssertEqual(st.open?.key, "DW")
+        XCTAssertEqual(st.open?.key, "Deep work")
         XCTAssertEqual(st.today?.count, 2)
         XCTAssertEqual(st.nowMs, ApplyOps.nowMs)
         XCTAssertEqual(st.tz, ApplyOps.timeZone.identifier)
         let data = try JSONEncoder().encode(st)
         let decoded = try JSONDecoder().decode(ServerState.self, from: data)
-        XCTAssertEqual(decoded.open?.key, "DW")
+        XCTAssertEqual(decoded.open?.key, "Deep work")
         XCTAssertEqual(decoded.today?.count, 2)
     }
 
     func testTwoOpenKeepsNewest() throws {
-        _ = ApplyOps.apply([Op(id: "o1", type: "openActual", ref: dw, key: "DW", startMs: t)])
+        _ = ApplyOps.apply([Op(id: "o1", type: "openActual", ref: dw, key: "Deep work", startMs: t)])
         let extra = actual.createEvent(
-            calendarId: "a1", title: "MTG:", startMs: t + 60_000, endMs: t + 120_000
+            calendarId: "a1", title: "Meetings:", startMs: t + 60_000, endMs: t + 120_000
         )
         extra.description = "#ref:\(mtg)\n#open"
         extra.colorId = "3"
         let st = try ApplyOps.getState()
-        XCTAssertEqual(st.open?.key, "MTG")
+        XCTAssertEqual(st.open?.key, "Meetings")
         let dwEv = actual.events.first { $0.description.contains(dw) }!
         XCTAssertFalse(dwEv.description.contains("#open"))
         XCTAssertEqual(dwEv.endMs, t + 60_000)
@@ -65,7 +65,7 @@ final class B4Tests: TimeTapTestCase {
         }
         let start = local(2026, 1, 15, 22)
         ApplyOps.nowMs = local(2026, 1, 16, 7)
-        _ = ApplyOps.apply([Op(id: "o1", type: "openActual", ref: dw, key: "DW", startMs: start)])
+        _ = ApplyOps.apply([Op(id: "o1", type: "openActual", ref: dw, key: "Deep work", startMs: start)])
         let st = try ApplyOps.getState()
         XCTAssertNil(st.open)
         let dwEv = actual.events.first { $0.description.contains(dw) }!
@@ -82,7 +82,7 @@ final class B4Tests: TimeTapTestCase {
         ev.description = "#ref:\(dw)\n#open"
         let st = try ApplyOps.getState()
         XCTAssertEqual(st.open?.key, "UNFILED")
-        XCTAssertNotEqual(st.open?.key, "ADM")
+        XCTAssertNotEqual(st.open?.key, "Admin")
     }
 
     func testCalendarReadErrorDoesNotInventIdleDay() {
@@ -97,7 +97,7 @@ final class B4Tests: TimeTapTestCase {
 
     func testAllDayEventIgnored() throws {
         let ev = actual.createEvent(
-            calendarId: "a1", title: "DW:", startMs: t, endMs: t + 86_400_000
+            calendarId: "a1", title: "Deep work:", startMs: t, endMs: t + 86_400_000
         )
         ev.description = "#ref:\(dw)\n#open"
         ev.isAllDay = true

@@ -34,8 +34,8 @@ final class R7Tests: TimeTapTestCase {
         seedListedClosedDWOpenMTG()
         let store = TapStore()
         await store.bootNow()
-        XCTAssertEqual(store.open?.key, "MTG")
-        XCTAssertTrue(store.today.contains { $0.key == "DW" })
+        XCTAssertEqual(store.open?.key, "Meetings")
+        XCTAssertTrue(store.today.contains { $0.key == "Deep work" })
         XCTAssertNil(store.banner)
     }
 
@@ -55,8 +55,8 @@ final class R7Tests: TimeTapTestCase {
         store.showSignIn = true
         await store.didSignIn()
         XCTAssertFalse(store.showSignIn)
-        XCTAssertEqual(store.open?.key, "MTG")
-        XCTAssertTrue(store.today.contains { $0.key == "DW" })
+        XCTAssertEqual(store.open?.key, "Meetings")
+        XCTAssertTrue(store.today.contains { $0.key == "Deep work" })
         XCTAssertNil(store.banner)
     }
 
@@ -66,20 +66,20 @@ final class R7Tests: TimeTapTestCase {
         store.showPicker = true
         await store.didConfirmCalendars()
         XCTAssertFalse(store.showPicker)
-        XCTAssertEqual(store.open?.key, "MTG")
-        XCTAssertTrue(store.today.contains { $0.key == "DW" })
+        XCTAssertEqual(store.open?.key, "Meetings")
+        XCTAssertTrue(store.today.contains { $0.key == "Deep work" })
         XCTAssertNil(store.banner)
     }
 
     func testListThrowKeepsPersistedOpen() async {
         let store = TapStore()
-        store.open = OpenBlock(ref: dw, key: "DW", startMs: t)
-        store.today = [TodayBlock(key: "MTG", startMs: t, endMs: t + 600_000)]
+        store.open = OpenBlock(ref: dw, key: "Deep work", startMs: t)
+        store.today = [TodayBlock(key: "Meetings", startMs: t, endMs: t + 600_000)]
         CalendarAPI.testStateError = "boom"
         await store.bootNow()
-        XCTAssertEqual(store.open?.key, "DW")
+        XCTAssertEqual(store.open?.key, "Deep work")
         XCTAssertEqual(store.open?.ref, dw)
-        XCTAssertEqual(store.today.map(\.key), ["MTG"])
+        XCTAssertEqual(store.today.map(\.key), ["Meetings"])
         XCTAssertEqual(store.banner, "boom")
     }
 
@@ -87,7 +87,7 @@ final class R7Tests: TimeTapTestCase {
         let listed = seedOvernightOpenDW()
         _ = try await CalendarAPI.refreshState()
         XCTAssertTrue(CalendarAPI.didPushState)
-        let dwEv = listed.events.first { $0.title.hasPrefix("DW") }!
+        let dwEv = listed.events.first { $0.title.hasPrefix("Deep work") }!
         XCTAssertTrue(dwEv.title.hasSuffix("?"))
         XCTAssertFalse(dwEv.description.contains("#open"))
         XCTAssertEqual(dwEv.endMs, ApplyOps.addLocalDays(local(2026, 1, 15, 22), 1))
@@ -101,7 +101,7 @@ final class R7Tests: TimeTapTestCase {
         CalendarAPI.skipStatePush = true
         _ = try await CalendarAPI.refreshState()
         XCTAssertFalse(CalendarAPI.didPushState)
-        let dwEv = listed.events.first { $0.title.hasPrefix("DW") }!
+        let dwEv = listed.events.first { $0.title.hasPrefix("Deep work") }!
         XCTAssertTrue(dwEv.description.contains("#open"))
         XCTAssertFalse(dwEv.title.hasSuffix("?"))
         XCTAssertFalse(listed.events.contains { $0.title == "UNLOGGED -" })
@@ -145,9 +145,9 @@ final class R7Tests: TimeTapTestCase {
         GoogleAuth.testAccessToken = "t"
         let store = TapStore()
         store.showSignIn = false
-        store.tapCategory("DW")
+        store.tapCategory("Deep work")
         XCTAssertFalse(store.showSignIn)
-        XCTAssertTrue(store.queue.contains { $0.type == "openActual" && $0.key == "DW" })
+        XCTAssertTrue(store.queue.contains { $0.type == "openActual" && $0.key == "Deep work" })
     }
 
     func testFollowSDKSessionClearsAPinnedFalseSeam() {
@@ -163,15 +163,15 @@ final class R7Tests: TimeTapTestCase {
     func testDeepReadingOpenActualKeepsNextColor() throws {
         let store = TapStore()
         store.addCategory(label: "Deep reading")
-        XCTAssertEqual(Grammar.colorId(for: "DEEPREAD"), "1")
+        XCTAssertEqual(Grammar.colorId(for: "Deep reading"), "1")
         let actual = FakeCalendar()
         ApplyOps.actual = actual
         ApplyOps.sitting = FakeCalendar()
         _ = ApplyOps.apply([
-            Op(id: "o1", type: "openActual", ref: dw, key: "DEEPREAD", startMs: t)
+            Op(id: "o1", type: "openActual", ref: dw, key: "Deep reading", startMs: t)
         ])
         XCTAssertEqual(actual.events[0].colorId, "1")
-        let ev = try CalendarAPI.openActual(key: "DEEPREAD", at: t, ref: dw)
+        let ev = try CalendarAPI.openActual(key: "Deep reading", at: t, ref: dw)
         XCTAssertEqual(ev.colorId, "1")
     }
 
@@ -184,9 +184,9 @@ final class R7Tests: TimeTapTestCase {
         ApplyOps.actual = listed
         ApplyOps.sitting = sit
         _ = ApplyOps.apply([
-            Op(id: "o1", type: "openActual", ref: dw, key: "DW", startMs: t),
-            Op(id: "c1", type: "closeActual", ref: dw, key: "DW", mark: "=", endMs: t + 600_000),
-            Op(id: "o2", type: "openActual", ref: mtg, key: "MTG", startMs: t + 600_000),
+            Op(id: "o1", type: "openActual", ref: dw, key: "Deep work", startMs: t),
+            Op(id: "c1", type: "closeActual", ref: dw, key: "Deep work", mark: "=", endMs: t + 600_000),
+            Op(id: "o2", type: "openActual", ref: mtg, key: "Meetings", startMs: t + 600_000),
         ])
         CalendarAPI.testListedActual = listed
         CalendarAPI.testListedSitting = sit
@@ -203,7 +203,7 @@ final class R7Tests: TimeTapTestCase {
         let listed = FakeCalendar()
         ApplyOps.actual = listed
         ApplyOps.sitting = FakeCalendar()
-        _ = ApplyOps.apply([Op(id: "o1", type: "openActual", ref: dw, key: "DW", startMs: start)])
+        _ = ApplyOps.apply([Op(id: "o1", type: "openActual", ref: dw, key: "Deep work", startMs: start)])
         CalendarAPI.testListedActual = listed
         CalendarAPI.testListedSitting = FakeCalendar()
         ApplyOps.actual = nil

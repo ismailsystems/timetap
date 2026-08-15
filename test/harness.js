@@ -421,7 +421,17 @@ vm.runInThisContext(script(), { filename: 'Index.html' });
 
 /* ── test helpers ──────────────────────────────────────────────── */
 const $ = id => NODES[id];
-const tap = key => { $('grid').children.find(b => b.dataset.key === key).fire('click'); settle(); };
+const CAT_ALIAS = {
+  DW: 'Deep work', MTG: 'Meetings', ADM: 'Admin',
+  BODY: 'Zone 2', REL: 'People', FRAG: 'Fragments', POOP: 'Poop'
+};
+const catId = key => CAT_ALIAS[key] || key;
+const tap = key => {
+  const b = $('grid').children.find(el => el.dataset.key === catId(key));
+  if (!b) throw new Error('no category button for ' + key + ' (as ' + catId(key) + ')');
+  b.fire('click');
+  settle();
+};
 const litPosture = () => ($('postureBtn')._cls.has('on') ? 'sit' : 'stand');
 // One button now, so setting a posture means toggling only when it differs.
 const posture = k => {
@@ -526,7 +536,7 @@ module.exports = { LOGGED, fireVisible: () => VIS.forEach(f => f()),
   chk, skip, near, reset, reboot, META_ALLOWED, SCRIPT_PROPS, SHEETS, TRIGGERS,
   setActiveEmail: v => { ACTIVE_EMAIL = v; },
   postApi: (body) => doPost({ postData: { contents: JSON.stringify(body) } }),
-  posture, activeKey, litPosture, noteBox, elapsedBox, nowElapsed, addCell,
+  posture, activeKey, litPosture, noteBox, elapsedBox, nowElapsed, addCell, catId,
   clearPropCache: () => { global.PROPS_ = null; }, tap, tapSit, tapMark, tapStop, stopArmedNow, stopLabel, armedText,
   wait, advance, settle, A, S, show, hhmm, $,
   CALS, NODES, STORE, desc, indexSource: html,

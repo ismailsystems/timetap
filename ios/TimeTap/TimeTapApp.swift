@@ -23,7 +23,7 @@ struct TimeTapApp: App {
         }
         let store = TapStore()
         if Self.isUISmoke {
-            store.open = OpenBlock(ref: "ui-smoke", key: "DW", text: "", startMs: store.clock())
+            store.open = OpenBlock(ref: "ui-smoke", key: "Deep work", text: "", startMs: store.clock())
             store.sit = nil
             store.showSignIn = false
             store.showPicker = false

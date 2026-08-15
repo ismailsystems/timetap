@@ -135,10 +135,9 @@ surface of the app. There is no settings screen and there will never be one.
   You can also add one from the grid itself: the `+` box names a category and
   the app stores it in a script property called `EXTRA_CATEGORIES`, appended to
   this array rather than merged into it. Delete that property to get back to
-  exactly what is written here. Categories cannot be renamed from either place,
-  because a key change would split every past event away from every future one
-  in the rollup.
-- `MAX_CATEGORIES` (10) — the ceiling on both together. The `+` box disappears
+  exactly what is written here. A rename changes the label only. Old titles
+  keep an alias so past events stay in the same column.
+- `MAX_CATEGORIES` (16) — the ceiling on both together. The `+` box disappears
   once you reach it.
   **Order matters ergonomically:** the grid fills from the bottom row upward,
   so the first entries land nearest your thumb and the last entries sit in the
@@ -302,17 +301,17 @@ For **PLAN**:
 - Nothing to configure. The app opens it read-only and never creates, edits or
   deletes anything on it. Notifications there are your business — that is the
   calendar you actually want to look at.
-- **A PLAN event only counts if its title begins with a category key and a
+- **A PLAN event only counts if its title begins with a category label and a
   colon.** This is the one thing about PLAN that is worth knowing, and it is
   easy to get wrong for months without noticing.
 
-  `DW: ship the memo` counts its hours toward `plan DW`.
-  `Deep work — memo` counts toward nothing at all — the `DW ratio` column stays
-  blank, and the sheet cannot tell you why.
+  `Deep work: ship the memo` counts its hours toward `plan Deep work`.
+  `Deep work — memo` counts toward nothing at all — the `Deep work ratio`
+  column stays blank, and the sheet cannot tell you why.
 
-  The key is the short uppercase token from the `CATEGORIES` array in
-  `Code.gs`, not the label on the button. `Deep work` is a label; `DW` is the
-  key.
+  The label is the full name from the `CATEGORIES` array in `Code.gs`, written
+  as-is. `Deep work:` counts; `DW:` still counts because old titles keep an
+  alias. A group name such as Body is not a category.
 - `rollupStatus` tells you how many it managed to read: *"found 12, of which 3
   named a configured category"*. If that second number is lower than you
   expect, your PLAN titles are the reason.

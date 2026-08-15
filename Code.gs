@@ -28,9 +28,9 @@ var CAL_SITTING = '';   // written continuously by this app. Posture overlay.
  * Categories. Adding or removing one requires editing only this array —
  * the UI grid, the week report and the mark rules all lay out from here.
  *
- *   key      short uppercase token. Becomes the "KEY:" title prefix and the
- *            row name in the week report. Never appears on the grid.
- *   label    what the button says, verbatim and full size. Write it to be read.
+ *   label    the full name. Becomes the title prefix ("Deep work:") and the
+ *            column name in the week report. Groups such as Body live on the
+ *            phone only and are not listed here.
  *   color    CalendarApp.EventColor.* — the ACTUAL event's colour, and the
  *            button's background. See COLOR_HEX below for the eleven names.
  *   autoMark '+' | '=' | '-' | null.  Non-null means this category NEVER
@@ -42,12 +42,14 @@ var CAL_SITTING = '';   // written continuously by this app. Posture overlay.
  *            staleGuard_ writes it.
  */
 var CATEGORIES = [
-  { key: 'DW',   label: 'Deep work', color: CalendarApp.EventColor.BLUE,       autoMark: null },
-  { key: 'MTG',  label: 'Meetings',  color: CalendarApp.EventColor.MAUVE,      autoMark: null },
-  { key: 'ADM',  label: 'Admin',     color: CalendarApp.EventColor.GRAY,       autoMark: null },
-  { key: 'BODY', label: 'Body',      color: CalendarApp.EventColor.GREEN,      autoMark: '+'  },
-  { key: 'REL',  label: 'People',    color: CalendarApp.EventColor.ORANGE,     autoMark: null },
-  { key: 'FRAG', label: 'Fragments', color: CalendarApp.EventColor.PALE_RED,   autoMark: '-'  }
+  { label: 'Deep work', color: CalendarApp.EventColor.BLUE,       autoMark: null },
+  { label: 'Meetings',  color: CalendarApp.EventColor.MAUVE,      autoMark: null },
+  { label: 'Admin',     color: CalendarApp.EventColor.GRAY,       autoMark: null },
+  { label: 'Zone 2',    color: CalendarApp.EventColor.GREEN,      autoMark: '+'  },
+  { label: 'Lifting',   color: CalendarApp.EventColor.GREEN,      autoMark: '+'  },
+  { label: 'Walking',   color: CalendarApp.EventColor.GREEN,      autoMark: '+'  },
+  { label: 'People',    color: CalendarApp.EventColor.ORANGE,     autoMark: null },
+  { label: 'Fragments', color: CalendarApp.EventColor.PALE_RED,   autoMark: '-'  }
 ];
 
 /** Closed blocks shorter than this never get a mark and never show the strip. */
@@ -122,7 +124,7 @@ var LONG_BLOCK_MINUTES = 90;
  * ceiling on CATEGORIES itself — silently discarding entries someone typed
  * into the file is worse than a grid that is one row taller than intended.
  */
-var MAX_CATEGORIES = 10;
+var MAX_CATEGORIES = 16;
 
 /** A queued write that fails this many times is set aside instead of retried. */
 var MAX_OP_TRIES = 5;
@@ -166,8 +168,17 @@ var UNLOGGED_TITLE = 'UNLOGGED -';
  * also keeps the word "parsed" for B4's PLAN counts, which mean something else.
  */
 var UNFILED_KEY = 'UNFILED';
-/** Keys the rollup writes to, which a category may not take. See keyFor_. */
+/** Labels the rollup writes to, which a category may not take. */
 var RESERVED_KEYS_ = ['UNLOGGED', UNFILED_KEY];
+/**
+ * Old title prefixes. parseTitle_ still reads them so events already on the
+ * calendar keep their hours. The value is the label those hours belong to now.
+ * BODY maps to the retired label Body, not to a group and not to Zone 2.
+ */
+var LEGACY_TITLE_ALIASES_ = {
+  DW: 'Deep work', MTG: 'Meetings', ADM: 'Admin',
+  BODY: 'Body', REL: 'People', FRAG: 'Fragments', POOP: 'Poop'
+};
 var SIT_TITLE   = 'SIT';
 var MS_HOUR     = 3600000;
 var MS_MIN      = 60000;
@@ -360,7 +371,7 @@ function clientConfig_() {
   return {
     categories: allCategories_().map(function (c) {
       return {
-        key: c.key,
+        key: c.label,
         label: c.label,
         color: String(c.color),
         hex: COLOR_HEX[String(c.color)] || '#616161',
@@ -436,8 +447,17 @@ function extraCategories_() {
   if (!raw) return [];
   try {
     var a = JSON.parse(raw);
-    return Array.isArray(a) ? a : [];
+    return Array.isArray(a) ? a.map(normalizeCat_) : [];
   } catch (e) { return []; }
+}
+
+function normalizeCat_(c) {
+  if (!c || typeof c !== 'object') return { label: '', color: '', autoMark: null };
+  var label = c.label;
+  if (!label && c.key) {
+    label = LEGACY_TITLE_ALIASES_[String(c.key).toUpperCase()] || c.key;
+  }
+  return { label: label || '', color: c.color, autoMark: c.autoMark || null };
 }
 
 function allCategories_() {
@@ -459,34 +479,47 @@ function retiredKeys_() {
   } catch (e) { return []; }
 }
 
-function catOf_(key) {
+function retiredLabels_() {
+  return retiredKeys_().map(function (r) {
+    var label = typeof r === 'string' ? r : (r && (r.label || r.key));
+    if (!label) return { label: '' };
+    var alias = LEGACY_TITLE_ALIASES_[String(label).toUpperCase()];
+    return { label: alias || String(label) };
+  }).filter(function (r) { return r.label; });
+}
+
+function catOf_(id) {
+  var want = resolveLabel_(String(id == null ? '' : id));
+  if (!want) return null;
   var all = allCategories_();
-  for (var i = 0; i < all.length; i++) if (all[i].key === key) return all[i];
+  var i;
+  for (i = 0; i < all.length; i++) {
+    if (String(all[i].label).toLowerCase() === want.toLowerCase()) return all[i];
+  }
+  if (want === 'Body') {
+    return { label: 'Body', color: CalendarApp.EventColor.GREEN, autoMark: '+' };
+  }
   return null;
 }
 
-/**
- * The key is the calendar's vocabulary, so it has to be short, unique and
- * stable. It is derived once from the label and never changes — there is no
- * rename, here or anywhere, because renaming a key would split every past
- * event away from every future one in the rollup.
- */
-function keyFor_(label, taken) {
-  var base = String(label).toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 8) || 'CAT';
-  var key = base, n = 2;
-  var used = {};
-  taken.forEach(function (c) { used[c.key] = 1; });
-  /*
-   * Two keys belong to the report rather than to the user. A category named
-   * "Unlogged" derived UNLOGGED, and then its real hours stopped counting
-   * toward the waking span, the key got two columns, and the client lit that
-   * button for blocks the app could not read. Reserving them here means such a
-   * category becomes UNLOGGE2 — exactly what a second category named the same
-   * as an existing one already does, so the user sees nothing new.
-   */
-  RESERVED_KEYS_.forEach(function (k) { used[k] = 1; });
-  while (used[key]) { key = base.slice(0, 7) + n; n++; }
-  return key;
+function resolveLabel_(head) {
+  var t = String(head == null ? '' : head).replace(/\s+/g, ' ').trim();
+  if (!t) return t;
+  if (t.toUpperCase() === 'UNLOGGED') return 'UNLOGGED';
+  if (t.toUpperCase() === UNFILED_KEY) return UNFILED_KEY;
+  var alias = LEGACY_TITLE_ALIASES_[t.toUpperCase()];
+  if (alias) return alias;
+  var all = allCategories_();
+  var i;
+  for (i = 0; i < all.length; i++) {
+    if (String(all[i].label).toLowerCase() === t.toLowerCase()) return all[i].label;
+  }
+  var retired = retiredLabels_();
+  for (i = 0; i < retired.length; i++) {
+    if (String(retired[i].label).toLowerCase() === t.toLowerCase()) return retired[i].label;
+  }
+  if (t.toLowerCase() === 'body') return 'Body';
+  return t;
 }
 
 /** First colour in the palette nobody is using yet. */
@@ -521,9 +554,15 @@ function addCategory(label) {
       }
     }
 
+    if (name.indexOf(':') >= 0) {
+      throw new Error('A category name cannot contain a colon.');
+    }
+    if (RESERVED_KEYS_.some(function (k) { return k.toLowerCase() === name.toLowerCase(); })) {
+      throw new Error(name + ' is reserved.');
+    }
+
     var extras = extraCategories_();
-    extras.push({ key: keyFor_(name, all.concat(retiredKeys_())), label: name,
-                  color: nextColor_(all), autoMark: null });
+    extras.push({ label: name, color: nextColor_(all), autoMark: null });
     PropertiesService.getScriptProperties().setProperty('EXTRA_CATEGORIES', JSON.stringify(extras));
     PROPS_ = null;                     // the cache is now a lie
     return clientConfig_();
@@ -541,27 +580,36 @@ function addCategory(label) {
  * yours to edit in the file. The key is remembered as retired so the rollup
  * keeps reporting the events already logged under it.
  */
-function removeCategory(key) {
-  var want = String(key == null ? '' : key).trim().toUpperCase();
-  if (!want) throw new Error('Which key?');
+function removeCategory(label) {
+  var want = resolveLabel_(String(label == null ? '' : label));
+  if (!want) throw new Error('Which category?');
 
   var lock = LockService.getUserLock();
   try { lock.waitLock(20000); } catch (e) { throw new Error('Busy, try that again.'); }
   try {
     PROPS_ = null;
     var extras = extraCategories_();
-    var keep = extras.filter(function (c) { return c.key !== want; });
+    var keep = extras.filter(function (c) {
+      return String(c.label).toLowerCase() !== want.toLowerCase();
+    });
     if (keep.length === extras.length) {
-      if (CATEGORIES.some(function (c) { return c.key === want; })) {
+      if (CATEGORIES.some(function (c) {
+        return String(c.label).toLowerCase() === want.toLowerCase();
+      })) {
         throw new Error(want + ' is in the CATEGORIES array. Remove it from Code.gs.');
       }
-      throw new Error('No added category with key ' + want + '.');
+      throw new Error('No added category called ' + want + '.');
     }
-    var gone = extras.filter(function (c) { return c.key === want; })[0];
+    var gone = extras.filter(function (c) {
+      return String(c.label).toLowerCase() === want.toLowerCase();
+    })[0];
 
     var retired = retiredKeys_();
-    if (!retired.some(function (r) { return r.key === want; })) {
-      retired.push({ key: want, label: gone.label });
+    if (!retired.some(function (r) {
+      var lab = typeof r === 'string' ? r : (r && (r.label || r.key));
+      return String(lab || '').toLowerCase() === want.toLowerCase();
+    })) {
+      retired.push({ label: gone.label });
     }
     var props = PropertiesService.getScriptProperties();
     props.setProperty('EXTRA_CATEGORIES', JSON.stringify(keep));
@@ -612,7 +660,8 @@ function isMark_(m) {
 var MARK_BUCKETS = MARKS.split('').concat(['']);
 
 function buildTitle_(key, text, mark) {
-  var t = String(key || '').toUpperCase() + ':';
+  var id = resolveLabel_(key);
+  var t = id + ':';
   var s = String(text == null ? '' : text).replace(/[\r\n]+/g, ' ').replace(/\s+/g, ' ').trim();
   /*
    * A note may not end in a mark character, because the trailing slot is where
@@ -640,7 +689,7 @@ function buildTitle_(key, text, mark) {
    * written a second time, and contract 18 was false as worded. Only when there
    * is no text: "UNLOGGED: something" keeps its colon, because it needs one.
    */
-  if (String(key || '').toUpperCase() === 'UNLOGGED' && !s) {
+  if (String(id || '').toUpperCase() === 'UNLOGGED' && !s) {
     return 'UNLOGGED' + (isMark_(mark) ? ' ' + mark : '');
   }
   if (s) t += ' ' + s;
@@ -658,17 +707,17 @@ function buildTitle_(key, text, mark) {
 var MARK_TAIL_RE_ = new RegExp('(?:^|\\s)([' + MARKS.replace(/[\]^\-\\]/g, '\\$&') + '])$');
 
 /**
- * "DW: memo drafting -"  ->  {key:'DW', text:'memo drafting', mark:'-'}
- * "ADM: ="               ->  {key:'ADM', text:'', mark:'='}
- * "UNLOGGED -"           ->  {key:'UNLOGGED', text:'', mark:'-'}
- * "Lunch with Ada"       ->  null
+ * "Deep work: memo drafting -"  ->  {key:'Deep work', text:'memo drafting', mark:'-'}
+ * "DW: memo drafting -"         ->  {key:'Deep work', ...}  (legacy prefix)
+ * "UNLOGGED -"                  ->  {key:'UNLOGGED', text:'', mark:'-'}
+ * "Lunch with Ada"              ->  null
  */
 function parseTitle_(title) {
   var raw = String(title == null ? '' : title).trim();
   var key = null, rest = null;
-  var m = /^([A-Za-z0-9_]+)\s*:\s*([\s\S]*)$/.exec(raw);
+  var m = /^([^:]+):\s*([\s\S]*)$/.exec(raw);
   if (m) {
-    key = m[1].toUpperCase();
+    key = resolveLabel_(m[1]);
     rest = m[2].trim();
   } else {
     var u = /^UNLOGGED\b([\s\S]*)$/.exec(raw);
@@ -1466,19 +1515,21 @@ function rollupOnce_() {
  * ordinary calendar entries into columns and would have gone on doing it.
  */
 function rollupKeys_() {
-  var keys = allCategories_().map(function (c) { return c.key; });
-  retiredKeys_().forEach(function (r) { if (keys.indexOf(r.key) < 0) keys.push(r.key); });
+  var keys = allCategories_().map(function (c) { return c.label; });
+  function add(label) {
+    if (label && keys.indexOf(label) < 0) keys.push(label);
+  }
+  retiredLabels_().forEach(function (r) { add(r.label); });
+  add('Body');
   keys.push('UNLOGGED');
   /*
    * Guarded, unlike UNLOGGED above, because a category the user names "Unfiled"
    * derives this same key and one key must not get two columns.
    *
    * The guard stops the duplicate COLUMN. It does not stop the collision:
-   * keyFor_ reserves neither this key nor UNLOGGED, so such a category still
-   * shares a name with a key the rollup writes to, and the client would then
-   * light that button for a block it could not read. Reserving a key is a
-   * product decision — reject the name, rename the key, or suffix it silently
-   * — and it is parked in factory/progress-2.md rather than decided here.
+   * a category named Unfiled still shares a name with the rollup column, and
+   * the client would then light that button for a block it could not read.
+   * Rejecting the name is a product decision, parked in factory/progress-2.md.
    */
   if (keys.indexOf(UNFILED_KEY) < 0) keys.push(UNFILED_KEY);
   return keys;

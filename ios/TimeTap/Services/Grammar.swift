@@ -6,7 +6,9 @@ enum TT {
     static let mistapSeconds = 20
     static let staleOpenHours = 5
     static let undoSeconds = 5
-    static let maxCategories = 10
+    static let maxCategories = 16
+    static let maxGroups = 8
+    static let maxChildrenPerGroup = 8
     static let maxOpTries = 5
     static let confirmTimeoutMs = 4000
     static let markTimeoutMs = 6000
@@ -21,8 +23,14 @@ enum TT {
         "5": "#f6bf26", "6": "#f4511e", "7": "#039be5", "8": "#616161",
         "9": "#3f51b5", "10": "#0b8043", "11": "#d50000"
     ]
-    static let colorIdByKey: [String: String] = [
-        "DW": "9", "MTG": "3", "ADM": "8", "BODY": "10", "REL": "6", "FRAG": "4", "POOP": "5"
+    static let colorIdByLabel: [String: String] = [
+        "Deep work": "9", "Meetings": "3", "Admin": "8",
+        "Zone 2": "10", "Lifting": "10", "Walking": "10", "Body": "10",
+        "People": "6", "Fragments": "4", "Poop": "5",
+    ]
+    static let legacyAliases: [String: String] = [
+        "DW": "Deep work", "MTG": "Meetings", "ADM": "Admin",
+        "BODY": "Body", "REL": "People", "FRAG": "Fragments", "POOP": "Poop",
     ]
 }
 
@@ -42,7 +50,8 @@ enum Grammar {
     }
 
     static func buildTitle(_ key: String, _ text: String?, _ mark: String?) -> String {
-        var t = key.uppercased() + ":"
+        let id = resolve(key)
+        var t = id + ":"
         var s = String(text ?? "")
             .replacingOccurrences(of: #"[\r\n]+"#, with: " ", options: .regularExpression)
             .replacingOccurrences(of: #"\s+"#, with: " ", options: .regularExpression)
@@ -52,7 +61,7 @@ enum Grammar {
                 s = String(s.dropLast()).trimmingCharacters(in: .whitespacesAndNewlines)
             }
         }
-        if key.uppercased() == "UNLOGGED" && s.isEmpty {
+        if id.uppercased() == "UNLOGGED" && s.isEmpty {
             return "UNLOGGED" + (isMark(mark) ? " \(mark!)" : "")
         }
         if !s.isEmpty { t += " " + s }
@@ -64,8 +73,8 @@ enum Grammar {
         let raw = (title ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
         let key: String
         var rest: String
-        if let m = match("^([A-Za-z0-9_]+)\\s*:\\s*([\\s\\S]*)$", raw) {
-            key = m[1].uppercased()
+        if let m = match("^([^:]+):\\s*([\\s\\S]*)$", raw) {
+            key = resolve(m[1])
             rest = m[2].trimmingCharacters(in: .whitespacesAndNewlines)
         } else if let u = match("^UNLOGGED\\b([\\s\\S]*)$", raw) {
             key = "UNLOGGED"
@@ -101,31 +110,29 @@ enum Grammar {
     }
 
     static var extraColors: [String: String] = [:]
+    static var knownLabels: [String] = ClientConfig.seed.categories.map(\.label) + ["Body"]
+
+    static func resolve(_ head: String) -> String {
+        let t = head.trimmingCharacters(in: .whitespacesAndNewlines)
+        if t.isEmpty { return t }
+        if t.uppercased() == "UNLOGGED" { return "UNLOGGED" }
+        if t.uppercased() == TT.unfiledKey { return TT.unfiledKey }
+        if let a = TT.legacyAliases[t.uppercased()] { return a }
+        if let hit = knownLabels.first(where: {
+            $0.compare(t, options: .caseInsensitive) == .orderedSame
+        }) {
+            return hit
+        }
+        return t
+    }
 
     static func colorId(for key: String) -> String {
-        TT.colorIdByKey[key] ?? extraColors[key] ?? ""
+        let id = resolve(key)
+        return TT.colorIdByLabel[id] ?? extraColors[id] ?? extraColors[key] ?? ""
     }
 
     static func hex(for key: String) -> String {
         TT.colorHex[colorId(for: key)] ?? "#616161"
-    }
-
-    static func keyFor(_ label: String, taken: [Category]) -> String {
-        let stripped = label.uppercased().replacingOccurrences(
-            of: "[^A-Z0-9]", with: "", options: .regularExpression
-        )
-        let base = String(stripped.prefix(8))
-        let baseKey = base.isEmpty ? "CAT" : base
-        var used = Set(taken.map(\.key))
-        used.insert("UNLOGGED")
-        used.insert(TT.unfiledKey)
-        var key = baseKey
-        var n = 2
-        while used.contains(key) {
-            key = String(baseKey.prefix(7)) + "\(n)"
-            n += 1
-        }
-        return key
     }
 
     static func nextColor(_ taken: [Category]) -> String {

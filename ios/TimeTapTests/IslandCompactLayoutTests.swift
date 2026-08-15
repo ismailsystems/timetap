@@ -14,7 +14,7 @@ final class IslandCompactLayoutTests: TimeTapTestCase {
 
     func testIslandBlockCompactHeightFits37() {
         let state = RunningBlockAttributes.ContentState(
-            key: "DW",
+            key: "Deep work",
             face: "DEEP WORK",
             startMs: 1_700_000_000_000
         )
@@ -38,7 +38,7 @@ final class IslandCompactLayoutTests: TimeTapTestCase {
 
     func testCompactLeadingAndTrailingStackFits37() {
         let state = RunningBlockAttributes.ContentState(
-            key: "DW",
+            key: "Deep work",
             face: "DEEP WORK",
             startMs: 1_700_000_000_000,
             sitting: false,

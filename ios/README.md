@@ -48,7 +48,8 @@ simulator (iPhone 17 Pro Max).
 Tap a category. The phone inserts/patches events on ACTUAL (and SITTING)
 through Calendar REST. Titles, colours, `#ref:` / `#open`, stale `?`, and undo
 match `Code.gs`. STOP closes the running block only. Sitting has its own
-start/stop. Add category stays on the device (cap 10).
+start/stop. Add category stays on the device (cap 16). Groups stay on the
+phone. Only child labels are written to Calendar.
 
 The Lock Screen and Dynamic Island show the running block, and sitting as a
 second row with its own timer. Enable Live Activities for timetap in Settings

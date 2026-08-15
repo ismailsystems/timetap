@@ -28,13 +28,13 @@ final class C1Tests: TimeTapTestCase {
     }
 
     func testSuccessfulFlushLeavesQueueAndSkipsTimetapAPI() async throws {
-        seedQueue([Op(id: "o1", type: "openActual", ref: dw, key: "DW", startMs: t)])
+        seedQueue([Op(id: "o1", type: "openActual", ref: dw, key: "Deep work", startMs: t)])
         let store = TapStore()
         XCTAssertEqual(store.queue.map(\.id), ["o1"])
         await store.flushNow()
         XCTAssertTrue(store.queue.isEmpty, "applied ids must leave the queue")
         XCTAssertEqual(actual.events.count, 1)
-        XCTAssertEqual(actual.events[0].title, "DW:")
+        XCTAssertEqual(actual.events[0].title, "Deep work:")
         XCTAssertTrue(CalendarAPI.didFlush)
         XCTAssertFalse(store.syncLabel.contains("synced") && store.syncFailed)
         XCTAssertEqual(store.syncLabel, "synced")
@@ -42,9 +42,9 @@ final class C1Tests: TimeTapTestCase {
     }
 
     func testRejectedOpenActualGoesDeadAfterFiveFlushes() async {
-        seedQueue([Op(id: "o1", type: "openActual", ref: dw, key: "DW", startMs: t)])
+        seedQueue([Op(id: "o1", type: "openActual", ref: dw, key: "Deep work", startMs: t)])
         let store = TapStore()
-        store.open = OpenBlock(ref: dw, key: "DW", startMs: t)
+        store.open = OpenBlock(ref: dw, key: "Deep work", startMs: t)
         CalendarAPI.rejectWrites = true
         for _ in 1...5 { await store.flushNow() }
         XCTAssertTrue(store.queue.isEmpty, "dead-lettered op must leave the queue")
@@ -58,16 +58,16 @@ final class C1Tests: TimeTapTestCase {
     func testSetAsideSetMarkLeavesBlockRunning() async {
         seedQueue([Op(id: "m1", type: "setMark", ref: dw, mark: "-", hintMs: t)])
         let store = TapStore()
-        store.open = OpenBlock(ref: dw, key: "DW", startMs: t)
+        store.open = OpenBlock(ref: dw, key: "Deep work", startMs: t)
         CalendarAPI.rejectWrites = true
         for _ in 1...5 { await store.flushNow() }
         XCTAssertEqual(store.dead.map(\.op.type), ["setMark"])
         XCTAssertEqual(store.open?.ref, dw)
-        XCTAssertEqual(store.open?.key, "DW")
+        XCTAssertEqual(store.open?.key, "Deep work")
     }
 
     func test401Then200RefreshesOnceAndApplies() async {
-        seedQueue([Op(id: "o1", type: "openActual", ref: dw, key: "DW", startMs: t)])
+        seedQueue([Op(id: "o1", type: "openActual", ref: dw, key: "Deep work", startMs: t)])
         let store = TapStore()
         CalendarAPI.testStatusQueue = [401, 200]
         await store.flushNow()
@@ -77,7 +77,7 @@ final class C1Tests: TimeTapTestCase {
     }
 
     func testSecond401DoesNotRefreshInALoop() async {
-        seedQueue([Op(id: "o1", type: "openActual", ref: dw, key: "DW", startMs: t)])
+        seedQueue([Op(id: "o1", type: "openActual", ref: dw, key: "Deep work", startMs: t)])
         let store = TapStore()
         CalendarAPI.testStatusQueue = [401, 401]
         await store.flushNow()
@@ -94,9 +94,9 @@ final class C1Tests: TimeTapTestCase {
     }
 
     func test429And500BackoffAndStayQueued() async {
-        seedQueue([Op(id: "o1", type: "openActual", ref: dw, key: "DW", startMs: t)])
+        seedQueue([Op(id: "o1", type: "openActual", ref: dw, key: "Deep work", startMs: t)])
         let store = TapStore()
-        store.open = OpenBlock(ref: dw, key: "DW", startMs: t)
+        store.open = OpenBlock(ref: dw, key: "Deep work", startMs: t)
         XCTAssertEqual(store.retryDelay, 4)
         CalendarAPI.testStatusQueue = [429]
         await store.flushNow()
@@ -120,9 +120,9 @@ final class C1Tests: TimeTapTestCase {
     }
 
     func test400GoesDeadAfterFive() async {
-        seedQueue([Op(id: "o1", type: "openActual", ref: dw, key: "DW", startMs: t)])
+        seedQueue([Op(id: "o1", type: "openActual", ref: dw, key: "Deep work", startMs: t)])
         let store = TapStore()
-        store.open = OpenBlock(ref: dw, key: "DW", startMs: t)
+        store.open = OpenBlock(ref: dw, key: "Deep work", startMs: t)
         CalendarAPI.testStatusQueue = [400, 400, 400, 400, 400]
         for _ in 1...5 { await store.flushNow() }
         XCTAssertTrue(store.queue.isEmpty)
@@ -132,7 +132,7 @@ final class C1Tests: TimeTapTestCase {
     }
 
     func testDidSignInAfterSecond401FlushesQueue() async {
-        seedQueue([Op(id: "o1", type: "openActual", ref: dw, key: "DW", startMs: t)])
+        seedQueue([Op(id: "o1", type: "openActual", ref: dw, key: "Deep work", startMs: t)])
         let store = TapStore()
         CalendarAPI.testStatusQueue = [401, 401]
         await store.flushNow()
@@ -143,34 +143,34 @@ final class C1Tests: TimeTapTestCase {
         XCTAssertFalse(store.showSignIn)
         XCTAssertTrue(store.queue.isEmpty)
         XCTAssertEqual(actual.events.count, 1)
-        XCTAssertEqual(actual.events[0].title, "DW:")
+        XCTAssertEqual(actual.events[0].title, "Deep work:")
     }
 
     func testAppliedUndoSwitchRunsGetState() async {
         _ = ApplyOps.apply([
-            Op(id: "o1", type: "openActual", ref: dw, key: "DW", startMs: t),
-            Op(id: "o2", type: "openActual", ref: "mtgmtgmtgmtgmtg1", key: "MTG", startMs: t + 60_000),
+            Op(id: "o1", type: "openActual", ref: dw, key: "Deep work", startMs: t),
+            Op(id: "o2", type: "openActual", ref: "mtgmtgmtgmtgmtg1", key: "Meetings", startMs: t + 60_000),
         ])
         actual.delete(actual.events.first { $0.description.contains("mtgmtgmtgmtgmtg1") }!)
         let undo = Op(
             id: "u1", type: "undoSwitch", atMs: t + 60_000, nowMs: t + 61_000,
-            newRef: "mtgmtgmtgmtgmtg1", prevRef: dw, prevKey: "DW", prevStartMs: t
+            newRef: "mtgmtgmtgmtgmtg1", prevRef: dw, prevKey: "Deep work", prevStartMs: t
         )
         let mark = Op(id: "m1", type: "setMark", ref: dw, mark: "=", hintMs: t)
         seedQueue([undo, mark])
         let store = TapStore()
-        store.open = OpenBlock(ref: "mtgmtgmtgmtgmtg1", key: "MTG", startMs: t + 60_000)
+        store.open = OpenBlock(ref: "mtgmtgmtgmtgmtg1", key: "Meetings", startMs: t + 60_000)
         XCTAssertEqual(CalendarAPI.getStateCalls, 0)
         await store.flushNow()
         XCTAssertTrue(store.queue.isEmpty)
         XCTAssertEqual(CalendarAPI.getStateCalls, 1)
-        XCTAssertEqual(store.open?.key, "DW")
+        XCTAssertEqual(store.open?.key, "Deep work")
         XCTAssertEqual(store.open?.ref, dw)
         XCTAssertTrue(actual.events.contains { $0.description.contains("#open") && $0.description.contains(dw) })
     }
 
     func test403IsNotSyncedThenSetAside() async {
-        seedQueue([Op(id: "o1", type: "openActual", ref: dw, key: "DW", startMs: t)])
+        seedQueue([Op(id: "o1", type: "openActual", ref: dw, key: "Deep work", startMs: t)])
         let store = TapStore()
         CalendarAPI.testStatusQueue = [403]
         await store.flushNow()
@@ -194,33 +194,33 @@ final class C1Tests: TimeTapTestCase {
         var now = t
         let store = TapStore()
         store.clock = { now }
-        store.tapCategory("DW")
+        store.tapCategory("Deep work")
         await store.flushNow()
         let dwRef = store.open?.ref
-        XCTAssertEqual(store.open?.key, "DW")
+        XCTAssertEqual(store.open?.key, "Deep work")
         now += 20 * 60_000
         store.openSplit()
-        store.doSplit(key: "MTG")
-        XCTAssertEqual(store.open?.key, "MTG")
+        store.doSplit(key: "Meetings")
+        XCTAssertEqual(store.open?.key, "Meetings")
         CalendarAPI.rejectWrites = true
         for _ in 1...5 { await store.flushNow() }
         XCTAssertEqual(store.dead.last?.op.type, "splitActual")
-        XCTAssertEqual(store.open?.key, "DW")
+        XCTAssertEqual(store.open?.key, "Deep work")
         XCTAssertEqual(store.open?.ref, dwRef)
     }
 
     func test400OnTwoOpBatchDoesNotDeadLetterTheFirst() async {
         seedQueue([
-            Op(id: "c1", type: "closeActual", ref: dw, key: "DW", mark: "=", endMs: t + 60_000),
-            Op(id: "o2", type: "openActual", ref: "mtgmtgmtgmtgmtg1", key: "MTG", startMs: t + 60_000),
+            Op(id: "c1", type: "closeActual", ref: dw, key: "Deep work", mark: "=", endMs: t + 60_000),
+            Op(id: "o2", type: "openActual", ref: "mtgmtgmtgmtgmtg1", key: "Meetings", startMs: t + 60_000),
         ])
         let store = TapStore()
-        store.open = OpenBlock(ref: "mtgmtgmtgmtgmtg1", key: "MTG", startMs: t + 60_000)
+        store.open = OpenBlock(ref: "mtgmtgmtgmtgmtg1", key: "Meetings", startMs: t + 60_000)
         CalendarAPI.testStatusQueue = [400]
         await store.flushNow()
         XCTAssertEqual(store.queue.map(\.id), ["c1", "o2"])
         XCTAssertTrue(store.dead.isEmpty)
-        XCTAssertEqual(store.open?.key, "MTG")
+        XCTAssertEqual(store.open?.key, "Meetings")
     }
 
     func testGetState401RefreshesOnceThenLoads() async {
@@ -240,7 +240,7 @@ final class C1Tests: TimeTapTestCase {
     }
 
     func testRefreshOnReturnFlushesQueuedOp() async {
-        seedQueue([Op(id: "o1", type: "openActual", ref: dw, key: "DW", startMs: t)])
+        seedQueue([Op(id: "o1", type: "openActual", ref: dw, key: "Deep work", startMs: t)])
         let store = TapStore()
         await store.refreshOnReturnNow()
         XCTAssertTrue(store.queue.isEmpty)

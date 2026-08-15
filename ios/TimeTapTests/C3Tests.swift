@@ -31,33 +31,25 @@ final class C3Tests: TimeTapTestCase {
 
     func testCaptureParityMatchesB2B3Writer() async {
         let store = wiredStore()
-        store.tapCategory("DW")
+        store.tapCategory("Deep work")
         await store.flushNow()
         XCTAssertEqual(actual.events.count, 1)
-        XCTAssertEqual(actual.events[0].title, "DW:")
+        XCTAssertEqual(actual.events[0].title, "Deep work:")
         XCTAssertTrue(actual.events[0].description.contains("#open"))
         XCTAssertEqual(actual.events[0].colorId, "9")
 
         t += 60_000
-        store.tapCategory("MTG")
-        await store.flushNow()
-        let dw = actual.events.first { $0.title.hasPrefix("DW") }!
-        let mtg = actual.events.first { $0.title.hasPrefix("MTG") }!
-        XCTAssertEqual(dw.title, "DW:")
-        XCTAssertFalse(dw.description.contains("#open"))
-        XCTAssertEqual(dw.endMs, t)
-        XCTAssertEqual(dw.colorId, "9")
-        XCTAssertEqual(mtg.title, "MTG:")
-        XCTAssertEqual(mtg.colorId, "3")
-        XCTAssertTrue(mtg.description.contains("#open"))
-        XCTAssertEqual(actual.events.filter { $0.description.contains("#open") }.count, 1)
-
+        store.propose("Meetings")
+        XCTAssertEqual(store.open?.key, "Deep work")
+        XCTAssertEqual(store.pendingKey, "Meetings")
+        XCTAssertFalse(store.pendingStop)
         store.takeUndo()
         await store.flushNow()
-        XCTAssertNil(actual.events.first { $0.title.hasPrefix("MTG") })
-        XCTAssertTrue(actual.events.contains { $0.title.hasPrefix("DW") && $0.description.contains("#open") })
+        XCTAssertNil(store.pendingKey)
+        XCTAssertNil(actual.events.first { $0.title.hasPrefix("Meetings") })
+        XCTAssertTrue(actual.events.contains { $0.title.hasPrefix("Deep work") && $0.description.contains("#open") })
         XCTAssertFalse(actual.events[0].title.contains("="))
-        XCTAssertEqual(store.open?.key, "DW")
+        XCTAssertEqual(store.open?.key, "Deep work")
 
         t += 60_000
         store.toggleSit()
@@ -70,29 +62,29 @@ final class C3Tests: TimeTapTestCase {
         store.openSplit()
         store.setSplitWhole(false)
         store.setSplitMinutes(1)
-        store.doSplit(key: "ADM")
+        store.doSplit(key: "Admin")
         await store.flushNow()
         let splitAt = t0 + 60_000
-        let dwHalf = actual.events.first { $0.title.hasPrefix("DW") }!
-        let adm = actual.events.first { $0.title.hasPrefix("ADM") }!
+        let dwHalf = actual.events.first { $0.title.hasPrefix("Deep work") }!
+        let adm = actual.events.first { $0.title.hasPrefix("Admin") }!
         XCTAssertFalse(dwHalf.description.contains("#open"))
         XCTAssertEqual(dwHalf.endMs, splitAt)
-        XCTAssertEqual(adm.title, "ADM:")
+        XCTAssertEqual(adm.title, "Admin:")
         XCTAssertEqual(adm.colorId, "8")
         XCTAssertTrue(adm.description.contains("#open"))
         XCTAssertEqual(adm.startMs, splitAt)
         XCTAssertEqual(actual.events.filter { $0.description.contains("#open") }.count, 1)
-        XCTAssertEqual(store.open?.key, "ADM")
+        XCTAssertEqual(store.open?.key, "Admin")
 
         store.openSplit()
         store.setSplitWhole(true)
-        store.doSplit(key: "BODY")
+        store.doSplit(key: "Zone 2")
         await store.flushNow()
-        XCTAssertEqual(store.open?.key, "BODY")
+        XCTAssertEqual(store.open?.key, "Zone 2")
         XCTAssertEqual(actual.events.count, 2)
-        XCTAssertFalse(actual.events.contains { $0.title.hasPrefix("ADM") })
+        XCTAssertFalse(actual.events.contains { $0.title.hasPrefix("Admin") })
         let body = actual.events.first { $0.description.contains("#open") }!
-        XCTAssertEqual(body.title, "BODY:")
+        XCTAssertEqual(body.title, "Zone 2:")
         XCTAssertEqual(body.colorId, "10")
         XCTAssertEqual(body.startMs, splitAt)
 
@@ -102,7 +94,7 @@ final class C3Tests: TimeTapTestCase {
         await store.flushNow()
         XCTAssertEqual(
             actual.events.first { $0.description.contains("#open") }?.title,
-            "BODY: memo"
+            "Zone 2: memo"
         )
 
         store.markStrip = .init(
@@ -113,7 +105,7 @@ final class C3Tests: TimeTapTestCase {
         await store.flushNow()
         XCTAssertEqual(
             actual.events.first { $0.description.contains("#open") }?.title,
-            "BODY: memo -"
+            "Zone 2: memo -"
         )
 
         t += 60_000
@@ -123,11 +115,11 @@ final class C3Tests: TimeTapTestCase {
         XCTAssertFalse(actual.events.contains { $0.description.contains("#open") })
         XCTAssertTrue(sitting.events.contains { $0.description.contains("#open") })
         XCTAssertEqual(actual.events.count, 2)
-        let dwDone = actual.events.first { $0.title.hasPrefix("DW") }!
-        let bodyDone = actual.events.first { $0.title.hasPrefix("BODY") }!
-        XCTAssertEqual(dwDone.title, "DW:")
+        let dwDone = actual.events.first { $0.title.hasPrefix("Deep work") }!
+        let bodyDone = actual.events.first { $0.title.hasPrefix("Zone 2") }!
+        XCTAssertEqual(dwDone.title, "Deep work:")
         XCTAssertEqual(dwDone.endMs, splitAt)
-        XCTAssertEqual(bodyDone.title, "BODY: memo +")
+        XCTAssertEqual(bodyDone.title, "Zone 2: memo +")
         XCTAssertEqual(bodyDone.endMs, stopAt)
         XCTAssertEqual(sitting.events.count, 1)
         XCTAssertEqual(sitting.events[0].title, "SIT")
@@ -146,8 +138,8 @@ final class C3Tests: TimeTapTestCase {
     func testRailHasUnloggedGap() {
         let store = wiredStore()
         store.today = [
-            TodayBlock(ref: "a", key: "DW", startMs: t0, endMs: t0 + 60_000),
-            TodayBlock(ref: "b", key: "MTG", startMs: t0 + 180_000, endMs: t0 + 240_000),
+            TodayBlock(ref: "a", key: "Deep work", startMs: t0, endMs: t0 + 60_000),
+            TodayBlock(ref: "b", key: "Meetings", startMs: t0 + 180_000, endMs: t0 + 240_000),
         ]
         let (_, items) = store.railItems(budget: 400, now: t0 + 240_000)
         XCTAssertTrue(items.contains { $0.isGap && $0.name == "UNLOGGED" })
@@ -164,10 +156,10 @@ final class C3Tests: TimeTapTestCase {
         let store = wiredStore()
         await store.bootNow()
         XCTAssertEqual(store.open?.key, "UNFILED")
-        XCTAssertNotEqual(store.open?.key, "ADM")
+        XCTAssertNotEqual(store.open?.key, "Admin")
         XCTAssertTrue(store.unreadableOpen)
         XCTAssertTrue(store.banner?.contains("cannot read") == true)
-        XCTAssertFalse(store.categories.contains { $0.key == store.open?.key })
+        XCTAssertFalse(store.categories.contains { $0.label == store.open?.key })
     }
 
     private func wiredStore() -> TapStore {

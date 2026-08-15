@@ -27,6 +27,8 @@ final class TapStore: ObservableObject {
 
     @Published var undoLabel: String?
     @Published var undoSecondsLeft: Int = 0
+    @Published var pendingKey: String?
+    @Published var pendingStop = false
     @Published var markStrip: MarkStrip?
 
     @Published var split: SplitState?
@@ -90,6 +92,8 @@ final class TapStore: ObservableObject {
 
     private var undo: UndoOffer?
     private var undoTimer: Timer?
+    private var pendingUntil: Date?
+    private var pendingTimer: Timer?
     private var markTimer: Timer?
     private var noteTask: Task<Void, Never>?
     private var flushTask: Task<Void, Never>?
@@ -166,7 +170,47 @@ final class TapStore: ObservableObject {
 
     // MARK: - Capture actions
 
+    /// Gesture proposes a start, switch, or stop. Calendar write waits 5s.
+    func propose(_ key: String) {
+        let key = Grammar.resolve(key)
+        if !sessionReady { return }
+        guard GoogleAuth.hasSession else {
+            showSignIn = true
+            return
+        }
+        if Credentials.actualId.isEmpty {
+            banner = "Pick PLAN, ACTUAL and SITTING calendars first."
+            showPicker = true
+            return
+        }
+        if let open, open.key == key, lastInsertFailed {
+            tapCategory(key)
+            return
+        }
+        pendingKey = key
+        pendingStop = open?.key == key
+        armPending()
+    }
+
+    func cancelPending() {
+        clearPending()
+    }
+
+    func commitPending() {
+        let key = pendingKey
+        let stop = pendingStop
+        clearPending()
+        lastTapMs = 0
+        if stop {
+            endDay()
+        } else if let key {
+            tapCategory(key)
+        }
+    }
+
     func tapCategory(_ key: String) {
+        clearPending()
+        let key = Grammar.resolve(key)
         if !sessionReady { return }
         guard GoogleAuth.hasSession else {
             showSignIn = true
@@ -193,14 +237,11 @@ final class TapStore: ObservableObject {
 
         closeBlockSheets()
 
-        var prev: OpenBlock?
-        var closeId: String?
         var pending: MarkStrip?
         if let cur = open {
-            prev = cur
             let dur = now - cur.startMs
             let m = markFor(key: cur.key, durMs: dur)
-            closeId = enqueue(Op(
+            _ = enqueue(Op(
                 id: Op.uid(), type: "closeActual", ts: now,
                 ref: cur.ref, key: cur.key, text: cur.text, mark: m.mark, endMs: now
             ))
@@ -212,20 +253,15 @@ final class TapStore: ObservableObject {
 
         let ref = Op.uid()
         open = OpenBlock(ref: ref, key: key, startMs: now)
-        let openId = enqueue(Op(
+        _ = enqueue(Op(
             id: Op.uid(), type: "openActual", ts: now,
             ref: ref, key: key, startMs: now
         ))
 
         if let pending { showMarkStrip(pending) } else { hideMarkStrip() }
-        armUndo(UndoOffer(
-            prev: prev, newRef: ref, atMs: now,
-            closeId: closeId, openId: openId, sit: nil,
-            label: "SWITCHED TO \(labelFor(key).uppercased())",
-            until: Date().addingTimeInterval(Double(config?.undoSeconds ?? 5))
-        ))
         unreadableOpen = false
         scrollToKey = key
+        if let g = group(containing: key) { lastUsed[g.label] = key }
         persist()
         if CalendarAPI.testCalendar != nil {
             do {
@@ -251,17 +287,17 @@ final class TapStore: ObservableObject {
     }
 
     func endDay() {
+        clearPending()
         let now = clock()
         closeBlockSheets()
-        var prev: OpenBlock?
-        var closeId: String?
         var pending: MarkStrip?
+        var didStop = false
 
         if let cur = open {
-            prev = cur
+            didStop = true
             let dur = now - cur.startMs
             let m = markFor(key: cur.key, durMs: dur)
-            closeId = enqueue(Op(
+            _ = enqueue(Op(
                 id: Op.uid(), type: "closeActual", ts: now,
                 ref: cur.ref, key: cur.key, text: cur.text, mark: m.mark, endMs: now
             ))
@@ -273,13 +309,7 @@ final class TapStore: ObservableObject {
             if let pending { showMarkStrip(pending) } else { hideMarkStrip() }
         }
 
-        if prev != nil {
-            armUndo(UndoOffer(
-                prev: prev, newRef: nil, atMs: now,
-                closeId: closeId, openId: nil, sit: nil,
-                label: "STOPPED — NOW UNLOGGED",
-                until: Date().addingTimeInterval(Double(config?.undoSeconds ?? 5))
-            ))
+        if didStop {
             UIImpactFeedbackGenerator(style: .medium).impactOccurred()
         }
         unreadableOpen = false
@@ -357,6 +387,10 @@ final class TapStore: ObservableObject {
     }
 
     func takeUndo() {
+        if pendingKey != nil {
+            clearPending()
+            return
+        }
         guard let u = undo else { return }
         clearUndo()
         let now = clock()
@@ -475,6 +509,7 @@ final class TapStore: ObservableObject {
     }
 
     func doSplit(key: String) {
+        let key = Grammar.resolve(key)
         guard let s = split, let cur = open, cur.ref == s.ref else {
             split = nil
             return
@@ -613,13 +648,14 @@ final class TapStore: ObservableObject {
                 if let pe = prevEnd, b.startMs - pe > gapMs {
                     raw.append(("UNLOGGED", b.startMs - pe, nil, true, false, 20, ""))
                 }
-                let cat = catByKey[b.key]
+                let id = Grammar.resolve(b.key)
+                let cat = catByKey[id]
                 let ms = b.endMs - max(b.startMs, dayStart)
                 let isOpen = open.map { o in
                     (b.ref != nil && b.ref == o.ref) || (b.ref == nil && b.startMs == o.startMs && b.endMs == now)
                 } ?? false
                 raw.append((
-                    (cat?.face ?? b.key).uppercased(),
+                    (cat?.face ?? id).uppercased(),
                     ms,
                     cat?.hex,
                     false,
@@ -660,45 +696,209 @@ final class TapStore: ObservableObject {
         return ("TODAY · \(Format.clock(labelStart))", items)
     }
 
-    func labelFor(_ key: String) -> String { catByKey[key]?.face ?? key }
-    func colorFor(_ key: String) -> Color { Theme.hex(catByKey[key]?.hex ?? "#616161") }
+    func labelFor(_ key: String) -> String { catByKey[Grammar.resolve(key)]?.face ?? Grammar.resolve(key) }
+    func colorFor(_ key: String) -> Color { Theme.hex(catByKey[Grammar.resolve(key)]?.hex ?? "#616161") }
     var categories: [Category] { config?.categories ?? [] }
+    var groups: [CategoryGroup] { config?.groups ?? [] }
+    var lastUsed: [String: String] = [:]
     var deadCount: Int { dead.count }
     var canAddCategory: Bool {
-        categories.count < (config?.maxCategories ?? 10)
+        groups.count < (config?.maxGroups ?? TT.maxGroups)
+            && categories.count < (config?.maxCategories ?? TT.maxCategories)
+    }
+
+    func group(containing label: String) -> CategoryGroup? {
+        let want = Grammar.resolve(label)
+        return groups.first { $0.children.contains { $0.label == want } }
+    }
+
+    func pickFromGroup(_ group: CategoryGroup, hover: String?) -> String? {
+        if let hover, group.children.contains(where: { $0.label == hover }) { return hover }
+        if let used = lastUsed[group.label], group.children.contains(where: { $0.label == used }) {
+            return used
+        }
+        return group.children.first?.label
+    }
+
+    func arm(_ group: CategoryGroup, child: String) {
+        guard group.children.contains(where: { $0.label == child }) else { return }
+        lastUsed[group.label] = child
+        objectWillChange.send()
+        persist()
+    }
+
+    func neighbor(in group: CategoryGroup, of label: String, step: Int) -> String {
+        let kids = group.children.map(\.label)
+        guard let i = kids.firstIndex(of: label), !kids.isEmpty else {
+            return kids.first ?? label
+        }
+        let n = kids.count
+        return kids[(i + step % n + n) % n]
     }
 
     func addCategory(label: String, onSuccess: (() -> Void)? = nil) {
-        let name = String(label)
-            .replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-        let clipped = String(name.prefix(24))
-        guard !clipped.isEmpty else {
-            banner = "A category needs a name."
+        addGroup(label: label, onSuccess: onSuccess)
+    }
+
+    func addGroup(label: String, onSuccess: (() -> Void)? = nil) {
+        guard let clipped = cleanName(label) else { return }
+        var cfg = config ?? .seed
+        if cfg.groups.count >= cfg.maxGroups {
+            banner = "That is \(cfg.maxGroups) groups already."
             return
         }
-        var cats = config?.categories ?? ClientConfig.seed.categories
-        let max = config?.maxCategories ?? TT.maxCategories
-        if cats.count >= max {
-            banner = "That is \(max) categories already."
+        if cfg.categories.count >= cfg.maxCategories {
+            banner = "That is \(cfg.maxCategories) categories already."
             return
         }
-        if let hit = cats.first(where: { $0.label.lowercased() == clipped.lowercased() }) {
+        if cfg.groups.contains(where: { $0.label.lowercased() == clipped.lowercased() }) {
+            banner = "There is already a group called \(clipped)."
+            return
+        }
+        if let hit = cfg.categories.first(where: { $0.label.lowercased() == clipped.lowercased() }) {
             banner = "There is already a category called \(hit.label)."
             return
         }
-        let key = Grammar.keyFor(clipped, taken: cats)
-        let color = Grammar.nextColor(cats)
-        cats.append(Category(
-            key: key, label: clipped, color: color,
-            hex: TT.colorHex[color] ?? "#616161", autoMark: nil
-        ))
-        var cfg = config ?? .seed
-        cfg.categories = cats
+        let color = Grammar.nextColor(cfg.categories)
+        let hex = TT.colorHex[color] ?? "#616161"
+        let child = Category(label: clipped, color: color, hex: hex)
+        cfg.retired.removeAll { $0.lowercased() == clipped.lowercased() }
+        cfg.groups.append(CategoryGroup(label: clipped, color: color, hex: hex, children: [child]))
         applyConfig(cfg)
         addingCategory = false
         banner = nil
         onSuccess?()
+    }
+
+    func addChild(group: String, label: String) {
+        guard let clipped = cleanName(label) else { return }
+        var cfg = config ?? .seed
+        guard let gi = cfg.groups.firstIndex(where: { $0.label == group }) else { return }
+        if cfg.groups[gi].children.count >= TT.maxChildrenPerGroup {
+            banner = "That is \(TT.maxChildrenPerGroup) in \(group) already."
+            return
+        }
+        if cfg.categories.count >= cfg.maxCategories {
+            banner = "That is \(cfg.maxCategories) categories already."
+            return
+        }
+        if let hit = cfg.categories.first(where: { $0.label.lowercased() == clipped.lowercased() }) {
+            banner = "There is already a category called \(hit.label)."
+            return
+        }
+        let g = cfg.groups[gi]
+        let child = Category(label: clipped, color: g.color, hex: g.hex, autoMark: g.autoMark)
+        cfg.retired.removeAll { $0.lowercased() == clipped.lowercased() }
+        cfg.groups[gi].children.append(child)
+        applyConfig(cfg)
+        banner = nil
+    }
+
+    func renameGroup(from: String, to: String) {
+        guard let clipped = cleanName(to) else { return }
+        var cfg = config ?? .seed
+        guard let gi = cfg.groups.firstIndex(where: { $0.label == from }) else { return }
+        if cfg.groups.contains(where: {
+            $0.label.lowercased() == clipped.lowercased() && $0.label != from
+        }) {
+            banner = "There is already a group called \(clipped)."
+            return
+        }
+        cfg.groups[gi].label = clipped
+        if let used = lastUsed[from] {
+            lastUsed[clipped] = used
+            lastUsed.removeValue(forKey: from)
+        }
+        applyConfig(cfg)
+        persist()
+        banner = nil
+    }
+
+    func renameChild(from: String, to: String) {
+        guard let clipped = cleanName(to) else { return }
+        var cfg = config ?? .seed
+        if let hit = cfg.categories.first(where: {
+            $0.label.lowercased() == clipped.lowercased() && $0.label != from
+        }) {
+            banner = "There is already a category called \(hit.label)."
+            return
+        }
+        for gi in cfg.groups.indices {
+            guard let ci = cfg.groups[gi].children.firstIndex(where: { $0.label == from }) else { continue }
+            cfg.groups[gi].children[ci].label = clipped
+            if open?.key == from { open?.key = clipped }
+            lastUsed = lastUsed.mapValues { $0 == from ? clipped : $0 }
+            applyConfig(cfg)
+            persist()
+            banner = nil
+            return
+        }
+    }
+
+    func deleteGroup(_ label: String) {
+        var cfg = config ?? .seed
+        guard let gi = cfg.groups.firstIndex(where: { $0.label == label }) else { return }
+        if cfg.groups.count <= 1 {
+            banner = "Keep at least one group."
+            return
+        }
+        let kids = cfg.groups[gi].children
+        if let open, kids.contains(where: { $0.label == open.key }) {
+            banner = "Stop that block first."
+            return
+        }
+        for kid in kids where !cfg.retired.contains(where: { $0.lowercased() == kid.label.lowercased() }) {
+            cfg.retired.append(kid.label)
+        }
+        cfg.groups.remove(at: gi)
+        lastUsed.removeValue(forKey: label)
+        applyConfig(cfg)
+        persist()
+        banner = nil
+    }
+
+    func deleteChild(_ label: String) {
+        var cfg = config ?? .seed
+        for gi in cfg.groups.indices {
+            guard let ci = cfg.groups[gi].children.firstIndex(where: { $0.label == label }) else { continue }
+            if cfg.groups[gi].children.count <= 1 {
+                banner = "Delete the group instead."
+                return
+            }
+            if open?.key == label {
+                banner = "Stop that block first."
+                return
+            }
+            if !cfg.retired.contains(where: { $0.lowercased() == label.lowercased() }) {
+                cfg.retired.append(label)
+            }
+            cfg.groups[gi].children.remove(at: ci)
+            lastUsed = lastUsed.filter { $0.value != label }
+            applyConfig(cfg)
+            persist()
+            banner = nil
+            return
+        }
+    }
+
+    private func cleanName(_ label: String) -> String? {
+        let name = String(label)
+            .replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let clipped = String(name.prefix(24))
+        if clipped.isEmpty {
+            banner = "A category needs a name."
+            return nil
+        }
+        if clipped.contains(":") {
+            banner = "A category name cannot contain a colon."
+            return nil
+        }
+        if clipped.uppercased() == "UNLOGGED" || clipped.uppercased() == TT.unfiledKey {
+            banner = "\(clipped) is reserved."
+            return nil
+        }
+        return clipped
     }
 
     private func refreshUnreadable() {
@@ -806,11 +1006,13 @@ final class TapStore: ObservableObject {
     }
 
     private func applyConfig(_ cfg: ClientConfig, write: Bool = true) {
+        let cfg = Self.normalize(cfg)
         config = cfg
-        catByKey = Dictionary(cfg.categories.map { ($0.key, $0) }, uniquingKeysWith: { _, n in n })
+        catByKey = Dictionary(cfg.categories.map { ($0.label, $0) }, uniquingKeysWith: { _, n in n })
+        Grammar.knownLabels = cfg.categories.map(\.label) + cfg.retired
         Grammar.extraColors = [:]
-        for c in cfg.categories where TT.colorIdByKey[c.key] == nil && !c.color.isEmpty {
-            Grammar.extraColors[c.key] = c.color
+        for c in cfg.categories where TT.colorIdByLabel[c.label] == nil && !c.color.isEmpty {
+            Grammar.extraColors[c.label] = c.color
         }
         if write, let data = try? JSONEncoder().encode(cfg) {
             UserDefaults.standard.set(data, forKey: configKey)
@@ -1200,6 +1402,51 @@ final class TapStore: ObservableObject {
         markStrip = nil
     }
 
+    private func armPending() {
+        pendingTimer?.invalidate()
+        let secs = Double(config?.undoSeconds ?? 5)
+        pendingUntil = Date().addingTimeInterval(secs)
+        undoLabel = pendingRibbonLabel()
+        paintPending()
+        pendingTimer = Timer.scheduledTimer(withTimeInterval: 0.25, repeats: true) { [weak self] _ in
+            Task { @MainActor in self?.paintPending() }
+        }
+    }
+
+    private func pendingRibbonLabel() -> String {
+        guard let key = pendingKey else { return "" }
+        let name = labelFor(key).uppercased()
+        if pendingStop { return "STOP \(name)" }
+        if open != nil { return "SWITCH TO \(name)" }
+        return "START \(name)"
+    }
+
+    private func paintPending() {
+        guard pendingKey != nil, let until = pendingUntil else {
+            clearPending()
+            return
+        }
+        let left = Int(ceil(until.timeIntervalSinceNow))
+        if left <= 0 {
+            commitPending()
+            return
+        }
+        undoLabel = pendingRibbonLabel()
+        undoSecondsLeft = max(1, left)
+    }
+
+    private func clearPending() {
+        pendingTimer?.invalidate()
+        pendingTimer = nil
+        pendingUntil = nil
+        pendingKey = nil
+        pendingStop = false
+        if undo == nil {
+            undoLabel = nil
+            undoSecondsLeft = 0
+        }
+    }
+
     private func armUndo(_ offer: UndoOffer) {
         clearUndo()
         undo = offer
@@ -1301,6 +1548,7 @@ final class TapStore: ObservableObject {
             sit = st.sit
             today = st.today ?? []
             standStartMs = st.standStartMs
+            lastUsed = st.lastUsed ?? [:]
         }
         if let data = UserDefaults.standard.data(forKey: deadKey),
            let d = try? JSONDecoder().decode([DeadEntry].self, from: data) {
@@ -1314,7 +1562,7 @@ final class TapStore: ObservableObject {
         if !dead.isEmpty { banner = deadMsg() }
         if let data = UserDefaults.standard.data(forKey: configKey) {
             if let cfg = try? JSONDecoder().decode(ClientConfig.self, from: data) {
-                applyConfig(Self.migrateSeedColors(cfg))
+                applyConfig(cfg, write: false)
             } else {
                 applyConfig(.seed, write: false)
             }
@@ -1326,7 +1574,7 @@ final class TapStore: ObservableObject {
     }
 
     private func persist() {
-        let st = Persisted(open: open, sit: sit, today: today, standStartMs: standStartMs)
+        let st = Persisted(open: open, sit: sit, today: today, standStartMs: standStartMs, lastUsed: lastUsed)
         if let data = try? JSONEncoder().encode(st) {
             UserDefaults.standard.set(data, forKey: stateKey)
         }
@@ -1351,14 +1599,46 @@ final class TapStore: ObservableObject {
         }
     }
 
-    /// Old installs seeded POOP as lavender 1 (DW's hue). Banana is 5.
+    static func normalize(_ cfg: ClientConfig) -> ClientConfig {
+        migrateBody(migrateSeedColors(cfg))
+    }
+
+    /// Old installs seeded Poop as lavender 1 (Deep work's hue). Banana is 5.
     static func migrateSeedColors(_ cfg: ClientConfig) -> ClientConfig {
         var cfg = cfg
-        guard let i = cfg.categories.firstIndex(where: {
-            $0.key == "POOP" && ($0.color == "1" || $0.hex.lowercased() == "#7986cb")
-        }) else { return cfg }
-        cfg.categories[i].color = "5"
-        cfg.categories[i].hex = "#f6bf26"
+        for gi in cfg.groups.indices {
+            for ci in cfg.groups[gi].children.indices {
+                let c = cfg.groups[gi].children[ci]
+                if c.label.lowercased() == "poop"
+                    && (c.color == "1" || c.hex.lowercased() == "#7986cb") {
+                    cfg.groups[gi].children[ci].color = "5"
+                    cfg.groups[gi].children[ci].hex = "#f6bf26"
+                }
+            }
+        }
+        return cfg
+    }
+
+    /// A stored Body leaf becomes the three Body children. Body itself is retired.
+    static func migrateBody(_ cfg: ClientConfig) -> ClientConfig {
+        var cfg = cfg
+        guard let i = cfg.groups.firstIndex(where: { $0.label.lowercased() == "body" }) else {
+            return cfg
+        }
+        let kids = cfg.groups[i].children.map { $0.label.lowercased() }
+        if kids.contains("zone 2") { return cfg }
+        guard kids == ["body"] || kids.isEmpty else { return cfg }
+        let color = cfg.groups[i].color.isEmpty ? "10" : cfg.groups[i].color
+        let hex = cfg.groups[i].hex.isEmpty ? (TT.colorHex[color] ?? "#0b8043") : cfg.groups[i].hex
+        cfg.groups[i].autoMark = "+"
+        cfg.groups[i].color = color
+        cfg.groups[i].hex = hex
+        cfg.groups[i].children = ["Zone 2", "Lifting", "Walking"].map {
+            Category(label: $0, color: color, hex: hex, autoMark: "+")
+        }
+        if !cfg.retired.contains(where: { $0.lowercased() == "body" }) {
+            cfg.retired.append("Body")
+        }
         return cfg
     }
 
@@ -1367,5 +1647,6 @@ final class TapStore: ObservableObject {
         var sit: SitBlock?
         var today: [TodayBlock]?
         var standStartMs: Double?
+        var lastUsed: [String: String]?
     }
 }

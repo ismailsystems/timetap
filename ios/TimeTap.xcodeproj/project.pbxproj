@@ -63,6 +63,7 @@
 		ED4399E69EE496C6FF815DCD /* ApplyOps.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5D9FAAEA0FBB3106BE727550 /* ApplyOps.swift */; };
 		EE887BB1B6C4E3954FE18778 /* TimeTapWidgetBundle.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD80F6B3006ACF8E61D20600 /* TimeTapWidgetBundle.swift */; };
 		F0D1D645E73776D17B15A756 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D55675D4A21D2C2D804358B /* SettingsView.swift */; };
+		A8E1C2D3F405162738495A6B /* CategoryEditor.swift in Sources */ = {isa = PBXBuildFile; fileRef = A8E1C2D3F405162738495A6A /* CategoryEditor.swift */; };
 		F80F9FE33774C44C0E469E98 /* C2Tests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B8AD8C15BC946325CF02364B /* C2Tests.swift */; };
 		FAF11E3081864E2D33B11B77 /* CaptureView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 749D803612D26E9D5D20E863 /* CaptureView.swift */; };
 		FE4C16B4DBEA5F7CCA79E6E5 /* DeadLetterSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 67FE41A5E22FCCF25FC6FFDB /* DeadLetterSheet.swift */; };
@@ -117,6 +118,7 @@
 		1F5930FFC528A2FFBD795210 /* IslandActivityKitTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IslandActivityKitTests.swift; sourceTree = "<group>"; };
 		202DBF96A0E63CD41E7A516D /* Google.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Google.xcconfig; sourceTree = "<group>"; };
 		2D55675D4A21D2C2D804358B /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		A8E1C2D3F405162738495A6A /* CategoryEditor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CategoryEditor.swift; sourceTree = "<group>"; };
 		2D740D026C2724E59E51C467 /* NowPanelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NowPanelTests.swift; sourceTree = "<group>"; };
 		31BB6E2F4AC7571D01632124 /* CalendarPickerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalendarPickerView.swift; sourceTree = "<group>"; };
 		39244103B3847640AAA55B11 /* GoogleAuth.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoogleAuth.swift; sourceTree = "<group>"; };
@@ -312,6 +314,7 @@
 				49092CA9D4C73500509BB649 /* DayRailView.swift */,
 				67FE41A5E22FCCF25FC6FFDB /* DeadLetterSheet.swift */,
 				979753C469BB46C427293E02 /* RootView.swift */,
+				A8E1C2D3F405162738495A6A /* CategoryEditor.swift */,
 				2D55675D4A21D2C2D804358B /* SettingsView.swift */,
 				6D7B42C20E98A8B8C2475C8B /* SignInView.swift */,
 				CF45FF913A460C9661EDF34B /* SitEditSheet.swift */,
@@ -536,6 +539,7 @@
 				E9690D9084C34359B2CA4BE0 /* RunningBlockAttributes.swift in Sources */,
 				6C6BD82B6B90AB6AE376B39C /* RunningBlockIntents.swift in Sources */,
 				9ED3731DEF0BF69D4EAB26A6 /* RunningBlockSync.swift in Sources */,
+				A8E1C2D3F405162738495A6B /* CategoryEditor.swift in Sources */,
 				F0D1D645E73776D17B15A756 /* SettingsView.swift in Sources */,
 				6815C88AE2DF31036A8B5A8B /* SignInView.swift in Sources */,
 				3BE07A0305050503BCA5CE8D /* SitEditSheet.swift in Sources */,

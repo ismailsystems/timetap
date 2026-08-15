@@ -40,7 +40,7 @@ private final class FakeLiveActivityRuntime: LiveActivityRuntime, @unchecked Sen
 final class IslandActivityKitTests: TimeTapTestCase {
     private var fake = FakeLiveActivityRuntime()
     private let state = RunningBlockAttributes.ContentState(
-        key: "DW",
+        key: "Deep work",
         face: "Deep work",
         hex: "#4185F4",
         startMs: 1_700_000_000_000,

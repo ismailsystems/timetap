@@ -75,28 +75,12 @@ final class RailSyncTests: TimeTapTestCase {
         )
     }
 
-    func testNowMarkerKeepsBottomPadding() throws {
+    func testNowMarkerIsGone() throws {
         let text = try readIOS("TimeTap/Views/DayRailView.swift")
-        XCTAssertTrue(text.contains("Theme.font(11, weight: .bold)"), "TODAY, SYNCED, and NOW ▲ are 11pt bold")
+        XCTAssertTrue(text.contains("Theme.font(11, weight: .bold)"), "TODAY and SYNCED are 11pt bold")
         XCTAssertFalse(text.contains("Theme.font(10, weight: .semibold)"), "chrome labels left 10pt semibold")
-        XCTAssertFalse(text.contains("Theme.font(10, weight: .bold)"), "NOW ▲ left 10pt")
-        let now = try XCTUnwrap(text.range(of: "NOW ▲"), "NOW ▲ marker left the day rail")
-        let pad = try XCTUnwrap(
-            text.range(of: "padding(.bottom, 2)"),
-            "NOW ▲ lost padding(.bottom, 2)"
-        )
-        XCTAssertLessThan(
-            now.lowerBound,
-            pad.lowerBound,
-            "NOW ▲ must keep padding(.bottom, 2) on the marker"
-        )
-        XCTAssertTrue(text.contains("var nowRowHeight: CGFloat"), "NOW ▲ has its own row height")
-        XCTAssertTrue(text.contains("alignment: .topLeading"), "NOW ▲ lines up with the top of the gear")
-        XCTAssertTrue(
-            text[now.lowerBound...].contains("padding(.top, 12)"),
-            "NOW ▲ keeps a 12pt gap under the calendar"
-        )
-        XCTAssertFalse(text.contains("padding(.bottom, 8)"), "NOW ▲ must not sit on an 8pt rail inset")
+        XCTAssertFalse(text.contains("NOW ▲"), "NOW ▲ left the day rail")
+        XCTAssertFalse(text.contains("nowRowHeight"), "NOW row left the day rail")
         XCTAssertFalse(text.contains("\"gearshape\""), "settings gear left the day rail")
         XCTAssertFalse(text.contains("store.showSettings = true"), "settings gear left the day rail")
     }
@@ -168,8 +152,8 @@ final class RailSyncTests: TimeTapTestCase {
             DeadEntry(
                 at: 1_700_000_000_000,
                 why: "insert failed",
-                op: Op(id: "o1", type: "openActual", ref: "abcdefghijklmnop", key: "DW"),
-                key: "DW",
+                op: Op(id: "o1", type: "openActual", ref: "abcdefghijklmnop", key: "Deep work"),
+                key: "Deep work",
                 startMs: 1_700_000_000_000
             )
         ]) {

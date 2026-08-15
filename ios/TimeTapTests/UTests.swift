@@ -42,26 +42,21 @@ final class UTests: TimeTapTestCase {
         XCTAssertFalse(text.contains("showAddNote"), "ADD NOTE chip is gone")
         XCTAssertFalse(text.contains("addNoteButton"), "ADD NOTE chip is gone")
         XCTAssertTrue(text.contains("editingNote || focus == .note"), "the field stays up only while editing")
-        let nowPanel = text[
-            text.range(of: "private var nowPanel")!.lowerBound
+        let titleBar = text[
+            text.range(of: "private var titleBar")!.lowerBound
                 ..< text.range(of: "private var noteField")!.lowerBound
         ]
-        XCTAssertFalse(nowPanel.contains("addNoteButton"), "ADD NOTE left the title row")
-        XCTAssertTrue(nowPanel.contains("noteField"), "the field still opens under the duration")
-        XCTAssertLessThan(
-            nowPanel.range(of: ".uppercased()")!.lowerBound,
-            nowPanel.range(of: "elapsedLabel")!.lowerBound,
-            "elapsed sits on the category label row"
-        )
-        XCTAssertLessThan(
-            nowPanel.range(of: "elapsedLabel")!.lowerBound,
-            nowPanel.range(of: "noteField")!.lowerBound,
-            "note field sits under the title row"
-        )
-        XCTAssertFalse(nowPanel.contains("headerActions"), "NOW has no STOP/SPLIT column")
+        XCTAssertTrue(titleBar.contains("Text(\"TimeTap\")"), "title is TimeTap")
+        XCTAssertTrue(titleBar.contains("gearshape"), "gear sits on the title row")
+        XCTAssertTrue(titleBar.contains("store.showSettings = true"), "gear opens settings")
+        XCTAssertFalse(titleBar.contains("addNoteButton"), "ADD NOTE left the title row")
+        XCTAssertTrue(titleBar.contains("noteField"), "the field still opens under the title")
+        XCTAssertFalse(titleBar.contains("elapsedLabel"), "elapsed left the title row")
+        XCTAssertFalse(titleBar.contains("NOTHING RUNNING"), "running title left the title row")
+        XCTAssertFalse(titleBar.contains("headerActions"), "title bar has no STOP/SPLIT column")
         XCTAssertTrue(text.contains("if let banner = store.banner"), "banner must stay in CaptureView")
         XCTAssertTrue(text.contains("multilineTextAlignment(.center)"), "banner must be centered at the top")
-        XCTAssertTrue(text.contains("Text(\"+\")"), "New must be a plus, not a category row")
+        XCTAssertFalse(text.contains("Text(\"+\")"), "add lives in Settings, not on capture")
         XCTAssertFalse(text.contains("face: \"ADD\""), "ADD label is back")
         XCTAssertFalse(text.contains("face: \"New\""), "New text label is back")
         XCTAssertTrue(text.contains("NOT SITTING"), "idle sit names not sitting, like the Live Activity")
@@ -72,9 +67,10 @@ final class UTests: TimeTapTestCase {
         XCTAssertFalse(text.contains("headerActions"), "STOP/SPLIT column is gone")
         XCTAssertFalse(text.contains("stopButton"), "STOP chip is gone")
         XCTAssertFalse(text.contains("splitButton"), "SPLIT chip is gone")
-        XCTAssertTrue(text.contains("runningCategoryMenu(enabled: running)"), "split is a long press menu on the running row")
+        XCTAssertTrue(text.contains("runningCategoryMenu(enabled: running, stop:"), "split is a long press menu on the running row")
         XCTAssertTrue(text.contains("store.openSplit()"), "long press still opens split")
-        XCTAssertTrue(text.contains("store.tapCategory(cat.key)"), "tap still goes through tapCategory")
+        XCTAssertTrue(text.contains("proposeFromRow"), "tap proposes, then waits 5s")
+        XCTAssertTrue(text.contains("store.propose(key)"), "propose still waits 5s")
         XCTAssertFalse(text.contains("gridCellColumns"), "sit is not in a SPLIT/STOP cluster")
         let footer = text[
             text.range(of: "private var footer")!.lowerBound
@@ -94,13 +90,15 @@ final class UTests: TimeTapTestCase {
             "sitting chip must be one button, not a stop control plus a clock"
         )
         XCTAssertTrue(text.contains("Adjust sitting start"), "long press still opens sit edit")
-        XCTAssertTrue(text.contains("offset(y: -1)"), "+ must sit on the visual centre of the add row")
+        XCTAssertFalse(text.contains("private var addRow"), "add row left the capture grid")
         XCTAssertFalse(
             text.contains("padding(.trailing, 8)"),
             "sit duration must not sit next to STOP as its own chip"
         )
         XCTAssertTrue(text.contains("MARK IT"), "mark row must name the closed block")
-        XCTAssertTrue(text.contains("padding(.bottom, 12)"), "UNDO must sit off the sit row")
+        XCTAssertTrue(text.contains("CANCEL ·"), "pending cancel sits on the armed row")
+        XCTAssertTrue(text.contains("pendingFuse"), "the fuse replaced the bottom bar")
+        XCTAssertFalse(text.contains("tt.pendingCancelHit"), "the cancel A/B switch is gone")
         XCTAssertTrue(text.contains("categoryList(height:"), "category column must know its height")
         XCTAssertFalse(
             text.contains("overlay(alignment: .bottom)"),
@@ -120,42 +118,24 @@ final class UTests: TimeTapTestCase {
         XCTAssertFalse(sitBody.contains("Theme.mute"), "idle posture is not a muted prompt")
         XCTAssertFalse(sitBody.contains("Color.clear"), "idle posture keeps the selected fill")
         XCTAssertTrue(sitBody.contains(".isSelected"), "VoiceOver always treats posture as on")
-        let add = text.range(of: "if store.canAddCategory")!
-        let forEach = text.range(of: "ForEach(store.categories)")!
+        let forEach = text.range(of: "ForEach(store.groups)")!
         let sit = text.range(of: "sitChip")!
-        XCTAssertLessThan(add.lowerBound, forEach.lowerBound, "+ must sit on top of the category list")
         XCTAssertLessThan(forEach.lowerBound, sit.lowerBound, "sit must sit under the category list")
-        XCTAssertLessThan(
-            sit.lowerBound,
-            text.range(of: "settingsRow")!.lowerBound,
-            "gear sits under NOT SITTING"
-        )
-        XCTAssertTrue(text.contains("categories.count + 3"), "now-row height still counts the settings row")
-        XCTAssertTrue(text.contains("categories.count + 2"), "add, categories, and sit share one row height")
-        XCTAssertTrue(text.contains("gearshape"), "settings gear sits under the sit row")
+        XCTAssertFalse(text.contains("settingsRow"), "gear left the category column")
+        XCTAssertTrue(text.contains("groups.count + 1"), "groups and sit share one row height")
+        XCTAssertTrue(text.contains("gearshape"), "settings gear sits on the title row")
         XCTAssertTrue(text.contains("store.showSettings = true"), "gear opens settings")
-        XCTAssertTrue(
-            text.contains("alignment: .topTrailing"),
-            "settings gear sits on the top right"
-        )
-        XCTAssertTrue(text.contains("nowRowHeight: nowH"), "calendar ends on the sit row")
-        XCTAssertTrue(text.contains("let nowH = rowH - 25"), "NOW/gear row stays 25pt shorter than a list row")
-        XCTAssertTrue(text.contains("(height - nowH)"), "list rows fill the space above the gear")
         XCTAssertTrue(text.contains("padding(.bottom, 5)"), "dual columns keep a 5pt bottom inset")
         XCTAssertTrue(
-            text.contains("min(rowH * CGFloat(store.categories.count + 1), max(0, height - nowH - rowH))"),
+            text.contains("min(rowH * CGFloat(store.groups.count), max(0, height - rowH))"),
             "the category scroll must not leave a gap above NOT SITTING"
         )
         XCTAssertTrue(
-            text.contains("minHeight: nowH, maxHeight: nowH"),
-            "the gear row uses nowH"
-        )
-        XCTAssertTrue(
-            text.contains("categoryList(height: geo.size.height, nowH: nowH)"),
-            "category list receives the shared NOW/gear row height"
+            text.contains("categoryList(height: geo.size.height)"),
+            "category list receives the column height"
         )
         XCTAssertTrue(text.contains("Theme.font("), "capture type must scale")
-        XCTAssertTrue(text.contains("let running = store.open?.key == cat.key"), "running row must show elapsed")
+        XCTAssertTrue(text.contains("group.children.first { $0.label == open.key }"), "running row must show elapsed")
         XCTAssertFalse(
             text.contains("Rectangle().fill(Theme.accent).frame(width: 4)"),
             "running category must not keep a red leading bar"
@@ -289,13 +269,13 @@ final class UTests: TimeTapTestCase {
         var now: Double = 1_700_000_000_000
         let store = TapStore()
         store.clock = { now }
-        store.tapCategory("MTG")
+        store.tapCategory("Meetings")
         store.noteChanged("Poop")
         now += 60_000
         let (_, items) = store.railItems(budget: 400, now: now)
         XCTAssertEqual(items.first { $0.isOpen }?.note, "Poop")
         now += 300
-        store.tapCategory("DW")
+        store.tapCategory("Deep work")
         now += 60_000
         let (_, after) = store.railItems(budget: 400, now: now)
         XCTAssertEqual(after.first { $0.name == "MEETINGS" }?.note, "Poop")
@@ -310,9 +290,10 @@ final class UTests: TimeTapTestCase {
             encoding: .utf8
         )
         XCTAssertFalse(text.contains("outlineChip(\"SPLIT\""), "SPLIT chip is gone")
-        XCTAssertTrue(text.contains("runningCategoryMenu(enabled: running)"))
+        XCTAssertTrue(text.contains("runningCategoryMenu(enabled: running, stop:"))
         XCTAssertTrue(text.contains("store.openSplit()"))
         XCTAssertTrue(text.contains(".contextMenu"))
+        XCTAssertTrue(text.contains("Button(\"Stop\""))
         XCTAssertTrue(text.contains("Button(\"Split\""))
         XCTAssertTrue(text.contains("Button(\"Add note\""))
         XCTAssertFalse(text.contains(".onLongPressGesture(perform: perform)"))
@@ -321,7 +302,7 @@ final class UTests: TimeTapTestCase {
             text.contains("if store.open != nil { store.openSplit() }"),
             "title/elapsed must not open SPLIT"
         )
-        XCTAssertTrue(text.contains("Dismisses the keyboard"))
+        XCTAssertFalse(text.contains("Dismisses the keyboard"), "elapsed keyboard dismiss left the title")
     }
 
     func testRailLabelSizeGrowsWithTheBlock() {
@@ -339,7 +320,7 @@ final class UTests: TimeTapTestCase {
     func testCalendarWriteBodyOmitsEmptyColorId() {
         let t: Double = 1_700_000_000_000
         let empty = CalEvent(
-            id: "a", calendarId: "cal", key: "DW", title: "DW:",
+            id: "a", calendarId: "cal", key: "Deep work", title: "Deep work:",
             colorId: "", description: "#ref:abcdefghijklmnop\n#open",
             startMs: t, endMs: t + 60_000
         )
@@ -347,7 +328,7 @@ final class UTests: TimeTapTestCase {
         XCTAssertNil(body["colorId"], "empty colorId is a Google 400")
         XCTAssertEqual(body["start"] as? [String: String], ["dateTime": "2023-11-14T22:13:20Z"])
         let dw = CalEvent(
-            id: "a", calendarId: "cal", key: "DW", title: "DW:",
+            id: "a", calendarId: "cal", key: "Deep work", title: "Deep work:",
             colorId: "9", description: "#open",
             startMs: t, endMs: t + 60_000
         )
@@ -376,15 +357,15 @@ final class UTests: TimeTapTestCase {
         var now: Double = 1_700_000_000_000
         let store = TapStore()
         store.clock = { now }
-        store.tapCategory("DW")
-        XCTAssertEqual(store.open?.key, "DW")
+        store.tapCategory("Deep work")
+        XCTAssertEqual(store.open?.key, "Deep work")
         now += 100
-        store.tapCategory("MTG")
-        XCTAssertEqual(store.open?.key, "DW")
-        XCTAssertFalse(store.queue.contains { $0.key == "MTG" })
+        store.tapCategory("Meetings")
+        XCTAssertEqual(store.open?.key, "Deep work")
+        XCTAssertFalse(store.queue.contains { $0.key == "Meetings" })
         now += 300
-        store.tapCategory("MTG")
-        XCTAssertEqual(store.open?.key, "MTG")
+        store.tapCategory("Meetings")
+        XCTAssertEqual(store.open?.key, "Meetings")
     }
 
     func testSecondSameKeyTapWithin300msDoesNotStop() {
@@ -396,10 +377,10 @@ final class UTests: TimeTapTestCase {
         var now: Double = 1_700_000_000_000
         let store = TapStore()
         store.clock = { now }
-        store.tapCategory("DW")
+        store.tapCategory("Deep work")
         now += 100
-        store.tapCategory("DW")
-        XCTAssertEqual(store.open?.key, "DW")
+        store.tapCategory("Deep work")
+        XCTAssertEqual(store.open?.key, "Deep work")
         XCTAssertNil(store.split)
         XCTAssertEqual(store.queue.filter { $0.type == "openActual" }.count, 1)
         XCTAssertFalse(store.queue.contains { $0.type == "closeActual" })
@@ -430,17 +411,80 @@ final class UTests: TimeTapTestCase {
         var now: Double = 1_700_000_000_000
         let store = TapStore()
         store.clock = { now }
-        store.tapCategory("DW")
+        store.tapCategory("Deep work")
         now += 300
         store.toggleSit()
         XCTAssertNotNil(store.sit)
         now += 300
-        store.tapCategory("DW")
+        store.tapCategory("Deep work")
         XCTAssertNil(store.open)
         XCTAssertNotNil(store.sit)
         XCTAssertNil(store.split)
         XCTAssertTrue(store.queue.contains { $0.type == "closeActual" })
         XCTAssertFalse(store.queue.contains { $0.type == "closeSit" })
+    }
+
+    func testProposeWaitsCancelAndCommit() {
+        GoogleAuth.testHasSession = true
+        GoogleAuth.testAccessToken = "t"
+        Credentials.planId = "p1"
+        Credentials.actualId = "a1"
+        Credentials.sittingId = "s1"
+        var now: Double = 1_700_000_000_000
+        let store = TapStore()
+        store.clock = { now }
+
+        store.propose("Deep work")
+        XCTAssertNil(store.open)
+        XCTAssertEqual(store.pendingKey, "Deep work")
+        XCTAssertFalse(store.pendingStop)
+        XCTAssertTrue(store.queue.isEmpty)
+        store.takeUndo()
+        XCTAssertNil(store.open)
+        XCTAssertNil(store.pendingKey)
+        XCTAssertTrue(store.queue.isEmpty)
+
+        store.propose("Deep work")
+        store.propose("Meetings")
+        store.commitPending()
+        XCTAssertEqual(store.open?.key, "Meetings")
+        XCTAssertNil(store.pendingKey)
+        XCTAssertEqual(store.queue.filter { $0.type == "openActual" }.count, 1)
+
+        now += 300
+        store.propose("Deep work")
+        XCTAssertEqual(store.open?.key, "Meetings")
+        XCTAssertEqual(store.pendingKey, "Deep work")
+        store.takeUndo()
+        XCTAssertEqual(store.open?.key, "Meetings")
+        XCTAssertFalse(store.queue.contains { $0.type == "closeActual" })
+
+        now += 300
+        store.propose("Meetings")
+        XCTAssertTrue(store.pendingStop)
+        store.takeUndo()
+        XCTAssertEqual(store.open?.key, "Meetings")
+
+        now += 300
+        store.propose("Meetings")
+        store.commitPending()
+        XCTAssertNil(store.open)
+        XCTAssertTrue(store.queue.contains { $0.type == "closeActual" })
+    }
+
+    func testCancelPendingClearsWithoutApply() {
+        GoogleAuth.testHasSession = true
+        GoogleAuth.testAccessToken = "t"
+        Credentials.planId = "p1"
+        Credentials.actualId = "a1"
+        Credentials.sittingId = "s1"
+        let store = TapStore()
+        store.propose("Deep work")
+        XCTAssertEqual(store.pendingKey, "Deep work")
+        store.cancelPending()
+        XCTAssertNil(store.open)
+        XCTAssertNil(store.pendingKey)
+        XCTAssertTrue(store.queue.isEmpty)
     }
 
     func testLiveFlushSeamPostsDW() async {
@@ -453,7 +497,7 @@ final class UTests: TimeTapTestCase {
         CalendarAPI.testListedByCal = ["a1": [], "s1": []]
         let dw = "abcdefghijklmnop"
         if let data = try? JSONEncoder().encode([
-            Op(id: "o1", type: "openActual", ref: dw, key: "DW", startMs: ApplyOps.nowMs)
+            Op(id: "o1", type: "openActual", ref: dw, key: "Deep work", startMs: ApplyOps.nowMs)
         ]) {
             UserDefaults.standard.set(data, forKey: "tt.queue.v1")
         }
@@ -461,7 +505,7 @@ final class UTests: TimeTapTestCase {
         await store.flushNow()
         XCTAssertTrue(store.queue.isEmpty)
         XCTAssertTrue(
-            CalendarAPI.testPushes.contains { $0.method == "POST" && $0.summary == "DW:" },
+            CalendarAPI.testPushes.contains { $0.method == "POST" && $0.summary == "Deep work:" },
             "liveFlush must POST DW: \(CalendarAPI.testPushes)"
         )
     }
@@ -477,8 +521,49 @@ final class UTests: TimeTapTestCase {
         XCTAssertTrue(text.contains("last write wins") || text.contains("later write replaces"))
         XCTAssertTrue(
             text.contains("Categories you add here do not appear on the web app.")
-            || text.contains("A category you add on the capture grid stays on this phone")
+            || text.contains("A category you add in Settings stays on this phone")
         )
+        XCTAssertTrue(text.contains("Edit categories"), "the first verb is edit categories")
+        XCTAssertTrue(text.contains("CalendarPickerView(embedded: true)"), "the picker is a push")
+        XCTAssertFalse(text.contains("showSettings = false"), "settings must stay while calendars open")
+        XCTAssertFalse(text.contains("Edit groups and children"), "children is gone from the first screen")
+        XCTAssertFalse(text.contains("Section(\"Device\")"), "device status left the first screen")
+        XCTAssertTrue(text.contains("presentationDetents"), "the sheet opens at medium")
+        let editor = try String(
+            contentsOf: URL(fileURLWithPath: #filePath)
+                .deletingLastPathComponent()
+                .deletingLastPathComponent()
+                .appendingPathComponent("TimeTap/Views/CategoryEditor.swift"),
+            encoding: .utf8
+        )
+        XCTAssertTrue(editor.contains("Theme.rowFont(20"), "editor names match capture")
+        XCTAssertTrue(editor.contains(".pair(group:"), "a 1:1 rename writes the group and the child")
+        XCTAssertTrue(editor.contains("Delete \(name)?") || editor.contains("deleteTitle"), "delete names the row")
+    }
+
+    func testCategoryRowStacksGroupOverNameAndKeepsDots() throws {
+        let text = try String(
+            contentsOf: URL(fileURLWithPath: #filePath)
+                .deletingLastPathComponent()
+                .deletingLastPathComponent()
+                .appendingPathComponent("TimeTap/Views/CaptureView.swift"),
+            encoding: .utf8
+        )
+        XCTAssertEqual(Theme.typeBump, 1.1, "row type stays 10% over the design size")
+        XCTAssertTrue(text.contains("Theme.rowFont(20"), "category names stay 10% over the design size")
+        XCTAssertTrue(text.contains("Theme.rowFont(11"), "the group line stays in the same 10% bump")
+        XCTAssertTrue(text.contains("VStack(alignment: .leading, spacing: 2)"), "group hangs over the child")
+        XCTAssertTrue(text.contains("HStack(alignment: .firstTextBaseline"), "dots sit after the group name")
+        XCTAssertTrue(text.contains("ForEach(0..<stops"), "dots still mark how many children you can scrub")
+        XCTAssertTrue(text.contains("preview ?? pendingChild"), "finger preview wins the face")
+        XCTAssertTrue(text.contains("minimumDistance: 0"), "a tap must still fire onEnded")
+        XCTAssertTrue(text.contains("/ 56"), "one child is 56pt")
+        XCTAssertTrue(text.contains("((raw % n) + n) % n"), "scrub wraps at both ends")
+        XCTAssertTrue(text.contains("cancelPending()"), "scrub back to the open child cancels")
+        XCTAssertTrue(text.contains("pendingHere, inChip"), "only the chip cancels")
+        XCTAssertTrue(text.contains("chipAteTap"), "the chip tap must win over the row drag")
+        XCTAssertTrue(text.contains("running && longPress"), "a long press on the running row does not arm cancel")
+        XCTAssertFalse(text.contains("store.rowStyle"), "the A/B row picker is gone")
     }
 
     func testDeadLetterWarnsBeforeDiscard() throws {
@@ -522,20 +607,20 @@ final class UTests: TimeTapTestCase {
         var now: Double = 1_700_000_000_000
         let store = TapStore()
         store.clock = { now }
-        store.tapCategory("DW")
+        store.tapCategory("Deep work")
         let start = store.open?.startMs
         now += 5_000
         store.openSplit()
         XCTAssertEqual(store.split?.whole, true)
         store.setSplitWhole(false)
         store.setSplitMinutes(2)
-        store.doSplit(key: "MTG")
-        XCTAssertEqual(store.open?.key, "MTG")
+        store.doSplit(key: "Meetings")
+        XCTAssertEqual(store.open?.key, "Meetings")
         XCTAssertEqual(store.open?.startMs, start)
         XCTAssertFalse(store.queue.contains { $0.type == "splitActual" })
     }
 
-    func testRailKeepsNowMarker() throws {
+    func testRailHasNoNowMarker() throws {
         let text = try String(
             contentsOf: URL(fileURLWithPath: #filePath)
                 .deletingLastPathComponent()
@@ -543,20 +628,13 @@ final class UTests: TimeTapTestCase {
                 .appendingPathComponent("TimeTap/Views/DayRailView.swift"),
             encoding: .utf8
         )
-        XCTAssertTrue(text.contains("NOW ▲"))
+        XCTAssertFalse(text.contains("NOW ▲"), "NOW ▲ left the day rail")
+        XCTAssertFalse(text.contains("nowRowHeight"), "NOW row left the day rail")
         XCTAssertFalse(text.contains("\"gearshape\""), "settings gear left the day rail")
         XCTAssertFalse(text.contains("store.showSettings = true"), "settings gear left the day rail")
         XCTAssertTrue(text.contains("store.clock()"))
         XCTAssertTrue(text.contains("dash:"))
-        XCTAssertTrue(text.contains("padding(.bottom, 2)"), "NOW ▲ must sit above the footer rule")
-        XCTAssertTrue(text.contains("nowRowHeight"), "NOW ▲ shares the sit/gear row height")
-        XCTAssertTrue(text.contains("alignment: .topLeading"), "NOW ▲ lines up with the top of the gear")
-        let now = try XCTUnwrap(text.range(of: "NOW ▲"), "NOW ▲ left the day rail")
-        XCTAssertTrue(
-            text[now.lowerBound...].contains("padding(.top, 12)"),
-            "NOW ▲ keeps a 12pt gap under the calendar"
-        )
-        XCTAssertTrue(text.contains("bodyGeo.size.height"), "NOW ▲ keeps its own row so the blocks cannot clip it")
+        XCTAssertTrue(text.contains("bodyGeo.size.height"), "blocks still fill the rail body")
         XCTAssertTrue(text.contains("store.syncLabel"), "sync status sits on the TODAY row")
         XCTAssertTrue(text.contains("store.syncLabel.uppercased()"), "sync status is all caps")
         XCTAssertTrue(text.contains("multilineTextAlignment(.trailing)"), "sync status is right-justified")
@@ -591,7 +669,7 @@ final class UTests: TimeTapTestCase {
         Credentials.actualId = "a1"
         Credentials.sittingId = "s1"
         let store = TapStore()
-        store.tapCategory("DW")
+        store.tapCategory("Deep work")
         XCTAssertNil(store.open)
         XCTAssertTrue(store.queue.isEmpty)
         XCTAssertFalse(store.showSignIn)
@@ -610,7 +688,7 @@ final class UTests: TimeTapTestCase {
     }
 
     func testPostReplyIdIsRead() {
-        let data = Data(#"{"id":"google-event-1","summary":"DW:"}"#.utf8)
+        let data = Data(#"{"id":"google-event-1","summary":"Deep work:"}"#.utf8)
         XCTAssertEqual(CalendarAPI.createdEventId(from: data), "google-event-1")
         XCTAssertNil(CalendarAPI.createdEventId(from: Data("{}".utf8)))
     }
@@ -645,7 +723,7 @@ final class UTests: TimeTapTestCase {
         let first = dayStart + 9 * 3_600_000
         let store = TapStore()
         store.today = [
-            TodayBlock(ref: "a", key: "DW", startMs: first, endMs: first + 120_000)
+            TodayBlock(ref: "a", key: "Deep work", startMs: first, endMs: first + 120_000)
         ]
         let (label, items) = store.railItems(budget: 400, now: first + 120_000)
         XCTAssertEqual(items.first?.name, "DEEP WORK")
@@ -655,29 +733,30 @@ final class UTests: TimeTapTestCase {
 
     func testLavenderPOOPMigratesToBanana() {
         var cfg = ClientConfig.seed
-        guard let i = cfg.categories.firstIndex(where: { $0.key == "POOP" }) else {
-            return XCTFail("no POOP")
+        guard let gi = cfg.groups.firstIndex(where: { $0.label == "Poop" }) else {
+            return XCTFail("no Poop")
         }
-        cfg.categories[i].color = "1"
-        cfg.categories[i].hex = "#7986cb"
+        cfg.groups[gi].children[0].color = "1"
+        cfg.groups[gi].children[0].hex = "#7986cb"
         let out = TapStore.migrateSeedColors(cfg)
-        XCTAssertEqual(out.categories[i].color, "5")
-        XCTAssertEqual(out.categories[i].hex, "#f6bf26")
+        let poop = out.categories.first { $0.label == "Poop" }
+        XCTAssertEqual(poop?.color, "5")
+        XCTAssertEqual(poop?.hex, "#f6bf26")
     }
 
     func testPersistedLavenderPOOPBecomesBananaOnLoad() {
         var cfg = ClientConfig.seed
-        guard let i = cfg.categories.firstIndex(where: { $0.key == "POOP" }) else {
-            return XCTFail("no POOP")
+        guard let gi = cfg.groups.firstIndex(where: { $0.label == "Poop" }) else {
+            return XCTFail("no Poop")
         }
-        cfg.categories[i].color = "1"
-        cfg.categories[i].hex = "#7986cb"
+        cfg.groups[gi].children[0].color = "1"
+        cfg.groups[gi].children[0].hex = "#7986cb"
         if let data = try? JSONEncoder().encode(cfg) {
             UserDefaults.standard.set(data, forKey: "tt.config.v1")
         }
         GoogleAuth.testHasSession = false
         let store = TapStore()
-        let poop = store.categories.first { $0.key == "POOP" }
+        let poop = store.categories.first { $0.label == "Poop" }
         XCTAssertEqual(poop?.color, "5")
         XCTAssertEqual(poop?.hex, "#f6bf26")
     }
@@ -687,8 +766,8 @@ final class UTests: TimeTapTestCase {
             DeadEntry(
                 at: 1_700_000_000_000,
                 why: "insert failed",
-                op: Op(id: "o1", type: "openActual", ref: "abcdefghijklmnop", key: "DW"),
-                key: "DW",
+                op: Op(id: "o1", type: "openActual", ref: "abcdefghijklmnop", key: "Deep work"),
+                key: "Deep work",
                 startMs: 1_700_000_000_000
             )
         ]) {
@@ -715,12 +794,12 @@ final class UTests: TimeTapTestCase {
         var now: Double = 1_700_000_000_000
         let store = TapStore()
         store.clock = { now }
-        store.tapCategory("DW")
+        store.tapCategory("Deep work")
         now += 60_000
         store.endDay()
-        XCTAssertEqual(store.today.first?.key, "DW")
+        XCTAssertEqual(store.today.first?.key, "Deep work")
         let again = TapStore()
-        XCTAssertEqual(again.today.first?.key, "DW")
+        XCTAssertEqual(again.today.first?.key, "Deep work")
         XCTAssertEqual(again.today.first?.endMs, now)
     }
 
@@ -733,7 +812,7 @@ final class UTests: TimeTapTestCase {
         var now: Double = 1_700_000_000_000
         let store = TapStore()
         store.clock = { now }
-        store.tapCategory("DW")
+        store.tapCategory("Deep work")
         now += 1_000
         store.toggleSit()
         now += 60_000
@@ -755,7 +834,7 @@ final class UTests: TimeTapTestCase {
         let t: Double = 1_700_000_000_000
         ApplyOps.nowMs = t + 120_000
         let open = CalEvent(
-            id: "gid-old", calendarId: "a1", key: "DW", title: "DW:",
+            id: "gid-old", calendarId: "a1", key: "Deep work", title: "Deep work:",
             colorId: "9", description: "#ref:abcdefghijklmnop\n#open",
             startMs: t, endMs: t + 60_000
         )
@@ -773,7 +852,7 @@ final class UTests: TimeTapTestCase {
             "\(CalendarAPI.testPushes)"
         )
         XCTAssertTrue(
-            CalendarAPI.testPushes.contains { $0.method == "POST" && $0.summary.contains("DW") },
+            CalendarAPI.testPushes.contains { $0.method == "POST" && $0.summary.contains("Deep work") },
             "PATCH 404 must POST \(CalendarAPI.testPushes)"
         )
         XCTAssertTrue(store.queue.isEmpty)
@@ -782,19 +861,19 @@ final class UTests: TimeTapTestCase {
     func testCancelledListedEventsAreSkipped() throws {
         let json = Data("""
         {"items":[
-          {"id":"a","status":"cancelled","summary":"DW:","start":{"dateTime":"2023-11-14T22:13:20Z"},"end":{"dateTime":"2023-11-14T22:14:20Z"}},
-          {"id":"b","status":"confirmed","summary":"MTG:","start":{"dateTime":"2023-11-14T22:13:20Z"},"end":{"dateTime":"2023-11-14T22:14:20Z"}}
+          {"id":"a","status":"cancelled","summary":"Deep work:","start":{"dateTime":"2023-11-14T22:13:20Z"},"end":{"dateTime":"2023-11-14T22:14:20Z"}},
+          {"id":"b","status":"confirmed","summary":"Meetings:","start":{"dateTime":"2023-11-14T22:13:20Z"},"end":{"dateTime":"2023-11-14T22:14:20Z"}}
         ]}
         """.utf8)
         let evs = try CalendarAPI.listedEvents(from: json, calendarId: "a1")
         XCTAssertEqual(evs.map(\.id), ["b"])
-        XCTAssertEqual(evs[0].title, "MTG:")
+        XCTAssertEqual(evs[0].title, "Meetings:")
     }
 
     func testRetryAfterRaisesTheBackoffFloor() async {
         let dw = "abcdefghijklmnop"
         if let data = try? JSONEncoder().encode([
-            Op(id: "o1", type: "openActual", ref: dw, key: "DW", startMs: 1_700_000_000_000)
+            Op(id: "o1", type: "openActual", ref: dw, key: "Deep work", startMs: 1_700_000_000_000)
         ]) {
             UserDefaults.standard.set(data, forKey: "tt.queue.v1")
         }
@@ -872,7 +951,7 @@ final class UTests: TimeTapTestCase {
         let t: Double = 1_700_000_000_000
         ApplyOps.nowMs = t + 120_000
         let open = CalEvent(
-            id: "gid-a1", calendarId: "a1", key: "DW", title: "DW:",
+            id: "gid-a1", calendarId: "a1", key: "Deep work", title: "Deep work:",
             colorId: "9", description: "#ref:abcdefghijklmnop\n#open",
             startMs: t, endMs: t + 60_000
         )
@@ -880,7 +959,7 @@ final class UTests: TimeTapTestCase {
         var now = t + 120_000
         let store = TapStore()
         store.clock = { now }
-        store.open = OpenBlock(ref: "abcdefghijklmnop", key: "DW", startMs: t)
+        store.open = OpenBlock(ref: "abcdefghijklmnop", key: "Deep work", startMs: t)
         await store.confirmCalendars(plan: "p1", actual: "a2", sitting: "s1")
         XCTAssertEqual(Credentials.actualId, "a2")
         XCTAssertTrue(

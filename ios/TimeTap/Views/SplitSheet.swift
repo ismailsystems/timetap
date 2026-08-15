@@ -67,9 +67,9 @@ struct SplitSheet: View {
 
                 ScrollView {
                     LazyVStack(spacing: 0) {
-                        ForEach(store.categories.filter { $0.key != open.key }) { cat in
+                        ForEach(store.categories.filter { $0.label != open.key }) { cat in
                             Button {
-                                store.doSplit(key: cat.key)
+                                store.doSplit(key: cat.label)
                             } label: {
                                 HStack(spacing: 12) {
                                     Rectangle()

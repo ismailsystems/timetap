@@ -213,12 +213,13 @@ enum CalendarAPI {
         guard !Credentials.actualId.isEmpty else {
             throw CalendarAPIError.calendarsNotPicked
         }
+        let id = Grammar.resolve(key)
         let event = CalEvent(
             id: ref,
             calendarId: Credentials.actualId,
-            key: key,
-            title: "\(key):",
-            colorId: Grammar.colorId(for: key),
+            key: id,
+            title: Grammar.buildTitle(id, "", nil),
+            colorId: Grammar.colorId(for: id),
             description: "#ref:\(ref)\n#open",
             startMs: t,
             endMs: t + 60_000
