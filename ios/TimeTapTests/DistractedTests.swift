@@ -146,6 +146,72 @@ final class DistractedTests: TimeTapTestCase {
         XCTAssertTrue(ev.description.contains("#open"))
     }
 
+    func testCloseActualWithZeroDistractStripsLiveTag() {
+        ApplyOps.actual = FakeCalendar()
+        ApplyOps.sitting = FakeCalendar()
+        let t = ApplyOps.nowMs.rounded()
+        ApplyOps.nowMs = t
+        let ref = "abcdefghijklmnop"
+        _ = ApplyOps.apply([
+            Op(id: "o1", type: "openActual", ref: ref, key: "Deep work", startMs: t)
+        ])
+        _ = ApplyOps.apply([
+            Op(id: "d1", type: "setDistract", ref: ref, startMs: t + 1_000, hintMs: t, distractedMs: 0)
+        ])
+        _ = ApplyOps.apply([
+            Op(id: "c1", type: "closeActual", ref: ref, key: "Deep work", endMs: t + 60_000)
+        ])
+        let ev = ApplyOps.actual!.events[0]
+        XCTAssertNil(Grammar.readLiveDistract(ev.description))
+        XCTAssertFalse(ev.description.contains("#open"))
+        XCTAssertNil(Grammar.readDistract(ev.description))
+    }
+
+    func testCloseActualKeepsAccruedAndStripsLiveTag() {
+        ApplyOps.actual = FakeCalendar()
+        ApplyOps.sitting = FakeCalendar()
+        let t = ApplyOps.nowMs.rounded()
+        ApplyOps.nowMs = t
+        let ref = "abcdefghijklmnop"
+        _ = ApplyOps.apply([
+            Op(id: "o1", type: "openActual", ref: ref, key: "Deep work", startMs: t)
+        ])
+        _ = ApplyOps.apply([
+            Op(id: "d1", type: "setDistract", ref: ref, startMs: t + 1_000, hintMs: t, distractedMs: 0)
+        ])
+        _ = ApplyOps.apply([
+            Op(
+                id: "c1", type: "closeActual", ref: ref, key: "Deep work",
+                endMs: t + 60_000, distractedMs: 12_000
+            )
+        ])
+        let ev = ApplyOps.actual!.events[0]
+        XCTAssertNil(Grammar.readLiveDistract(ev.description))
+        XCTAssertEqual(Grammar.readDistract(ev.description), 12_000)
+        XCTAssertFalse(ev.description.contains("#open"))
+    }
+
+    func testGetStateOffLiveTagClearsStart() throws {
+        ApplyOps.actual = FakeCalendar()
+        ApplyOps.sitting = FakeCalendar()
+        ApplyOps.nowMs = 1_700_000_060_000
+        let ev = ApplyOps.actual!.createEvent(
+            calendarId: "a1",
+            title: Grammar.buildTitle("Deep work", "", nil),
+            startMs: 1_700_000_000_000,
+            endMs: 1_700_000_060_000
+        )
+        ev.description = Grammar.stampLiveDistract(
+            Grammar.writeDesc("", ref: "abcdefghijklmnop", isOpen: true),
+            accruedMs: 4_000,
+            startMs: 0
+        )
+        let st = try ApplyOps.getState()
+        XCTAssertEqual(st.distracted, false)
+        XCTAssertEqual(st.distractedAccruedMs, 4_000)
+        XCTAssertNil(st.distractStartMs)
+    }
+
     private func pinSession() {
         GoogleAuth.testHasSession = true
         GoogleAuth.testAccessToken = "t"

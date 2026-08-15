@@ -181,7 +181,7 @@ enum ApplyOps {
             ev.title = Grammar.buildTitle(p.key, p.text, "?")
         }
         endEventAt(ev, boundEnd)
-        writeDesc(ev, ref: refOf(ev), isOpen: false)
+        sealClosed(ev, ref: refOf(ev))
 
         if isActual && now - boundEnd >= msMin {
             let un = cal.createEvent(
@@ -244,6 +244,21 @@ enum ApplyOps {
         ev.description = Grammar.writeDesc(ev.description, ref: ref, isOpen: isOpen)
     }
 
+    /// Close an ACTUAL event. Always strip `#distractlive`. Keep accrued time when present.
+    static func sealClosed(_ ev: CalEvent, ref: String, distractedMs: Double = 0) {
+        var d = distractedMs
+        if d <= 0, let live = Grammar.readLiveDistract(ev.description) {
+            d = live.accruedMs
+            if live.startMs > 0 {
+                d += max(0, ev.endMs - live.startMs)
+            }
+        }
+        ev.description = Grammar.stampDistract(
+            ev.description, distractedMs: d, blockMs: ev.endMs - ev.startMs
+        )
+        writeDesc(ev, ref: ref, isOpen: false)
+    }
+
     static func refOf(_ ev: CalEvent) -> String {
         let pat = NSRegularExpression.escapedPattern(for: TT.refPrefix) + "([A-Za-z0-9]+)"
         if let m = Grammar.match(pat, ev.description) { return m[1] }
@@ -269,7 +284,7 @@ enum ApplyOps {
         let newest = open[open.count - 1]
         for j in 0..<(open.count - 1) {
             endEventAt(open[j], newest.startMs)
-            writeDesc(open[j], ref: refOf(open[j]), isOpen: false)
+            sealClosed(open[j], ref: refOf(open[j]))
         }
         return newest
     }
@@ -285,7 +300,7 @@ enum ApplyOps {
         if findByRef(cal, op.ref, hintMs: op.startMs) != nil { return }
         if let prev = findOpen(cal), refOf(prev) != op.ref {
             endEventAt(prev, op.startMs ?? nowMs)
-            writeDesc(prev, ref: refOf(prev), isOpen: false)
+            sealClosed(prev, ref: refOf(prev))
         }
         let start = op.startMs ?? nowMs
         let ev = cal.createEvent(
@@ -307,11 +322,9 @@ enum ApplyOps {
         // Vacuity: remove `!closed ||` and the stretch criterion goes red.
         if !closed || p.mark == "?" { endEventAt(ev, op.endMs ?? nowMs) }
         ev.title = Grammar.buildTitle(p.key, text, op.mark)
-        if let d = op.distractedMs, d > 0 {
-            ev.description = Grammar.stampDistract(
-                ev.description, distractedMs: d, blockMs: ev.endMs - ev.startMs
-            )
-        }
+        ev.description = Grammar.stampDistract(
+            ev.description, distractedMs: op.distractedMs ?? 0, blockMs: ev.endMs - ev.startMs
+        )
         writeDesc(ev, ref: op.ref ?? "", isOpen: false)
     }
 
