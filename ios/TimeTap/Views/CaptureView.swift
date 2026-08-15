@@ -53,8 +53,8 @@ struct CaptureView: View {
                 footer
             }
             .foregroundStyle(Theme.fg)
-            .ignoresSafeArea(.keyboard, edges: focus == nil ? .bottom : [])
             #if os(iOS)
+            .ignoresSafeArea(.keyboard, edges: focus == nil ? .bottom : [])
             .toolbar(.hidden, for: .navigationBar)
             #endif
         }
@@ -133,7 +133,9 @@ struct CaptureView: View {
     private var noteField: some View {
         TextField("note", text: $noteDraft)
             .focused($focus, equals: .note)
+            #if os(iOS)
             .submitLabel(.done)
+            #endif
             .onSubmit { finishNoteEdit() }
             .padding(11)
             .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
