@@ -57,6 +57,34 @@
             buildForAnalyzing = "YES">
             <BuildableReference
                BuildableIdentifier = "primary"
+               BlueprintIdentifier = "FBD404962D92E966FD6AE900"
+               BuildableName = "TimeTapWatch.app"
+               BlueprintName = "TimeTapWatch"
+               ReferencedContainer = "container:TimeTap.xcodeproj">
+            </BuildableReference>
+         </BuildActionEntry>
+         <BuildActionEntry
+            buildForTesting = "YES"
+            buildForRunning = "YES"
+            buildForProfiling = "YES"
+            buildForArchiving = "YES"
+            buildForAnalyzing = "YES">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "706963C440EDDE47E576A2FE"
+               BuildableName = "TimeTapWatchWidgets.appex"
+               BlueprintName = "TimeTapWatchWidgets"
+               ReferencedContainer = "container:TimeTap.xcodeproj">
+            </BuildableReference>
+         </BuildActionEntry>
+         <BuildActionEntry
+            buildForTesting = "YES"
+            buildForRunning = "YES"
+            buildForProfiling = "YES"
+            buildForArchiving = "YES"
+            buildForAnalyzing = "YES">
+            <BuildableReference
+               BuildableIdentifier = "primary"
                BlueprintIdentifier = "3808FD036A9F99338925BEB8"
                BuildableName = "TimeTapWidget.appex"
                BlueprintName = "TimeTapWidget"

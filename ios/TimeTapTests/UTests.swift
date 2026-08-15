@@ -67,22 +67,22 @@ final class UTests: TimeTapTestCase {
         XCTAssertFalse(text.contains("headerActions"), "STOP/SPLIT column is gone")
         XCTAssertFalse(text.contains("stopButton"), "STOP chip is gone")
         XCTAssertFalse(text.contains("splitButton"), "SPLIT chip is gone")
-        XCTAssertTrue(text.contains("runningCategoryMenu(enabled: running, stop:"), "split is a long press menu on the running row")
-        XCTAssertTrue(text.contains("store.openSplit()"), "long press still opens split")
-        XCTAssertTrue(text.contains("store.proposeFromRow(key)"), "tap proposes, then waits 5s")
-        XCTAssertTrue(text.contains("store.propose(key)"), "menu Stop still calls propose")
+        XCTAssertTrue(text.contains("source: .plan"), "left rail is PLAN")
+        XCTAssertTrue(text.contains("source: .actual"), "right rail is ACTUAL")
+        XCTAssertFalse(text.contains("categoryList"), "category column is gone")
+        XCTAssertFalse(text.contains("runningCategoryMenu"), "category menu left capture")
+        XCTAssertFalse(text.contains("proposeFromRow"), "row tap left capture")
         XCTAssertFalse(text.contains("gridCellColumns"), "sit is not in a SPLIT/STOP cluster")
         let footer = text[
             text.range(of: "private var footer")!.lowerBound
-                ..< text.range(of: "private var elapsedLabel")!.lowerBound
+                ..< text.range(of: "private var postureElapsed")!.lowerBound
         ]
-        XCTAssertFalse(footer.contains("sitChip"), "footer must not keep a sitting row")
+        XCTAssertTrue(footer.contains("sitChip"), "sit chip sits in the footer")
         XCTAssertFalse(footer.contains("TAP TO SIT"), "footer must not keep TAP TO SIT")
         XCTAssertFalse(
             text.contains("store.open != nil || store.sit != nil"),
             "STOP must not appear for sitting alone"
         )
-        XCTAssertTrue(text.contains("Does not stop sitting"))
         XCTAssertTrue(text.contains("SITTING"), "sitting chip keeps its name")
         XCTAssertTrue(text.contains("postureElapsed"), "sit and stand duration live inside the chip")
         XCTAssertFalse(
@@ -96,15 +96,12 @@ final class UTests: TimeTapTestCase {
             "sit duration must not sit next to STOP as its own chip"
         )
         XCTAssertTrue(text.contains("MARK IT"), "mark row must name the closed block")
-        XCTAssertTrue(text.contains("CANCEL ·"), "pending cancel sits on the armed row")
-        XCTAssertTrue(text.contains("pendingFuse"), "the fuse replaced the bottom bar")
         XCTAssertFalse(text.contains("tt.pendingCancelHit"), "the cancel A/B switch is gone")
-        XCTAssertTrue(text.contains("categoryList(height:"), "category column must know its height")
         XCTAssertFalse(
             text.contains("overlay(alignment: .bottom)"),
-            "NOW and the dual column have no 2pt bottom rule"
+            "the rails have no 2pt bottom rule"
         )
-        XCTAssertTrue(text.contains("minHeight: 44") || text.contains("max(44"), "category rows need a 44pt floor")
+        XCTAssertTrue(text.contains("minHeight: 44") || text.contains("max(44"), "note field keeps a 44pt floor")
         XCTAssertTrue(text.contains("Theme.postureSymbol"), "in-app sit uses the Live Activity figures")
         let sitBody = text[
             text.range(of: "private var sitChip")!.lowerBound
@@ -118,24 +115,13 @@ final class UTests: TimeTapTestCase {
         XCTAssertFalse(sitBody.contains("Theme.mute"), "idle posture is not a muted prompt")
         XCTAssertFalse(sitBody.contains("Color.clear"), "idle posture keeps the selected fill")
         XCTAssertTrue(sitBody.contains(".isSelected"), "VoiceOver always treats posture as on")
-        let forEach = text.range(of: "ForEach(store.groups)")!
-        let sit = text.range(of: "sitChip")!
-        XCTAssertLessThan(forEach.lowerBound, sit.lowerBound, "sit must sit under the category list")
-        XCTAssertFalse(text.contains("settingsRow"), "gear left the category column")
-        XCTAssertTrue(text.contains("groups.count + 1"), "groups and sit share one row height")
+        XCTAssertFalse(text.contains("ForEach(store.groups)"), "category column is gone")
+        XCTAssertFalse(text.contains("settingsRow"), "gear left the capture chrome")
+        XCTAssertFalse(text.contains("groups.count + 1"), "sit is not a category row")
         XCTAssertTrue(text.contains("gearshape"), "settings gear sits on the title row")
         XCTAssertTrue(text.contains("store.showSettings = true"), "gear opens settings")
-        XCTAssertTrue(text.contains("padding(.bottom, 5)"), "dual columns keep a 5pt bottom inset")
-        XCTAssertTrue(
-            text.contains("min(rowH * CGFloat(store.groups.count), max(0, height - rowH))"),
-            "the category scroll must not leave a gap above NOT SITTING"
-        )
-        XCTAssertTrue(
-            text.contains("categoryList(height: geo.size.height)"),
-            "category list receives the column height"
-        )
+        XCTAssertTrue(text.contains("padding(.bottom, 5)"), "the rails keep a 5pt bottom inset")
         XCTAssertTrue(text.contains("Theme.font("), "capture type must scale")
-        XCTAssertTrue(text.contains("group.children.first { $0.label == open.key }"), "running row must show elapsed")
         XCTAssertFalse(
             text.contains("Rectangle().fill(Theme.accent).frame(width: 4)"),
             "running category must not keep a red leading bar"
@@ -290,12 +276,12 @@ final class UTests: TimeTapTestCase {
             encoding: .utf8
         )
         XCTAssertFalse(text.contains("outlineChip(\"SPLIT\""), "SPLIT chip is gone")
-        XCTAssertTrue(text.contains("runningCategoryMenu(enabled: running, stop:"))
-        XCTAssertTrue(text.contains("store.openSplit()"))
-        XCTAssertTrue(text.contains(".contextMenu"))
-        XCTAssertTrue(text.contains("Button(\"Stop\""))
-        XCTAssertTrue(text.contains("Button(\"Split\""))
-        XCTAssertTrue(text.contains("Button(\"Add note\""))
+        XCTAssertFalse(text.contains("runningCategoryMenu"), "category menu left capture")
+        XCTAssertFalse(text.contains("proposeFromRow"), "row tap left capture")
+        XCTAssertFalse(text.contains("store.openSplit()"), "capture has no split control")
+        XCTAssertTrue(text.contains("source: .plan"), "left rail is PLAN")
+        XCTAssertTrue(text.contains("source: .actual"), "right rail is ACTUAL")
+        XCTAssertTrue(text.contains("SplitSheet()"), "split sheet still exists")
         XCTAssertFalse(text.contains(".onLongPressGesture(perform: perform)"))
         XCTAssertFalse(text.contains("TAP TO SPLIT"), "mute TAP TO SPLIT chip is back")
         XCTAssertFalse(
@@ -620,19 +606,17 @@ final class UTests: TimeTapTestCase {
             encoding: .utf8
         )
         XCTAssertEqual(Theme.typeBump, 1.1, "row type stays 10% over the design size")
-        XCTAssertTrue(text.contains("Theme.rowFont(20"), "category names stay 10% over the design size")
-        XCTAssertTrue(text.contains("Theme.rowFont(11"), "the group line stays in the same 10% bump")
-        XCTAssertTrue(text.contains("VStack(alignment: .leading, spacing: 2)"), "group hangs over the child")
-        XCTAssertTrue(text.contains("HStack(alignment: .firstTextBaseline"), "dots sit after the group name")
-        XCTAssertTrue(text.contains("ForEach(0..<stops"), "dots still mark how many children you can scrub")
-        XCTAssertTrue(text.contains("preview ?? pendingChild"), "finger preview wins the face")
-        XCTAssertTrue(text.contains("minimumDistance: 0"), "a tap must still fire onEnded")
-        XCTAssertTrue(text.contains("/ 56"), "one child is 56pt")
-        XCTAssertTrue(text.contains("((raw % n) + n) % n"), "scrub wraps at both ends")
-        XCTAssertTrue(text.contains("cancelPending()"), "scrub back to the open child cancels")
-        XCTAssertTrue(text.contains("pendingHere, inChip"), "only the chip cancels")
-        XCTAssertTrue(text.contains("chipAteTap"), "the chip tap must win over the row drag")
-        XCTAssertTrue(text.contains("running && longPress"), "a long press on the running row does not arm cancel")
+        XCTAssertTrue(text.contains("DayRailView(source: .plan"), "left rail is PLAN")
+        XCTAssertTrue(text.contains("source: .actual"), "right rail is ACTUAL")
+        XCTAssertFalse(text.contains("categoryList"), "category column is gone")
+        XCTAssertFalse(text.contains("ForEach(store.groups)"), "group rows left capture")
+        XCTAssertFalse(text.contains("ForEach(0..<stops"), "scrub dots left capture")
+        XCTAssertTrue(text.contains("Theme.rowFont(20"), "sit name stays 10% over the design size")
+        let footer = text[
+            text.range(of: "private var footer")!.lowerBound
+                ..< text.range(of: "private var postureElapsed")!.lowerBound
+        ]
+        XCTAssertTrue(footer.contains("sitChip"), "sit chip sits in the footer")
         XCTAssertFalse(text.contains("store.rowStyle"), "the A/B row picker is gone")
     }
 
@@ -774,7 +758,7 @@ final class UTests: TimeTapTestCase {
         let store = TapStore()
         store.clock = { now }
         let (label, items) = store.railItems(budget: 400, now: now)
-        XCTAssertTrue(label.hasPrefix("TODAY · "))
+        XCTAssertTrue(label.hasPrefix("ACTUAL · "))
         XCTAssertEqual(items.count, 1)
         XCTAssertTrue(items[0].isGap)
         XCTAssertEqual(items[0].name, "UNLOGGED")
@@ -796,9 +780,12 @@ final class UTests: TimeTapTestCase {
             TodayBlock(ref: "a", key: "Deep work", startMs: first, endMs: first + 120_000)
         ]
         let (label, items) = store.railItems(budget: 400, now: first + 120_000)
-        XCTAssertEqual(items.first?.name, "DEEP WORK")
-        XCTAssertFalse(items.contains { $0.isGap && $0.ms > 8 * 3_600_000 })
-        XCTAssertEqual(label, "TODAY · \(Format.clock(first))")
+        XCTAssertTrue(items.contains { $0.name == "DEEP WORK" })
+        XCTAssertEqual(label, "ACTUAL · \(Format.clock(first))")
+        XCTAssertFalse(
+            label.contains(Format.clock(dayStart)),
+            "the ACTUAL label must start at the first block, not midnight"
+        )
     }
 
     func testLavenderPOOPMigratesToBanana() {

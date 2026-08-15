@@ -2,6 +2,7 @@ import SwiftUI
 
 struct DayRailView: View {
     @EnvironmentObject private var store: TapStore
+    var source: RailSource = .actual
     let tick: Date
     var onOpenTap: () -> Void = {}
     var onOtherTap: () -> Void = {}
@@ -12,21 +13,23 @@ struct DayRailView: View {
             let now = store.clock()
             VStack(alignment: .leading, spacing: 6) {
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
-                    Text(store.railItems(budget: 40, now: now).startLabel)
+                    Text(store.railItems(source: source, budget: 40, now: now).startLabel)
                         .font(Theme.font(11, weight: .bold))
                         .foregroundStyle(Theme.mute)
                         .lineLimit(1)
                         .minimumScaleFactor(0.7)
-                    Spacer(minLength: 6)
-                    Text(store.syncLabel.uppercased())
-                        .font(Theme.font(11, weight: .bold))
-                        .foregroundStyle(store.syncFailed ? Theme.accentOn : Theme.mute)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.7)
-                        .multilineTextAlignment(.trailing)
+                    if source == .actual {
+                        Spacer(minLength: 6)
+                        Text(store.syncLabel.uppercased())
+                            .font(Theme.font(11, weight: .bold))
+                            .foregroundStyle(store.syncFailed ? Theme.accentOn : Theme.mute)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.7)
+                            .multilineTextAlignment(.trailing)
+                    }
                 }
                 GeometryReader { bodyGeo in
-                    let rail = store.railItems(budget: max(bodyGeo.size.height, 40), now: now)
+                    let rail = store.railItems(source: source, budget: max(bodyGeo.size.height, 40), now: now)
                     VStack(spacing: 0) {
                         ForEach(rail.items) { item in
                             block(item, railWidth: geo.size.width - 24)

@@ -62,4 +62,6 @@ Device proof is the user's Google Calendar, not curl against `/exec`.
 - Nightly rollup / Sheets (`dailyRollup`, `setupRollup`) — rollup stays on Apps Script
 - PLAN editing by hand
 - `removeCategory` (editor-only)
-- Home Screen widgets, Watch app, App Store
+- Home Screen widgets, App Store
+
+The Watch app is in-scope.

@@ -24,7 +24,7 @@ final class CaptureChromeUITests: XCTestCase {
         XCTAssertGreaterThanOrEqual(
             field.frame.width,
             app.frame.width * 0.8,
-            "note field must span full NOW width"
+            "note field must span full title width"
         )
     }
 
