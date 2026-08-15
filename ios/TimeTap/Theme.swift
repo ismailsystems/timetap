@@ -1,5 +1,7 @@
 import SwiftUI
+#if canImport(UIKit)
 import UIKit
+#endif
 
 enum Theme {
     static let ground = Color(red: 0x16 / 255, green: 0x15 / 255, blue: 0x13 / 255)
@@ -27,7 +29,11 @@ enum Theme {
     static let typeBump: CGFloat = 1.1
 
     static func font(_ size: CGFloat, weight: Font.Weight = .regular) -> Font {
+        #if canImport(UIKit)
         .system(size: UIFontMetrics.default.scaledValue(for: size), weight: weight)
+        #else
+        .system(size: size, weight: weight)
+        #endif
     }
 
     static func rowFont(_ size: CGFloat, weight: Font.Weight = .regular) -> Font {
