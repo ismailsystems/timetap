@@ -869,14 +869,14 @@ async function checkSplitScope(browser, view, page) {
       // being the no-op the mis-tap window makes of it.
       const now = Date.now();
       localStorage.setItem('tt.state.v1', JSON.stringify({
-        open: { ref: 'aaaabbbbccccdddd', key: 'DW', text: '', startMs: now - 3 * 3600000 },
+        open: { ref: 'aaaabbbbccccdddd', key: 'Deep work', text: '', startMs: now - 3 * 3600000 },
         sit: null, lastTapMs: 0
       }));
     });
     await pg.goto(SPLIT_ORIGIN, { waitUntil: 'load' });
     await pg.waitForTimeout(120);
 
-    await pg.click('#grid [data-key="DW"]');
+    await pg.click('#grid [data-key="Deep work"]');
     await pg.waitForTimeout(80);
     if (!await pg.locator('#sheetSplit').isVisible()) {
       problems.push(label + ': re-tapping the lit block did not open SPLIT, so the two ' +
@@ -1091,7 +1091,7 @@ async function checkSetAsideOpen(browser, view, page) {
       };
     });
 
-    await pg.click('#grid [data-key="DW"]');
+    await pg.click('#grid [data-key="Deep work"]');
     await pg.waitForTimeout(80);
     const before = await lit();
     if (!before.active.length) {
@@ -1197,7 +1197,7 @@ async function checkNoteAndSheets(browser, view, page) {
     await pg.addInitScript(() => {
       const now = Date.now();
       localStorage.setItem('tt.state.v1', JSON.stringify({
-        open: { ref: 'aaaabbbbccccdddd', key: 'DW', text: '', startMs: now - 3 * 3600000 },
+        open: { ref: 'aaaabbbbccccdddd', key: 'Deep work', text: '', startMs: now - 3 * 3600000 },
         sit: { ref: 'eeeeffff11112222', startMs: now - 3600000 },
         lastTapMs: 0
       }));
@@ -1244,7 +1244,7 @@ async function checkNoteAndSheets(browser, view, page) {
       problems.push(label + ': the sitting chip accessibility node omits its 1h00 duration: ' +
                     JSON.stringify(sitChipA11y));
     }
-    await pg.click('#grid [data-key="DW"]');
+    await pg.click('#grid [data-key="Deep work"]');
     await pg.waitForTimeout(80);
     const splitSliderA11y = await pg.locator('#spRange').ariaSnapshot();
     if (!/slider "split at [^"]+"/i.test(splitSliderA11y) ||
@@ -1513,7 +1513,7 @@ async function checkReflexDoubleTap(browser, view, page) {
     await pg.addInitScript(() => {
       const now = Date.now();
       localStorage.setItem('tt.state.v1', JSON.stringify({
-        open: { ref: 'aaaabbbbccccdddd', key: 'DW', text: '', startMs: now - 40 * 60000 },
+        open: { ref: 'aaaabbbbccccdddd', key: 'Deep work', text: '', startMs: now - 40 * 60000 },
         sit: null, lastTapMs: 0
       }));
     });
@@ -1525,7 +1525,7 @@ async function checkReflexDoubleTap(browser, view, page) {
         b => b.addEventListener('click', () => { window.__markClicks++; }));
     });
 
-    const box = await pg.locator('#grid [data-key="MTG"]').boundingBox();
+    const box = await pg.locator('#grid [data-key="Meetings"]').boundingBox();
     if (!box) {
       problems.push(label + ': MEETINGS has no box, so the gesture never ran');
       return problems;
@@ -1554,14 +1554,14 @@ async function checkReflexDoubleTap(browser, view, page) {
                 ': scroll ' + before + ' -> ' + first.scrollTop +
                 ', same point hits ' + first.hit + ', final active=' + second.active +
                 ', mark taps=' + second.marks);
-    if (first.active !== 'MTG') {
-      problems.push(label + ': the first tap did not switch to MTG, so the premise failed');
+    if (first.active !== 'Meetings') {
+      problems.push(label + ': the first tap did not switch to Meetings, so the premise failed');
     }
-    if (Math.abs(first.scrollTop - before) > 0.5 || first.hit !== 'MTG') {
+    if (Math.abs(first.scrollTop - before) > 0.5 || first.hit !== 'Meetings') {
       problems.push(label + ': the first tap moved the list from scrollTop ' + before +
                     ' to ' + first.scrollTop + ', and the same point now hits ' + first.hit);
     }
-    if (second.active !== 'MTG') {
+    if (second.active !== 'Meetings') {
       problems.push(label + ': the second tap switched again to ' + second.active);
     }
     if (second.marks || second.queuedMarks) {
@@ -1940,7 +1940,7 @@ async function checkSheetModality(browser, view, page) {
     await pg.addInitScript(() => {
       const now = Date.now();
       const state = { nowMs: now, tz: 'local', notes: [], today: [], sit: null,
-                      open: { ref: 'aaaabbbbccccdddd', key: 'DW', text: '',
+                      open: { ref: 'aaaabbbbccccdddd', key: 'Deep work', text: '',
                               startMs: now - 43 * 60000 } };
       const mk = () => {
         const b = {
@@ -1961,7 +1961,7 @@ async function checkSheetModality(browser, view, page) {
       const a = document.querySelector('#grid .active');
       return a ? a.dataset.key : null;
     });
-    if (lit !== 'DW') {
+    if (lit !== 'Deep work') {
       problems.push(label + ': nothing was running before the re-tap (lit=' + lit +
                     '), so this was never the screen the checks below are about');
       return problems;
@@ -1970,7 +1970,7 @@ async function checkSheetModality(browser, view, page) {
        A real click rather than el.click(): a programmatic one never moves focus,
        so there would be nothing for the sheet to hand back afterwards and the
        check on that would pass against a build that lost focus entirely. */
-    await pg.locator('#grid [data-key="DW"]').click();
+    await pg.locator('#grid [data-key="Deep work"]').click();
     await pg.waitForTimeout(150);
 
     const open = await pg.evaluate(() => {
@@ -2044,7 +2044,7 @@ async function checkSheetModality(browser, view, page) {
     /* Back where it came from. A sheet that clears inert without restoring focus
        leaves the next Tab starting at the top of the document, which on a
        ten-category list is most of a screen away from the row that opened it. */
-    if (after.focused !== 'DW') {
+    if (after.focused !== 'Deep work') {
       problems.push(label + ': after Escape focus is on ' + after.focused +
                     ' rather than back on the row that opened the sheet');
     }

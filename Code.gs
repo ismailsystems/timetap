@@ -1419,7 +1419,7 @@ function planLine_(rec) {
   return 'PLAN events: found ' + rec.planFound + ', of which ' + rec.planParsed +
          ' named a configured category. The other ' + (rec.planFound - rec.planParsed) +
          ' counted toward nothing: a plan event only counts if its title begins ' +
-         'with a category key and a colon, like "DW: ship the thing".';
+         'with a category name and a colon, like "Deep work: ship the thing".';
 }
 
 /**

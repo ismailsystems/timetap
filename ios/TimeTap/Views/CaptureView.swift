@@ -481,7 +481,7 @@ struct CaptureView: View {
     private func proposeFromRow(_ key: String) {
         if store.open?.key == key { return }
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-        store.propose(key)
+        store.proposeFromRow(key)
     }
 
     private func clearScrub() {

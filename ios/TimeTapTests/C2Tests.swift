@@ -8,6 +8,7 @@ final class C2Tests: TimeTapTestCase {
         Credentials.resetForTests()
         CalendarAPI.resetTestHTTP()
         GoogleAuth.resetForTests()
+        UserDefaults.standard.removeObject(forKey: "tt.config.v1")
     }
 
     func testFreshStoreOfflineHasSeedLeaves() {
@@ -83,6 +84,46 @@ final class C2Tests: TimeTapTestCase {
         XCTAssertEqual(store.neighbor(in: body, of: "Zone 2", step: -1), "Walking")
         store.arm(body, child: "Lifting")
         XCTAssertEqual(store.pickFromGroup(body, hover: nil), "Lifting")
+    }
+
+    func testRenameChildThenGroupOnPair() {
+        UserDefaults.standard.removeObject(forKey: "tt.config.v1")
+        let store = TapStore()
+        store.renameChild(from: "Deep work", to: "Writing")
+        store.renameGroup(from: "Deep work", to: "Writing")
+        XCTAssertEqual(
+            store.groups.first { $0.label == "Writing" }?.children.map(\.label),
+            ["Writing"]
+        )
+        XCTAssertFalse(store.groups.contains { $0.label == "Deep work" })
+        XCTAssertTrue(store.categories.contains { $0.label == "Writing" })
+        XCTAssertFalse(store.categories.contains { $0.label == "Deep work" })
+    }
+
+    func testAddChildRefusesNinthInGroup() {
+        UserDefaults.standard.removeObject(forKey: "tt.config.v1")
+        let store = TapStore()
+        for name in ["Yoga", "Swim", "Bike", "Row", "Ski"] {
+            store.addChild(group: "Body", label: name)
+        }
+        XCTAssertEqual(store.groups.first { $0.label == "Body" }?.children.count, 8)
+        store.addChild(group: "Body", label: "Climb")
+        XCTAssertEqual(store.banner, "That is 8 in Body already.")
+        XCTAssertEqual(store.groups.first { $0.label == "Body" }?.children.count, 8)
+        XCTAssertFalse(store.categories.contains { $0.label == "Climb" })
+    }
+
+    func testAddChildRefusesSeventeenthLeaf() {
+        UserDefaults.standard.removeObject(forKey: "tt.config.v1")
+        let store = TapStore()
+        for name in ["A", "B", "C", "D", "E", "F", "G"] {
+            store.addChild(group: "Deep work", label: name)
+        }
+        XCTAssertEqual(store.categories.count, 16)
+        store.addChild(group: "Meetings", label: "H")
+        XCTAssertEqual(store.banner, "That is 16 categories already.")
+        XCTAssertEqual(store.categories.count, 16)
+        XCTAssertFalse(store.categories.contains { $0.label == "H" })
     }
 
     func testAddAndDeleteChild() {

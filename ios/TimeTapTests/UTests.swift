@@ -69,8 +69,8 @@ final class UTests: TimeTapTestCase {
         XCTAssertFalse(text.contains("splitButton"), "SPLIT chip is gone")
         XCTAssertTrue(text.contains("runningCategoryMenu(enabled: running, stop:"), "split is a long press menu on the running row")
         XCTAssertTrue(text.contains("store.openSplit()"), "long press still opens split")
-        XCTAssertTrue(text.contains("proposeFromRow"), "tap proposes, then waits 5s")
-        XCTAssertTrue(text.contains("store.propose(key)"), "propose still waits 5s")
+        XCTAssertTrue(text.contains("store.proposeFromRow(key)"), "tap proposes, then waits 5s")
+        XCTAssertTrue(text.contains("store.propose(key)"), "menu Stop still calls propose")
         XCTAssertFalse(text.contains("gridCellColumns"), "sit is not in a SPLIT/STOP cluster")
         let footer = text[
             text.range(of: "private var footer")!.lowerBound
@@ -470,6 +470,76 @@ final class UTests: TimeTapTestCase {
         store.commitPending()
         XCTAssertNil(store.open)
         XCTAssertTrue(store.queue.contains { $0.type == "closeActual" })
+    }
+
+    func testRowTapOnOpenLeafDoesNotArmStop() {
+        GoogleAuth.testHasSession = true
+        GoogleAuth.testAccessToken = "t"
+        Credentials.planId = "p1"
+        Credentials.actualId = "a1"
+        Credentials.sittingId = "s1"
+        let store = TapStore()
+        store.proposeFromRow("Deep work")
+        store.commitPending()
+        XCTAssertEqual(store.open?.key, "Deep work")
+
+        store.proposeFromRow("Deep work")
+        XCTAssertEqual(store.open?.key, "Deep work")
+        XCTAssertNil(store.pendingKey)
+        XCTAssertFalse(store.pendingStop)
+        XCTAssertTrue(store.queue.filter { $0.type == "closeActual" }.isEmpty)
+    }
+
+    func testMenuStopOnOpenLeafArmsPendingStop() {
+        GoogleAuth.testHasSession = true
+        GoogleAuth.testAccessToken = "t"
+        Credentials.planId = "p1"
+        Credentials.actualId = "a1"
+        Credentials.sittingId = "s1"
+        let store = TapStore()
+        store.propose("Deep work")
+        store.commitPending()
+        store.propose("Deep work")
+        XCTAssertEqual(store.open?.key, "Deep work")
+        XCTAssertEqual(store.pendingKey, "Deep work")
+        XCTAssertTrue(store.pendingStop)
+    }
+
+    func testChipCancelRearmsAndTimerCommits() {
+        GoogleAuth.testHasSession = true
+        GoogleAuth.testAccessToken = "t"
+        Credentials.planId = "p1"
+        Credentials.actualId = "a1"
+        Credentials.sittingId = "s1"
+        let store = TapStore()
+        var cfg = store.config ?? .seed
+        cfg.undoSeconds = 1
+        store.config = cfg
+
+        store.propose("Deep work")
+        XCTAssertEqual(store.pendingKey, "Deep work")
+        store.cancelPending()
+        XCTAssertNil(store.open)
+        XCTAssertNil(store.pendingKey)
+        XCTAssertTrue(store.queue.isEmpty)
+
+        store.propose("Deep work")
+        XCTAssertEqual(store.pendingKey, "Deep work")
+        XCTAssertNil(store.open)
+
+        let stillPending = expectation(description: "still pending")
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+            XCTAssertEqual(store.pendingKey, "Deep work")
+            XCTAssertNil(store.open)
+            stillPending.fulfill()
+        }
+        let committed = expectation(description: "pending timer commits")
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.6) {
+            XCTAssertNil(store.pendingKey)
+            XCTAssertEqual(store.open?.key, "Deep work")
+            committed.fulfill()
+        }
+        wait(for: [stillPending, committed], timeout: 2.5)
     }
 
     func testCancelPendingClearsWithoutApply() {

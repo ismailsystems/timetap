@@ -3216,7 +3216,9 @@ chk('in a sentence, not as a bare pair of integers',
 chk('and says what the other nine cost',
   /other 9 counted toward nothing/.test(st49), st49);
 chk('and says what would have made them count',
-  /category key and a colon/.test(st49), st49);
+  /category name and a colon/.test(st49) && /Deep work:/.test(st49), st49);
+chk('and does not say category key or a short code',
+  !/category key/.test(st49) && !/\bDW:/.test(st49), st49);
 chk('with neither undefined nor NaN anywhere in it',
   !/undefined|NaN/.test(st49), st49);
 

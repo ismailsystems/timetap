@@ -192,6 +192,12 @@ final class TapStore: ObservableObject {
         armPending()
     }
 
+    /// Row tap. Same leaf stays running; the long-press menu owns Stop.
+    func proposeFromRow(_ key: String) {
+        if open?.key == key { return }
+        propose(key)
+    }
+
     func cancelPending() {
         clearPending()
     }
