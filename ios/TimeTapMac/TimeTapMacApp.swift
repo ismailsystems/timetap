@@ -7,6 +7,8 @@ struct TimeTapMacApp: App {
     init() {
         GoogleAuth.configure()
         let store = TapStore()
+        MacCommandHub.store = store
+        StatusItemController.start(store: store)
         _store = StateObject(wrappedValue: store)
     }
 
@@ -18,7 +20,7 @@ struct TimeTapMacApp: App {
                 .frame(minWidth: 900, minHeight: 560)
         }
         .defaultSize(width: 1100, height: 720)
-        // MacCommands is not in the tree yet. Add `.commands { MacCommands() }` when that type exists.
+        .commands { MacCommands() }
         Settings {
             SettingsView()
                 .environmentObject(store)

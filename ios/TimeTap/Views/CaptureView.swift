@@ -66,6 +66,23 @@ struct CaptureView: View {
             }
         }
         .onAppear { noteDraft = store.open?.text ?? "" }
+        #if os(macOS)
+        .sheet(isPresented: Binding(
+            get: { store.split != nil },
+            set: { if !$0 { store.split = nil } }
+        )) {
+            SplitSheet().environmentObject(store)
+        }
+        .sheet(isPresented: Binding(
+            get: { store.sitEdit != nil },
+            set: { if !$0 { store.sitEdit = nil } }
+        )) {
+            SitEditSheet().environmentObject(store)
+        }
+        .sheet(isPresented: $store.showDead) {
+            DeadLetterSheet().environmentObject(store)
+        }
+        #else
         .fullScreenCover(isPresented: Binding(
             get: { store.split != nil },
             set: { if !$0 { store.split = nil } }
@@ -81,6 +98,7 @@ struct CaptureView: View {
         .fullScreenCover(isPresented: $store.showDead) {
             DeadLetterSheet().environmentObject(store)
         }
+        #endif
     }
 
     private var titleBar: some View {
