@@ -13,7 +13,11 @@ struct SettingsView: View {
                     }
                     .accessibilityHint("Opens the category list")
                 } footer: {
+                    #if os(macOS)
+                    Text("A category you add in Settings stays on this Mac. The web app does not show it.")
+                    #else
                     Text("A category you add in Settings stays on this phone. The web app does not show it.")
+                    #endif
                 }
 
                 Section {
@@ -43,7 +47,9 @@ struct SettingsView: View {
             .background(Theme.ground)
             .foregroundStyle(Theme.fg)
             .navigationTitle("Settings")
+            #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
+            #endif
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Close") { dismiss() }
@@ -52,8 +58,10 @@ struct SettingsView: View {
             }
         }
         .preferredColorScheme(.dark)
+        #if os(iOS)
         .presentationDetents([.medium, .large])
         .presentationDragIndicator(.visible)
+        #endif
     }
 
     private func calendarRow(_ title: String, id: String) -> some View {

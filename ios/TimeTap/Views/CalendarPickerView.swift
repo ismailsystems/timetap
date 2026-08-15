@@ -44,7 +44,9 @@ struct CalendarPickerView: View {
         .scrollContentBackground(.hidden)
         .background(Theme.ground)
         .navigationTitle("Calendars")
+        #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
+        #endif
         .toolbar {
             if !embedded {
                 ToolbarItem(placement: .cancellationAction) {
