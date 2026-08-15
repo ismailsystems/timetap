@@ -244,7 +244,11 @@ struct CaptureView: View {
                     .frame(width: 18, height: 18)
                     .accessibilityHidden(true)
                 Text(sitting ? "SITTING" : "NOT SITTING")
+                    #if os(macOS)
+                    .font(Theme.rowFont(13, weight: .semibold))
+                    #else
                     .font(Theme.rowFont(20, weight: .semibold))
+                    #endif
                     .fontWidth(.standard)
                     .lineLimit(1)
                     .minimumScaleFactor(0.6)

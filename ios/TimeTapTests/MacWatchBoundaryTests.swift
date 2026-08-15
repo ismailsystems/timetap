@@ -124,6 +124,10 @@ final class MacWatchBoundaryTests: TimeTapTestCase {
             text.contains("MacCommandHub.showMain()"),
             "status item must front the existing window"
         )
+        XCTAssertTrue(
+            text.contains("revealIfNeeded"),
+            "Sign-In, picker, and mark strip must open the window"
+        )
         XCTAssertFalse(text.contains("item.menu ="), "a permanent menu steals the left click")
         XCTAssertFalse(text.contains("WCSession"), "menu bar extra must not touch WCSession")
     }
@@ -138,6 +142,10 @@ final class MacWatchBoundaryTests: TimeTapTestCase {
         XCTAssertTrue(
             text.contains("MacCommandHub.showMain()"),
             "Show TimeTap must front the existing window"
+        )
+        XCTAssertTrue(
+            text.contains("revealIfNeeded"),
+            "Capture menu must open the window for Sign-In and mark strip"
         )
         let shortcuts = slice(text, from: "ForEach(Array(leaves.prefix(9)", to: "CommandGroup(after:")
         XCTAssertTrue(

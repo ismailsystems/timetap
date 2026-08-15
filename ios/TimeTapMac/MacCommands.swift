@@ -48,15 +48,22 @@ struct MacCommands: Commands {
         CommandGroup(replacing: .printItem) {}
         CommandGroup(replacing: .help) {}
         CommandMenu("Capture") {
-            Button("Distracted") { store.toggleDistract() }
+            Button("Distracted") {
+                store.toggleDistract()
+                revealIfNeeded()
+            }
                 .keyboardShortcut("d")
                 .disabled(store.open == nil)
-            Button("Stop") { store.endDay() }
+            Button("Stop") {
+                store.endDay()
+                revealIfNeeded()
+            }
                 .disabled(store.open == nil)
                 .accessibilityLabel("Stop the running block")
                 .accessibilityHint("Does not stop sitting")
             Button(store.sit != nil ? "Stand" : "Sit") {
                 store.toggleSit()
+                revealIfNeeded()
             }
             Divider()
             ForEach(Array(leaves.prefix(9).enumerated()), id: \.offset) { i, child in
@@ -76,6 +83,13 @@ struct MacCommands: Commands {
     private func propose(_ label: String) {
         if store.open?.key != label {
             store.propose(label)
+        }
+        revealIfNeeded()
+    }
+
+    private func revealIfNeeded() {
+        if store.showSignIn || store.showPicker || store.markStrip != nil || store.showDead {
+            MacCommandHub.showMain()
         }
     }
 }

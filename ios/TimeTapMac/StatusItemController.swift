@@ -69,7 +69,9 @@ final class StatusItemController: NSObject, NSMenuDelegate {
     private func showMenu() {
         guard let button = item?.button else { return }
         rebuild(menu)
+        button.highlight(true)
         menu.popUp(positioning: nil, at: NSPoint(x: 0, y: button.bounds.height + 4), in: button)
+        button.highlight(false)
     }
 
     private func refresh() {
@@ -145,18 +147,29 @@ final class StatusItemController: NSObject, NSMenuDelegate {
     @objc private func propose(_ sender: NSMenuItem) {
         guard let label = sender.representedObject as? String else { return }
         store?.propose(label)
+        revealIfNeeded()
     }
 
     @objc private func toggleDistract() {
         store?.toggleDistract()
+        revealIfNeeded()
     }
 
     @objc private func toggleSit() {
         store?.toggleSit()
+        revealIfNeeded()
     }
 
     @objc private func endDay() {
         store?.endDay()
+        revealIfNeeded()
+    }
+
+    private func revealIfNeeded() {
+        guard let store else { return }
+        if store.showSignIn || store.showPicker || store.markStrip != nil || store.showDead {
+            MacCommandHub.showMain()
+        }
     }
 
     @objc private func showWindow() {

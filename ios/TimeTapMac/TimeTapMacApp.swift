@@ -34,6 +34,7 @@ struct TimeTapMacApp: App {
     @StateObject private var store: TapStore
 
     init() {
+        NSWindow.allowsAutomaticWindowTabbing = false
         GoogleAuth.configure()
         let store = TapStore()
         if TimeTapRuntime.isUnderTest {
