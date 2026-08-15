@@ -65,3 +65,11 @@ Device proof is the user's Google Calendar, not curl against `/exec`.
 - Home Screen widgets, App Store
 
 The Watch app is in-scope.
+
+## 6. macOS
+
+Open the TimeTapMac scheme. Sign in with Google. Pick PLAN / ACTUAL / SITTING.
+
+Calendar is the sync bus with the iPhone and the Watch.
+
+Mint a macOS OAuth client in GCP project `timetap-505402` when the iOS client ID is not enough. Bundle ID `app.timetap.mac`.
