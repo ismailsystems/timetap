@@ -111,6 +111,7 @@ struct DayRailView: View {
     private func railLabel(_ item: TapStore.RailItem) -> String {
         var parts = [item.name]
         if !item.note.isEmpty { parts.append(item.note) }
+        parts.append(Format.shortElapsed(item.ms))
         if item.isOpen { parts.append("open") }
         return parts.joined(separator: ", ")
     }

@@ -44,6 +44,9 @@ final class StatusItemController: NSObject, NSMenuDelegate {
     private func refresh() {
         guard let store else { return }
         item?.button?.title = barTitle(store)
+        item?.button?.setAccessibilityLabel(
+            store.open == nil ? "TimeTap, nothing running" : "TimeTap, \(barTitle(store))"
+        )
         if let menu = item?.menu { rebuild(menu) }
     }
 

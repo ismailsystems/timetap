@@ -24,6 +24,8 @@ struct MacCommands: Commands {
             Button("Stop") { MacCommandHub.store?.endDay() }
                 .keyboardShortcut(".")
                 .disabled(MacCommandHub.store?.open == nil)
+                .accessibilityLabel("Stop the running block")
+                .accessibilityHint("Does not stop sitting")
             Button(MacCommandHub.store?.sit != nil ? "Stand" : "Sit") {
                 MacCommandHub.store?.toggleSit()
             }
