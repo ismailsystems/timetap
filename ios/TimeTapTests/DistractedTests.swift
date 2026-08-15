@@ -127,7 +127,8 @@ final class DistractedTests: TimeTapTestCase {
     func testApplySetDistractWritesLiveTag() {
         ApplyOps.actual = FakeCalendar()
         ApplyOps.sitting = FakeCalendar()
-        let t = ApplyOps.nowMs
+        let t = ApplyOps.nowMs.rounded()
+        ApplyOps.nowMs = t
         let ref = "abcdefghijklmnop"
         _ = ApplyOps.apply([
             Op(id: "o1", type: "openActual", ref: ref, key: "Deep work", startMs: t)
