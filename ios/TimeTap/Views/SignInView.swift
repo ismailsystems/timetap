@@ -42,7 +42,11 @@ struct SignInView: View {
             }
             .frame(maxWidth: 420)
         }
+        #if os(macOS)
+        .frame(minWidth: 360, minHeight: 280)
+        #else
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        #endif
         .preferredColorScheme(.dark)
         #if os(iOS)
         .interactiveDismissDisabled()
