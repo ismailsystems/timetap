@@ -21,4 +21,8 @@ enum TimeTapRuntime {
         false
         #endif
     }
+
+    static var isUnderTest: Bool {
+        NSClassFromString("XCTestCase") != nil
+    }
 }

@@ -38,16 +38,16 @@ struct RootView: View {
         }
         #endif
         .onAppear {
-            if TimeTapRuntime.isUISmoke { return }
+            if TimeTapRuntime.isUISmoke || TimeTapRuntime.isUnderTest { return }
             GoogleAuth.restore { store.boot() }
             store.startCalendarPoll()
         }
         .onDisappear {
-            if TimeTapRuntime.isUISmoke { return }
+            if TimeTapRuntime.isUISmoke || TimeTapRuntime.isUnderTest { return }
             store.stopCalendarPoll()
         }
         .onChange(of: scenePhase) { _, phase in
-            if TimeTapRuntime.isUISmoke { return }
+            if TimeTapRuntime.isUISmoke || TimeTapRuntime.isUnderTest { return }
             if phase == .active {
                 store.pollActive = true
                 store.refreshOnReturn()

@@ -7,8 +7,10 @@ struct TimeTapMacApp: App {
     init() {
         GoogleAuth.configure()
         let store = TapStore()
-        MacCommandHub.store = store
-        StatusItemController.start(store: store)
+        if !TimeTapRuntime.isUnderTest {
+            MacCommandHub.store = store
+            StatusItemController.start(store: store)
+        }
         _store = StateObject(wrappedValue: store)
     }
 
