@@ -177,16 +177,35 @@ final class TapStore: ObservableObject {
         if overdue || runaway { await loadServerState() }
     }
 
+    /// Calendar is the Mac ↔ iPhone ↔ Watch bus. Load on every tick.
+    func syncFromCalendar() async {
+        defer { syncLiveActivity() }
+        guard Credentials.isConfigured, config != nil else { return }
+        if !queue.isEmpty {
+            await flushNow()
+        }
+        if queue.isEmpty {
+            await loadServerState()
+        }
+    }
+
     func startCalendarPoll() {
         guard pollTask == nil else { return }
         pollTask = Task { [weak self] in
+            while !Task.isCancelled {
+                if let self, self.sessionReady && Credentials.isConfigured {
+                    await self.syncFromCalendar()
+                    break
+                }
+                try? await Task.sleep(nanoseconds: 200_000_000)
+            }
             while !Task.isCancelled {
                 let ns = MacSync.pollNs(active: self?.pollActive ?? true)
                 try? await Task.sleep(nanoseconds: ns)
                 guard !Task.isCancelled else { return }
                 guard let self else { return }
                 if self.sessionReady && Credentials.isConfigured {
-                    await self.refreshOnReturnNow()
+                    await self.syncFromCalendar()
                 }
             }
         }
@@ -372,6 +391,21 @@ final class TapStore: ObservableObject {
             distracted = true
         }
         persist()
+        enqueueLiveDistract()
+    }
+
+    private func enqueueLiveDistract() {
+        guard let cur = open else { return }
+        queue = queue.filter { !($0.type == "setDistract" && $0.ref == cur.ref) }
+        _ = enqueue(Op(
+            id: Op.uid(), type: "setDistract",
+            ts: clock(),
+            ref: cur.ref,
+            startMs: distracted ? (distractStartMs ?? 0) : 0,
+            hintMs: cur.startMs,
+            distractedMs: distractedAccruedMs
+        ))
+        flush()
     }
 
     func currentDistractedMs() -> Double {
@@ -1145,6 +1179,15 @@ final class TapStore: ObservableObject {
         sit = st.sit
         today = st.today ?? []
         planToday = st.planToday ?? []
+        if let flag = st.distracted {
+            distracted = flag
+            distractedAccruedMs = st.distractedAccruedMs ?? 0
+            distractStartMs = st.distractStartMs
+        } else if wasRef != open?.ref {
+            distracted = false
+            distractedAccruedMs = 0
+            distractStartMs = nil
+        }
         if wasRef != open?.ref || wasSit != sit?.ref {
             closeBlockSheets()
         }

@@ -60,6 +60,14 @@ enum ApplyOps {
                 ?? ParsedTitle(key: TT.unfiledKey, text: evA.title, mark: nil)
             open = OpenBlock(ref: refOf(evA), key: p.key, text: p.text, startMs: evA.startMs)
         }
+        var distracted: Bool?
+        var distractedAccruedMs: Double?
+        var distractStartMs: Double?
+        if let evA, let live = Grammar.readLiveDistract(evA.description) {
+            distracted = live.startMs > 0
+            distractedAccruedMs = live.accruedMs
+            distractStartMs = live.startMs > 0 ? live.startMs : nil
+        }
         let dayLo = localMidnightMs(nowMs)
         let dayHi = addLocalDays(dayLo, 1)
         let today: [TodayBlock] = ca.events(from: dayLo, to: dayHi).compactMap { e in
@@ -87,7 +95,9 @@ enum ApplyOps {
         let sit: SitBlock? = evS.map { SitBlock(ref: refOf($0), startMs: $0.startMs) }
         return ServerState(
             nowMs: nowMs, tz: timeZone.identifier, open: open, sit: sit,
-            notes: [], today: today, planToday: planToday
+            notes: [], today: today, planToday: planToday,
+            distracted: distracted, distractedAccruedMs: distractedAccruedMs,
+            distractStartMs: distractStartMs
         )
     }
 
@@ -118,6 +128,7 @@ enum ApplyOps {
         case "recategorize": opRecategorize(op)
         case "setMark": opSetMark(op)
         case "setText": opSetText(op)
+        case "setDistract": opSetDistract(op)
         case "splitActual": opSplitActual(op)
         case "openSit": opOpenSit(op)
         case "closeSit": opCloseSit(op)
@@ -324,6 +335,17 @@ enum ApplyOps {
         guard let ev = findByRef(cal, op.ref, hintMs: op.hintMs) else { return }
         guard let p = Grammar.parseTitle(ev.title) else { return }
         ev.title = Grammar.buildTitle(p.key, op.text ?? "", p.mark)
+    }
+
+    private static func opSetDistract(_ op: Op) {
+        guard let cal = actual else { return }
+        guard let ev = findByRef(cal, op.ref, hintMs: op.hintMs ?? op.startMs) else { return }
+        ev.description = Grammar.stampLiveDistract(
+            ev.description,
+            accruedMs: op.distractedMs ?? 0,
+            startMs: op.startMs ?? 0
+        )
+        writeDesc(ev, ref: op.ref ?? "", isOpen: isOpen(ev))
     }
 
     private static func opSplitActual(_ op: Op) {

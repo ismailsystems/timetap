@@ -77,6 +77,13 @@ final class MacWatchBoundaryTests: TimeTapTestCase {
         XCTAssertTrue(apply.contains("store.endDay()"), "apply must call store.endDay")
     }
 
+    func testStatusItemHasSitAndShow() throws {
+        let text = try iosSource("TimeTapMac/StatusItemController.swift")
+        XCTAssertTrue(text.contains("toggleSit"), "menu bar extra must offer Sit")
+        XCTAssertTrue(text.contains("Show TimeTap"), "menu bar extra must offer Show TimeTap")
+        XCTAssertFalse(text.contains("WCSession"), "menu bar extra must not touch WCSession")
+    }
+
     func testMacSyncNeverActivatesWCSession() throws {
         let text = try iosSource("TimeTap/Mac/MacSync.swift")
         XCTAssertTrue(

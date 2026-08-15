@@ -50,7 +50,7 @@ struct RootView: View {
             if TimeTapRuntime.isUISmoke || TimeTapRuntime.isUnderTest { return }
             if phase == .active {
                 store.pollActive = true
-                store.refreshOnReturn()
+                Task { await store.syncFromCalendar() }
             } else {
                 store.pollActive = false
             }

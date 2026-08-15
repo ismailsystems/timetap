@@ -268,6 +268,9 @@ struct ServerState: Codable {
     var notes: [String]?
     var today: [TodayBlock]?
     var planToday: [TodayBlock]?
+    var distracted: Bool? = nil
+    var distractedAccruedMs: Double? = nil
+    var distractStartMs: Double? = nil
 }
 
 struct ApplyResult: Codable {

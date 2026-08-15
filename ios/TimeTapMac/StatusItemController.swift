@@ -57,15 +57,29 @@ final class StatusItemController: NSObject, NSMenuDelegate {
 
         menu.addItem(.separator())
 
-        let distract = NSMenuItem(title: "Distracted", action: #selector(toggleDistract), keyEquivalent: "")
+        let distract = NSMenuItem(title: "Distracted", action: #selector(toggleDistract), keyEquivalent: "d")
         distract.target = self
         distract.state = store.distracted ? .on : .off
         distract.isEnabled = store.open != nil
         menu.addItem(distract)
 
-        let stop = NSMenuItem(title: "Stop", action: #selector(endDay), keyEquivalent: "")
+        let sit = NSMenuItem(
+            title: store.sit != nil ? "Stand" : "Sit",
+            action: #selector(toggleSit),
+            keyEquivalent: "s"
+        )
+        sit.target = self
+        sit.state = store.sit != nil ? .on : .off
+        menu.addItem(sit)
+
+        let stop = NSMenuItem(title: "Stop", action: #selector(endDay), keyEquivalent: ".")
         stop.target = self
         menu.addItem(stop)
+
+        menu.addItem(.separator())
+        let show = NSMenuItem(title: "Show TimeTap", action: #selector(showWindow), keyEquivalent: "")
+        show.target = self
+        menu.addItem(show)
     }
 
     private func statusLine(_ store: TapStore) -> String {
@@ -83,7 +97,16 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         store?.toggleDistract()
     }
 
+    @objc private func toggleSit() {
+        store?.toggleSit()
+    }
+
     @objc private func endDay() {
         store?.endDay()
+    }
+
+    @objc private func showWindow() {
+        NSApp.activate(ignoringOtherApps: true)
+        NSApp.windows.first { $0.isVisible || $0.canBecomeMain }?.makeKeyAndOrderFront(nil)
     }
 }
